@@ -309,6 +309,50 @@ app.post('/api/billing/cancel', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ============ PROMO CODES ============
+// Redeem a promo code
+app.post('/api/promo/redeem', auth, (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'Enter a promo code' });
+  const promo = db.prepare('SELECT * FROM promo_codes WHERE code=? AND is_active=1').get(code.trim().toUpperCase());
+  if (!promo) return res.status(404).json({ error: 'Invalid promo code' });
+  if (promo.expires_at && new Date(promo.expires_at) < new Date()) return res.status(400).json({ error: 'This code has expired' });
+  if (promo.max_uses > 0 && promo.times_used >= promo.max_uses) return res.status(400).json({ error: 'This code has been fully redeemed' });
+  const existing = db.prepare('SELECT id FROM promo_redemptions WHERE promo_code_id=? AND user_id=?').get(promo.id, req.userId);
+  if (existing) return res.status(400).json({ error: 'You already used this code' });
+
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + (promo.duration_days || 30));
+
+  db.prepare('INSERT INTO promo_redemptions (id, promo_code_id, user_id, expires_at) VALUES (?,?,?,?)').run(uuidv4(), promo.id, req.userId, expiresAt.toISOString());
+  db.prepare('UPDATE promo_codes SET times_used = times_used + 1 WHERE id=?').run(promo.id);
+  db.prepare('UPDATE users SET tier=? WHERE id=?').run(promo.tier, req.userId);
+
+  const token = jwt.sign({ userId: req.userId, tier: promo.tier }, JWT_SECRET, { expiresIn: '30d' });
+  res.json({ success: true, tier: promo.tier, expiresAt: expiresAt.toISOString(), token, message: 'Welcome! You now have ' + promo.tier.toUpperCase() + ' access for ' + promo.duration_days + ' days!' });
+});
+
+// Create a promo code (admin — for Christina)
+app.post('/api/promo/create', auth, (req, res) => {
+  const { code, tier, durationDays, maxUses, expiresAt } = req.body;
+  if (!code || !tier) return res.status(400).json({ error: 'Code and tier required' });
+  const id = uuidv4();
+  try {
+    db.prepare('INSERT INTO promo_codes (id, code, tier, duration_days, max_uses, created_by, expires_at) VALUES (?,?,?,?,?,?,?)')
+      .run(id, code.trim().toUpperCase(), tier, durationDays || 30, maxUses || 0, req.userId, expiresAt || null);
+    res.json({ id, code: code.trim().toUpperCase() });
+  } catch(e) {
+    if (e.message.includes('UNIQUE')) return res.status(409).json({ error: 'Code already exists' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// List promo codes (admin)
+app.get('/api/promo/codes', auth, (req, res) => {
+  const codes = db.prepare('SELECT * FROM promo_codes WHERE created_by=? ORDER BY created_at DESC').all(req.userId);
+  res.json(codes);
+});
+
 // ============ CLAY BODIES ============
 app.get('/api/clay-bodies', auth, (req, res) => {
   res.json(db.prepare('SELECT * FROM clay_bodies WHERE user_id=? ORDER BY name').all(req.userId));

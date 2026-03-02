@@ -894,8 +894,64 @@ async function loadUpgrade() {
       html += '</div>';
     }
 
+    // Promo code section
+    html += '<div class="card mt-24" style="max-width:500px"><h3 style="margin-bottom:12px">🎟️ Have a Promo Code?</h3>' +
+      '<div style="display:flex;gap:8px"><input type="text" class="form-input" id="promoCodeInput" placeholder="Enter code..." style="text-transform:uppercase">' +
+      '<button class="btn btn-primary" onclick="redeemPromo()">Redeem</button></div></div>';
+
+    // Admin promo creation (show for everyone for now — Christina can use it)
+    html += '<div class="card mt-24" style="max-width:500px"><h3 style="margin-bottom:12px">🔧 Create Promo Codes</h3>' +
+      '<div class="form-row"><div class="form-group"><label>Code</label><input type="text" class="form-input" id="newPromoCode" placeholder="e.g., FRIENDS2026" style="text-transform:uppercase"></div>' +
+      '<div class="form-group"><label>Tier</label><select class="form-select" id="newPromoTier"><option value="basic">Basic</option><option value="mid">Mid</option><option value="top">Top</option></select></div></div>' +
+      '<div class="form-row"><div class="form-group"><label>Days</label><input type="number" class="form-input" id="newPromoDays" value="30"></div>' +
+      '<div class="form-group"><label>Max Uses (0=unlimited)</label><input type="number" class="form-input" id="newPromoUses" value="0"></div></div>' +
+      '<button class="btn btn-primary btn-sm" onclick="createPromoCode()">Create Code</button>' +
+      '<div id="promoCodesList" class="mt-16"></div></div>';
+
     document.getElementById('upgradeContent').innerHTML = html;
+    loadPromoCodes();
   } catch(e) { toast(e.message,'error'); }
+}
+
+// Promo code redemption
+async function redeemPromo() {
+  const code = document.getElementById('promoCodeInput').value.trim();
+  if (!code) { toast('Enter a promo code','error'); return; }
+  try {
+    const d = await api('/api/promo/redeem', { method:'POST', body: { code } });
+    toast(d.message, 'success');
+    if (d.token) { token = d.token; localStorage.setItem('mudlog_token', d.token); }
+    const me = await api('/api/auth/me'); currentUser = me.user; showApp(); navigate('upgrade');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// Admin: create promo codes
+async function createPromoCode() {
+  const code = document.getElementById('newPromoCode').value.trim();
+  const tier = document.getElementById('newPromoTier').value;
+  const days = parseInt(document.getElementById('newPromoDays').value) || 30;
+  const uses = parseInt(document.getElementById('newPromoUses').value) || 0;
+  if (!code) { toast('Enter a code','error'); return; }
+  try {
+    const d = await api('/api/promo/create', { method:'POST', body: { code, tier, durationDays: days, maxUses: uses } });
+    toast('Promo code ' + d.code + ' created!', 'success');
+    document.getElementById('newPromoCode').value = '';
+    loadPromoCodes();
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function loadPromoCodes() {
+  try {
+    const codes = await api('/api/promo/codes');
+    const el = document.getElementById('promoCodesList');
+    if (!el) return;
+    if (!codes.length) { el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">No promo codes yet</div>'; return; }
+    el.innerHTML = codes.map(c =>
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">' +
+      '<div><strong>' + esc(c.code) + '</strong> — ' + c.tier.toUpperCase() + ' for ' + c.duration_days + ' days</div>' +
+      '<div class="text-sm" style="color:var(--text-muted)">Used: ' + c.times_used + (c.max_uses > 0 ? '/' + c.max_uses : '/∞') + '</div></div>'
+    ).join('');
+  } catch(e) {}
 }
 
 async function subscribePlan(plan) {

@@ -300,6 +300,32 @@ function initDB() {
       created_at TEXT DEFAULT (datetime('now'))
     );
 
+    -- Promo Codes
+    CREATE TABLE IF NOT EXISTS promo_codes (
+      id TEXT PRIMARY KEY,
+      code TEXT UNIQUE NOT NULL,
+      tier TEXT NOT NULL CHECK(tier IN ('basic', 'mid', 'top')),
+      duration_days INTEGER DEFAULT 30,
+      max_uses INTEGER DEFAULT 1,
+      times_used INTEGER DEFAULT 0,
+      created_by TEXT,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      expires_at TEXT
+    );
+
+    -- Promo Redemptions
+    CREATE TABLE IF NOT EXISTS promo_redemptions (
+      id TEXT PRIMARY KEY,
+      promo_code_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      redeemed_at TEXT DEFAULT (datetime('now')),
+      expires_at TEXT,
+      FOREIGN KEY (promo_code_id) REFERENCES promo_codes(id),
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      UNIQUE(promo_code_id, user_id)
+    );
+
     -- Merchant Orders
     CREATE TABLE IF NOT EXISTS merchant_orders (
       id TEXT PRIMARY KEY,
