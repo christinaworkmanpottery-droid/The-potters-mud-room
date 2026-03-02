@@ -1,0 +1,20 @@
+{
+  "name": "pottery-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A tracking app for potters and ceramicists",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^11.0.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "stripe": "^14.25.0",
+    "uuid": "^9.0.0"
+  }
+}

@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Potter's Mud Room — Track Your Pottery</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏺</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div id="authScreen" class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">🏺</div>
+    <h1 class="auth-title">The Potter's Mud Room</h1>
+    <p class="auth-subtitle">Your pottery journal — clay, glazes &amp; community</p>
+    <form id="authForm">
+      <div id="nameField" class="form-group hidden">
+        <input type="text" id="authName" class="form-input" placeholder="Display name">
+      </div>
+      <div class="form-group">
+        <input type="email" id="authEmail" class="form-input" placeholder="Email" required>
+      </div>
+      <div class="form-group">
+        <input type="password" id="authPassword" class="form-input" placeholder="Password" required minlength="6">
+      </div>
+      <button type="submit" class="btn btn-primary btn-lg" style="width:100%" id="authSubmit">Sign In</button>
+      <div id="authError" class="auth-error hidden"></div>
+    </form>
+    <p class="auth-toggle">
+      <span id="authToggleText">Don't have an account?</span>
+      <a id="authToggleLink" onclick="toggleAuth()">Create one</a>
+    </p>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="mainApp" class="hidden">
+  <nav class="nav">
+    <div class="nav-inner">
+      <div class="nav-brand">🏺 The Potter's <span class="mud">Mud Room</span></div>
+      <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')">☰</button>
+      <div class="nav-links">
+        <button class="nav-link active" data-page="dashboard" onclick="navigate('dashboard')">Dashboard</button>
+        <button class="nav-link" data-page="pieces" onclick="navigate('pieces')">Pieces</button>
+        <button class="nav-link" data-page="clayBodies" onclick="navigate('clayBodies')">Clay</button>
+        <button class="nav-link" data-page="glazes" onclick="navigate('glazes')">Glazes</button>
+        <button class="nav-link" data-page="firings" onclick="navigate('firings')">Firings</button>
+        <button class="nav-link" data-page="sales" onclick="navigate('sales')">Sales</button>
+        <button class="nav-link" data-page="community" onclick="navigate('community')">Community</button>
+        <button class="nav-link" data-page="forum" onclick="navigate('forum')">Forum</button>
+        <button class="nav-link" data-page="shop" onclick="navigate('shop')">Shop</button>
+        <button class="nav-link" data-page="upgrade" onclick="navigate('upgrade')">Plans</button>
+        <button class="nav-link" data-page="profile" onclick="navigate('profile')">Profile</button>
+      </div>
+      <div class="nav-user">
+        <span id="navTier" class="tier-badge tier-free">FREE</span>
+        <button class="btn-ghost" onclick="logout()" title="Sign out" style="color:rgba(255,255,255,0.7)">Sign Out</button>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <!-- DASHBOARD -->
+    <div id="pageDashboard" class="page active">
+      <div class="page-header">
+        <h1>🏺 Dashboard</h1>
+        <button class="btn btn-primary" onclick="openPieceModal()">+ New Piece</button>
+      </div>
+      <div id="upgradeBanner" class="upgrade-banner hidden">
+        <div><strong style="color:var(--primary)">Free tier:</strong> <span id="pieceCountText">0/20 pieces</span></div>
+      </div>
+      <div class="stats-row">
+        <div class="stat-box"><div class="stat-number" id="statPieces">0</div><div class="stat-label">Pieces</div></div>
+        <div class="stat-box"><div class="stat-number" id="statClays">0</div><div class="stat-label">Clay Bodies</div></div>
+        <div class="stat-box"><div class="stat-number" id="statGlazes">0</div><div class="stat-label">Glazes</div></div>
+        <div class="stat-box" id="statSalesBox"><div class="stat-number" id="statSales">$0</div><div class="stat-label">Total Sales</div></div>
+      </div>
+      <h2 class="mb-16">Recent Pieces</h2>
+      <div id="recentPieces" class="card-grid"></div>
+      <div id="dashboardEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">🏺</div>
+        <div class="empty-state-title">Welcome to your studio!</div>
+        <p>Start by adding your clay bodies and glazes, then log your first piece.</p>
+        <button class="btn btn-primary mt-16" onclick="openPieceModal()">+ Add Your First Piece</button>
+      </div>
+    </div>
+
+    <!-- PIECES LIST -->
+    <div id="pagePieces" class="page">
+      <div class="page-header">
+        <h1>My Pieces</h1>
+        <button class="btn btn-primary" onclick="openPieceModal()">+ New Piece</button>
+      </div>
+      <div class="filter-bar">
+        <input type="text" class="form-input" placeholder="Search pieces..." id="pieceSearch" oninput="debounceLoadPieces()">
+        <select class="form-select" id="pieceStatusFilter" onchange="loadPieces()">
+          <option value="">All statuses</option>
+          <option value="in-progress">In Progress</option>
+          <option value="leather-hard">Leather Hard</option>
+          <option value="bone-dry">Bone Dry</option>
+          <option value="bisque-fired">Bisque Fired</option>
+          <option value="glazed">Glazed</option>
+          <option value="glaze-fired">Glaze Fired</option>
+          <option value="done">Done</option>
+          <option value="sold">Sold</option>
+        </select>
+      </div>
+      <div id="piecesList" class="card-grid"></div>
+      <div id="piecesEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">✨</div>
+        <div class="empty-state-title">No pieces found</div>
+        <p>Log your first piece to start tracking.</p>
+      </div>
+    </div>
+
+    <!-- PIECE DETAIL -->
+    <div id="pagePieceDetail" class="page">
+      <button class="detail-back" onclick="navigate('pieces')">← Back to Pieces</button>
+      <div id="pieceDetailContent"></div>
+    </div>
+
+    <!-- CLAY BODIES -->
+    <div id="pageClayBodies" class="page">
+      <div class="page-header">
+        <h1>Clay Bodies</h1>
+        <button class="btn btn-primary" onclick="openClayModal()">+ Add Clay</button>
+      </div>
+      <div id="clayList" class="card-grid"></div>
+      <div id="clayEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">🪨</div>
+        <div class="empty-state-title">No clay bodies yet</div>
+        <p>Add the clays you work with.</p>
+      </div>
+    </div>
+
+    <!-- GLAZES -->
+    <div id="pageGlazes" class="page">
+      <div class="page-header">
+        <h1>Glazes</h1>
+        <button class="btn btn-primary" onclick="openGlazeModal()">+ Add Glaze</button>
+      </div>
+      <div id="glazeList" class="card-grid"></div>
+      <div id="glazeEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">🎨</div>
+        <div class="empty-state-title">No glazes yet</div>
+        <p>Add your commercial glazes or recipes.</p>
+      </div>
+    </div>
+
+    <!-- FIRINGS -->
+    <div id="pageFirings" class="page">
+      <div class="page-header">
+        <h1>Firing Logs</h1>
+        <button class="btn btn-primary" onclick="openFiringModal()">+ Log Firing</button>
+      </div>
+      <div id="firingList" class="card-grid"></div>
+      <div id="firingEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">🔥</div>
+        <div class="empty-state-title">No firing logs</div>
+        <p>Track your firings to remember what worked.</p>
+      </div>
+    </div>
+
+    <!-- SALES -->
+    <div id="pageSales" class="page">
+      <div class="page-header">
+        <h1>Sales</h1>
+        <button class="btn btn-primary" onclick="openSaleModal()">+ Log Sale</button>
+      </div>
+      <div id="salesSummary" class="stats-row"></div>
+      <div id="salesList" class="card-grid"></div>
+      <div id="salesEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">💰</div>
+        <div class="empty-state-title">No sales yet</div>
+        <p>Track your sales revenue here.</p>
+      </div>
+    </div>
+
+    <!-- COMMUNITY -->
+    <div id="pageCommunity" class="page">
+      <div class="page-header">
+        <h1>Community Glaze Library</h1>
+        <button class="btn btn-primary" onclick="openComboModal()">+ Share Combo</button>
+      </div>
+      <div class="filter-bar">
+        <input type="text" class="form-input" placeholder="Search combos..." id="comboSearch" oninput="debounceLoadCombos()">
+        <select class="form-select" id="comboConeFilter" onchange="loadCombos()">
+          <option value="">Any cone</option>
+          <option value="06">Cone 06</option>
+          <option value="6">Cone 6</option>
+          <option value="10">Cone 10</option>
+        </select>
+      </div>
+      <div id="comboList" class="card-grid"></div>
+      <div id="communityEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">🌍</div>
+        <div class="empty-state-title">Community Glaze Library</div>
+        <p>Browse and share glaze combos with other potters.</p>
+      </div>
+    </div>
+
+    <!-- FORUM -->
+    <div id="pageForum" class="page">
+      <div class="page-header">
+        <h1>The Mud Room Forum</h1>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span id="tokenBalance" class="piece-meta-tag">🪙 0 tokens</span>
+          <button class="btn btn-primary" onclick="openForumPostModal()">+ New Post</button>
+        </div>
+      </div>
+      <div class="filter-bar">
+        <input type="text" class="form-input" placeholder="Search the forum..." id="forumSearch" oninput="debounceLoadForum()">
+        <select class="form-select" id="forumCategoryFilter" onchange="loadForumPosts()">
+          <option value="">All Categories</option>
+        </select>
+      </div>
+      <div id="forumCategories" class="stats-row mb-16"></div>
+      <div id="forumPosts"></div>
+      <div id="forumEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">💬</div>
+        <div class="empty-state-title">Welcome to The Mud Room!</div>
+        <p>Start a conversation — ask questions, share your work, help other potters.</p>
+      </div>
+    </div>
+
+    <!-- FORUM POST DETAIL -->
+    <div id="pageForumPost" class="page">
+      <button class="detail-back" onclick="navigate('forum')">← Back to Forum</button>
+      <div id="forumPostContent"></div>
+    </div>
+
+    <!-- SHOP -->
+    <div id="pageShop" class="page">
+      <div class="page-header">
+        <h1>🛍️ The Mud Room Shop</h1>
+      </div>
+      <div id="shopProducts" class="card-grid"></div>
+    </div>
+
+    <!-- UPGRADE / PLANS -->
+    <div id="pageUpgrade" class="page">
+      <div class="page-header">
+        <h1>Choose Your Plan</h1>
+      </div>
+      <div id="upgradeContent"></div>
+    </div>
+
+    <!-- PROFILE -->
+    <div id="pageProfile" class="page">
+      <div class="page-header">
+        <h1>My Profile</h1>
+      </div>
+      <div class="detail-grid">
+        <div class="card">
+          <h3 style="margin-bottom:16px">About You</h3>
+          <div class="form-group">
+            <label>Display Name</label>
+            <input type="text" class="form-input" id="profileName" placeholder="Your name">
+          </div>
+          <div class="form-group">
+            <label>Bio</label>
+            <textarea class="form-textarea" id="profileBio" placeholder="Tell other potters about yourself..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>Location</label>
+            <input type="text" class="form-input" id="profileLocation" placeholder="City, State or Country">
+          </div>
+          <div class="form-group">
+            <label>Website</label>
+            <input type="text" class="form-input" id="profileWebsite" placeholder="https://...">
+          </div>
+          <div class="form-group">
+            <label><input type="checkbox" id="profilePrivate"> Make my profile private</label>
+          </div>
+          <button class="btn btn-primary" onclick="saveProfile()">Save Profile</button>
+        </div>
+        <div class="card">
+          <h3 style="margin-bottom:16px">Preferences</h3>
+          <div class="form-group">
+            <label>Measurement System</label>
+            <select class="form-select" id="profileUnits">
+              <option value="imperial">Imperial (inches, lbs, °F)</option>
+              <option value="metric">Metric (cm, kg, °C)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Temperature</label>
+            <select class="form-select" id="profileTemp">
+              <option value="fahrenheit">Fahrenheit (°F)</option>
+              <option value="celsius">Celsius (°C)</option>
+            </select>
+          </div>
+          <h3 style="margin:24px 0 16px">Forum Tokens</h3>
+          <div id="profileTokenInfo"></div>
+          <h3 style="margin:24px 0 16px">Subscription</h3>
+          <div id="profileTierInfo"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PIECE MODAL -->
+<div id="pieceModal" class="modal-overlay" onclick="if(event.target===this)closeModal('pieceModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="pieceModalTitle">Add New Piece</h2>
+      <button class="modal-close" onclick="closeModal('pieceModal')">&times;</button>
+    </div>
+    <form id="pieceForm" onsubmit="savePiece(event)">
+      <input type="hidden" id="pieceId">
+      <div class="form-group">
+        <label>Title</label>
+        <input type="text" class="form-input" id="pieceTitle" placeholder="e.g., Small bowl with speckled glaze">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Clay Body</label>
+          <select class="form-select" id="pieceClay"><option value="">Select clay...</option></select>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select class="form-select" id="pieceStatus">
+            <option value="in-progress">In Progress</option>
+            <option value="leather-hard">Leather Hard</option>
+            <option value="bone-dry">Bone Dry</option>
+            <option value="bisque-fired">Bisque Fired</option>
+            <option value="glazed">Glazed</option>
+            <option value="glaze-fired">Glaze Fired</option>
+            <option value="done">Done</option>
+            <option value="sold">Sold</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Technique</label>
+          <select class="form-select" id="pieceTechnique">
+            <option value="">Select...</option>
+            <option value="wheel-thrown">Wheel Thrown</option>
+            <option value="hand-built">Hand Built</option>
+            <option value="slab">Slab</option>
+            <option value="coil">Coil</option>
+            <option value="pinch">Pinch</option>
+            <option value="slip-cast">Slip Cast</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Form</label>
+          <input type="text" class="form-input" id="pieceForm_" placeholder="e.g., bowl, mug, plate">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Studio</label>
+          <input type="text" class="form-input" id="pieceStudio" placeholder="Which studio?">
+        </div>
+        <div class="form-group">
+          <label>Date Started</label>
+          <input type="date" class="form-input" id="pieceDateStarted">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Glazes Used</label>
+        <div id="pieceGlazeSelectors"></div>
+        <button type="button" class="btn btn-secondary btn-sm mt-8" onclick="addGlazeSelector()">+ Add Glaze</button>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea class="form-textarea" id="pieceNotes" placeholder="Any notes about this piece..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('pieceModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Piece</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- CLAY MODAL -->
+<div id="clayModal" class="modal-overlay" onclick="if(event.target===this)closeModal('clayModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="clayModalTitle">Add Clay Body</h2>
+      <button class="modal-close" onclick="closeModal('clayModal')">&times;</button>
+    </div>
+    <form id="clayForm" onsubmit="saveClay(event)">
+      <input type="hidden" id="clayId">
+      <div class="form-group">
+        <label>Name *</label>
+        <input type="text" class="form-input" id="clayName" placeholder="e.g., Standard 266" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Brand / Supplier</label>
+          <input type="text" class="form-input" id="clayBrand" placeholder="e.g., Standard Ceramic">
+        </div>
+        <div class="form-group">
+          <label>Type</label>
+          <select class="form-select" id="clayType">
+            <option value="">Select...</option>
+            <option value="stoneware">Stoneware</option>
+            <option value="porcelain">Porcelain</option>
+            <option value="earthenware">Earthenware</option>
+            <option value="terracotta">Terracotta</option>
+            <option value="raku">Raku</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Color (wet)</label>
+          <input type="text" class="form-input" id="clayColorWet" placeholder="e.g., Dark brown">
+        </div>
+        <div class="form-group">
+          <label>Color (fired)</label>
+          <input type="text" class="form-input" id="clayColorFired" placeholder="e.g., Warm buff">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Cone Range</label>
+          <input type="text" class="form-input" id="clayConeRange" placeholder="e.g., 6-10">
+        </div>
+        <div class="form-group">
+          <label>Shrinkage %</label>
+          <input type="number" step="0.1" class="form-input" id="clayShrinkage" placeholder="e.g., 12.5">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Cost per Bag</label>
+          <input type="number" step="0.01" class="form-input" id="clayCost" placeholder="$">
+        </div>
+        <div class="form-group">
+          <label>Bag Weight</label>
+          <input type="text" class="form-input" id="clayWeight" placeholder="e.g., 25 lbs">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea class="form-textarea" id="clayNotes" placeholder="Notes about this clay..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('clayModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Clay</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- GLAZE MODAL -->
+<div id="glazeModal" class="modal-overlay" onclick="if(event.target===this)closeModal('glazeModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="glazeModalTitle">Add Glaze</h2>
+      <button class="modal-close" onclick="closeModal('glazeModal')">&times;</button>
+    </div>
+    <form id="glazeForm" onsubmit="saveGlaze(event)">
+      <input type="hidden" id="glazeId">
+      <div class="form-group">
+        <label>Name *</label>
+        <input type="text" class="form-input" id="glazeName" placeholder="e.g., Amaco Celadon" required>
+      </div>
+      <div class="form-group">
+        <label>Type</label>
+        <select class="form-select" id="glazeType" onchange="toggleRecipeFields()">
+          <option value="commercial">Commercial / Store Bought</option>
+          <option value="recipe">Recipe (mix your own)</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Brand</label>
+          <input type="text" class="form-input" id="glazeBrand" placeholder="e.g., Amaco, Mayco">
+        </div>
+        <div class="form-group">
+          <label>SKU / Product #</label>
+          <input type="text" class="form-input" id="glazeSku" placeholder="e.g., C-41">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Color Description</label>
+          <input type="text" class="form-input" id="glazeColor" placeholder="e.g., Deep blue with brown speckles">
+        </div>
+        <div class="form-group">
+          <label>Cone Range</label>
+          <input type="text" class="form-input" id="glazeCone" placeholder="e.g., 6">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Atmosphere</label>
+          <select class="form-select" id="glazeAtmosphere">
+            <option value="">Any</option>
+            <option value="oxidation">Oxidation</option>
+            <option value="reduction">Reduction</option>
+            <option value="neutral">Neutral</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Surface</label>
+          <select class="form-select" id="glazeSurface">
+            <option value="">Select...</option>
+            <option value="gloss">Gloss</option>
+            <option value="satin">Satin</option>
+            <option value="matte">Matte</option>
+            <option value="crystal">Crystal</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div id="recipeFields" class="hidden">
+        <div class="form-group">
+          <label>Recipe Ingredients</label>
+          <div id="ingredientList"></div>
+          <button type="button" class="btn btn-secondary btn-sm mt-8" onclick="addIngredient()">+ Add Ingredient</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea class="form-textarea" id="glazeNotes" placeholder="Notes about this glaze..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('glazeModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Glaze</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- FIRING MODAL -->
+<div id="firingModal" class="modal-overlay" onclick="if(event.target===this)closeModal('firingModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Log Firing</h2>
+      <button class="modal-close" onclick="closeModal('firingModal')">&times;</button>
+    </div>
+    <form id="firingForm" onsubmit="saveFiring(event)">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Firing Type</label>
+          <select class="form-select" id="firingType">
+            <option value="bisque">Bisque</option>
+            <option value="glaze">Glaze</option>
+            <option value="raku">Raku</option>
+            <option value="pit">Pit Fire</option>
+            <option value="wood">Wood Fire</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" class="form-input" id="firingDate">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Cone</label>
+          <input type="text" class="form-input" id="firingCone" placeholder="e.g., 6">
+        </div>
+        <div class="form-group">
+          <label>Atmosphere</label>
+          <select class="form-select" id="firingAtmosphere">
+            <option value="">Select...</option>
+            <option value="oxidation">Oxidation</option>
+            <option value="reduction">Reduction</option>
+            <option value="neutral">Neutral</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Kiln</label>
+          <input type="text" class="form-input" id="firingKiln" placeholder="Kiln name/location">
+        </div>
+        <div class="form-group">
+          <label>Piece</label>
+          <select class="form-select" id="firingPiece"><option value="">Select piece...</option></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Firing Speed</label>
+          <select class="form-select" id="firingSpeed">
+            <option value="">Select...</option>
+            <option value="slow">Slow</option>
+            <option value="medium">Medium</option>
+            <option value="fast">Fast</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Hold Used?</label>
+          <select class="form-select" id="firingHoldUsed" onchange="document.getElementById('firingHoldDuration').parentElement.classList.toggle('hidden', this.value!=='1')">
+            <option value="0">No</option>
+            <option value="1">Yes</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group hidden" id="firingHoldDurationGroup">
+        <label>Hold Duration</label>
+        <input type="text" class="form-input" id="firingHoldDuration" placeholder="e.g., 15 min, 1 hour">
+      </div>
+      <div class="form-group">
+        <label>Results / Notes</label>
+        <textarea class="form-textarea" id="firingNotes" placeholder="How did it go?"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('firingModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Firing</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- SALE MODAL -->
+<div id="saleModal" class="modal-overlay" onclick="if(event.target===this)closeModal('saleModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Log Sale</h2>
+      <button class="modal-close" onclick="closeModal('saleModal')">&times;</button>
+    </div>
+    <form id="saleForm" onsubmit="saveSale(event)">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Piece</label>
+          <select class="form-select" id="salePiece"><option value="">Select piece...</option></select>
+        </div>
+        <div class="form-group">
+          <label>Price ($)</label>
+          <input type="number" step="0.01" class="form-input" id="salePrice" placeholder="0.00" required>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" class="form-input" id="saleDate">
+        </div>
+        <div class="form-group">
+          <label>Venue Type</label>
+          <select class="form-select" id="saleVenueType">
+            <option value="">Select...</option>
+            <option value="online">Online</option>
+            <option value="art-fair">Art Fair</option>
+            <option value="gallery">Gallery</option>
+            <option value="studio">Studio Sale</option>
+            <option value="commission">Commission</option>
+            <option value="gift">Gift</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Venue / Notes</label>
+        <input type="text" class="form-input" id="saleVenue" placeholder="e.g., Etsy, Holiday Market">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('saleModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Sale</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- COMBO MODAL -->
+<div id="comboModal" class="modal-overlay" onclick="if(event.target===this)closeModal('comboModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Share Glaze Combo</h2>
+      <button class="modal-close" onclick="closeModal('comboModal')">&times;</button>
+    </div>
+    <form id="comboForm" onsubmit="saveCombo(event)">
+      <div class="form-group">
+        <label>Combo Name *</label>
+        <input type="text" class="form-input" id="comboName" placeholder="e.g., Ocean Blue over Tenmoku" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Clay Body</label>
+          <input type="text" class="form-input" id="comboClay" placeholder="What clay was it on?">
+        </div>
+        <div class="form-group">
+          <label>Cone</label>
+          <input type="text" class="form-input" id="comboCone" placeholder="e.g., 6">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Glaze Layers</label>
+        <div id="comboLayers"></div>
+        <button type="button" class="btn btn-secondary btn-sm mt-8" onclick="addComboLayer()">+ Add Layer</button>
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea class="form-textarea" id="comboDesc" placeholder="Describe the result..."></textarea>
+      </div>
+      <div class="form-group">
+        <label><input type="checkbox" id="comboShared" checked> Share with community</label>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('comboModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Combo</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- PHOTO UPLOAD MODAL -->
+<div id="photoModal" class="modal-overlay" onclick="if(event.target===this)closeModal('photoModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Add Photo</h2>
+      <button class="modal-close" onclick="closeModal('photoModal')">&times;</button>
+    </div>
+    <form id="photoForm" onsubmit="uploadPhoto(event)">
+      <input type="hidden" id="photoPieceId">
+      <div class="form-group">
+        <label>Stage</label>
+        <select class="form-select" id="photoStage">
+          <option value="wet">Wet / Just Made</option>
+          <option value="leather-hard">Leather Hard</option>
+          <option value="bone-dry">Bone Dry</option>
+          <option value="bisque">Bisque Fired</option>
+          <option value="glazed">Glazed (before firing)</option>
+          <option value="finished">Finished</option>
+          <option value="detail">Detail Shot</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <div class="photo-upload-zone" id="photoDropZone" onclick="document.getElementById('photoFile').click()">
+          <div>📸</div>
+          <div class="mt-8">Click or drag a photo here</div>
+          <div class="text-sm" style="color:var(--text-muted)">JPG, PNG, WebP up to 10MB</div>
+        </div>
+        <input type="file" id="photoFile" accept="image/*" class="hidden" onchange="handlePhotoSelect(this)">
+        <div id="photoPreview" class="hidden mt-8"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('photoModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="photoSubmitBtn" disabled>Upload Photo</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- FORUM POST MODAL -->
+<div id="forumPostModal" class="modal-overlay" onclick="if(event.target===this)closeModal('forumPostModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>New Forum Post</h2>
+      <button class="modal-close" onclick="closeModal('forumPostModal')">&times;</button>
+    </div>
+    <form id="forumPostForm" onsubmit="saveForumPost(event)">
+      <div class="form-group">
+        <label>Category</label>
+        <select class="form-select" id="forumPostCategory"></select>
+      </div>
+      <div class="form-group">
+        <label>Title *</label>
+        <input type="text" class="form-input" id="forumPostTitle" placeholder="What's on your mind?" required>
+      </div>
+      <div class="form-group">
+        <label>Post *</label>
+        <textarea class="form-textarea" id="forumPostBody" placeholder="Share your thoughts, ask a question, show your work..." required style="min-height:120px"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Photos (optional, up to 3)</label>
+        <input type="file" id="forumPostPhotos" accept="image/*" multiple class="form-input">
+      </div>
+      <div class="text-sm" style="color:var(--text-muted)">🪙 This will use 1 forum token</div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('forumPostModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Post</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
