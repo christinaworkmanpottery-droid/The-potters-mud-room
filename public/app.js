@@ -899,14 +899,16 @@ async function loadUpgrade() {
       '<div style="display:flex;gap:8px"><input type="text" class="form-input" id="promoCodeInput" placeholder="Enter code..." style="text-transform:uppercase">' +
       '<button class="btn btn-primary" onclick="redeemPromo()">Redeem</button></div></div>';
 
-    // Admin promo creation (show for everyone for now — Christina can use it)
-    html += '<div class="card mt-24" style="max-width:500px"><h3 style="margin-bottom:12px">🔧 Create Promo Codes</h3>' +
-      '<div class="form-row"><div class="form-group"><label>Code</label><input type="text" class="form-input" id="newPromoCode" placeholder="e.g., FRIENDS2026" style="text-transform:uppercase"></div>' +
-      '<div class="form-group"><label>Tier</label><select class="form-select" id="newPromoTier"><option value="basic">Basic</option><option value="mid">Mid</option><option value="top">Top</option></select></div></div>' +
-      '<div class="form-row"><div class="form-group"><label>Days</label><input type="number" class="form-input" id="newPromoDays" value="30"></div>' +
-      '<div class="form-group"><label>Max Uses (0=unlimited)</label><input type="number" class="form-input" id="newPromoUses" value="0"></div></div>' +
-      '<button class="btn btn-primary btn-sm" onclick="createPromoCode()">Create Code</button>' +
-      '<div id="promoCodesList" class="mt-16"></div></div>';
+    // Admin promo creation (only for admin - Christina)
+    if (currentUser?.email === 'christinaworkmanpottery@gmail.com') {
+      html += '<div class="card mt-24" style="max-width:500px"><h3 style="margin-bottom:12px">🔧 Create Promo Codes (Admin)</h3>' +
+        '<div class="form-row"><div class="form-group"><label>Code</label><input type="text" class="form-input" id="newPromoCode" placeholder="e.g., FRIENDS2026" style="text-transform:uppercase"></div>' +
+        '<div class="form-group"><label>Tier</label><select class="form-select" id="newPromoTier"><option value="basic">Basic</option><option value="mid">Mid</option><option value="top">Top</option></select></div></div>' +
+        '<div class="form-row"><div class="form-group"><label>Days</label><input type="number" class="form-input" id="newPromoDays" value="30"></div>' +
+        '<div class="form-group"><label>Max Uses (0=unlimited)</label><input type="number" class="form-input" id="newPromoUses" value="0"></div></div>' +
+        '<button class="btn btn-primary btn-sm" onclick="createPromoCode()">Create Code</button>' +
+        '<div id="promoCodesList" class="mt-16"></div></div>';
+    }
 
     document.getElementById('upgradeContent').innerHTML = html;
     loadPromoCodes();

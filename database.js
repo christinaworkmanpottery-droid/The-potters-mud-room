@@ -29,6 +29,10 @@ function initDB() {
       unlimited_tokens_until TEXT,
       stripe_customer_id TEXT,
       stripe_subscription_id TEXT,
+      billing_period TEXT DEFAULT 'monthly' CHECK(billing_period IN ('monthly', 'yearly', 'promo')),
+      plan_expires_at TEXT,
+      referral_code TEXT UNIQUE,
+      referred_by TEXT,
       unit_system TEXT DEFAULT 'imperial' CHECK(unit_system IN ('imperial', 'metric')),
       temp_unit TEXT DEFAULT 'fahrenheit' CHECK(temp_unit IN ('fahrenheit', 'celsius')),
       created_at TEXT DEFAULT (datetime('now')),
@@ -324,6 +328,17 @@ function initDB() {
       FOREIGN KEY (promo_code_id) REFERENCES promo_codes(id),
       FOREIGN KEY (user_id) REFERENCES users(id),
       UNIQUE(promo_code_id, user_id)
+    );
+
+    -- Referral Rewards
+    CREATE TABLE IF NOT EXISTS referral_rewards (
+      id TEXT PRIMARY KEY,
+      referrer_id TEXT NOT NULL,
+      referred_id TEXT NOT NULL,
+      tokens_awarded INTEGER DEFAULT 5,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (referrer_id) REFERENCES users(id),
+      FOREIGN KEY (referred_id) REFERENCES users(id)
     );
 
     -- Merchant Orders

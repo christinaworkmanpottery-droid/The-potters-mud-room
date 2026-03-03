@@ -129,11 +129,21 @@ function getPieceCount(uid) { return db.prepare('SELECT COUNT(*) as c FROM piece
 // ============ AUTH ============
 app.post('/api/auth/register', (req, res) => {
   try {
-    const { email, password, displayName } = req.body;
+    const { email, password, displayName, referralCode } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
     if (db.prepare('SELECT id FROM users WHERE email=?').get(email)) return res.status(409).json({ error: 'Email already registered' });
     const id = uuidv4(), hash = bcrypt.hashSync(password, 10);
-    db.prepare('INSERT INTO users (id,email,password_hash,display_name) VALUES (?,?,?,?)').run(id, email, hash, displayName || email.split('@')[0]);
+    const myReferralCode = (displayName || email.split('@')[0]).replace(/[^a-zA-Z0-9]/g, '').toUpperCase().substring(0, 8) + Math.random().toString(36).substring(2, 6).toUpperCase();
+    let referredBy = null;
+    if (referralCode) {
+      const referrer = db.prepare('SELECT id FROM users WHERE referral_code=?').get(referralCode.trim().toUpperCase());
+      if (referrer) {
+        referredBy = referrer.id;
+        db.prepare('UPDATE users SET forum_tokens = forum_tokens + 5 WHERE id=?').run(referrer.id);
+        db.prepare('INSERT INTO referral_rewards (id, referrer_id, referred_id, tokens_awarded) VALUES (?,?,?,?)').run(uuidv4(), referrer.id, id, 5);
+      }
+    }
+    db.prepare('INSERT INTO users (id,email,password_hash,display_name,referral_code,referred_by) VALUES (?,?,?,?,?,?)').run(id, email, hash, displayName || email.split('@')[0], myReferralCode, referredBy);
     const token = jwt.sign({ userId: id, tier: 'free' }, JWT_SECRET, { expiresIn: '30d' });
     res.json({ token, user: { id, email, displayName: displayName || email.split('@')[0], tier: 'free' } });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -150,9 +160,10 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.get('/api/auth/me', auth, (req, res) => {
-  const u = db.prepare('SELECT id,email,display_name,bio,location,website,avatar_filename,is_private,tier,forum_tokens,unlimited_tokens_until,unit_system,temp_unit,created_at FROM users WHERE id=?').get(req.userId);
+  const u = db.prepare('SELECT id,email,display_name,bio,location,website,avatar_filename,is_private,tier,forum_tokens,unlimited_tokens_until,unit_system,temp_unit,billing_period,plan_expires_at,referral_code,created_at FROM users WHERE id=?').get(req.userId);
   if (!u) return res.status(404).json({ error: 'Not found' });
-  res.json({ user: { ...u, displayName: u.display_name, pieceCount: getPieceCount(req.userId) } });
+  const referralCount = db.prepare('SELECT COUNT(*) as c FROM referral_rewards WHERE referrer_id=?').get(req.userId).c;
+  res.json({ user: { ...u, displayName: u.display_name, pieceCount: getPieceCount(req.userId), referralCount } });
 });
 
 // ============ USER PROFILE ============
@@ -194,7 +205,10 @@ app.delete('/api/block/:userId', auth, (req, res) => {
 const PRICE_CONFIG = {
   basic: { amount: 995, name: "Basic Plan — $9.95/mo" },
   mid: { amount: 1295, name: "Mid Plan — $12.95/mo" },
-  top: { amount: 1995, name: "Top Plan — $19.95/mo" }
+  top: { amount: 1995, name: "Top Plan — $19.95/mo" },
+  'basic-yearly': { amount: 9500, name: "Basic Plan — $95/year (save $24.40!)", tier: 'basic' },
+  'mid-yearly': { amount: 12500, name: "Mid Plan — $125/year (save $30.40!)", tier: 'mid' },
+  'top-yearly': { amount: 19000, name: "Top Plan — $190/year (save $49.40!)", tier: 'top' }
 };
 const TOKEN_PACKS = {
   pack20: { amount: 299, tokens: 20, name: "20 Forum Tokens" },
@@ -205,10 +219,10 @@ const TOKEN_PACKS = {
 app.get('/api/billing/plans', (req, res) => {
   res.json({
     plans: [
-      { id: 'free', name: 'Free', price: 0, features: ['20 pieces', '1 photo each', 'Personal clay & glaze library', 'Basic search'] },
-      { id: 'basic', name: 'Basic', price: 9.95, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Forum access (read)'] },
-      { id: 'mid', name: 'Mid', price: 12.95, features: ['Everything in Basic', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', "Potter's Cheat Sheet", 'Forum access (read)'] },
-      { id: 'top', name: 'Top', price: 19.95, features: ['Everything in Mid', 'Community Glaze Library', 'Sales tracking', 'Import/export data', 'Forum access (read)', '10 free tokens/month'] }
+      { id: 'free', name: 'Free', price: 0, yearlyPrice: 0, features: ['20 pieces', '1 photo each', 'Personal clay & glaze library', 'Basic search', 'Forum (browse only)', 'Can buy tokens to post'] },
+      { id: 'basic', name: 'Basic', price: 9.95, yearlyPrice: 95.00, yearlySavings: 24.40, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Forum access (read & post with tokens)', 'Cancel anytime'] },
+      { id: 'mid', name: 'Mid', price: 12.95, yearlyPrice: 125.00, yearlySavings: 30.40, features: ['Everything in Basic', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', "Potter's Cheat Sheet", 'Cancel anytime'] },
+      { id: 'top', name: 'Top', price: 19.95, yearlyPrice: 190.00, yearlySavings: 49.40, features: ['Everything in Mid', 'Community Glaze Library', 'Sales tracking', 'Import/export data', '10 free tokens/month', 'Cancel anytime'] }
     ],
     tokenPacks: [
       { id: 'pack20', tokens: 20, price: 2.99 },
@@ -225,6 +239,8 @@ app.post('/api/billing/checkout', auth, async (req, res) => {
   const { plan } = req.body;
   const config = PRICE_CONFIG[plan];
   if (!config) return res.status(400).json({ error: 'Invalid plan' });
+  const isYearly = plan.includes('-yearly');
+  const actualTier = config.tier || plan;
 
   try {
     const session = await stripe.checkout.sessions.create({
@@ -233,14 +249,14 @@ app.post('/api/billing/checkout', auth, async (req, res) => {
       line_items: [{
         price_data: {
           currency: 'usd',
-          recurring: { interval: 'month' },
+          recurring: { interval: isYearly ? 'year' : 'month' },
           product_data: { name: config.name },
           unit_amount: config.amount,
         },
         quantity: 1,
       }],
-      metadata: { userId: req.userId, purchaseType: 'subscription', tier: plan },
-      success_url: `${APP_URL}?upgraded=${plan}`,
+      metadata: { userId: req.userId, purchaseType: 'subscription', tier: actualTier, billing: isYearly ? 'yearly' : 'monthly' },
+      success_url: `${APP_URL}?upgraded=${actualTier}`,
       cancel_url: `${APP_URL}?cancelled=true`,
     });
     res.json({ url: session.url });
@@ -603,14 +619,14 @@ app.post('/api/community/combos', auth, requireTier('top'), (req, res) => {
 });
 
 // ============ FORUM ============
-app.get('/api/forum/categories', auth, requireTier('basic'), (req, res) => {
+app.get('/api/forum/categories', auth, (req, res) => {
   const cats = db.prepare('SELECT * FROM forum_categories ORDER BY sort_order').all();
   const countPosts = db.prepare('SELECT COUNT(*) as c FROM forum_posts WHERE category_id=?');
   cats.forEach(c => { c.postCount = countPosts.get(c.id).c; });
   res.json(cats);
 });
 
-app.get('/api/forum/posts', auth, requireTier('basic'), (req, res) => {
+app.get('/api/forum/posts', auth, (req, res) => {
   const { categoryId, search, limit, offset } = req.query;
   let sql = `SELECT fp.*,u.display_name as author_name,u.avatar_filename as author_avatar,fc.name as category_name
     FROM forum_posts fp JOIN users u ON fp.user_id=u.id LEFT JOIN forum_categories fc ON fp.category_id=fc.id WHERE 1=1`;
@@ -629,7 +645,7 @@ app.get('/api/forum/posts', auth, requireTier('basic'), (req, res) => {
   res.json(posts);
 });
 
-app.get('/api/forum/posts/:id', auth, requireTier('basic'), (req, res) => {
+app.get('/api/forum/posts/:id', auth, (req, res) => {
   const post = db.prepare(`SELECT fp.*,u.display_name as author_name,u.avatar_filename as author_avatar
     FROM forum_posts fp JOIN users u ON fp.user_id=u.id WHERE fp.id=?`).get(req.params.id);
   if (!post) return res.status(404).json({ error: 'Not found' });
@@ -663,7 +679,7 @@ function useToken(userId) {
   return false;
 }
 
-app.post('/api/forum/posts', auth, requireTier('basic'), upload.array('photos', 3), (req, res) => {
+app.post('/api/forum/posts', auth, upload.array('photos', 3), (req, res) => {
   if (!canPost(req.userId)) return res.status(403).json({ error: 'You need forum tokens to post. Purchase tokens to participate!' });
   const { title, body, categoryId } = req.body;
   if (!title || !body) return res.status(400).json({ error: 'Title and body required' });
@@ -677,7 +693,7 @@ app.post('/api/forum/posts', auth, requireTier('basic'), upload.array('photos', 
   res.json({ id });
 });
 
-app.post('/api/forum/posts/:id/reply', auth, requireTier('basic'), upload.array('photos', 3), (req, res) => {
+app.post('/api/forum/posts/:id/reply', auth, upload.array('photos', 3), (req, res) => {
   if (!canPost(req.userId)) return res.status(403).json({ error: 'You need forum tokens to reply. Purchase tokens to participate!' });
   const { body } = req.body;
   if (!body) return res.status(400).json({ error: 'Reply body required' });
