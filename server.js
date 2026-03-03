@@ -387,7 +387,7 @@ app.post('/api/promo/create', auth, (req, res) => {
   const id = uuidv4();
   try {
     db.prepare('INSERT INTO promo_codes (id, code, promo_type, tier, token_amount, duration_days, max_uses, created_by, expires_at) VALUES (?,?,?,?,?,?,?,?,?)')
-      .run(id, code.trim().toUpperCase(), type, type === 'tier' ? tier : null, type === 'tokens' ? (tokenAmount || 0) : 0, durationDays || 30, maxUses || 0, req.userId, expiresAt || null);
+      .run(id, code.trim().toUpperCase(), type, type === 'tier' ? tier : 'free', type === 'tokens' ? (tokenAmount || 0) : 0, durationDays || 30, maxUses || 0, req.userId, expiresAt || null);
     res.json({ id, code: code.trim().toUpperCase(), promoType: type });
   } catch(e) {
     if (e.message.includes('UNIQUE')) return res.status(409).json({ error: 'Code already exists' });
