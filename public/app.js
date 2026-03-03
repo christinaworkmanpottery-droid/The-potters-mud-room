@@ -940,9 +940,12 @@ async function loadUpgrade() {
     // Admin promo creation (only for admin - Christina)
     if (currentUser?.email === 'christinaworkmanpottery@gmail.com') {
       html += '<div class="card mt-24" style="max-width:500px"><h3 style="margin-bottom:12px">🔧 Create Promo Codes (Admin)</h3>' +
+        '<div class="form-group"><label>Type</label><select class="form-select" id="newPromoType" onchange="togglePromoType()">' +
+        '<option value="tier">Tier Upgrade</option><option value="tokens">Token Gift</option></select></div>' +
         '<div class="form-row"><div class="form-group"><label>Code</label><input type="text" class="form-input" id="newPromoCode" placeholder="e.g., FRIENDS2026" style="text-transform:uppercase"></div>' +
-        '<div class="form-group"><label>Tier</label><select class="form-select" id="newPromoTier"><option value="basic">Basic</option><option value="mid">Mid</option><option value="top">Top</option></select></div></div>' +
-        '<div class="form-row"><div class="form-group"><label>Days</label><input type="number" class="form-input" id="newPromoDays" value="30"></div>' +
+        '<div class="form-group" id="promoTierGroup"><label>Tier</label><select class="form-select" id="newPromoTier"><option value="basic">Basic</option><option value="mid">Mid</option><option value="top">Top</option></select></div>' +
+        '<div class="form-group hidden" id="promoTokenGroup"><label>Tokens to Gift</label><input type="number" class="form-input" id="newPromoTokens" value="20" min="1"></div></div>' +
+        '<div class="form-row"><div class="form-group"><label>Days (tier duration)</label><input type="number" class="form-input" id="newPromoDays" value="30"></div>' +
         '<div class="form-group"><label>Max Uses (0=unlimited)</label><input type="number" class="form-input" id="newPromoUses" value="0"></div></div>' +
         '<button class="btn btn-primary btn-sm" onclick="createPromoCode()">Create Code</button>' +
         '<div id="promoCodesList" class="mt-16"></div></div>';
@@ -965,15 +968,23 @@ async function redeemPromo() {
   } catch(e) { toast(e.message,'error'); }
 }
 
+function togglePromoType() {
+  const type = document.getElementById('newPromoType').value;
+  document.getElementById('promoTierGroup').classList.toggle('hidden', type === 'tokens');
+  document.getElementById('promoTokenGroup').classList.toggle('hidden', type === 'tier');
+}
+
 // Admin: create promo codes
 async function createPromoCode() {
   const code = document.getElementById('newPromoCode').value.trim();
+  const promoType = document.getElementById('newPromoType').value;
   const tier = document.getElementById('newPromoTier').value;
+  const tokenAmount = parseInt(document.getElementById('newPromoTokens')?.value) || 20;
   const days = parseInt(document.getElementById('newPromoDays').value) || 30;
   const uses = parseInt(document.getElementById('newPromoUses').value) || 0;
   if (!code) { toast('Enter a code','error'); return; }
   try {
-    const d = await api('/api/promo/create', { method:'POST', body: { code, tier, durationDays: days, maxUses: uses } });
+    const d = await api('/api/promo/create', { method:'POST', body: { code, promoType, tier, tokenAmount, durationDays: days, maxUses: uses } });
     toast('Promo code ' + d.code + ' created!', 'success');
     document.getElementById('newPromoCode').value = '';
     loadPromoCodes();
@@ -986,11 +997,12 @@ async function loadPromoCodes() {
     const el = document.getElementById('promoCodesList');
     if (!el) return;
     if (!codes.length) { el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">No promo codes yet</div>'; return; }
-    el.innerHTML = codes.map(c =>
-      '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">' +
-      '<div><strong>' + esc(c.code) + '</strong> — ' + c.tier.toUpperCase() + ' for ' + c.duration_days + ' days</div>' +
-      '<div class="text-sm" style="color:var(--text-muted)">Used: ' + c.times_used + (c.max_uses > 0 ? '/' + c.max_uses : '/∞') + '</div></div>'
-    ).join('');
+    el.innerHTML = codes.map(c => {
+      const desc = c.promo_type === 'tokens' ? '🪙 ' + (c.token_amount||0) + ' tokens' : c.tier.toUpperCase() + ' for ' + c.duration_days + ' days';
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">' +
+      '<div><strong>' + esc(c.code) + '</strong> — ' + desc + '</div>' +
+      '<div class="text-sm" style="color:var(--text-muted)">Used: ' + c.times_used + (c.max_uses > 0 ? '/' + c.max_uses : '/∞') + '</div></div>';
+    }).join('');
   } catch(e) {}
 }
 

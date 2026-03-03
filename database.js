@@ -310,6 +310,7 @@ function initDB() {
       code TEXT UNIQUE NOT NULL,
       promo_type TEXT DEFAULT 'tier' CHECK(promo_type IN ('tier', 'tokens')),
       tier TEXT CHECK(tier IN ('basic', 'mid', 'top')),
+      token_amount INTEGER DEFAULT 0,
       duration_days INTEGER DEFAULT 30,
       max_uses INTEGER DEFAULT 1,
       times_used INTEGER DEFAULT 0,
@@ -385,6 +386,13 @@ function initDB() {
     CREATE INDEX IF NOT EXISTS idx_blocked_user ON blocked_users(user_id);
     CREATE INDEX IF NOT EXISTS idx_glaze_photos ON glaze_photos(glaze_id);
   `);
+
+  // Safe column additions for existing DBs
+  const safeAdd = (table, col, type) => {
+    try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`); } catch(e) { /* column already exists */ }
+  };
+  safeAdd('promo_codes', 'token_amount', 'INTEGER DEFAULT 0');
+  safeAdd('promo_codes', 'promo_type', "TEXT DEFAULT 'tier'");
 
   return db;
 }

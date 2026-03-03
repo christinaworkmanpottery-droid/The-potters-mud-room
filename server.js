@@ -362,22 +362,33 @@ app.post('/api/promo/redeem', auth, (req, res) => {
 
   db.prepare('INSERT INTO promo_redemptions (id, promo_code_id, user_id, expires_at) VALUES (?,?,?,?)').run(uuidv4(), promo.id, req.userId, expiresAt.toISOString());
   db.prepare('UPDATE promo_codes SET times_used = times_used + 1 WHERE id=?').run(promo.id);
-  db.prepare('UPDATE users SET tier=? WHERE id=?').run(promo.tier, req.userId);
 
+  if (promo.promo_type === 'tokens') {
+    const amt = promo.token_amount || 0;
+    db.prepare('UPDATE users SET forum_tokens = forum_tokens + ? WHERE id=?').run(amt, req.userId);
+    const u = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
+    const token = jwt.sign({ userId: req.userId, tier: u.tier }, JWT_SECRET, { expiresIn: '30d' });
+    return res.json({ success: true, promoType: 'tokens', tokensAwarded: amt, token, message: 'You received ' + amt + ' forum tokens!' });
+  }
+
+  db.prepare('UPDATE users SET tier=? WHERE id=?').run(promo.tier, req.userId);
   const token = jwt.sign({ userId: req.userId, tier: promo.tier }, JWT_SECRET, { expiresIn: '30d' });
-  res.json({ success: true, tier: promo.tier, expiresAt: expiresAt.toISOString(), token, message: 'Welcome! You now have ' + promo.tier.toUpperCase() + ' access for ' + promo.duration_days + ' days!' });
+  res.json({ success: true, promoType: 'tier', tier: promo.tier, expiresAt: expiresAt.toISOString(), token, message: 'Welcome! You now have ' + promo.tier.toUpperCase() + ' access for ' + promo.duration_days + ' days!' });
 });
 
 // Create a promo code (admin only — Christina)
 app.post('/api/promo/create', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
-  const { code, tier, durationDays, maxUses, expiresAt } = req.body;
-  if (!code || !tier) return res.status(400).json({ error: 'Code and tier required' });
+  const { code, promoType, tier, tokenAmount, durationDays, maxUses, expiresAt } = req.body;
+  const type = promoType || 'tier';
+  if (!code) return res.status(400).json({ error: 'Code required' });
+  if (type === 'tier' && !tier) return res.status(400).json({ error: 'Tier required for tier promos' });
+  if (type === 'tokens' && !tokenAmount) return res.status(400).json({ error: 'Token amount required' });
   const id = uuidv4();
   try {
-    db.prepare('INSERT INTO promo_codes (id, code, tier, duration_days, max_uses, created_by, expires_at) VALUES (?,?,?,?,?,?,?)')
-      .run(id, code.trim().toUpperCase(), tier, durationDays || 30, maxUses || 0, req.userId, expiresAt || null);
-    res.json({ id, code: code.trim().toUpperCase() });
+    db.prepare('INSERT INTO promo_codes (id, code, promo_type, tier, token_amount, duration_days, max_uses, created_by, expires_at) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run(id, code.trim().toUpperCase(), type, type === 'tier' ? tier : null, type === 'tokens' ? (tokenAmount || 0) : 0, durationDays || 30, maxUses || 0, req.userId, expiresAt || null);
+    res.json({ id, code: code.trim().toUpperCase(), promoType: type });
   } catch(e) {
     if (e.message.includes('UNIQUE')) return res.status(409).json({ error: 'Code already exists' });
     res.status(500).json({ error: e.message });
