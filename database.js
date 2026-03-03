@@ -308,7 +308,8 @@ function initDB() {
     CREATE TABLE IF NOT EXISTS promo_codes (
       id TEXT PRIMARY KEY,
       code TEXT UNIQUE NOT NULL,
-      tier TEXT NOT NULL CHECK(tier IN ('basic', 'mid', 'top')),
+      promo_type TEXT DEFAULT 'tier' CHECK(promo_type IN ('tier', 'tokens')),
+      tier TEXT CHECK(tier IN ('basic', 'mid', 'top')),
       duration_days INTEGER DEFAULT 30,
       max_uses INTEGER DEFAULT 1,
       times_used INTEGER DEFAULT 0,
@@ -364,7 +365,8 @@ function initDB() {
       ('cat-selling', 'Selling & Business', 'Pricing, shows, online sales, and business tips', 6, '💰'),
       ('cat-beginners', 'Beginners Welcome', 'No question is too basic — we all started somewhere', 7, '🌱'),
       ('cat-show-off', 'Show Your Work', 'Share photos of your pieces — we wanna see!', 8, '📸'),
-      ('cat-casualties', 'Pottery Casualties', 'RIP to the pieces that didn''t make it. Cracks, explosions, glaze disasters — share your pottery fails!', 9, '💀');
+      ('cat-casualties', 'Pottery Casualties', 'RIP to the pieces that didn''t make it. Cracks, explosions, glaze disasters — share your pottery fails!', 9, '💀'),
+      ('cat-help', 'Mud Room Help', 'Questions about using The Potter''s Mud Room? Ask here and we''ll help!', 10, '❓');
 
     -- Indexes
     CREATE INDEX IF NOT EXISTS idx_pieces_user ON pieces(user_id);

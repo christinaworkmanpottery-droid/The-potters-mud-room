@@ -28,8 +28,12 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOADS_DIR),
   filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`)
 });
-const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => { cb(null, /jpeg|jpg|png|gif|webp|heic/.test(path.extname(file.originalname).toLowerCase()) || file.mimetype === 'image/heic'); }
+const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const allowed = /jpeg|jpg|png|gif|webp|heic|mp4|mov|webm/;
+    cb(null, allowed.test(ext) || file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/'));
+  }
 });
 
 // Stripe webhook needs raw body — must be BEFORE express.json()

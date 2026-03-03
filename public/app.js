@@ -63,7 +63,7 @@ function toggleAuth() {
   document.getElementById('nameField').classList.toggle('hidden', !isSignUp);
   document.getElementById('authSubmit').textContent = isSignUp ? 'Create Account' : 'Sign In';
   document.getElementById('authToggleText').textContent = isSignUp ? 'Already have an account?' : "Don't have an account?";
-  document.getElementById('authToggleLink').textContent = isSignUp ? 'Sign in' : 'Create one';
+  document.getElementById('authToggleLink').textContent = isSignUp ? 'Sign in' : "Create one — it's free!";
   document.getElementById('authError').classList.add('hidden');
 }
 document.getElementById('authForm').addEventListener('submit', async (e) => {
@@ -75,7 +75,7 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
   errEl.classList.add('hidden');
   try {
     const data = await api(isSignUp ? '/api/auth/register' : '/api/auth/login', {
-      method: 'POST', body: isSignUp ? { email, password, displayName: name, referralCode: document.getElementById('authReferral').value } : { email, password }
+      method: 'POST', body: isSignUp ? { email, password, displayName: name } : { email, password }
     });
     token = data.token;
     localStorage.setItem('mudlog_token', token);
