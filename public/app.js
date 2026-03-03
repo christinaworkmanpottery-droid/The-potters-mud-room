@@ -121,7 +121,7 @@ function navigate(page) {
     clayBodies:'pageClayBodies', glazes:'pageGlazes', firings:'pageFirings',
     sales:'pageSales', community:'pageCommunity', forum:'pageForum',
     forumPost:'pageForumPost', profile:'pageProfile', shop:'pageShop',
-    upgrade:'pageUpgrade'
+    upgrade:'pageUpgrade', help:'pageHelp'
   };
   const el = document.getElementById(map[page]); if (el) el.classList.add('active');
   const nb = document.querySelector('.nav-link[data-page="' + page + '"]'); if (nb) nb.classList.add('active');

@@ -51,6 +51,7 @@
         <button class="nav-link" data-page="community" onclick="navigate('community')">Community</button>
         <button class="nav-link" data-page="forum" onclick="navigate('forum')">Forum</button>
         <button class="nav-link" data-page="shop" onclick="navigate('shop')">Shop</button>
+        <button class="nav-link" data-page="help" onclick="navigate('help')">Help</button>
         <button class="nav-link" data-page="upgrade" onclick="navigate('upgrade')">Plans</button>
         <button class="nav-link" data-page="profile" onclick="navigate('profile')">Profile</button>
       </div>
@@ -229,6 +230,112 @@
     <div id="pageForumPost" class="page">
       <button class="detail-back" onclick="navigate('forum')">← Back to Forum</button>
       <div id="forumPostContent"></div>
+    </div>
+
+    <!-- HELP / TUTORIAL -->
+    <div id="pageHelp" class="page">
+      <div class="page-header">
+        <h1>📖 How to Use The Potter's Mud Room</h1>
+      </div>
+      <div style="max-width:700px">
+
+        <div class="card mb-16">
+          <h2 style="margin-bottom:12px">👋 Welcome, Potter!</h2>
+          <p>The Potter's Mud Room helps you track every piece you make — from wet clay to finished work. No more forgetting which glaze you used or what cone you fired at. Here's how to get the most out of it.</p>
+        </div>
+
+        <div class="card mb-16">
+          <h2 style="margin-bottom:12px">🏺 Tracking Pieces</h2>
+          <p><strong>This is the heart of the app.</strong> Each piece gets its own log.</p>
+          <ol style="margin:12px 0;padding-left:20px;line-height:2">
+            <li>Go to <strong>Pieces</strong> → click <strong>+ Add Piece</strong></li>
+            <li>Give it a name (e.g., "Blue cereal bowl")</li>
+            <li>Pick your <strong>clay body</strong> and <strong>technique</strong></li>
+            <li>Add the <strong>glazes</strong> you used — pick how many coats and the method (dip, brush, spray)</li>
+            <li>Click <strong>Save</strong> — done!</li>
+          </ol>
+          <p>Come back later to update the status as it moves through the process. Add photos at each stage so you can see the transformation.</p>
+          <p class="text-sm" style="color:var(--text-light);margin-top:8px">💡 Free accounts: 20 pieces, 1 photo each. Paid plans: unlimited pieces, 3 photos each.</p>
+        </div>
+
+        <div class="card mb-16">
+          <h2 style="margin-bottom:12px">🪨 Clay Bodies</h2>
+          <p>Before logging pieces, add your clay bodies:</p>
+          <ol style="margin:12px 0;padding-left:20px;line-height:2">
+            <li>Go to <strong>Clay</strong> → click <strong>+ Add Clay Body</strong></li>
+            <li>Enter the name, brand, type, cone range</li>
+            <li>Add the <strong>shrinkage %</strong> and <strong>cost per bag</strong> to track expenses</li>
+            <li>Note the wet vs fired color — super helpful for planning</li>
+          </ol>
+        </div>
+
+        <div class="card mb-16">
+          <h2 style="margin-bottom:12px">🎨 Glazes</h2>
+          <p>Log every glaze in your collection:</p>
+          <ol style="margin:12px 0;padding-left:20px;line-height:2">
+            <li>Go to <strong>Glazes</strong> → click <strong>+ Add Glaze</strong></li>
+            <li>Choose <strong>Commercial</strong> (store bought) or <strong>Recipe</strong> (mix your own)</li>
+            <li>For commercial: add the brand and SKU so you can reorder</li>
+            <li>For recipes: add each ingredient and percentage</li>
+            <li>Add up to 3 photos of the glaze result on different clays</li>
+          </ol>
+          <p class="text-sm" style="color:var(--text-light);margin-top:8px">💡 The #1 pain point for potters: "What glaze was that?" This solves it.</p>
+        </div>
+
+        <div class="card mb-16">
+          <h2 style="margin-bottom:12px">🔥 Firing Logs</h2>
+          <p>Track every firing:</p>
+          <ol style="margin:12px 0;padding-left:20px;line-height:2">
+            <li>Go to <strong>Firings</strong> → click <strong>+ Log Firing</strong></li>
+            <li>Pick the type (bisque, glaze, raku, etc.)</li>
+            <li>Enter cone, atmosphere, kiln name</li>
+            <li>Log the <strong>speed</strong> and whether you used a <strong>hold</strong> (and for how long)</li>
+            <li>Link it to a specific piece</li>
+            <li>After opening the kiln, come back and add your results!</li>
+          </ol>
+        </div>
+
+        <div class="card mb-16">
+          <h2 style="margin-bottom:12px">💬 Forum</h2>
+          <p>Connect with other potters:</p>
+          <ul style="margin:12px 0;padding-left:20px;line-height:2">
+            <li><strong>Browse for free</strong> — everyone can read posts</li>
+            <li><strong>Post & reply</strong> — costs 1 forum token each</li>
+            <li><strong>Add photos & short videos</strong> to your posts</li>
+            <li>Buy token packs on the <strong>Plans</strong> page</li>
+            <li>Top tier members get <strong>10 free tokens/month</strong></li>
+          </ul>
+          <p>Categories include General Chat, Glazes & Combos, Show Your Work, Pottery Casualties 💀 (we've all been there), and more!</p>
+        </div>
+
+        <div class="card mb-16">
+          <h2 style="margin-bottom:12px">💰 Sales Tracking</h2>
+          <p><em>(Top tier)</em> Log every sale — price, venue, date. See your revenue summary and average price. Export to CSV for tax time.</p>
+        </div>
+
+        <div class="card mb-16">
+          <h2 style="margin-bottom:12px">🛍️ Shop</h2>
+          <p>Check out the <strong>Potter's Mud Log</strong> — a 38-page printable PDF journal that mirrors the app. Perfect for the studio when you don't want your phone near wet clay. Preview it for free before buying!</p>
+        </div>
+
+        <div class="card mb-16">
+          <h2 style="margin-bottom:12px">⚡ Quick Tips</h2>
+          <ul style="margin:12px 0;padding-left:20px;line-height:2">
+            <li>Use the <strong>search bar</strong> on the Pieces page to find anything fast</li>
+            <li>Filter pieces by <strong>status</strong> to see what's in progress vs done</li>
+            <li>Add photos at <strong>each stage</strong> — wet, leather hard, bisque, finished. You'll thank yourself later</li>
+            <li>The <strong>Dashboard</strong> shows your recent work at a glance</li>
+            <li>Update your <strong>Profile</strong> to set imperial/metric preferences</li>
+          </ul>
+        </div>
+
+        <div class="card" style="background:var(--primary-light);border-color:var(--primary)">
+          <h2 style="margin-bottom:12px">❤️ Built by a Potter, for Potters</h2>
+          <p>Questions? Post in the <strong>Mud Room Help</strong> forum category. We're here to help!</p>
+          <p style="margin-top:8px"><strong>thepottersmudroom.com</strong></p>
+        </div>
+
+      </div>
     </div>
 
     <!-- SHOP -->
