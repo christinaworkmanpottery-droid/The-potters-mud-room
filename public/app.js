@@ -120,19 +120,20 @@ function showApp() {
 // ---- Navigation ----
 let currentPage = 'dashboard';
 function navigate(page) {
-  currentPage = page;
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-  const map = {
-    dashboard:'pageDashboard', pieces:'pagePieces', pieceDetail:'pagePieceDetail',
-    clayBodies:'pageClayBodies', glazes:'pageGlazes', firings:'pageFirings',
-    sales:'pageSales', community:'pageCommunity', forum:'pageForum',
-    forumPost:'pageForumPost', profile:'pageProfile', shop:'pageShop',
-    upgrade:'pageUpgrade', help:'pageHelp', admin:'pageAdmin'
-  };
-  const el = document.getElementById(map[page]); if (el) el.classList.add('active');
-  const nb = document.querySelector('.nav-link[data-page="' + page + '"]'); if (nb) nb.classList.add('active');
-  document.querySelector('.nav-links')?.classList.remove('open');
+  try {
+    currentPage = page;
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    const map = {
+      dashboard:'pageDashboard', pieces:'pagePieces', pieceDetail:'pagePieceDetail',
+      clayBodies:'pageClayBodies', glazes:'pageGlazes', firings:'pageFirings',
+      sales:'pageSales', community:'pageCommunity', forum:'pageForum',
+      forumPost:'pageForumPost', profile:'pageProfile', shop:'pageShop',
+      upgrade:'pageUpgrade', help:'pageHelp', admin:'pageAdmin'
+    };
+    const el = document.getElementById(map[page]); if (el) el.classList.add('active');
+    try { const nb = document.querySelector('.nav-link[data-page="' + page + '"]'); if (nb) nb.classList.add('active'); } catch(e) {}
+    try { document.querySelector('.nav-links')?.classList.remove('open'); } catch(e) {}
   const loaders = {
     dashboard:loadDashboard, pieces:loadPieces, clayBodies:loadClayBodies,
     glazes:loadGlazes, firings:loadFirings, sales:loadSales,
@@ -140,6 +141,7 @@ function navigate(page) {
     shop:loadShop, upgrade:loadUpgrade, admin:loadAdmin
   };
   if (loaders[page]) loaders[page]();
+  } catch(navErr) { console.error('Navigation error:', navErr); }
 }
 
 // ---- Dashboard ----
@@ -1120,14 +1122,21 @@ async function exportData(endpoint) {
 
 // ---- Admin Dashboard ----
 async function loadAdmin() {
+  const el = document.getElementById('adminContent');
   if (currentUser?.email !== 'christinaworkmanpottery@gmail.com') {
-    document.getElementById('adminContent').innerHTML = '<div class="card"><p>Admin access only.</p></div>';
+    el.innerHTML = '<div class="card"><p>Admin access only.</p></div>';
     return;
   }
   try {
-    const data = await api('/api/admin/members');
-    const m = data.members;
-    const s = data.stats;
+    let data;
+    try {
+      data = await api('/api/admin/members');
+    } catch(fetchErr) {
+      el.innerHTML = '<div class="card"><h3>Error loading admin data</h3><p>' + esc(fetchErr.message) + '</p></div>';
+      return;
+    }
+    const m = data.members || [];
+    const s = data.stats || { total: 0, byTier: { free: 0, basic: 0, mid: 0, top: 0 }, recent7d: 0, recent30d: 0 };
     
     let html = '<div class="stats-bar" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">' +
       '<div class="stat-box"><div class="stat-number">' + s.total + '</div><div class="stat-label">Total Members</div></div>' +
@@ -1169,7 +1178,12 @@ async function loadAdmin() {
     // Orders section
     html += '<div class="card mb-16"><h3 style="margin-bottom:12px">🛍️ Recent Orders</h3><div id="adminOrders">Loading...</div></div>';
 
-    document.getElementById('adminContent').innerHTML = html;
+    try {
+      el.innerHTML = html;
+    } catch(renderErr) {
+      el.innerHTML = '<div class="card"><h3>Admin loaded but display error</h3><p>' + esc(String(renderErr)) + '</p><p>Members: ' + s.total + ' | Free: ' + s.byTier.free + ' | Basic: ' + s.byTier.basic + ' | Mid: ' + s.byTier.mid + ' | Top: ' + s.byTier.top + '</p></div>';
+      return;
+    }
     loadDiscountCodes();
     loadAdminOrders();
   } catch(e) { toast(e.message, 'error'); }

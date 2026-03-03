@@ -328,23 +328,28 @@ function isAdmin(req) {
 // Admin dashboard — see all members, signups, cancellations, tiers
 app.get('/api/admin/members', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
-  const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, forum_tokens, 
-    avatar_filename, created_at, updated_at, stripe_customer_id, stripe_subscription_id 
-    FROM users ORDER BY created_at DESC`).all();
-  const stats = {
-    total: members.length,
-    byTier: { free: 0, basic: 0, mid: 0, top: 0 },
-    recent7d: 0,
-    recent30d: 0
-  };
-  const now = Date.now();
-  members.forEach(m => {
-    stats.byTier[m.tier || 'free']++;
-    const age = now - new Date(m.created_at).getTime();
-    if (age < 7 * 86400000) stats.recent7d++;
-    if (age < 30 * 86400000) stats.recent30d++;
-  });
-  res.json({ members, stats });
+  try {
+    const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, forum_tokens, 
+      avatar_filename, created_at, updated_at, stripe_customer_id, stripe_subscription_id 
+      FROM users ORDER BY created_at DESC`).all();
+    const stats = {
+      total: members.length,
+      byTier: { free: 0, basic: 0, mid: 0, top: 0 },
+      recent7d: 0,
+      recent30d: 0
+    };
+    const now = Date.now();
+    members.forEach(m => {
+      stats.byTier[m.tier || 'free']++;
+      const age = now - new Date(m.created_at).getTime();
+      if (age < 7 * 86400000) stats.recent7d++;
+      if (age < 30 * 86400000) stats.recent30d++;
+    });
+    res.json({ members, stats });
+  } catch(err) {
+    console.error('Admin members error:', err.message);
+    res.status(500).json({ error: 'Failed to load members: ' + err.message });
+  }
 });
 
 // Admin: view orders
@@ -452,8 +457,13 @@ app.post('/api/admin/discount/create', auth, (req, res) => {
 
 app.get('/api/admin/discount/codes', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
-  const codes = db.prepare('SELECT * FROM discount_codes ORDER BY created_at DESC').all();
-  res.json(codes);
+  try {
+    const codes = db.prepare('SELECT * FROM discount_codes ORDER BY created_at DESC').all();
+    res.json(codes);
+  } catch(err) {
+    // Table might not exist yet
+    res.json([]);
+  }
 });
 
 app.post('/api/shop/apply-discount', auth, (req, res) => {
