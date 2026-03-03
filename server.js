@@ -729,6 +729,31 @@ app.post('/api/forum/posts/:id/reply', auth, upload.array('photos', 3), (req, re
   res.json({ id });
 });
 
+// Delete own forum post
+app.delete('/api/forum/posts/:id', auth, (req, res) => {
+  const post = db.prepare('SELECT user_id FROM forum_posts WHERE id=?').get(req.params.id);
+  if (!post) return res.status(404).json({ error: 'Not found' });
+  const admin = db.prepare('SELECT email FROM users WHERE id=?').get(req.userId);
+  if (post.user_id !== req.userId && admin?.email !== ADMIN_EMAIL) return res.status(403).json({ error: 'You can only delete your own posts' });
+  db.prepare('DELETE FROM forum_photos WHERE post_id=?').run(req.params.id);
+  db.prepare('DELETE FROM forum_photos WHERE reply_id IN (SELECT id FROM forum_replies WHERE post_id=?)').run(req.params.id);
+  db.prepare('DELETE FROM forum_replies WHERE post_id=?').run(req.params.id);
+  db.prepare('DELETE FROM forum_posts WHERE id=?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// Delete own forum reply
+app.delete('/api/forum/replies/:id', auth, (req, res) => {
+  const reply = db.prepare('SELECT user_id,post_id FROM forum_replies WHERE id=?').get(req.params.id);
+  if (!reply) return res.status(404).json({ error: 'Not found' });
+  const admin = db.prepare('SELECT email FROM users WHERE id=?').get(req.userId);
+  if (reply.user_id !== req.userId && admin?.email !== ADMIN_EMAIL) return res.status(403).json({ error: 'You can only delete your own replies' });
+  db.prepare('DELETE FROM forum_photos WHERE reply_id=?').run(req.params.id);
+  db.prepare('DELETE FROM forum_replies WHERE id=?').run(req.params.id);
+  db.prepare('UPDATE forum_posts SET reply_count=reply_count-1 WHERE id=?').run(reply.post_id);
+  res.json({ success: true });
+});
+
 app.get('/api/tokens/balance', auth, (req, res) => {
   const u = db.prepare('SELECT forum_tokens,unlimited_tokens_until FROM users WHERE id=?').get(req.userId);
   const hasUnlimited = u.unlimited_tokens_until && new Date(u.unlimited_tokens_until) > new Date();

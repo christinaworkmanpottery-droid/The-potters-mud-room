@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+  <circle cx="300" cy="300" r="290" fill="#3E2E24"/>
+  <circle cx="300" cy="300" r="275" fill="none" stroke="#8B9E6B" stroke-width="4"/>
+  <text x="300" y="180" text-anchor="middle" font-family="Georgia, serif" font-size="32" fill="#8B9E6B">LIFE IS</text>
+  <text x="300" y="235" text-anchor="middle" font-family="Georgia, serif" font-size="50" font-weight="bold" fill="#FFFFFF">BETTER</text>
+  <text x="300" y="300" text-anchor="middle" font-family="Georgia, serif" font-size="32" fill="#8B9E6B">AT THE</text>
+  <text x="300" y="370" text-anchor="middle" font-family="Georgia, serif" font-size="55" font-weight="bold" fill="#C67B4E">WHEEL</text>
+  <text x="300" y="420" text-anchor="middle" font-size="30">☸️</text>
+  <text x="300" y="460" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#B5A99A">thepottersmudroom.com</text>
+</svg>

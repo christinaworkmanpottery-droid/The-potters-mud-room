@@ -3,14 +3,111 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>The Potter's Mud Room — Track Your Pottery</title>
+  <title>The Potter's Mud Room — Track Your Pottery, Clay, Glazes & Firings</title>
+  <meta name="description" content="Free pottery tracking app for ceramicists. Log your pieces, clay bodies, glazes, firing schedules, and sales. Join the potter community. Built by a potter, for potters.">
+  <meta name="keywords" content="pottery tracker, ceramics app, pottery journal, glaze log, clay body tracker, kiln firing log, pottery community, ceramic artists, pottery tools, handmade pottery, pottery studio, pottery organizer">
+  <meta name="author" content="The Potter's Mud Room">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://thepottersmudroom.com">
+
+  <!-- Open Graph / Facebook / Instagram -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://thepottersmudroom.com">
+  <meta property="og:title" content="The Potter's Mud Room — Your Pottery Journal">
+  <meta property="og:description" content="Track every piece from wet clay to finished work. Log clay bodies, glazes, firings & sales. Free to start. Built by a potter, for potters. 🏺">
+  <meta property="og:image" content="https://thepottersmudroom.com/og-image.svg">
+  <meta property="og:site_name" content="The Potter's Mud Room">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="The Potter's Mud Room — Your Pottery Journal">
+  <meta name="twitter:description" content="Track every piece from wet clay to finished work. Log clay bodies, glazes, firings & sales. Free to start. Built by a potter, for potters. 🏺">
+  <meta name="twitter:image" content="https://thepottersmudroom.com/og-image.svg">
+
+  <!-- Pinterest -->
+  <meta name="pinterest-rich-pin" content="true">
+
+  <!-- Structured Data for Google -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "The Potter's Mud Room",
+    "url": "https://thepottersmudroom.com",
+    "description": "Free pottery tracking app for ceramicists. Log pieces, clay bodies, glazes, firing schedules, and sales. Community forum for potters.",
+    "applicationCategory": "LifestyleApplication",
+    "operatingSystem": "Web",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD",
+      "description": "Free to start — 20 pieces included"
+    },
+    "creator": {
+      "@type": "Organization",
+      "name": "The Potter's Mud Room",
+      "url": "https://thepottersmudroom.com"
+    },
+    "keywords": "pottery tracker, ceramics app, glaze log, clay body tracker, pottery journal, kiln firing log"
+  }
+  </script>
+
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏺</text></svg>">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
+<!-- LANDING PAGE (visible to search engines) -->
+<div id="landingPage">
+  <div style="background:var(--bg-dark);color:#fff;padding:60px 20px;text-align:center">
+    <div style="max-width:800px;margin:0 auto">
+      <div style="font-size:4rem;margin-bottom:16px">🏺</div>
+      <h1 style="font-family:Georgia,serif;font-size:2.5rem;margin-bottom:12px">The Potter's <span style="color:#C67B4E">Mud Room</span></h1>
+      <p style="font-size:1.2rem;color:rgba(255,255,255,0.8);margin-bottom:32px">Track every piece from wet clay to finished work.<br>Clay bodies. Glazes. Firings. Sales. Community.</p>
+      <button class="btn btn-primary btn-lg" onclick="document.getElementById('landingPage').style.display='none';document.getElementById('authScreen').style.display='flex'" style="font-size:1.1rem;padding:16px 40px">Get Started — It's Free</button>
+      <p style="margin-top:12px;color:rgba(255,255,255,0.5);font-size:0.9rem">No credit card required. 20 pieces free forever.</p>
+    </div>
+  </div>
+
+  <div style="max-width:900px;margin:0 auto;padding:40px 20px">
+    <h2 style="text-align:center;font-family:Georgia,serif;font-size:1.8rem;margin-bottom:32px;color:var(--text)">Everything a Potter Needs in One Place</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px">
+      <div class="card" style="text-align:center"><div style="font-size:2rem;margin-bottom:8px">🏺</div><h3>Piece Tracking</h3><p class="text-sm" style="color:var(--text-light)">Log every piece with clay body, glazes, technique, photos at each stage, and notes. Never forget what you used again.</p></div>
+      <div class="card" style="text-align:center"><div style="font-size:2rem;margin-bottom:8px">🎨</div><h3>Glaze Library</h3><p class="text-sm" style="color:var(--text-light)">Track commercial glazes and your own recipes. Record brand, SKU, ingredients, percentages. Add result photos.</p></div>
+      <div class="card" style="text-align:center"><div style="font-size:2rem;margin-bottom:8px">🪨</div><h3>Clay Bodies</h3><p class="text-sm" style="color:var(--text-light)">Log every clay you use — wet and fired colors, shrinkage %, cone range, cost per bag. Compare and choose.</p></div>
+      <div class="card" style="text-align:center"><div style="font-size:2rem;margin-bottom:8px">🔥</div><h3>Firing Logs</h3><p class="text-sm" style="color:var(--text-light)">Record every firing — type, cone, atmosphere, kiln, speed, holds. Link firings to specific pieces.</p></div>
+      <div class="card" style="text-align:center"><div style="font-size:2rem;margin-bottom:8px">💬</div><h3>Potter Community</h3><p class="text-sm" style="color:var(--text-light)">Forum for potters — share your work, ask questions, post glaze results, and connect with other ceramicists.</p></div>
+      <div class="card" style="text-align:center"><div style="font-size:2rem;margin-bottom:8px">💰</div><h3>Sales Tracking</h3><p class="text-sm" style="color:var(--text-light)">Log sales by venue, track revenue, export CSV for taxes. Know your numbers and grow your pottery business.</p></div>
+    </div>
+  </div>
+
+  <div style="background:var(--primary-light);padding:40px 20px;text-align:center">
+    <h2 style="font-family:Georgia,serif;font-size:1.6rem;margin-bottom:16px;color:var(--text)">The #1 Problem for Potters?</h2>
+    <p style="font-size:1.1rem;color:var(--text);max-width:600px;margin:0 auto 24px">"Which clay and glaze did I use on that piece?"<br><strong>The Potter's Mud Room solves that.</strong></p>
+    <button class="btn btn-primary btn-lg" onclick="document.getElementById('landingPage').style.display='none';document.getElementById('authScreen').style.display='flex'">Start Tracking Free</button>
+  </div>
+
+  <div style="max-width:900px;margin:0 auto;padding:40px 20px">
+    <h2 style="text-align:center;font-family:Georgia,serif;font-size:1.6rem;margin-bottom:24px">Plans for Every Potter</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
+      <div class="card" style="text-align:center"><h3>Free</h3><div style="font-size:1.5rem;font-weight:700;color:var(--primary);margin:8px 0">$0</div><p class="text-sm" style="color:var(--text-light)">20 pieces, 1 photo each, clay &amp; glaze library, browse the forum</p></div>
+      <div class="card" style="text-align:center"><h3>Basic</h3><div style="font-size:1.5rem;font-weight:700;color:var(--primary);margin:8px 0">$9.95<span style="font-size:0.8rem;font-weight:400">/mo</span></div><p class="text-sm" style="color:var(--text-light)">Unlimited pieces, 3 photos, firing logs, forum access</p></div>
+      <div class="card" style="text-align:center;border-color:var(--primary)"><h3>Mid</h3><div style="font-size:1.5rem;font-weight:700;color:var(--primary);margin:8px 0">$12.95<span style="font-size:0.8rem;font-weight:400">/mo</span></div><p class="text-sm" style="color:var(--text-light)">+ Glaze recipes, cost tracking, multi-studio, export</p></div>
+      <div class="card" style="text-align:center"><h3>Top</h3><div style="font-size:1.5rem;font-weight:700;color:var(--primary);margin:8px 0">$19.95<span style="font-size:0.8rem;font-weight:400">/mo</span></div><p class="text-sm" style="color:var(--text-light)">+ Community glaze library, sales tracking, 10 free tokens/mo</p></div>
+    </div>
+    <p style="text-align:center;margin-top:16px;color:var(--text-light);font-size:0.9rem">Save with yearly plans! Cancel anytime.</p>
+  </div>
+
+  <div style="background:var(--bg-dark);color:#fff;padding:40px 20px;text-align:center">
+    <h2 style="font-family:Georgia,serif;font-size:1.6rem;margin-bottom:12px">Built by a Potter, for Potters 🏺</h2>
+    <p style="color:rgba(255,255,255,0.7);margin-bottom:20px">We know the struggle. We built the solution.</p>
+    <button class="btn btn-primary btn-lg" onclick="document.getElementById('landingPage').style.display='none';document.getElementById('authScreen').style.display='flex'" style="font-size:1.1rem;padding:16px 40px">Join The Mud Room — Free</button>
+    <p style="margin-top:20px;color:rgba(255,255,255,0.4);font-size:0.85rem">thepottersmudroom.com</p>
+  </div>
+</div>
+
 <!-- AUTH SCREEN -->
-<div id="authScreen" class="auth-screen">
+<div id="authScreen" class="auth-screen" style="display:none">
   <div class="auth-card">
     <div class="auth-logo">🏺</div>
     <h1 class="auth-title">The Potter's Mud Room</h1>
@@ -879,8 +976,8 @@
         <textarea class="form-textarea" id="forumPostBody" placeholder="Share your thoughts, ask a question, show your work..." required style="min-height:120px"></textarea>
       </div>
       <div class="form-group">
-        <label>Photos (optional, up to 3)</label>
-        <input type="file" id="forumPostPhotos" accept="image/*" multiple class="form-input">
+        <label>Photos &amp; Videos (optional, up to 3)</label>
+        <input type="file" id="forumPostPhotos" accept="image/*,video/mp4,video/mov,video/webm" multiple class="form-input">
       </div>
       <div class="text-sm" style="color:var(--text-muted)">🪙 This will use 1 forum token</div>
       <div class="modal-footer">

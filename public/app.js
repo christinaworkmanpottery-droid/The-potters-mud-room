@@ -86,14 +86,16 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
 function logout() {
   token = null; currentUser = null;
   localStorage.removeItem('mudlog_token');
-  document.getElementById('authScreen').style.display = 'flex';
+  document.getElementById('landingPage').style.display = '';
+  document.getElementById('authScreen').style.display = 'none';
   document.getElementById('mainApp').classList.add('hidden');
 }
 async function checkAuth() {
-  if (!token) return;
-  try { const d = await api('/api/auth/me'); currentUser = d.user; showApp(); } catch { logout(); }
+  if (!token) { document.getElementById('landingPage').style.display = ''; return; }
+  try { document.getElementById('landingPage').style.display = 'none'; const d = await api('/api/auth/me'); currentUser = d.user; showApp(); } catch { logout(); }
 }
 function showApp() {
+  document.getElementById('landingPage').style.display = 'none';
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('mainApp').classList.remove('hidden');
   const badge = document.getElementById('navTier');
@@ -707,14 +709,23 @@ async function viewForumPost(id) {
     const post = await api('/api/forum/posts/' + id);
     navigate('forumPost');
     const avatar = post.author_avatar ? '<img src="/uploads/' + post.author_avatar + '" class="forum-avatar-lg">' : '<div class="forum-avatar-placeholder forum-avatar-lg">' + (post.author_name||'?')[0].toUpperCase() + '</div>';
-    const photos = (post.photos||[]).map(p => '<img src="/uploads/' + p.filename + '" class="forum-photo" onclick="window.open(\'/uploads/' + p.filename + '\',\'_blank\')">').join('');
+    const photos = (post.photos||[]).map(p => {
+      const ext = (p.filename||'').split('.').pop().toLowerCase();
+      if (['mp4','mov','webm'].includes(ext)) return '<video src="/uploads/' + p.filename + '" class="forum-photo" controls style="max-width:100%;max-height:400px;border-radius:var(--radius-sm)"></video>';
+      return '<img src="/uploads/' + p.filename + '" class="forum-photo" style="max-width:100%;max-height:400px" onclick="window.open(\'/uploads/' + p.filename + '\',\'_blank\')">';
+    }).join('');
     const replies = (post.replies||[]).map(r => {
       const ra = r.author_avatar ? '<img src="/uploads/' + r.author_avatar + '" class="forum-avatar">' : '<div class="forum-avatar-placeholder">' + (r.author_name||'?')[0].toUpperCase() + '</div>';
-      const rPhotos = (r.photos||[]).map(p => '<img src="/uploads/' + p.filename + '" class="forum-photo-sm">').join('');
+      const rPhotos = (r.photos||[]).map(p => {
+        const ext = (p.filename||'').split('.').pop().toLowerCase();
+        if (['mp4','mov','webm'].includes(ext)) return '<video src="/uploads/' + p.filename + '" class="forum-photo" controls style="max-width:300px;max-height:200px"></video>';
+        return '<img src="/uploads/' + p.filename + '" class="forum-photo-sm">';
+      }).join('');
+      const deleteBtn = (r.user_id === currentUser?.id || currentUser?.email === 'christinaworkmanpottery@gmail.com') ? '<button class="btn-ghost btn-sm" onclick="deleteReply(\'' + r.id + '\',\'' + post.id + '\')" title="Delete reply">🗑️</button>' : '';
       return '<div class="forum-reply">' +
         '<div style="display:flex;gap:10px">' + ra +
         '<div style="flex:1"><div style="display:flex;justify-content:space-between"><strong>' + esc(r.author_name||'Anonymous') + '</strong>' +
-        '<span class="text-sm" style="color:var(--text-muted)">' + timeAgo(r.created_at) + '</span></div>' +
+        '<div>' + deleteBtn + '<span class="text-sm" style="color:var(--text-muted)">' + timeAgo(r.created_at) + '</span></div></div>' +
         '<div class="mt-8" style="white-space:pre-wrap">' + esc(r.body) + '</div>' +
         (rPhotos ? '<div class="forum-photos-row mt-8">' + rPhotos + '</div>' : '') +
         '</div></div></div>';
@@ -725,6 +736,7 @@ async function viewForumPost(id) {
       '<div><h2>' + esc(post.title) + '</h2>' +
       '<div class="text-sm" style="color:var(--text-light)">by <strong>' + esc(post.author_name||'Anonymous') + '</strong> · ' + timeAgo(post.created_at) +
       ' · 👁 ' + post.view_count + ' views · 💬 ' + post.reply_count + ' replies</div></div></div>' +
+      ((post.user_id === currentUser?.id || currentUser?.email === 'christinaworkmanpottery@gmail.com') ? '<div style="margin-bottom:12px"><button class="btn btn-danger btn-sm" onclick="deleteForumPost(\'' + post.id + '\')">🗑️ Delete Post</button></div>' : '') +
       '<div style="white-space:pre-wrap;margin-bottom:16px">' + esc(post.body) + '</div>' +
       (photos ? '<div class="forum-photos-row mb-16">' + photos + '</div>' : '') +
       '</div>' +
@@ -732,11 +744,21 @@ async function viewForumPost(id) {
       (replies || '<div class="text-sm" style="color:var(--text-muted)">No replies yet — be the first!</div>') +
       '<div class="card mt-16"><h3 style="margin-bottom:12px">Reply</h3>' +
       '<textarea class="form-textarea" id="replyBody" placeholder="Write your reply..." style="min-height:80px"></textarea>' +
-      '<div class="form-group mt-8"><input type="file" id="replyPhotos" accept="image/*" multiple class="form-input" style="font-size:0.85rem"></div>' +
+      '<div class="form-group mt-8"><input type="file" id="replyPhotos" accept="image/*,video/mp4,video/mov,video/webm" multiple class="form-input" style="font-size:0.85rem"></div>' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">' +
       '<span class="text-sm" style="color:var(--text-muted)">🪙 Uses 1 forum token</span>' +
       '<button class="btn btn-primary" onclick="submitReply(\'' + post.id + '\')">Reply</button></div></div>';
   } catch(e) { toast(e.message,'error'); }
+}
+
+async function deleteForumPost(id) {
+  if (!confirm('Delete this post and all its replies?')) return;
+  try { await api('/api/forum/posts/' + id, { method: 'DELETE' }); toast('Post deleted', 'success'); navigate('forum'); } catch(e) { toast(e.message, 'error'); }
+}
+
+async function deleteReply(id, postId) {
+  if (!confirm('Delete this reply?')) return;
+  try { await api('/api/forum/replies/' + id, { method: 'DELETE' }); toast('Reply deleted', 'success'); viewForumPost(postId); } catch(e) { toast(e.message, 'error'); }
 }
 
 async function submitReply(postId) {
