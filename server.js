@@ -133,21 +133,11 @@ function getPieceCount(uid) { return db.prepare('SELECT COUNT(*) as c FROM piece
 // ============ AUTH ============
 app.post('/api/auth/register', (req, res) => {
   try {
-    const { email, password, displayName, referralCode } = req.body;
+    const { email, password, displayName } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
     if (db.prepare('SELECT id FROM users WHERE email=?').get(email)) return res.status(409).json({ error: 'Email already registered' });
     const id = uuidv4(), hash = bcrypt.hashSync(password, 10);
-    const myReferralCode = (displayName || email.split('@')[0]).replace(/[^a-zA-Z0-9]/g, '').toUpperCase().substring(0, 8) + Math.random().toString(36).substring(2, 6).toUpperCase();
-    let referredBy = null;
-    if (referralCode) {
-      const referrer = db.prepare('SELECT id FROM users WHERE referral_code=?').get(referralCode.trim().toUpperCase());
-      if (referrer) {
-        referredBy = referrer.id;
-        db.prepare('UPDATE users SET forum_tokens = forum_tokens + 5 WHERE id=?').run(referrer.id);
-        db.prepare('INSERT INTO referral_rewards (id, referrer_id, referred_id, tokens_awarded) VALUES (?,?,?,?)').run(uuidv4(), referrer.id, id, 5);
-      }
-    }
-    db.prepare('INSERT INTO users (id,email,password_hash,display_name,referral_code,referred_by) VALUES (?,?,?,?,?,?)').run(id, email, hash, displayName || email.split('@')[0], myReferralCode, referredBy);
+    db.prepare('INSERT INTO users (id,email,password_hash,display_name) VALUES (?,?,?,?)').run(id, email, hash, displayName || email.split('@')[0]);
     const token = jwt.sign({ userId: id, tier: 'free' }, JWT_SECRET, { expiresIn: '30d' });
     res.json({ token, user: { id, email, displayName: displayName || email.split('@')[0], tier: 'free' } });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -164,10 +154,9 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.get('/api/auth/me', auth, (req, res) => {
-  const u = db.prepare('SELECT id,email,display_name,bio,location,website,avatar_filename,is_private,tier,forum_tokens,unlimited_tokens_until,unit_system,temp_unit,billing_period,plan_expires_at,referral_code,created_at FROM users WHERE id=?').get(req.userId);
+  const u = db.prepare('SELECT id,email,display_name,bio,location,website,avatar_filename,is_private,tier,forum_tokens,unlimited_tokens_until,unit_system,temp_unit,created_at FROM users WHERE id=?').get(req.userId);
   if (!u) return res.status(404).json({ error: 'Not found' });
-  const referralCount = db.prepare('SELECT COUNT(*) as c FROM referral_rewards WHERE referrer_id=?').get(req.userId).c;
-  res.json({ user: { ...u, displayName: u.display_name, pieceCount: getPieceCount(req.userId), referralCount } });
+  res.json({ user: { ...u, displayName: u.display_name, pieceCount: getPieceCount(req.userId) } });
 });
 
 // ============ USER PROFILE ============
