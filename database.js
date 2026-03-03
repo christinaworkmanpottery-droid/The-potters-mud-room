@@ -363,7 +363,8 @@ function initDB() {
       ('cat-techniques', 'Techniques', 'Hand building, throwing, trimming, and more', 5, '🏺'),
       ('cat-selling', 'Selling & Business', 'Pricing, shows, online sales, and business tips', 6, '💰'),
       ('cat-beginners', 'Beginners Welcome', 'No question is too basic — we all started somewhere', 7, '🌱'),
-      ('cat-show-off', 'Show Your Work', 'Share photos of your pieces — we wanna see!', 8, '📸');
+      ('cat-show-off', 'Show Your Work', 'Share photos of your pieces — we wanna see!', 8, '📸'),
+      ('cat-casualties', 'Pottery Casualties', 'RIP to the pieces that didn''t make it. Cracks, explosions, glaze disasters — share your pottery fails!', 9, '💀');
 
     -- Indexes
     CREATE INDEX IF NOT EXISTS idx_pieces_user ON pieces(user_id);

@@ -186,3 +186,7 @@ h1 { font-size: 1.75rem; } h2 { font-size: 1.4rem; } h3 { font-size: 1.15rem; }
 /* Photo stage label */
 .detail-photo-wrap { position: relative; display: inline-block; }
 .photo-stage-label { position: absolute; bottom: 4px; left: 4px; background: rgba(0,0,0,0.6); color: #fff; font-size: 0.7rem; padding: 2px 6px; border-radius: var(--radius-sm); }
+
+/* Yearly savings badge */
+.yearly-savings { display: inline-block; background: var(--accent-light); color: #558B2F; font-size: 0.8rem; padding: 2px 8px; border-radius: 20px; margin-top: 4px; font-weight: 600; }
+.billing-toggle { min-width: 120px; }

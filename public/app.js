@@ -75,7 +75,7 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
   errEl.classList.add('hidden');
   try {
     const data = await api(isSignUp ? '/api/auth/register' : '/api/auth/login', {
-      method: 'POST', body: isSignUp ? { email, password, displayName: name } : { email, password }
+      method: 'POST', body: isSignUp ? { email, password, displayName: name, referralCode: document.getElementById('authReferral').value } : { email, password }
     });
     token = data.token;
     localStorage.setItem('mudlog_token', token);
@@ -823,17 +823,33 @@ async function loadProfile() {
     // Tier info
     const tier = d.user.tier || 'free';
     const tierNames = { free: 'Free', basic: 'Basic ($9.95/mo)', mid: 'Mid ($12.95/mo)', top: 'Top ($19.95/mo)' };
-    document.getElementById('profileTierInfo').innerHTML =
-      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><span class="tier-badge tier-' + tier + '" style="font-size:0.9rem;padding:4px 12px">' + tier.toUpperCase() + '</span> ' + tierNames[tier] + '</div>' +
-      (tier === 'free' ? '<button class="btn btn-primary" onclick="navigate(\'upgrade\')">Upgrade Your Plan</button>' :
-       '<button class="btn btn-secondary btn-sm" onclick="navigate(\'upgrade\')">Change Plan</button>');
+    let tierHtml = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><span class="tier-badge tier-' + tier + '" style="font-size:0.9rem;padding:4px 12px">' + tier.toUpperCase() + '</span> ' + tierNames[tier] + '</div>';
+    if (d.user.plan_expires_at) {
+      const exp = new Date(d.user.plan_expires_at);
+      const daysLeft = Math.ceil((exp - Date.now()) / 86400000);
+      tierHtml += '<div class="text-sm" style="margin-bottom:8px;color:' + (daysLeft < 7 ? 'var(--danger)' : 'var(--text-light)') + '">Plan ' + (daysLeft > 0 ? 'expires ' + fmtDate(d.user.plan_expires_at) + ' (' + daysLeft + ' days left)' : 'expired') + '</div>';
+    }
+    if (d.user.billing_period && d.user.billing_period !== 'promo') {
+      tierHtml += '<div class="text-sm" style="margin-bottom:8px;color:var(--text-light)">Billing: ' + d.user.billing_period + ' · Cancel anytime</div>';
+    }
+    tierHtml += (tier === 'free' ? '<button class="btn btn-primary" onclick="navigate(\'upgrade\')">Upgrade Your Plan</button>' :
+       '<div style="display:flex;gap:8px"><button class="btn btn-secondary btn-sm" onclick="navigate(\'upgrade\')">Change Plan</button><button class="btn btn-danger btn-sm" onclick="cancelSubscription()">Cancel Plan</button></div>');
+    document.getElementById('profileTierInfo').innerHTML = tierHtml;
 
     // Token info
     const tb = await api('/api/tokens/balance');
     document.getElementById('profileTokenInfo').innerHTML =
       '<div style="margin-bottom:8px">🪙 <strong>' + tb.tokens + '</strong> tokens' +
       (tb.hasUnlimited ? ' + <strong>Unlimited posting</strong> until ' + fmtDate(tb.unlimitedUntil) : '') + '</div>' +
-      (tier !== 'free' ? '<button class="btn btn-secondary btn-sm" onclick="navigate(\'upgrade\')">Buy Tokens</button>' : '<div class="text-sm" style="color:var(--text-muted)">Upgrade to a paid plan to purchase forum tokens</div>');
+      '<button class="btn btn-secondary btn-sm" onclick="navigate(\'upgrade\')">Buy Tokens</button>';
+
+    // Referral section
+    const refCode = d.user.referral_code || '';
+    const refCount = d.user.referralCount || 0;
+    document.getElementById('profileReferralInfo').innerHTML =
+      '<div style="margin-bottom:8px">Your referral code: <strong style="color:var(--primary);font-size:1.1rem">' + esc(refCode) + '</strong></div>' +
+      '<div class="text-sm" style="margin-bottom:8px;color:var(--text-light)">Share this code — when someone signs up with it, you both get 5 free forum tokens!</div>' +
+      '<div class="text-sm">Friends referred: <strong>' + refCount + '</strong> · Tokens earned: <strong>' + (refCount * 5) + '</strong></div>';
   } catch(e) { toast(e.message,'error'); }
 }
 
@@ -859,40 +875,38 @@ async function loadUpgrade() {
     const tier = currentUser?.tier || 'free';
     const tierLv = { free: 0, basic: 1, mid: 2, top: 3 };
 
-    let html = '<div class="upgrade-plans">';
+    let html = '<div style="display:flex;gap:12px;margin-bottom:20px;justify-content:center"><button class="btn btn-primary billing-toggle active" id="btnMonthly" onclick="setBilling(\'monthly\')">Monthly</button><button class="btn btn-secondary billing-toggle" id="btnYearly" onclick="setBilling(\'yearly\')">Yearly (Save!)</button></div>';
+    let billingMode = 'monthly';
+    window._plansData = d;
+    window._billingMode = 'monthly';
+    html += '<div id="plansGrid" class="upgrade-plans">';
     d.plans.forEach(p => {
       const isCurrent = p.id === tier;
       const isDowngrade = tierLv[p.id] < tierLv[tier];
       html += '<div class="upgrade-plan-card' + (isCurrent ? ' current' : '') + '">' +
         '<div class="plan-name">' + esc(p.name) + '</div>' +
-        '<div class="plan-price">' + (p.price ? '$' + p.price.toFixed(2) + '<span class="plan-period">/mo</span>' : 'Free') + '</div>' +
+        '<div class="plan-price monthly-price">' + (p.price ? '$' + p.price.toFixed(2) + '<span class="plan-period">/mo</span>' : 'Free') + '</div>' +
+        (p.yearlyPrice ? '<div class="plan-price yearly-price hidden">$' + p.yearlyPrice.toFixed(2) + '<span class="plan-period">/yr</span>' + (p.yearlySavings ? '<div class="yearly-savings">Save $' + p.yearlySavings.toFixed(2) + '!</div>' : '') + '</div>' : '') +
         '<ul class="plan-features">' + p.features.map(f => '<li>✓ ' + esc(f) + '</li>').join('') + '</ul>' +
         (isCurrent ? '<button class="btn btn-secondary" disabled>Current Plan</button>' :
          p.id === 'free' ? '' :
          isDowngrade ? '' :
-         '<button class="btn btn-primary" onclick="subscribePlan(\'' + p.id + '\')">' + (d.stripeEnabled ? 'Subscribe' : 'Coming Soon') + '</button>') +
+         '<button class="btn btn-primary plan-subscribe-btn" data-plan="' + p.id + '" onclick="subscribePlan(window._billingMode===\'yearly\'?\'' + p.id + '-yearly\':\'' + p.id + '\')">' + (d.stripeEnabled ? 'Subscribe' : 'Coming Soon') + '</button>') +
         '</div>';
     });
     html += '</div>';
 
-    // Token packs section (only for paid users)
-    if (tierLv[tier] >= 1) {
-      html += '<h2 class="mt-24 mb-16">🪙 Forum Tokens</h2>' +
-        '<p class="text-sm mb-16" style="color:var(--text-light)">Tokens let you post and reply in the forum. 1 token = 1 post or reply. Tokens roll over as long as your membership is active.</p>' +
-        '<div class="upgrade-plans">';
-      d.tokenPacks.forEach(tp => {
-        html += '<div class="upgrade-plan-card">' +
-          '<div class="plan-name">' + tp.tokens + ' Tokens</div>' +
-          '<div class="plan-price">$' + tp.price.toFixed(2) + '</div>' +
-          '<button class="btn btn-primary btn-sm" onclick="buyTokens(\'' + tp.id + '\')">' + (d.stripeEnabled ? 'Buy' : 'Coming Soon') + '</button></div>';
-      });
+    // Token packs section (available to everyone)
+    html += '<h2 class="mt-24 mb-16">🪙 Forum Tokens</h2>' +
+      '<p class="text-sm mb-16" style="color:var(--text-light)">Tokens let you post and reply in the forum. 1 token = 1 post or reply. Tokens never expire for paid members. Free members\' tokens expire in 30 days.</p>' +
+      '<div class="upgrade-plans">';
+    d.tokenPacks.forEach(tp => {
       html += '<div class="upgrade-plan-card">' +
-        '<div class="plan-name">Unlimited Pass</div>' +
-        '<div class="plan-price">$' + d.unlimitedPass.price.toFixed(2) + '<span class="plan-period">/30 days</span></div>' +
-        '<div class="text-sm mb-16" style="color:var(--text-light)">Post and reply unlimited for 30 days. No token cost.</div>' +
-        '<button class="btn btn-primary btn-sm" onclick="buyUnlimitedPass()">' + (d.stripeEnabled ? 'Buy Pass' : 'Coming Soon') + '</button></div>';
-      html += '</div>';
-    }
+        '<div class="plan-name">' + tp.tokens + ' Tokens</div>' +
+        '<div class="plan-price">$' + tp.price.toFixed(2) + '</div>' +
+        '<button class="btn btn-primary btn-sm" onclick="buyTokens(\'' + tp.id + '\')">' + (d.stripeEnabled ? 'Buy' : 'Coming Soon') + '</button></div>';
+    });
+    html += '</div>';
 
     // Promo code section
     html += '<div class="card mt-24" style="max-width:500px"><h3 style="margin-bottom:12px">🎟️ Have a Promo Code?</h3>' +
@@ -956,6 +970,14 @@ async function loadPromoCodes() {
   } catch(e) {}
 }
 
+function setBilling(mode) {
+  window._billingMode = mode;
+  document.querySelectorAll('.monthly-price').forEach(el => el.classList.toggle('hidden', mode === 'yearly'));
+  document.querySelectorAll('.yearly-price').forEach(el => el.classList.toggle('hidden', mode === 'monthly'));
+  document.getElementById('btnMonthly').className = 'btn ' + (mode === 'monthly' ? 'btn-primary' : 'btn-secondary') + ' billing-toggle';
+  document.getElementById('btnYearly').className = 'btn ' + (mode === 'yearly' ? 'btn-primary' : 'btn-secondary') + ' billing-toggle';
+}
+
 async function subscribePlan(plan) {
   try {
     const d = await api('/api/billing/checkout', { method:'POST', body: { plan } });
@@ -974,6 +996,15 @@ async function buyUnlimitedPass() {
   try {
     const d = await api('/api/billing/unlimited-pass', { method:'POST' });
     if (d.url) window.location.href = d.url;
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function cancelSubscription() {
+  if (!confirm('Are you sure you want to cancel your subscription? You\'ll keep access until the end of your billing period.')) return;
+  try {
+    await api('/api/billing/cancel', { method:'POST' });
+    toast('Subscription cancelled. You\'ll keep access until the end of your billing period.', 'success');
+    const me = await api('/api/auth/me'); currentUser = me.user; loadProfile();
   } catch(e) { toast(e.message,'error'); }
 }
 

@@ -325,6 +325,33 @@ app.post('/api/billing/cancel', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ============ ADMIN ============
+const ADMIN_EMAIL = 'christinaworkmanpottery@gmail.com';
+function isAdmin(req) {
+  const u = db.prepare('SELECT email FROM users WHERE id=?').get(req.userId);
+  return u?.email === ADMIN_EMAIL;
+}
+
+app.post('/api/admin/set-unlimited', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  const { userId, email } = req.body;
+  const target = userId || (email ? db.prepare('SELECT id FROM users WHERE email=?').get(email)?.id : null);
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  const until = new Date(); until.setFullYear(until.getFullYear() + 100);
+  db.prepare('UPDATE users SET unlimited_tokens_until=?, forum_tokens=999999 WHERE id=?').run(until.toISOString(), target);
+  res.json({ success: true, message: 'Unlimited tokens set' });
+});
+
+app.post('/api/admin/give-tokens', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  const { email, amount } = req.body;
+  if (!email || !amount) return res.status(400).json({ error: 'Email and amount required' });
+  const u = db.prepare('SELECT id FROM users WHERE email=?').get(email);
+  if (!u) return res.status(404).json({ error: 'User not found' });
+  db.prepare('UPDATE users SET forum_tokens = forum_tokens + ? WHERE id=?').run(amount, u.id);
+  res.json({ success: true });
+});
+
 // ============ PROMO CODES ============
 // Redeem a promo code
 app.post('/api/promo/redeem', auth, (req, res) => {
@@ -348,8 +375,9 @@ app.post('/api/promo/redeem', auth, (req, res) => {
   res.json({ success: true, tier: promo.tier, expiresAt: expiresAt.toISOString(), token, message: 'Welcome! You now have ' + promo.tier.toUpperCase() + ' access for ' + promo.duration_days + ' days!' });
 });
 
-// Create a promo code (admin — for Christina)
+// Create a promo code (admin only — Christina)
 app.post('/api/promo/create', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   const { code, tier, durationDays, maxUses, expiresAt } = req.body;
   if (!code || !tier) return res.status(400).json({ error: 'Code and tier required' });
   const id = uuidv4();
