@@ -329,7 +329,7 @@ function isAdmin(req) {
 app.get('/api/admin/members', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, forum_tokens, 
-    avatar_filename, profile_photo, created_at, updated_at, stripe_customer_id, stripe_subscription_id 
+    avatar_filename, created_at, updated_at, stripe_customer_id, stripe_subscription_id 
     FROM users ORDER BY created_at DESC`).all();
   const stats = {
     total: members.length,
@@ -680,10 +680,10 @@ app.get('/api/firing-logs', auth, (req, res) => {
 });
 
 app.post('/api/firing-logs', auth, requireTier('basic'), (req, res) => {
-  const { pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, holdUsed, holdDuration, date, results, notes } = req.body;
+  const { pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail, holdUsed, holdDuration, date, results, notes } = req.body;
   const id = uuidv4();
-  db.prepare('INSERT INTO firing_logs (id,user_id,piece_id,firing_type,cone,temperature,atmosphere,kiln_name,schedule,duration,firing_speed,hold_used,hold_duration,date,results,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-    .run(id, req.userId, pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, holdUsed ? 1 : 0, holdDuration, date, results, notes);
+  db.prepare('INSERT INTO firing_logs (id,user_id,piece_id,firing_type,cone,temperature,atmosphere,kiln_name,schedule,duration,firing_speed,custom_speed_detail,hold_used,hold_duration,date,results,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .run(id, req.userId, pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes);
   res.json({ id });
 });
 
@@ -740,14 +740,17 @@ app.get('/api/community/combos', auth, requireTier('top'), (req, res) => {
   res.json(combos);
 });
 
-app.post('/api/community/combos', auth, requireTier('top'), (req, res) => {
+app.post('/api/community/combos', auth, requireTier('top'), upload.array('photos', 2), (req, res) => {
   const { name, clayBodyName, cone, atmosphere, description, notes, isShared, layers } = req.body;
+  const parsedLayers = typeof layers === 'string' ? JSON.parse(layers) : layers;
   const id = uuidv4();
-  db.prepare('INSERT INTO glaze_combos (id,user_id,name,clay_body_name,cone,atmosphere,description,notes,is_shared) VALUES (?,?,?,?,?,?,?,?,?)')
-    .run(id, req.userId, name, clayBodyName, cone, atmosphere, description, notes, isShared ? 1 : 0);
-  if (layers?.length) {
+  const photo1 = req.files?.[0]?.filename || null;
+  const photo2 = req.files?.[1]?.filename || null;
+  db.prepare('INSERT INTO glaze_combos (id,user_id,name,clay_body_name,cone,atmosphere,description,notes,is_shared,photo_filename,photo_filename2) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
+    .run(id, req.userId, name, clayBodyName, cone, atmosphere, description, notes, isShared === 'true' || isShared === true ? 1 : 0, photo1, photo2);
+  if (parsedLayers?.length) {
     const ins = db.prepare('INSERT INTO glaze_combo_layers (id,combo_id,glaze_name,brand,coats,application_method,layer_order) VALUES (?,?,?,?,?,?,?)');
-    layers.forEach((l, i) => ins.run(uuidv4(), id, l.glazeName, l.brand, l.coats || 1, l.method, i));
+    parsedLayers.forEach((l, i) => ins.run(uuidv4(), id, l.glazeName, l.brand, l.coats || 1, l.method, i));
   }
   res.json({ id });
 });

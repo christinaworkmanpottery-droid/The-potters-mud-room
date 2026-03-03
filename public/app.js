@@ -211,7 +211,7 @@ async function viewPiece(id) {
     const firings = (p.firings||[]).map(f =>
       '<div class="card" style="padding:14px;margin-bottom:8px"><strong>' + esc(f.firing_type||'Firing') + '</strong> — Cone ' + esc(f.cone||'?') +
       (f.atmosphere ? ' (' + esc(f.atmosphere) + ')' : '') + (f.kiln_name ? ' — ' + esc(f.kiln_name) : '') +
-      (f.firing_speed ? '<br><span class="text-sm"><strong>Speed:</strong> ' + esc(f.firing_speed) + '</span>' : '') +
+      (f.firing_speed ? '<br><span class="text-sm"><strong>Speed:</strong> ' + esc(f.firing_speed) + (f.custom_speed_detail ? ' — ' + esc(f.custom_speed_detail) : '') + '</span>' : '') +
       (f.hold_used ? '<br><span class="text-sm"><strong>Hold:</strong> Yes' + (f.hold_duration ? ' — ' + esc(f.hold_duration) : '') + '</span>' : '') +
       (f.date ? '<br><span class="text-sm" style="color:var(--text-light)">' + fmtDate(f.date) + '</span>' : '') +
       (f.results ? '<br><span class="text-sm">' + esc(f.results) + '</span>' : '') + '</div>'
@@ -525,6 +525,8 @@ function openFiringModal() {
   document.getElementById('firingHoldUsed').value = '0';
   document.getElementById('firingHoldDuration').value = '';
   document.getElementById('firingHoldDuration').parentElement.classList.add('hidden');
+  const csd = document.getElementById('firingCustomSpeedDetail');
+  if (csd) { csd.value = ''; csd.parentElement.classList.add('hidden'); }
   document.getElementById('firingNotes').value = '';
   api('/api/pieces').then(pieces => {
     const s = document.getElementById('firingPiece');
@@ -541,6 +543,7 @@ async function saveFiring(e) {
     atmosphere:document.getElementById('firingAtmosphere').value||null,
     kilnName:document.getElementById('firingKiln').value||null,
     firingSpeed:document.getElementById('firingSpeed').value||null,
+    customSpeedDetail:document.getElementById('firingCustomSpeedDetail')?.value||null,
     holdUsed:document.getElementById('firingHoldUsed').value==='1',
     holdDuration:document.getElementById('firingHoldDuration').value||null,
     date:document.getElementById('firingDate').value||null,
@@ -609,6 +612,7 @@ async function loadCombos() {
       (cb.atmosphere ? '<span class="piece-meta-tag">' + esc(cb.atmosphere) + '</span>' : '') +
       '</div></div>' +
       (cb.clay_body_name ? '<div class="text-sm mb-16"><strong>Clay:</strong> ' + esc(cb.clay_body_name) + '</div>' : '') +
+      (cb.photo_filename || cb.photo_filename2 ? '<div style="display:flex;gap:8px;margin-bottom:12px">' + (cb.photo_filename ? '<img src="/uploads/' + cb.photo_filename + '" style="max-width:200px;max-height:200px;border-radius:var(--radius-sm);object-fit:cover" loading="lazy">' : '') + (cb.photo_filename2 ? '<img src="/uploads/' + cb.photo_filename2 + '" style="max-width:200px;max-height:200px;border-radius:var(--radius-sm);object-fit:cover" loading="lazy">' : '') + '</div>' : '') +
       '<div>' + (cb.layers||[]).map((l,i) => '<div style="margin-bottom:4px"><span style="color:var(--text-muted);font-size:0.8rem">Layer ' + (i+1) + ':</span> <span class="glaze-tag">' + esc(l.glaze_name) + '</span>' + (l.brand ? ' <span class="text-sm">(' + esc(l.brand) + ')</span>' : '') + (l.coats > 1 ? ' · ' + l.coats + ' coats' : '') + '</div>').join('') + '</div>' +
       (cb.description ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(cb.description) + '</div>' : '') + '</div>'
     ).join('');
@@ -630,6 +634,7 @@ function openComboModal() {
   document.getElementById('comboDesc').value = '';
   document.getElementById('comboShared').checked = true;
   document.getElementById('comboLayers').innerHTML = '';
+  if (document.getElementById('comboPhotos')) document.getElementById('comboPhotos').value = '';
   addComboLayer(); addComboLayer();
   openModal('comboModal');
 }
@@ -638,9 +643,20 @@ async function saveCombo(e) {
   const layers = []; document.querySelectorAll('.combo-layer-row').forEach(r => {
     const n = r.querySelector('.cl-name').value; if(n) layers.push({glazeName:n, brand:r.querySelector('.cl-brand').value||null, coats:parseInt(r.querySelector('.cl-coats').value)||1});
   });
-  const body = { name:document.getElementById('comboName').value, clayBodyName:document.getElementById('comboClay').value||null, cone:document.getElementById('comboCone').value||null, description:document.getElementById('comboDesc').value||null, isShared:document.getElementById('comboShared').checked, layers };
-  try { await api('/api/community/combos', {method:'POST',body}); toast('Combo saved!','success'); closeModal('comboModal'); loadCombos(); }
-  catch(e) { toast(e.message,'error'); }
+  const fd = new FormData();
+  fd.append('name', document.getElementById('comboName').value);
+  fd.append('clayBodyName', document.getElementById('comboClay').value || '');
+  fd.append('cone', document.getElementById('comboCone').value || '');
+  fd.append('description', document.getElementById('comboDesc').value || '');
+  fd.append('isShared', document.getElementById('comboShared').checked);
+  fd.append('layers', JSON.stringify(layers));
+  const files = document.getElementById('comboPhotos')?.files;
+  if (files) { for (let i = 0; i < Math.min(files.length, 2); i++) fd.append('photos', files[i]); }
+  try {
+    const r = await fetch('/api/community/combos', { method:'POST', headers:{Authorization:'Bearer '+token}, body:fd });
+    const d = await r.json(); if (!r.ok) throw new Error(d.error);
+    toast('Combo saved!','success'); closeModal('comboModal'); loadCombos();
+  } catch(e) { toast(e.message,'error'); }
 }
 
 // ---- Forum ----

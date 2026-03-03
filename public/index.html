@@ -537,7 +537,8 @@
 
         <div class="card" style="background:var(--primary-light);border-color:var(--primary)">
           <h2 style="margin-bottom:12px">❤️ Built by a Potter, for Potters</h2>
-          <p>Questions? Post in the <strong>Mud Room Help</strong> forum category. We're here to help!</p>
+          <p>Questions? Post in the <strong>Mud Room Help</strong> forum category or email us:</p>
+          <p style="margin-top:8px"><strong>📧 <a href="mailto:thepottersmudroom@gmail.com" style="color:var(--primary)">thepottersmudroom@gmail.com</a></strong></p>
           <p style="margin-top:8px"><strong>thepottersmudroom.com</strong></p>
         </div>
 
@@ -992,13 +993,17 @@
       <div class="form-row">
         <div class="form-group">
           <label>Firing Speed</label>
-          <select class="form-select" id="firingSpeed">
+          <select class="form-select" id="firingSpeed" onchange="var csd=document.getElementById('firingCustomSpeedGroup');if(csd)csd.classList.toggle('hidden',this.value!=='custom')">
             <option value="">Select...</option>
             <option value="slow">Slow</option>
             <option value="medium">Medium</option>
             <option value="fast">Fast</option>
             <option value="custom">Custom</option>
           </select>
+        </div>
+        <div class="form-group hidden" id="firingCustomSpeedGroup">
+          <label>Custom Speed Details</label>
+          <input type="text" class="form-input" id="firingCustomSpeedDetail" placeholder="e.g., ramp 100°/hr to 1800°, hold 20 min">
         </div>
         <div class="form-group">
           <label>Hold Used?</label>
@@ -1106,6 +1111,10 @@
       </div>
       <div class="form-group">
         <label><input type="checkbox" id="comboShared" checked> Share with community</label>
+      </div>
+      <div class="form-group">
+        <label>Photos (up to 2 — show the effect!)</label>
+        <input type="file" id="comboPhotos" accept="image/*" multiple class="form-input" style="font-size:0.85rem">
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('comboModal')">Cancel</button>

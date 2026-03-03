@@ -408,6 +408,8 @@ function initDB() {
   safeAdd('promo_codes', 'token_amount', 'INTEGER DEFAULT 0');
   safeAdd('promo_codes', 'promo_type', "TEXT DEFAULT 'tier'");
   safeAdd('users', 'profile_photo', 'TEXT');
+  safeAdd('firing_logs', 'custom_speed_detail', 'TEXT');
+  safeAdd('glaze_combos', 'photo_filename2', 'TEXT');
 
   // Ensure new forum categories exist
   const catInsert = db.prepare('INSERT OR IGNORE INTO forum_categories (id, name, description, sort_order, icon) VALUES (?,?,?,?,?)');
