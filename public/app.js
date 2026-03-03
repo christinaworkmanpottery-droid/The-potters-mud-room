@@ -110,6 +110,11 @@ function showApp() {
   });
   checkUrlParams();
   loadDashboard(); loadClayBodies(); loadGlazes();
+  // Show admin nav for Christina
+  const adminNav = document.getElementById('navAdmin');
+  if (adminNav && currentUser?.email === 'christinaworkmanpottery@gmail.com') adminNav.style.display = '';
+  // Load profile photo in nav/profile
+  loadProfilePhoto();
 }
 
 // ---- Navigation ----
@@ -123,7 +128,7 @@ function navigate(page) {
     clayBodies:'pageClayBodies', glazes:'pageGlazes', firings:'pageFirings',
     sales:'pageSales', community:'pageCommunity', forum:'pageForum',
     forumPost:'pageForumPost', profile:'pageProfile', shop:'pageShop',
-    upgrade:'pageUpgrade', help:'pageHelp'
+    upgrade:'pageUpgrade', help:'pageHelp', admin:'pageAdmin'
   };
   const el = document.getElementById(map[page]); if (el) el.classList.add('active');
   const nb = document.querySelector('.nav-link[data-page="' + page + '"]'); if (nb) nb.classList.add('active');
@@ -132,7 +137,7 @@ function navigate(page) {
     dashboard:loadDashboard, pieces:loadPieces, clayBodies:loadClayBodies,
     glazes:loadGlazes, firings:loadFirings, sales:loadSales,
     community:loadCombos, forum:loadForum, profile:loadProfile,
-    shop:loadShop, upgrade:loadUpgrade
+    shop:loadShop, upgrade:loadUpgrade, admin:loadAdmin
   };
   if (loaders[page]) loaders[page]();
 }
@@ -844,6 +849,16 @@ async function loadProfile() {
     document.getElementById('profileUnits').value = d.user.unit_system || 'imperial';
     document.getElementById('profileTemp').value = d.user.temp_unit || 'fahrenheit';
 
+    // Profile photo
+    const preview = document.getElementById('profilePhotoPreview');
+    if (preview) {
+      if (d.user.avatar_filename) {
+        preview.innerHTML = '<img src="/uploads/' + d.user.avatar_filename + '" style="width:100%;height:100%;object-fit:cover">';
+      } else {
+        preview.innerHTML = '🏺';
+      }
+    }
+
     // Tier info
     const tier = d.user.tier || 'free';
     const tierNames = { free: 'Free', basic: 'Basic ($9.95/mo)', mid: 'Mid ($12.95/mo)', top: 'Top ($19.95/mo)' };
@@ -1042,6 +1057,146 @@ async function cancelSubscription() {
     toast('Subscription cancelled. You\'ll keep access until the end of your billing period.', 'success');
     const me = await api('/api/auth/me'); currentUser = me.user; loadProfile();
   } catch(e) { toast(e.message,'error'); }
+}
+
+// ---- Profile Photo ----
+function loadProfilePhoto() {
+  const preview = document.getElementById('profilePhotoPreview');
+  if (preview && currentUser?.avatar_filename) {
+    preview.innerHTML = '<img src="/uploads/' + currentUser.avatar_filename + '" style="width:100%;height:100%;object-fit:cover">';
+  }
+}
+async function uploadProfilePhoto(input) {
+  if (!input.files?.[0]) return;
+  const fd = new FormData();
+  fd.append('photo', input.files[0]);
+  try {
+    const r = await fetch('/api/profile/photo', { method:'POST', headers:{Authorization:'Bearer '+token}, body:fd });
+    const d = await r.json(); if (!r.ok) throw new Error(d.error);
+    toast('Profile photo updated!','success');
+    currentUser.avatar_filename = d.filename;
+    loadProfilePhoto();
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// ---- Export Data ----
+async function exportData(endpoint) {
+  try {
+    const r = await fetch(endpoint, { headers: { Authorization: 'Bearer ' + token } });
+    if (!r.ok) {
+      const d = await r.json();
+      throw new Error(d.error || 'Export failed');
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const disp = r.headers.get('Content-Disposition') || '';
+    const match = disp.match(/filename=([^;]+)/);
+    a.download = match ? match[1] : 'export.csv';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast('Downloaded!', 'success');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ---- Admin Dashboard ----
+async function loadAdmin() {
+  if (currentUser?.email !== 'christinaworkmanpottery@gmail.com') {
+    document.getElementById('adminContent').innerHTML = '<div class="card"><p>Admin access only.</p></div>';
+    return;
+  }
+  try {
+    const data = await api('/api/admin/members');
+    const m = data.members;
+    const s = data.stats;
+    
+    let html = '<div class="stats-bar" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">' +
+      '<div class="stat-box"><div class="stat-number">' + s.total + '</div><div class="stat-label">Total Members</div></div>' +
+      '<div class="stat-box"><div class="stat-number">' + s.recent7d + '</div><div class="stat-label">Last 7 Days</div></div>' +
+      '<div class="stat-box"><div class="stat-number">' + s.recent30d + '</div><div class="stat-label">Last 30 Days</div></div>' +
+      '<div class="stat-box"><div class="stat-number" style="color:var(--accent)">' + s.byTier.basic + '</div><div class="stat-label">Basic</div></div>' +
+      '<div class="stat-box"><div class="stat-number" style="color:var(--primary)">' + s.byTier.mid + '</div><div class="stat-label">Mid</div></div>' +
+      '<div class="stat-box"><div class="stat-number" style="color:var(--success)">' + s.byTier.top + '</div><div class="stat-label">Top</div></div>' +
+      '<div class="stat-box"><div class="stat-number">' + s.byTier.free + '</div><div class="stat-label">Free</div></div>' +
+      '</div>';
+
+    // Members table
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">All Members</h3>';
+    html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
+    html += '<tr style="border-bottom:2px solid var(--border);text-align:left"><th style="padding:8px">Name</th><th style="padding:8px">Email</th><th style="padding:8px">Tier</th><th style="padding:8px">Billing</th><th style="padding:8px">Tokens</th><th style="padding:8px">Joined</th></tr>';
+    m.forEach(u => {
+      const tier = u.tier || 'free';
+      html += '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:8px">' + esc(u.display_name || '—') + '</td>' +
+        '<td style="padding:8px">' + esc(u.email) + '</td>' +
+        '<td style="padding:8px"><span class="tier-badge tier-' + tier + '" style="font-size:0.75rem">' + tier.toUpperCase() + '</span>' +
+        (u.stripe_subscription_id ? ' 💳' : '') + '</td>' +
+        '<td style="padding:8px">' + (u.billing_period || '—') + '</td>' +
+        '<td style="padding:8px">' + (u.forum_tokens || 0) + '</td>' +
+        '<td style="padding:8px">' + fmtDate(u.created_at) + '</td></tr>';
+    });
+    html += '</table></div></div>';
+
+    // Discount codes section
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">🏷️ Shop Discount Codes</h3>' +
+      '<p class="text-sm mb-16" style="color:var(--text-light)">Create discount codes for professionals promoting your site. These give a % off in the shop — no free subscriptions or tokens.</p>' +
+      '<div class="form-row" style="gap:8px">' +
+      '<div class="form-group"><label>Code</label><input type="text" class="form-input" id="discountCode" placeholder="e.g., POTTER20" style="text-transform:uppercase"></div>' +
+      '<div class="form-group"><label>Discount %</label><input type="number" class="form-input" id="discountPct" value="10" min="1" max="100"></div>' +
+      '<div class="form-group"><label>Max Uses (0=∞)</label><input type="number" class="form-input" id="discountMaxUses" value="0"></div>' +
+      '</div><button class="btn btn-primary btn-sm" onclick="createDiscountCode()">Create Discount Code</button>' +
+      '<div id="discountCodesList" class="mt-16"></div></div>';
+
+    // Orders section
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">🛍️ Recent Orders</h3><div id="adminOrders">Loading...</div></div>';
+
+    document.getElementById('adminContent').innerHTML = html;
+    loadDiscountCodes();
+    loadAdminOrders();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function createDiscountCode() {
+  const code = document.getElementById('discountCode').value.trim();
+  const pct = parseFloat(document.getElementById('discountPct').value);
+  const maxUses = parseInt(document.getElementById('discountMaxUses').value) || 0;
+  if (!code || !pct) { toast('Code and discount % required', 'error'); return; }
+  try {
+    await api('/api/admin/discount/create', { method:'POST', body: { code, discountPct: pct, maxUses } });
+    toast('Discount code ' + code.toUpperCase() + ' created!', 'success');
+    document.getElementById('discountCode').value = '';
+    loadDiscountCodes();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function loadDiscountCodes() {
+  try {
+    const codes = await api('/api/admin/discount/codes');
+    const el = document.getElementById('discountCodesList');
+    if (!el) return;
+    if (!codes.length) { el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">No discount codes yet</div>'; return; }
+    el.innerHTML = codes.map(c =>
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">' +
+      '<div><strong>' + esc(c.code) + '</strong> — ' + c.discount_pct + '% off</div>' +
+      '<div class="text-sm" style="color:var(--text-muted)">Used: ' + c.times_used + (c.max_uses > 0 ? '/' + c.max_uses : '/∞') + (c.is_active ? '' : ' (inactive)') + '</div></div>'
+    ).join('');
+  } catch(e) {}
+}
+
+async function loadAdminOrders() {
+  try {
+    const orders = await api('/api/admin/orders');
+    const el = document.getElementById('adminOrders');
+    if (!orders.length) { el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">No orders yet</div>'; return; }
+    el.innerHTML = orders.map(o =>
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">' +
+      '<div><strong>' + esc(o.product_name || 'Unknown') + '</strong> — ' + esc(o.display_name || o.email) + '</div>' +
+      '<div><span style="color:var(--accent);font-weight:700">$' + (o.price_paid || 0).toFixed(2) + '</span> · ' + fmtDate(o.created_at) + '</div></div>'
+    ).join('');
+  } catch(e) { document.getElementById('adminOrders').innerHTML = '<div class="text-sm" style="color:var(--text-muted)">Could not load orders</div>'; }
 }
 
 // ---- Init ----

@@ -259,6 +259,7 @@
         <button class="nav-link" data-page="help" onclick="navigate('help')">Help</button>
         <button class="nav-link" data-page="upgrade" onclick="navigate('upgrade')">Plans</button>
         <button class="nav-link" data-page="profile" onclick="navigate('profile')">Profile</button>
+        <button class="nav-link" data-page="admin" onclick="navigate('admin')" id="navAdmin" style="display:none">Admin</button>
       </div>
       <div class="nav-user">
         <span id="navTier" class="tier-badge tier-free">FREE</span>
@@ -540,6 +541,68 @@
           <p style="margin-top:8px"><strong>thepottersmudroom.com</strong></p>
         </div>
 
+        <div class="card mb-16" style="margin-top:16px">
+          <h2 style="margin-bottom:12px">🔒 Security & Privacy</h2>
+          <p style="margin-bottom:12px"><strong>Your data is safe with us.</strong> Here's how we protect you:</p>
+          <ul style="margin:12px 0;padding-left:20px;line-height:2">
+            <li><strong>Payments:</strong> All credit card info is handled by <strong>Stripe</strong> — the same payment processor used by Amazon, Shopify, and millions of businesses. Your card number never touches our servers. Ever.</li>
+            <li><strong>Your pottery data is private:</strong> Only YOU can see your pieces, clay bodies, glazes, and firing logs. No one else — not even other members — can view your personal logs.</li>
+            <li><strong>Glaze privacy:</strong> Your glazes are private by default. They ONLY appear in the Community Glaze Library if you specifically choose to share them. Your secret recipes stay secret.</li>
+            <li><strong>Passwords:</strong> Stored encrypted (bcrypt hashed). We can't read your password even if we tried.</li>
+            <li><strong>Profile control:</strong> You can make your profile private at any time. You can also block any user.</li>
+            <li><strong>HTTPS:</strong> All connections are encrypted in transit.</li>
+          </ul>
+        </div>
+
+        <div class="card mb-16">
+          <h2 style="margin-bottom:12px">❓ Frequently Asked Questions</h2>
+          
+          <div style="margin-bottom:16px">
+            <p><strong>Q: Can other members see my pottery logs?</strong></p>
+            <p style="color:var(--text-light)">A: No. Your pieces, clay bodies, glazes, and firing logs are completely private to you. Only you can see them when you log in.</p>
+          </div>
+          
+          <div style="margin-bottom:16px">
+            <p><strong>Q: What if I share a glaze in the community — can someone steal my recipe?</strong></p>
+            <p style="color:var(--text-light)">A: You choose what to share. If you share a combo or recipe in the Community Glaze Library, other members can see it. If you keep it in your personal glaze library, it's private.</p>
+          </div>
+          
+          <div style="margin-bottom:16px">
+            <p><strong>Q: Is my credit card safe?</strong></p>
+            <p style="color:var(--text-light)">A: Yes. We use Stripe for all payments. Your card number is never stored on our servers — Stripe handles everything securely.</p>
+          </div>
+          
+          <div style="margin-bottom:16px">
+            <p><strong>Q: Can I export my data?</strong></p>
+            <p style="color:var(--text-light)">A: Yes! Go to your Profile page and use the export buttons to download your clay bodies, glazes, firing logs, pieces, and sales as CSV files. You can open these in Excel, Google Sheets, or any spreadsheet app.</p>
+          </div>
+          
+          <div style="margin-bottom:16px">
+            <p><strong>Q: What are forum tokens?</strong></p>
+            <p style="color:var(--text-light)">A: Forum tokens are used to post and reply in the community forum. 1 token = 1 post or reply. You can buy token packs on the Plans page, or get 10 free tokens/month with the Top tier.</p>
+          </div>
+          
+          <div>
+            <p><strong>Q: Can I cancel my subscription?</strong></p>
+            <p style="color:var(--text-light)">A: Yes, anytime. Go to your Profile page and click "Cancel Plan." You'll keep access until the end of your billing period.</p>
+          </div>
+        </div>
+
+        <div class="card mb-16">
+          <h2 style="margin-bottom:12px">🏷️ Free Sticker Designs</h2>
+          <p style="margin-bottom:12px">Download these pottery sticker designs — print them yourself or send to a print shop!</p>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <a href="/downloads/get-muddy.svg" download class="btn btn-secondary btn-sm" style="text-decoration:none">🎨 Get Muddy</a>
+            <a href="/downloads/glazed-and-confused.svg" download class="btn btn-secondary btn-sm" style="text-decoration:none">🎨 Glazed & Confused</a>
+            <a href="/downloads/id-rather-be-throwing.svg" download class="btn btn-secondary btn-sm" style="text-decoration:none">🎨 I'd Rather Be Throwing</a>
+            <a href="/downloads/life-is-better-at-the-wheel.svg" download class="btn btn-secondary btn-sm" style="text-decoration:none">🎨 Life Is Better at the Wheel</a>
+            <a href="/downloads/hand-built-with-love.svg" download class="btn btn-secondary btn-sm" style="text-decoration:none">🎨 Hand Built With Love</a>
+            <a href="/downloads/hand-built-bumper.svg" download class="btn btn-secondary btn-sm" style="text-decoration:none">🎨 Hand Built (Bumper)</a>
+            <a href="/downloads/mud-room-logo.svg" download class="btn btn-secondary btn-sm" style="text-decoration:none">🏺 Mud Room Logo</a>
+          </div>
+          <p class="text-sm" style="color:var(--text-muted);margin-top:8px">SVG format — print-ready. Upload to <strong>StickerMule</strong>, <strong>StickerApp</strong>, or any sticker printer.</p>
+        </div>
+
       </div>
     </div>
 
@@ -565,6 +628,16 @@
         <h1>My Profile</h1>
       </div>
       <div class="detail-grid">
+        <div class="card">
+          <h3 style="margin-bottom:16px">Profile Photo</h3>
+          <div style="text-align:center;margin-bottom:16px">
+            <div id="profilePhotoPreview" style="width:100px;height:100px;border-radius:50%;background:var(--bg-light);display:inline-flex;align-items:center;justify-content:center;overflow:hidden;border:3px solid var(--border);font-size:2.5rem">
+              🏺
+            </div>
+          </div>
+          <input type="file" id="profilePhotoFile" accept="image/*" onchange="uploadProfilePhoto(this)" class="form-input" style="font-size:0.85rem">
+          <p class="text-sm" style="color:var(--text-muted);margin-top:6px">This photo shows in the forum and your profile.</p>
+        </div>
         <div class="card">
           <h3 style="margin-bottom:16px">About You</h3>
           <div class="form-group">
@@ -610,9 +683,27 @@
           <div id="profileTierInfo"></div>
           <h3 style="margin:24px 0 16px">Referrals</h3>
           <div id="profileReferralInfo"></div>
+          <h3 style="margin:24px 0 16px">Export Your Data</h3>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <a href="/api/export/clay-bodies" class="btn btn-secondary btn-sm" style="text-decoration:none" onclick="event.preventDefault();exportData('/api/export/clay-bodies')">📥 Clay Bodies</a>
+            <a href="/api/export/glazes" class="btn btn-secondary btn-sm" style="text-decoration:none" onclick="event.preventDefault();exportData('/api/export/glazes')">📥 Glazes</a>
+            <a href="/api/export/firing-logs" class="btn btn-secondary btn-sm" style="text-decoration:none" onclick="event.preventDefault();exportData('/api/export/firing-logs')">📥 Firing Logs</a>
+            <a href="/api/export/pieces" class="btn btn-secondary btn-sm" style="text-decoration:none" onclick="event.preventDefault();exportData('/api/export/pieces')">📥 Pieces (Mid+)</a>
+            <a href="/api/sales/export" class="btn btn-secondary btn-sm" style="text-decoration:none" onclick="event.preventDefault();exportData('/api/sales/export')">📥 Sales (Top)</a>
+          </div>
+          <p class="text-sm" style="color:var(--text-muted);margin-top:8px">Downloads a CSV file to your computer.</p>
         </div>
       </div>
     </div>
+
+    <!-- ADMIN (Christina only) -->
+    <div id="pageAdmin" class="page">
+      <div class="page-header">
+        <h1>🔧 Admin Dashboard</h1>
+      </div>
+      <div id="adminContent"></div>
+    </div>
+
   </div>
 </div>
 

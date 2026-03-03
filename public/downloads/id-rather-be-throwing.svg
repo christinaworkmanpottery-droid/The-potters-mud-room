@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
+  <circle cx="300" cy="300" r="290" fill="#C67B4E"/>
+  <circle cx="300" cy="300" r="275" fill="none" stroke="#FAF7F2" stroke-width="3"/>
+  <text x="300" y="190" text-anchor="middle" font-family="Georgia, serif" font-size="36" font-weight="bold" fill="#FAF7F2">I'D RATHER</text>
+  <text x="300" y="245" text-anchor="middle" font-family="Georgia, serif" font-size="36" font-weight="bold" fill="#FAF7F2">BE</text>
+  <text x="300" y="330" text-anchor="middle" font-family="Georgia, serif" font-size="60" font-weight="bold" fill="#FFFFFF">THROWING</text>
+  <text x="300" y="390" text-anchor="middle" font-size="40">🏺</text>
+  <text x="300" y="440" text-anchor="middle" font-family="sans-serif" font-size="16" fill="rgba(255,255,255,0.7)">thepottersmudroom.com</text>
+</svg>

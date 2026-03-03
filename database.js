@@ -356,6 +356,18 @@ function initDB() {
       FOREIGN KEY (product_id) REFERENCES merchant_products(id)
     );
 
+    -- Shop discount codes
+    CREATE TABLE IF NOT EXISTS discount_codes (
+      id TEXT PRIMARY KEY,
+      code TEXT UNIQUE NOT NULL,
+      discount_pct REAL NOT NULL DEFAULT 10,
+      max_uses INTEGER DEFAULT 0,
+      times_used INTEGER DEFAULT 0,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      expires_at TEXT
+    );
+
     -- Insert default forum categories
     INSERT OR IGNORE INTO forum_categories (id, name, description, sort_order, icon) VALUES
       ('cat-general', 'General Chat', 'Talk about anything pottery related', 1, '💬'),
@@ -367,7 +379,9 @@ function initDB() {
       ('cat-beginners', 'Beginners Welcome', 'No question is too basic — we all started somewhere', 7, '🌱'),
       ('cat-show-off', 'Show Your Work', 'Share photos of your pieces — we wanna see!', 8, '📸'),
       ('cat-casualties', 'Pottery Casualties', 'RIP to the pieces that didn''t make it. Cracks, explosions, glaze disasters — share your pottery fails!', 9, '💀'),
-      ('cat-help', 'Mud Room Help', 'Questions about using The Potter''s Mud Room? Ask here and we''ll help!', 10, '❓');
+      ('cat-help', 'Mud Room Help', 'Questions about using The Potter''s Mud Room? Ask here and we''ll help!', 10, '❓'),
+      ('cat-events', 'Events', 'Post pottery events, workshops, shows, and meetups near you!', 11, '📅'),
+      ('cat-jobs', 'Job Board', 'Pottery jobs, studio assistant positions, teaching gigs, and opportunities', 12, '💼');
 
     -- Indexes
     CREATE INDEX IF NOT EXISTS idx_pieces_user ON pieces(user_id);
@@ -393,6 +407,12 @@ function initDB() {
   };
   safeAdd('promo_codes', 'token_amount', 'INTEGER DEFAULT 0');
   safeAdd('promo_codes', 'promo_type', "TEXT DEFAULT 'tier'");
+  safeAdd('users', 'profile_photo', 'TEXT');
+
+  // Ensure new forum categories exist
+  const catInsert = db.prepare('INSERT OR IGNORE INTO forum_categories (id, name, description, sort_order, icon) VALUES (?,?,?,?,?)');
+  catInsert.run('cat-events', 'Events', 'Post pottery events, workshops, shows, and meetups near you!', 11, '📅');
+  catInsert.run('cat-jobs', 'Job Board', 'Pottery jobs, studio assistant positions, teaching gigs, and opportunities', 12, '💼');
 
   return db;
 }

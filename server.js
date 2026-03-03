@@ -325,6 +325,39 @@ function isAdmin(req) {
   return u?.email === ADMIN_EMAIL;
 }
 
+// Admin dashboard — see all members, signups, cancellations, tiers
+app.get('/api/admin/members', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, forum_tokens, 
+    avatar_filename, profile_photo, created_at, updated_at, stripe_customer_id, stripe_subscription_id 
+    FROM users ORDER BY created_at DESC`).all();
+  const stats = {
+    total: members.length,
+    byTier: { free: 0, basic: 0, mid: 0, top: 0 },
+    recent7d: 0,
+    recent30d: 0
+  };
+  const now = Date.now();
+  members.forEach(m => {
+    stats.byTier[m.tier || 'free']++;
+    const age = now - new Date(m.created_at).getTime();
+    if (age < 7 * 86400000) stats.recent7d++;
+    if (age < 30 * 86400000) stats.recent30d++;
+  });
+  res.json({ members, stats });
+});
+
+// Admin: view orders
+app.get('/api/admin/orders', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  const orders = db.prepare(`SELECT mo.*, u.email, u.display_name, mp.name as product_name 
+    FROM merchant_orders mo 
+    JOIN users u ON mo.user_id = u.id 
+    LEFT JOIN merchant_products mp ON mo.product_id = mp.id 
+    ORDER BY mo.created_at DESC`).all();
+  res.json(orders);
+});
+
 app.post('/api/admin/set-unlimited', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   const { userId, email } = req.body;
@@ -399,6 +432,75 @@ app.post('/api/promo/create', auth, (req, res) => {
 app.get('/api/promo/codes', auth, (req, res) => {
   const codes = db.prepare('SELECT * FROM promo_codes WHERE created_by=? ORDER BY created_at DESC').all(req.userId);
   res.json(codes);
+});
+
+// ============ DISCOUNT CODES (Shop) ============
+app.post('/api/admin/discount/create', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  const { code, discountPct, maxUses, expiresAt } = req.body;
+  if (!code || !discountPct) return res.status(400).json({ error: 'Code and discount percentage required' });
+  const id = uuidv4();
+  try {
+    db.prepare('INSERT INTO discount_codes (id, code, discount_pct, max_uses, expires_at) VALUES (?,?,?,?,?)')
+      .run(id, code.trim().toUpperCase(), discountPct, maxUses || 0, expiresAt || null);
+    res.json({ id, code: code.trim().toUpperCase(), discountPct });
+  } catch(e) {
+    if (e.message.includes('UNIQUE')) return res.status(409).json({ error: 'Code already exists' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/admin/discount/codes', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  const codes = db.prepare('SELECT * FROM discount_codes ORDER BY created_at DESC').all();
+  res.json(codes);
+});
+
+app.post('/api/shop/apply-discount', auth, (req, res) => {
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ error: 'Enter a discount code' });
+  const discount = db.prepare('SELECT * FROM discount_codes WHERE code=? AND is_active=1').get(code.trim().toUpperCase());
+  if (!discount) return res.status(404).json({ error: 'Invalid discount code' });
+  if (discount.expires_at && new Date(discount.expires_at) < new Date()) return res.status(400).json({ error: 'This code has expired' });
+  if (discount.max_uses > 0 && discount.times_used >= discount.max_uses) return res.status(400).json({ error: 'This code has been fully redeemed' });
+  res.json({ valid: true, discountPct: discount.discount_pct, code: discount.code });
+});
+
+// ============ PROFILE PHOTO ============
+app.post('/api/profile/photo', auth, upload.single('photo'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No file' });
+  const old = db.prepare('SELECT profile_photo FROM users WHERE id=?').get(req.userId);
+  if (old?.profile_photo) { const p = path.join(UPLOADS_DIR, old.profile_photo); if (fs.existsSync(p)) fs.unlinkSync(p); }
+  db.prepare('UPDATE users SET profile_photo=?, avatar_filename=? WHERE id=?').run(req.file.filename, req.file.filename, req.userId);
+  res.json({ filename: req.file.filename });
+});
+
+// ============ EXPORT (all tiers — glazes and pieces) ============
+app.get('/api/export/glazes', auth, (req, res) => {
+  const glazes = db.prepare('SELECT * FROM glazes WHERE user_id=? ORDER BY name').all(req.userId);
+  let csv = 'Name,Type,Brand,SKU,Color,Cone Range,Atmosphere,Surface,Notes\n';
+  glazes.forEach(g => { csv += `"${(g.name||'').replace(/"/g,'""')}","${g.glaze_type||''}","${(g.brand||'').replace(/"/g,'""')}","${g.sku||''}","${(g.color_description||'').replace(/"/g,'""')}","${g.cone_range||''}","${g.atmosphere||''}","${g.surface||''}","${(g.notes||'').replace(/"/g,'""')}"\n`; });
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=potters-mudroom-glazes.csv');
+  res.send(csv);
+});
+
+app.get('/api/export/clay-bodies', auth, (req, res) => {
+  const clays = db.prepare('SELECT * FROM clay_bodies WHERE user_id=? ORDER BY name').all(req.userId);
+  let csv = 'Name,Brand,Type,Wet Color,Fired Color,Shrinkage %,Cone Range,Cost Per Bag,Bag Weight,Notes\n';
+  clays.forEach(c => { csv += `"${(c.name||'').replace(/"/g,'""')}","${(c.brand||'').replace(/"/g,'""')}","${c.clay_type||''}","${c.color_wet||''}","${c.color_fired||''}","${c.shrinkage_pct||''}","${c.cone_range||''}","${c.cost_per_bag||''}","${c.bag_weight||''}","${(c.notes||'').replace(/"/g,'""')}"\n`; });
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=potters-mudroom-clay-bodies.csv');
+  res.send(csv);
+});
+
+app.get('/api/export/firing-logs', auth, (req, res) => {
+  const firings = db.prepare('SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id WHERE fl.user_id=? ORDER BY fl.date DESC').all(req.userId);
+  let csv = 'Date,Piece,Type,Cone,Temperature,Atmosphere,Kiln,Speed,Hold,Hold Duration,Results,Notes\n';
+  firings.forEach(f => { csv += `"${f.date||''}","${(f.piece_title||'').replace(/"/g,'""')}","${f.firing_type||''}","${f.cone||''}","${f.temperature||''}","${f.atmosphere||''}","${(f.kiln_name||'').replace(/"/g,'""')}","${f.firing_speed||''}","${f.hold_used?'Yes':'No'}","${f.hold_duration||''}","${(f.results||'').replace(/"/g,'""')}","${(f.notes||'').replace(/"/g,'""')}"\n`; });
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=potters-mudroom-firing-logs.csv');
+  res.send(csv);
 });
 
 // ============ CLAY BODIES ============
@@ -614,7 +716,7 @@ app.get('/api/sales/export', auth, requireTier('top'), (req, res) => {
   res.send(csv);
 });
 
-app.get('/api/export/pieces', auth, requireTier('top'), (req, res) => {
+app.get('/api/export/pieces', auth, requireTier('mid'), (req, res) => {
   const pieces = db.prepare('SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id WHERE p.user_id=? ORDER BY p.updated_at DESC').all(req.userId);
   let csv = 'Title,Clay Body,Status,Technique,Form,Studio,Date Started,Date Completed,Material Cost,Firing Cost,Sale Price,Notes\n';
   pieces.forEach(p => { csv += `"${(p.title||'').replace(/"/g,'""')}","${(p.clay_body_name||'').replace(/"/g,'""')}","${p.status||''}","${p.technique||''}","${(p.form||'').replace(/"/g,'""')}","${(p.studio||'').replace(/"/g,'""')}","${p.date_started||''}","${p.date_completed||''}","${p.material_cost||''}","${p.firing_cost||''}","${p.sale_price||''}","${(p.notes||'').replace(/"/g,'""')}"\n`; });
