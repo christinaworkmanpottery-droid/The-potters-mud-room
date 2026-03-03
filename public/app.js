@@ -789,12 +789,14 @@ async function loadShop() {
     c.innerHTML = products.map(p => {
       const img = p.image_filename ? '<img src="/uploads/' + p.image_filename + '" class="shop-product-img">' : '<div class="shop-product-placeholder">' + (p.product_type === 'sticker' ? '🏷️' : p.product_type === 'journal' ? '📓' : p.product_type === 'pdf' ? '📄' : '🎁') + '</div>';
       const typeLabel = p.is_digital ? '<span class="piece-meta-tag">Digital Download</span>' : '<span class="piece-meta-tag">Physical</span>';
+      const previewLink = p.product_type === 'pdf' ? '<a href="/shop/mud-log-preview.pdf" target="_blank" class="btn btn-secondary btn-sm mt-8" style="width:100%">📖 Preview Sample Pages</a>' : '';
       return '<div class="card shop-product-card">' + img +
         '<div class="card-title">' + esc(p.name) + '</div>' +
         (p.description ? '<div class="text-sm" style="color:var(--text-light);margin:6px 0">' + esc(p.description) + '</div>' : '') +
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">' +
         '<div style="font-family:var(--font-display);font-size:1.3rem;font-weight:700;color:var(--primary)">$' + p.price.toFixed(2) + '</div>' +
         typeLabel + '</div>' +
+        previewLink +
         '<button class="btn btn-primary btn-sm mt-8" style="width:100%" onclick="buyProduct(\'' + p.id + '\')">Buy Now</button></div>';
     }).join('');
   } catch(e) { toast(e.message,'error'); }
