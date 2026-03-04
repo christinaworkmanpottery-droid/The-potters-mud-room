@@ -158,9 +158,9 @@
     <h2 style="text-align:center;font-family:Georgia,serif;font-size:1.6rem;margin-bottom:24px">Plans for Every Potter</h2>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
       <div class="card" style="text-align:center"><h3>Free</h3><div style="font-size:1.5rem;font-weight:700;color:var(--primary);margin:8px 0">$0</div><p class="text-sm" style="color:var(--text-light)">20 pieces, 1 photo each, clay &amp; glaze library, browse the forum</p></div>
-      <div class="card" style="text-align:center"><h3>Basic</h3><div style="font-size:1.5rem;font-weight:700;color:var(--primary);margin:8px 0">$9.95<span style="font-size:0.8rem;font-weight:400">/mo</span></div><p class="text-sm" style="color:var(--text-light)">Unlimited pieces, 3 photos, firing logs, forum access</p></div>
-      <div class="card" style="text-align:center;border-color:var(--primary)"><h3>Mid</h3><div style="font-size:1.5rem;font-weight:700;color:var(--primary);margin:8px 0">$12.95<span style="font-size:0.8rem;font-weight:400">/mo</span></div><p class="text-sm" style="color:var(--text-light)">+ Glaze recipes, cost tracking, multi-studio, export</p></div>
-      <div class="card" style="text-align:center"><h3>Top</h3><div style="font-size:1.5rem;font-weight:700;color:var(--primary);margin:8px 0">$19.95<span style="font-size:0.8rem;font-weight:400">/mo</span></div><p class="text-sm" style="color:var(--text-light)">+ Community glaze library, sales tracking, 10 free tokens/mo</p></div>
+      <div class="card" style="text-align:center"><h3>Basic</h3><div style="font-size:1.5rem;font-weight:700;color:var(--primary);margin:8px 0">$9.95<span style="font-size:0.8rem;font-weight:400">/mo</span></div><p class="text-sm" style="color:var(--text-light)">Unlimited pieces, 3 photos, firing logs, forum + 3 tokens/mo</p></div>
+      <div class="card" style="text-align:center;border-color:var(--primary)"><h3>Mid</h3><div style="font-size:1.5rem;font-weight:700;color:var(--primary);margin:8px 0">$12.95<span style="font-size:0.8rem;font-weight:400">/mo</span></div><p class="text-sm" style="color:var(--text-light)">+ Glaze recipes, cost tracking, multi-studio, export + 5 tokens/mo</p></div>
+      <div class="card" style="text-align:center"><h3>Top</h3><div style="font-size:1.5rem;font-weight:700;color:var(--primary);margin:8px 0">$19.95<span style="font-size:0.8rem;font-weight:400">/mo</span></div><p class="text-sm" style="color:var(--text-light)">+ Community glaze library, sales tracking, 10 tokens/mo</p></div>
     </div>
     <p style="text-align:center;margin-top:16px;color:var(--text-light);font-size:0.9rem">Save with yearly plans! Cancel anytime.</p>
   </div>
@@ -424,6 +424,10 @@
         </select>
       </div>
       <div id="forumCategories" class="stats-row mb-16"></div>
+      <div class="card mb-16" style="background:var(--primary-light);padding:14px 18px;font-size:0.9rem">
+        <strong>🪙 Why tokens?</strong> Posting costs 1 token to keep the community high-quality and free from spam, misinformation, and low-effort posts. Every post here is from a real potter who cares. 
+        Paid plans include monthly tokens (Basic: 3, Mid: 5, Top: 10). Free accounts can <a href="#" onclick="navigate('upgrade');return false" style="color:var(--primary);font-weight:600">buy token packs</a>.
+      </div>
       <div id="forumPosts"></div>
       <div id="forumEmpty" class="empty-state hidden">
         <div class="empty-state-icon">💬</div>
@@ -957,6 +961,8 @@
             <option value="raku">Raku</option>
             <option value="pit">Pit Fire</option>
             <option value="wood">Wood Fire</option>
+            <option value="soda">Soda Firing</option>
+            <option value="salt">Salt Firing</option>
             <option value="other">Other</option>
           </select>
         </div>

@@ -58,9 +58,11 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req,
         const tier = session.metadata.tier;
         db.prepare('UPDATE users SET tier=?, stripe_customer_id=?, stripe_subscription_id=? WHERE id=?')
           .run(tier, session.customer, session.subscription, userId);
-        // Top tier gets 10 free tokens monthly
-        if (tier === 'top') {
-          db.prepare('UPDATE users SET forum_tokens = forum_tokens + 10 WHERE id=?').run(userId);
+        // Monthly tokens by tier (don't roll over — reset to tier amount)
+        const tierTokens = { basic: 3, mid: 5, top: 10 };
+        const tokens = tierTokens[tier] || 0;
+        if (tokens > 0) {
+          db.prepare('UPDATE users SET forum_tokens = ? WHERE id=?').run(tokens, userId);
         }
       } else if (purchaseType === 'token_pack') {
         const amount = parseInt(session.metadata.tokenAmount) || 0;
@@ -105,6 +107,22 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(UPLOADS_DIR));
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Simple analytics — track page views
+app.post('/api/analytics/pageview', (req, res) => {
+  try {
+    const { path: pagePath, referrer } = req.body;
+    const ua = req.headers['user-agent'] || '';
+    const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.ip || '';
+    // Extract user from token if present
+    let userId = null;
+    const t = req.headers.authorization?.replace('Bearer ', '');
+    if (t) { try { const d = jwt.verify(t, JWT_SECRET); userId = d.userId; } catch {} }
+    db.prepare('INSERT INTO page_views (path, referrer, user_agent, ip, user_id) VALUES (?,?,?,?,?)')
+      .run(pagePath || '/', referrer || null, ua, ip, userId);
+    res.json({ ok: true });
+  } catch(e) { res.json({ ok: true }); /* don't fail on analytics */ }
+});
 
 // Auth middleware
 function auth(req, res, next) {
@@ -213,9 +231,9 @@ app.get('/api/billing/plans', (req, res) => {
   res.json({
     plans: [
       { id: 'free', name: 'Free', price: 0, yearlyPrice: 0, features: ['20 pieces', '1 photo each', 'Personal clay & glaze library', 'Basic search', 'Forum (browse only)', 'Can buy tokens to post'] },
-      { id: 'basic', name: 'Basic', price: 9.95, yearlyPrice: 95.00, yearlySavings: 24.40, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Forum access (read & post with tokens)', 'Cancel anytime'] },
-      { id: 'mid', name: 'Mid', price: 12.95, yearlyPrice: 125.00, yearlySavings: 30.40, features: ['Everything in Basic', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', "Potter's Cheat Sheet", 'Cancel anytime'] },
-      { id: 'top', name: 'Top', price: 19.95, yearlyPrice: 190.00, yearlySavings: 49.40, features: ['Everything in Mid', 'Community Glaze Library', 'Sales tracking', 'Import/export data', '10 free tokens/month', 'Cancel anytime'] }
+      { id: 'basic', name: 'Basic', price: 9.95, yearlyPrice: 95.00, yearlySavings: 24.40, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Forum access (read & post)', '3 tokens/month (don\'t roll over)', 'Can buy more tokens', 'Cancel anytime'] },
+      { id: 'mid', name: 'Mid', price: 12.95, yearlyPrice: 125.00, yearlySavings: 30.40, features: ['Everything in Basic', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', '5 tokens/month (don\'t roll over)', 'Cancel anytime'] },
+      { id: 'top', name: 'Top', price: 19.95, yearlyPrice: 190.00, yearlySavings: 49.40, features: ['Everything in Mid', 'Community Glaze Library', 'Sales tracking', 'Import/export data', '10 tokens/month (don\'t roll over)', 'Cancel anytime'] }
     ],
     tokenPacks: [
       { id: 'pack20', tokens: 20, price: 2.99 },
@@ -355,12 +373,31 @@ app.get('/api/admin/members', auth, (req, res) => {
 // Admin: view orders
 app.get('/api/admin/orders', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
-  const orders = db.prepare(`SELECT mo.*, u.email, u.display_name, mp.name as product_name 
-    FROM merchant_orders mo 
-    JOIN users u ON mo.user_id = u.id 
-    LEFT JOIN merchant_products mp ON mo.product_id = mp.id 
-    ORDER BY mo.created_at DESC`).all();
-  res.json(orders);
+  try {
+    const orders = db.prepare(`SELECT mo.*, u.email, u.display_name, mp.name as product_name 
+      FROM merchant_orders mo 
+      JOIN users u ON mo.user_id = u.id 
+      LEFT JOIN merchant_products mp ON mo.product_id = mp.id 
+      ORDER BY mo.created_at DESC`).all();
+    res.json(orders);
+  } catch(e) { res.json([]); }
+});
+
+// Admin: analytics
+app.get('/api/admin/analytics', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const today = db.prepare("SELECT COUNT(*) as c FROM page_views WHERE created_at >= datetime('now', '-1 day')").get().c;
+    const week = db.prepare("SELECT COUNT(*) as c FROM page_views WHERE created_at >= datetime('now', '-7 day')").get().c;
+    const month = db.prepare("SELECT COUNT(*) as c FROM page_views WHERE created_at >= datetime('now', '-30 day')").get().c;
+    const total = db.prepare("SELECT COUNT(*) as c FROM page_views").get().c;
+    const byDay = db.prepare("SELECT date(created_at) as day, COUNT(*) as views FROM page_views WHERE created_at >= datetime('now', '-30 day') GROUP BY day ORDER BY day").all();
+    const topReferrers = db.prepare("SELECT referrer, COUNT(*) as c FROM page_views WHERE referrer IS NOT NULL AND referrer != '' GROUP BY referrer ORDER BY c DESC LIMIT 20").all();
+    const topPages = db.prepare("SELECT path, COUNT(*) as c FROM page_views GROUP BY path ORDER BY c DESC LIMIT 10").all();
+    const uniqueIPs = db.prepare("SELECT COUNT(DISTINCT ip) as c FROM page_views WHERE created_at >= datetime('now', '-30 day')").get().c;
+    const signupsByDay = db.prepare("SELECT date(created_at) as day, COUNT(*) as signups FROM users WHERE created_at >= datetime('now', '-30 day') GROUP BY day ORDER BY day").all();
+    res.json({ today, week, month, total, byDay, topReferrers, topPages, uniqueIPs, signupsByDay });
+  } catch(e) { res.json({ today:0, week:0, month:0, total:0, byDay:[], topReferrers:[], topPages:[], uniqueIPs:0, signupsByDay:[] }); }
 });
 
 app.post('/api/admin/set-unlimited', auth, (req, res) => {

@@ -27,7 +27,7 @@ function generatePreviewPDF(outputPath) {
 
   // COVER
   doc.rect(0, 0, 612, 792).fill('#FAF7F2');
-  doc.fontSize(60).font('Helvetica-Bold').fillColor(brown).text('🏺', 0, 200, { align: 'center' });
+  doc.fontSize(60).font('Helvetica-Bold').fillColor(clay).text('*', 0, 200, { align: 'center' });
   doc.fontSize(36).font('Helvetica-Bold').fillColor(brown).text("The Potter's", 0, 290, { align: 'center' });
   doc.fontSize(36).font('Helvetica-Bold').fillColor(clay).text('Mud Log', 0, 335, { align: 'center' });
   doc.fontSize(14).font('Helvetica').fillColor(light).text('A Printable Pottery Journal', 0, 400, { align: 'center' });

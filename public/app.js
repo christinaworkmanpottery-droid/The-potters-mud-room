@@ -141,6 +141,7 @@ function navigate(page) {
     shop:loadShop, upgrade:loadUpgrade, admin:loadAdmin
   };
   if (loaders[page]) loaders[page]();
+    trackPageView('/' + page);
   } catch(navErr) { console.error('Navigation error:', navErr); }
 }
 
@@ -1078,6 +1079,21 @@ async function cancelSubscription() {
 }
 
 // ---- Profile Photo ----
+// Track page views for analytics
+function trackPageView(pagePath) {
+  try {
+    const h = {};
+    if (token) h['Authorization'] = 'Bearer ' + token;
+    h['Content-Type'] = 'application/json';
+    fetch('/api/analytics/pageview', {
+      method: 'POST', headers: h,
+      body: JSON.stringify({ path: pagePath || window.location.pathname, referrer: document.referrer })
+    }).catch(() => {});
+  } catch(e) {}
+}
+// Track landing page view immediately
+trackPageView('/');
+
 function loadProfilePhoto() {
   const preview = document.getElementById('profilePhotoPreview');
   if (preview && currentUser?.avatar_filename) {
@@ -1178,6 +1194,9 @@ async function loadAdmin() {
     // Orders section
     html += '<div class="card mb-16"><h3 style="margin-bottom:12px">🛍️ Recent Orders</h3><div id="adminOrders">Loading...</div></div>';
 
+    // Analytics section
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">📊 Site Traffic</h3><div id="adminAnalytics">Loading...</div></div>';
+
     try {
       el.innerHTML = html;
     } catch(renderErr) {
@@ -1186,6 +1205,7 @@ async function loadAdmin() {
     }
     loadDiscountCodes();
     loadAdminOrders();
+    loadAdminAnalytics();
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -1227,6 +1247,57 @@ async function loadAdminOrders() {
       '<div><span style="color:var(--accent);font-weight:700">$' + (o.price_paid || 0).toFixed(2) + '</span> · ' + fmtDate(o.created_at) + '</div></div>'
     ).join('');
   } catch(e) { document.getElementById('adminOrders').innerHTML = '<div class="text-sm" style="color:var(--text-muted)">Could not load orders</div>'; }
+}
+
+async function loadAdminAnalytics() {
+  try {
+    const a = await api('/api/admin/analytics');
+    const el = document.getElementById('adminAnalytics');
+    let html = '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">' +
+      '<div class="stat-box"><div class="stat-number">' + (a.today || 0) + '</div><div class="stat-label">Today</div></div>' +
+      '<div class="stat-box"><div class="stat-number">' + (a.week || 0) + '</div><div class="stat-label">This Week</div></div>' +
+      '<div class="stat-box"><div class="stat-number">' + (a.month || 0) + '</div><div class="stat-label">This Month</div></div>' +
+      '<div class="stat-box"><div class="stat-number">' + (a.total || 0) + '</div><div class="stat-label">All Time</div></div>' +
+      '<div class="stat-box"><div class="stat-number">' + (a.uniqueIPs || 0) + '</div><div class="stat-label">Unique Visitors (30d)</div></div>' +
+      '</div>';
+
+    // Signups by day
+    if (a.signupsByDay?.length) {
+      html += '<h4 style="margin:12px 0 8px">📈 Signups (Last 30 Days)</h4>';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+      a.signupsByDay.forEach(d => {
+        html += '<div style="text-align:center;padding:4px 8px;background:var(--primary-light);border-radius:4px;font-size:0.8rem"><div style="font-weight:700">' + d.signups + '</div><div style="color:var(--text-muted)">' + d.day.substring(5) + '</div></div>';
+      });
+      html += '</div>';
+    }
+
+    // Top referrers
+    if (a.topReferrers?.length) {
+      html += '<h4 style="margin:16px 0 8px">🔗 Where Traffic Comes From</h4>';
+      a.topReferrers.forEach(r => {
+        let source = r.referrer;
+        try { source = new URL(r.referrer).hostname; } catch {}
+        html += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:0.85rem"><span>' + esc(source) + '</span><strong>' + r.c + '</strong></div>';
+      });
+    }
+
+    // Daily views
+    if (a.byDay?.length) {
+      html += '<h4 style="margin:16px 0 8px">👁️ Page Views (Last 30 Days)</h4>';
+      const maxViews = Math.max(...a.byDay.map(d => d.views), 1);
+      html += '<div style="display:flex;align-items:flex-end;gap:2px;height:80px">';
+      a.byDay.forEach(d => {
+        const pct = Math.max((d.views / maxViews) * 100, 3);
+        html += '<div title="' + d.day + ': ' + d.views + ' views" style="flex:1;min-width:4px;background:var(--primary);border-radius:2px 2px 0 0;height:' + pct + '%"></div>';
+      });
+      html += '</div>';
+    }
+
+    el.innerHTML = html;
+  } catch(e) {
+    const el = document.getElementById('adminAnalytics');
+    if (el) el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">Analytics will start showing after some traffic</div>';
+  }
 }
 
 // ---- Init ----

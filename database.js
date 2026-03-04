@@ -166,7 +166,7 @@ function initDB() {
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
       piece_id TEXT,
-      firing_type TEXT CHECK(firing_type IN ('bisque', 'glaze', 'raku', 'pit', 'wood', 'other')),
+      firing_type TEXT CHECK(firing_type IN ('bisque', 'glaze', 'raku', 'pit', 'wood', 'soda', 'salt', 'other')),
       cone TEXT,
       temperature TEXT,
       atmosphere TEXT CHECK(atmosphere IN ('oxidation', 'reduction', 'neutral', NULL)),
@@ -367,6 +367,20 @@ function initDB() {
       created_at TEXT DEFAULT (datetime('now')),
       expires_at TEXT
     );
+
+    -- Page view analytics
+    CREATE TABLE IF NOT EXISTS page_views (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      path TEXT NOT NULL,
+      referrer TEXT,
+      user_agent TEXT,
+      ip TEXT,
+      user_id TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_page_views_date ON page_views(created_at);
+    CREATE INDEX IF NOT EXISTS idx_page_views_path ON page_views(path);
 
     -- Insert default forum categories
     INSERT OR IGNORE INTO forum_categories (id, name, description, sort_order, icon) VALUES
