@@ -163,6 +163,16 @@ h1 { font-size: 1.75rem; } h2 { font-size: 1.4rem; } h3 { font-size: 1.15rem; }
 .plan-features { list-style: none; text-align: left; margin-bottom: 20px; font-size: 0.9rem; }
 .plan-features li { padding: 4px 0; color: var(--text-light); }
 
+/* Founding Member */
+.founding-banner { background: linear-gradient(135deg, #C67B4E, #A0522D); color: #fff; padding: 20px; border-radius: var(--radius-lg); text-align: center; margin-bottom: 24px; }
+.founding-banner h2 { font-family: var(--font-display); margin-bottom: 6px; }
+.founding-banner p { opacity: 0.9; font-size: 0.95rem; }
+.plan-price-regular { font-size: 1.1rem; color: var(--text-muted); text-decoration: line-through; margin-bottom: 2px; font-weight: 400; }
+.plan-price-founding { font-family: var(--font-display); font-size: 2rem; font-weight: 700; color: #A0522D; margin-bottom: 4px; }
+.founding-badge { display: inline-block; background: linear-gradient(135deg, #C67B4E, #A0522D); color: #fff; font-size: 0.7rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+.founding-savings { color: #A0522D; font-weight: 600; font-size: 0.85rem; margin-bottom: 12px; }
+.token-price-regular { text-decoration: line-through; color: var(--text-muted); font-size: 0.9rem; margin-right: 6px; }
+
 /* Shop */
 .shop-product-card { text-align: center; }
 .shop-product-img { width: 100%; height: 200px; object-fit: cover; border-radius: var(--radius-sm); margin-bottom: 12px; }

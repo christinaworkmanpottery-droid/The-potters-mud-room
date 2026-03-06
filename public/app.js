@@ -880,7 +880,7 @@ async function loadProfile() {
 
     // Tier info
     const tier = d.user.tier || 'free';
-    const tierNames = { free: 'Free', basic: 'Basic ($9.95/mo)', mid: 'Mid ($12.95/mo)', top: 'Top ($19.95/mo)' };
+    const tierNames = { free: 'Free', basic: 'Basic (Founding: $4.99/mo)', mid: 'Mid (Founding: $7.99/mo)', top: 'Top (Founding: $11.99/mo)' };
     let tierHtml = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><span class="tier-badge tier-' + tier + '" style="font-size:0.9rem;padding:4px 12px">' + tier.toUpperCase() + '</span> ' + tierNames[tier] + '</div>';
     if (d.user.plan_expires_at) {
       const exp = new Date(d.user.plan_expires_at);
@@ -932,20 +932,51 @@ async function loadUpgrade() {
     const d = await api('/api/billing/plans');
     const tier = currentUser?.tier || 'free';
     const tierLv = { free: 0, basic: 1, mid: 2, top: 3 };
+    const founding = d.foundingMember;
 
-    let html = '<div style="display:flex;gap:12px;margin-bottom:20px;justify-content:center"><button class="btn btn-primary billing-toggle active" id="btnMonthly" onclick="setBilling(\'monthly\')">Monthly</button><button class="btn btn-secondary billing-toggle" id="btnYearly" onclick="setBilling(\'yearly\')">Yearly (Save!)</button></div>';
-    let billingMode = 'monthly';
+    let html = '';
+
+    // Founding Member Banner
+    if (founding) {
+      html += '<div class="founding-banner">' +
+        '<h2>🔥 Founding Member Rates</h2>' +
+        '<p>Lock in your discounted rate now — keep it as long as your membership stays active!</p>' +
+        '<p style="font-size:0.85rem;opacity:0.8;margin-top:6px">Limited time only. If you cancel and come back, regular pricing applies.</p>' +
+        '</div>';
+    }
+
+    html += '<div style="display:flex;gap:12px;margin-bottom:20px;justify-content:center"><button class="btn btn-primary billing-toggle active" id="btnMonthly" onclick="setBilling(\'monthly\')">Monthly</button><button class="btn btn-secondary billing-toggle" id="btnYearly" onclick="setBilling(\'yearly\')">Yearly (Save More!)</button></div>';
     window._plansData = d;
     window._billingMode = 'monthly';
     html += '<div id="plansGrid" class="upgrade-plans">';
     d.plans.forEach(p => {
       const isCurrent = p.id === tier;
       const isDowngrade = tierLv[p.id] < tierLv[tier];
+      const hasFoundingPrice = founding && p.foundingPrice;
+      const moSavePct = hasFoundingPrice ? Math.round((1 - p.foundingPrice / p.price) * 100) : 0;
+      const yrSavePct = hasFoundingPrice ? Math.round((1 - p.foundingYearly / p.yearlyPrice) * 100) : 0;
+
       html += '<div class="upgrade-plan-card' + (isCurrent ? ' current' : '') + '">' +
-        '<div class="plan-name">' + esc(p.name) + '</div>' +
-        '<div class="plan-price monthly-price">' + (p.price ? '$' + p.price.toFixed(2) + '<span class="plan-period">/mo</span>' : 'Free') + '</div>' +
-        (p.yearlyPrice ? '<div class="plan-price yearly-price hidden">$' + p.yearlyPrice.toFixed(2) + '<span class="plan-period">/yr</span>' + (p.yearlySavings ? '<div class="yearly-savings">Save $' + p.yearlySavings.toFixed(2) + '!</div>' : '') + '</div>' : '') +
-        '<ul class="plan-features">' + p.features.map(f => '<li>✓ ' + esc(f) + '</li>').join('') + '</ul>' +
+        '<div class="plan-name">' + esc(p.name) + '</div>';
+
+      if (hasFoundingPrice) {
+        html += '<span class="founding-badge">Founding Rate</span>';
+        // Monthly prices
+        html += '<div class="monthly-price">' +
+          '<div class="plan-price-regular">$' + p.price.toFixed(2) + '/mo</div>' +
+          '<div class="plan-price-founding">$' + p.foundingPrice.toFixed(2) + '<span class="plan-period">/mo</span></div>' +
+          '<div class="founding-savings">Save ' + moSavePct + '%!</div></div>';
+        // Yearly prices
+        html += '<div class="yearly-price hidden">' +
+          '<div class="plan-price-regular">$' + p.yearlyPrice.toFixed(2) + '/yr</div>' +
+          '<div class="plan-price-founding">$' + p.foundingYearly.toFixed(2) + '<span class="plan-period">/yr</span></div>' +
+          '<div class="founding-savings">Save ' + yrSavePct + '%!</div></div>';
+      } else {
+        html += '<div class="plan-price monthly-price">' + (p.price ? '$' + p.price.toFixed(2) + '<span class="plan-period">/mo</span>' : 'Free') + '</div>' +
+          (p.yearlyPrice ? '<div class="plan-price yearly-price hidden">$' + p.yearlyPrice.toFixed(2) + '<span class="plan-period">/yr</span></div>' : '');
+      }
+
+      html += '<ul class="plan-features">' + p.features.map(f => '<li>✓ ' + esc(f) + '</li>').join('') + '</ul>' +
         (isCurrent ? '<button class="btn btn-secondary" disabled>Current Plan</button>' :
          p.id === 'free' ? '' :
          isDowngrade ? '' :
@@ -954,15 +985,24 @@ async function loadUpgrade() {
     });
     html += '</div>';
 
-    // Token packs section (available to everyone)
+    // Token packs section
     html += '<h2 class="mt-24 mb-16">🪙 Forum Tokens</h2>' +
       '<p class="text-sm mb-16" style="color:var(--text-light)">Tokens let you post and reply in the forum. 1 token = 1 post or reply. Tokens never expire for paid members. Free members\' tokens expire in 30 days.</p>' +
       '<div class="upgrade-plans">';
     d.tokenPacks.forEach(tp => {
+      const hasFoundingTp = founding && tp.foundingPrice;
+      const tpSavePct = hasFoundingTp ? Math.round((1 - tp.foundingPrice / tp.price) * 100) : 0;
       html += '<div class="upgrade-plan-card">' +
-        '<div class="plan-name">' + tp.tokens + ' Tokens</div>' +
-        '<div class="plan-price">$' + tp.price.toFixed(2) + '</div>' +
-        '<button class="btn btn-primary btn-sm" onclick="buyTokens(\'' + tp.id + '\')">' + (d.stripeEnabled ? 'Buy' : 'Coming Soon') + '</button></div>';
+        '<div class="plan-name">' + tp.tokens + ' Tokens</div>';
+      if (hasFoundingTp) {
+        html += '<span class="founding-badge">Founding Rate</span>' +
+          '<div class="plan-price-regular">$' + tp.price.toFixed(2) + '</div>' +
+          '<div class="plan-price-founding">$' + tp.foundingPrice.toFixed(2) + '</div>' +
+          '<div class="founding-savings">Save ' + tpSavePct + '%!</div>';
+      } else {
+        html += '<div class="plan-price">$' + tp.price.toFixed(2) + '</div>';
+      }
+      html += '<button class="btn btn-primary btn-sm" onclick="buyTokens(\'' + tp.id + '\')">' + (d.stripeEnabled ? 'Buy' : 'Coming Soon') + '</button></div>';
     });
     html += '</div>';
 
