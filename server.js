@@ -232,9 +232,9 @@ app.get('/api/billing/plans', (req, res) => {
     foundingMember: true,
     plans: [
       { id: 'free', name: 'Free', price: 0, yearlyPrice: 0, features: ['20 pieces', '1 photo each', 'Personal clay & glaze library', 'Basic search', 'Forum (browse only)', 'Can buy tokens to post'] },
-      { id: 'basic', name: 'Basic', price: 9.95, yearlyPrice: 99.00, foundingPrice: 4.99, foundingYearly: 49.99, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Forum access (read & post)', '3 tokens/month (don\'t roll over)', 'Can buy more tokens', 'Cancel anytime'] },
-      { id: 'mid', name: 'Mid', price: 12.95, yearlyPrice: 129.00, foundingPrice: 7.99, foundingYearly: 79.99, features: ['Everything in Basic', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', '5 tokens/month (don\'t roll over)', 'Cancel anytime'] },
-      { id: 'top', name: 'Top', price: 19.95, yearlyPrice: 199.00, foundingPrice: 11.99, foundingYearly: 109.99, features: ['Everything in Mid', 'Community Glaze Library', 'Sales tracking', 'Import/export data', '10 tokens/month (don\'t roll over)', 'Cancel anytime'] }
+      { id: 'basic', name: 'Basic', price: 9.95, yearlyPrice: 99.00, foundingPrice: 4.99, foundingYearly: 49.99, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Forum access (read & post)', '🪙 10 free tokens (roll over while active)', 'Can buy more tokens', 'Cancel anytime'] },
+      { id: 'mid', name: 'Mid', price: 12.95, yearlyPrice: 129.00, foundingPrice: 7.99, foundingYearly: 79.99, features: ['Everything in Basic', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', '🪙 10 free tokens (roll over while active)', 'Cancel anytime'] },
+      { id: 'top', name: 'Top', price: 19.95, yearlyPrice: 199.00, foundingPrice: 11.99, foundingYearly: 109.99, features: ['Everything in Mid', 'Community Glaze Library', 'Sales tracking', 'Import/export data', '🪙 10 free tokens (roll over while active)', 'Cancel anytime'] }
     ],
     tokenPacks: [
       { id: 'pack20', tokens: 20, price: 2.99, foundingPrice: 1.99 },

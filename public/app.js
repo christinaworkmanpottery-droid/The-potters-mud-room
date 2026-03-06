@@ -976,7 +976,9 @@ async function loadUpgrade() {
           (p.yearlyPrice ? '<div class="plan-price yearly-price hidden">$' + p.yearlyPrice.toFixed(2) + '<span class="plan-period">/yr</span></div>' : '');
       }
 
-      html += '<ul class="plan-features">' + p.features.map(f => '<li>✓ ' + esc(f) + '</li>').join('') + '</ul>' +
+      html += '<ul class="plan-features">' + p.features.map(f => '<li>✓ ' + esc(f) + '</li>').join('') +
+        (p.id !== 'free' ? '<li class="yearly-price hidden" style="color:#A0522D;font-weight:600">✓ 🎁 20 bonus tokens on signup (roll over!)</li>' : '') +
+        '</ul>' +
         (isCurrent ? '<button class="btn btn-secondary" disabled>Current Plan</button>' :
          p.id === 'free' ? '' :
          isDowngrade ? '' :
@@ -987,7 +989,12 @@ async function loadUpgrade() {
 
     // Token packs section
     html += '<h2 class="mt-24 mb-16">🪙 Forum Tokens</h2>' +
-      '<p class="text-sm mb-16" style="color:var(--text-light)">Tokens let you post and reply in the forum. 1 token = 1 post or reply. Tokens never expire for paid members. Free members\' tokens expire in 30 days.</p>' +
+      '<p class="text-sm mb-16" style="color:var(--text-light)">Tokens let you post and reply in the forum. 1 token = 1 post or reply. All membership tokens roll over as long as your membership is active!</p>' +
+      '<div class="card mb-16" style="background:var(--primary-light);padding:14px 18px;font-size:0.9rem">' +
+      '<strong>🎁 Token Bonuses with Membership:</strong><br>' +
+      '• <strong>Any monthly plan</strong> — 10 free tokens that roll over while your membership is active<br>' +
+      '• <strong>Any yearly plan</strong> — 20 free tokens that roll over while your membership is active<br>' +
+      '<span style="color:var(--text-muted);font-size:0.85rem">Purchased token packs are yours to keep too — they never expire for active members.</span></div>' +
       '<div class="upgrade-plans">';
     d.tokenPacks.forEach(tp => {
       const hasFoundingTp = founding && tp.foundingPrice;

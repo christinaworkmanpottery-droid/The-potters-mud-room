@@ -162,9 +162,9 @@
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">
       <div class="card" style="text-align:center"><h3>Free</h3><div style="font-size:1.5rem;font-weight:700;color:var(--primary);margin:8px 0">$0</div><p class="text-sm" style="color:var(--text-light)">20 pieces, 1 photo each, clay &amp; glaze library, browse the forum</p></div>
-      <div class="card" style="text-align:center"><h3>Basic</h3><div style="color:#999;text-decoration:line-through;font-size:0.95rem;margin-top:8px">$9.95/mo</div><div style="font-size:1.5rem;font-weight:700;color:#A0522D;margin:4px 0">$4.99<span style="font-size:0.8rem;font-weight:400">/mo</span></div><div style="color:#A0522D;font-size:0.85rem;font-weight:600;margin-bottom:8px">Save 50%!</div><p class="text-sm" style="color:var(--text-light)">Unlimited pieces, 3 photos, firing logs, forum + 3 tokens/mo</p></div>
-      <div class="card" style="text-align:center;border-color:var(--primary)"><h3>Mid</h3><div style="color:#999;text-decoration:line-through;font-size:0.95rem;margin-top:8px">$12.95/mo</div><div style="font-size:1.5rem;font-weight:700;color:#A0522D;margin:4px 0">$7.99<span style="font-size:0.8rem;font-weight:400">/mo</span></div><div style="color:#A0522D;font-size:0.85rem;font-weight:600;margin-bottom:8px">Save 38%!</div><p class="text-sm" style="color:var(--text-light)">+ Glaze recipes, cost tracking, multi-studio, export + 5 tokens/mo</p></div>
-      <div class="card" style="text-align:center"><h3>Top</h3><div style="color:#999;text-decoration:line-through;font-size:0.95rem;margin-top:8px">$19.95/mo</div><div style="font-size:1.5rem;font-weight:700;color:#A0522D;margin:4px 0">$11.99<span style="font-size:0.8rem;font-weight:400">/mo</span></div><div style="color:#A0522D;font-size:0.85rem;font-weight:600;margin-bottom:8px">Save 40%!</div><p class="text-sm" style="color:var(--text-light)">+ Community glaze library, sales tracking, 10 tokens/mo</p></div>
+      <div class="card" style="text-align:center"><h3>Basic</h3><div style="color:#999;text-decoration:line-through;font-size:0.95rem;margin-top:8px">$9.95/mo</div><div style="font-size:1.5rem;font-weight:700;color:#A0522D;margin:4px 0">$4.99<span style="font-size:0.8rem;font-weight:400">/mo</span></div><div style="color:#A0522D;font-size:0.85rem;font-weight:600;margin-bottom:8px">Save 50%!</div><p class="text-sm" style="color:var(--text-light)">Unlimited pieces, 3 photos, firing logs, forum + 🪙 10 free tokens that roll over</p></div>
+      <div class="card" style="text-align:center;border-color:var(--primary)"><h3>Mid</h3><div style="color:#999;text-decoration:line-through;font-size:0.95rem;margin-top:8px">$12.95/mo</div><div style="font-size:1.5rem;font-weight:700;color:#A0522D;margin:4px 0">$7.99<span style="font-size:0.8rem;font-weight:400">/mo</span></div><div style="color:#A0522D;font-size:0.85rem;font-weight:600;margin-bottom:8px">Save 38%!</div><p class="text-sm" style="color:var(--text-light)">+ Glaze recipes, cost tracking, multi-studio, export + 🪙 10 free tokens that roll over</p></div>
+      <div class="card" style="text-align:center"><h3>Top</h3><div style="color:#999;text-decoration:line-through;font-size:0.95rem;margin-top:8px">$19.95/mo</div><div style="font-size:1.5rem;font-weight:700;color:#A0522D;margin:4px 0">$11.99<span style="font-size:0.8rem;font-weight:400">/mo</span></div><div style="color:#A0522D;font-size:0.85rem;font-weight:600;margin-bottom:8px">Save 40%!</div><p class="text-sm" style="color:var(--text-light)">+ Community glaze library, sales tracking + 🪙 10 free tokens that roll over</p></div>
     </div>
     <p style="text-align:center;margin-top:16px;color:var(--text-light);font-size:0.9rem">Save even more with yearly plans! Cancel anytime.</p>
   </div>
@@ -430,7 +430,7 @@
       <div id="forumCategories" class="stats-row mb-16"></div>
       <div class="card mb-16" style="background:var(--primary-light);padding:14px 18px;font-size:0.9rem">
         <strong>🪙 Why tokens?</strong> Posting costs 1 token to keep the community high-quality and free from spam, misinformation, and low-effort posts. Every post here is from a real potter who cares. 
-        Paid plans include monthly tokens (Basic: 3, Mid: 5, Top: 10). Free accounts can <a href="#" onclick="navigate('upgrade');return false" style="color:var(--primary);font-weight:600">buy token packs</a>.
+        Any monthly membership includes <strong>10 free tokens</strong>. Any yearly membership includes <strong>20 free tokens</strong>. Tokens roll over as long as your membership is active! Free accounts can <a href="#" onclick="navigate('upgrade');return false" style="color:var(--primary);font-weight:600">buy token packs</a>.
       </div>
       <div id="forumPosts"></div>
       <div id="forumEmpty" class="empty-state hidden">
@@ -516,8 +516,9 @@
             <li><strong>Browse for free</strong> — everyone can read posts</li>
             <li><strong>Post & reply</strong> — costs 1 forum token each</li>
             <li><strong>Add photos & short videos</strong> to your posts</li>
-            <li>Buy token packs on the <strong>Plans</strong> page</li>
-            <li>Top tier members get <strong>10 free tokens/month</strong></li>
+            <li>Any <strong>monthly membership</strong> includes <strong>10 free tokens</strong> that roll over</li>
+            <li>Any <strong>yearly membership</strong> includes <strong>20 free tokens</strong> that roll over</li>
+            <li>Buy extra token packs on the <strong>Plans</strong> page</li>
           </ul>
           <p>Categories include General Chat, Glazes & Combos, Show Your Work, Pottery Casualties 💀 (we've all been there), and more!</p>
         </div>
@@ -588,7 +589,7 @@
           
           <div style="margin-bottom:16px">
             <p><strong>Q: What are forum tokens?</strong></p>
-            <p style="color:var(--text-light)">A: Forum tokens are used to post and reply in the community forum. 1 token = 1 post or reply. You can buy token packs on the Plans page, or get 10 free tokens/month with the Top tier.</p>
+            <p style="color:var(--text-light)">A: Forum tokens are used to post and reply in the community forum. 1 token = 1 post or reply. Any monthly membership includes 10 free tokens, and any yearly membership includes 20 free tokens — they roll over as long as your membership is active. You can also buy extra token packs on the Plans page.</p>
           </div>
           
           <div>
