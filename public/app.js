@@ -1018,19 +1018,7 @@ async function loadUpgrade() {
       '<div style="display:flex;gap:8px"><input type="text" class="form-input" id="promoCodeInput" placeholder="Enter code..." style="text-transform:uppercase">' +
       '<button class="btn btn-primary" onclick="redeemPromo()">Redeem</button></div></div>';
 
-    // Admin promo creation (only for admin - Christina)
-    if (currentUser?.email === 'christinaworkmanpottery@gmail.com') {
-      html += '<div class="card mt-24" style="max-width:500px"><h3 style="margin-bottom:12px">🔧 Create Promo Codes (Admin)</h3>' +
-        '<div class="form-group"><label>Type</label><select class="form-select" id="newPromoType" onchange="togglePromoType()">' +
-        '<option value="tier">Tier Upgrade</option><option value="tokens">Token Gift</option></select></div>' +
-        '<div class="form-row"><div class="form-group"><label>Code</label><input type="text" class="form-input" id="newPromoCode" placeholder="e.g., FRIENDS2026" style="text-transform:uppercase"></div>' +
-        '<div class="form-group" id="promoTierGroup"><label>Tier</label><select class="form-select" id="newPromoTier"><option value="basic">Basic</option><option value="mid">Mid</option><option value="top">Top</option></select></div>' +
-        '<div class="form-group hidden" id="promoTokenGroup"><label>Tokens to Gift</label><input type="number" class="form-input" id="newPromoTokens" value="20" min="1"></div></div>' +
-        '<div class="form-row"><div class="form-group"><label>Days (tier duration)</label><input type="number" class="form-input" id="newPromoDays" value="30"></div>' +
-        '<div class="form-group"><label>Max Uses (0=unlimited)</label><input type="number" class="form-input" id="newPromoUses" value="0"></div></div>' +
-        '<button class="btn btn-primary btn-sm" onclick="createPromoCode()">Create Code</button>' +
-        '<div id="promoCodesList" class="mt-16"></div></div>';
-    }
+    // Promo code creation moved to Admin page
 
     document.getElementById('upgradeContent').innerHTML = html;
     loadPromoCodes();
@@ -1238,6 +1226,19 @@ async function loadAdmin() {
       '</div><button class="btn btn-primary btn-sm" onclick="createDiscountCode()">Create Discount Code</button>' +
       '<div id="discountCodesList" class="mt-16"></div></div>';
 
+    // Promo codes section (gift tokens or tier upgrades to friends)
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">🎟️ Promo Codes</h3>' +
+      '<p class="text-sm mb-16" style="color:var(--text-light)">Create promo codes to gift free tokens or tier upgrades to friends. Users redeem these on the Plans page.</p>' +
+      '<div class="form-group"><label>Type</label><select class="form-select" id="newPromoType" onchange="togglePromoType()">' +
+      '<option value="tier">Tier Upgrade</option><option value="tokens">Token Gift</option></select></div>' +
+      '<div class="form-row" style="gap:8px"><div class="form-group"><label>Code</label><input type="text" class="form-input" id="newPromoCode" placeholder="e.g., FRIENDS2026" style="text-transform:uppercase"></div>' +
+      '<div class="form-group" id="promoTierGroup"><label>Tier</label><select class="form-select" id="newPromoTier"><option value="basic">Basic</option><option value="mid">Mid</option><option value="top">Top</option></select></div>' +
+      '<div class="form-group hidden" id="promoTokenGroup"><label>Tokens to Gift</label><input type="number" class="form-input" id="newPromoTokens" value="20" min="1"></div></div>' +
+      '<div class="form-row" style="gap:8px"><div class="form-group"><label>Days (tier duration)</label><input type="number" class="form-input" id="newPromoDays" value="30"></div>' +
+      '<div class="form-group"><label>Max Uses (0=unlimited)</label><input type="number" class="form-input" id="newPromoUses" value="0"></div></div>' +
+      '<button class="btn btn-primary btn-sm" onclick="createPromoCode()">Create Code</button>' +
+      '<div id="promoCodesList" class="mt-16"></div></div>';
+
     // Orders section
     html += '<div class="card mb-16"><h3 style="margin-bottom:12px">🛍️ Recent Orders</h3><div id="adminOrders">Loading...</div></div>';
 
@@ -1251,6 +1252,7 @@ async function loadAdmin() {
       return;
     }
     loadDiscountCodes();
+    loadPromoCodes();
     loadAdminOrders();
     loadAdminAnalytics();
   } catch(e) { toast(e.message, 'error'); }
