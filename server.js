@@ -151,7 +151,8 @@ function getPieceCount(uid) { return db.prepare('SELECT COUNT(*) as c FROM piece
 // ============ AUTH ============
 app.post('/api/auth/register', (req, res) => {
   try {
-    const { email, password, displayName } = req.body;
+    const { password, displayName } = req.body;
+    const email = (req.body.email || '').trim().toLowerCase();
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
     if (db.prepare('SELECT id FROM users WHERE email=?').get(email)) return res.status(409).json({ error: 'Email already registered' });
     const id = uuidv4(), hash = bcrypt.hashSync(password, 10);
@@ -163,7 +164,8 @@ app.post('/api/auth/register', (req, res) => {
 
 app.post('/api/auth/login', (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { password } = req.body;
+    const email = (req.body.email || '').trim().toLowerCase();
     const u = db.prepare('SELECT * FROM users WHERE email=?').get(email);
     if (!u || !bcrypt.compareSync(password, u.password_hash)) return res.status(401).json({ error: 'Invalid email or password' });
     const token = jwt.sign({ userId: u.id, tier: u.tier }, JWT_SECRET, { expiresIn: '30d' });

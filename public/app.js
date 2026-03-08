@@ -68,7 +68,8 @@ function toggleAuth() {
 }
 document.getElementById('authForm').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const email = document.getElementById('authEmail').value;
+  const email = document.getElementById('authEmail').value.trim().toLowerCase();
+  document.getElementById('authEmail').value = email;
   const password = document.getElementById('authPassword').value;
   const name = document.getElementById('authName').value;
   const errEl = document.getElementById('authError');
