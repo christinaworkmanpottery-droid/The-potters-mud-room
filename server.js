@@ -864,7 +864,7 @@ function useToken(userId) {
   return false;
 }
 
-app.post('/api/forum/posts', auth, upload.array('photos', 3), (req, res) => {
+app.post('/api/forum/posts', auth, upload.array('photos', 5), (req, res) => {
   if (!canPost(req.userId)) return res.status(403).json({ error: 'You need forum tokens to post. Purchase tokens to participate!' });
   const { title, body, categoryId } = req.body;
   if (!title || !body) return res.status(400).json({ error: 'Title and body required' });

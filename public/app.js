@@ -768,7 +768,7 @@ async function viewForumPost(id) {
       (replies || '<div class="text-sm" style="color:var(--text-muted)">No replies yet — be the first!</div>') +
       '<div class="card mt-16"><h3 style="margin-bottom:12px">Reply</h3>' +
       '<textarea class="form-textarea" id="replyBody" placeholder="Write your reply..." style="min-height:80px"></textarea>' +
-      '<div class="form-group mt-8"><input type="file" id="replyPhotos" accept="image/*,video/mp4,video/mov,video/webm" multiple class="form-input" style="font-size:0.85rem"></div>' +
+      '<div class="form-group mt-8"><label class="text-sm" style="color:var(--text-muted);margin-bottom:4px;display:block">📸 Add photos or short videos (up to 3)</label><input type="file" id="replyPhotos" accept="image/*,video/mp4,video/mov,video/webm" multiple class="form-input" style="font-size:0.85rem"></div>' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">' +
       '<span class="text-sm" style="color:var(--text-muted)">🪙 Uses 1 forum token</span>' +
       '<button class="btn btn-primary" onclick="submitReply(\'' + post.id + '\')">Reply</button></div></div>';
@@ -815,7 +815,7 @@ async function saveForumPost(e) {
   fd.append('body', document.getElementById('forumPostBody').value);
   fd.append('categoryId', document.getElementById('forumPostCategory').value);
   const files = document.getElementById('forumPostPhotos')?.files;
-  if (files) { for (let i = 0; i < Math.min(files.length, 3); i++) fd.append('photos', files[i]); }
+  if (files) { for (let i = 0; i < Math.min(files.length, 5); i++) fd.append('photos', files[i]); }
   try {
     const r = await fetch('/api/forum/posts', { method:'POST', headers:{Authorization:'Bearer '+token}, body:fd });
     const d = await r.json(); if (!r.ok) throw new Error(d.error);
