@@ -157,6 +157,9 @@ async function loadDashboard() {
     document.getElementById('statGlazes').textContent = d.totalGlazes;
     const sb = document.getElementById('statSalesBox');
     if (d.sales?.total) { document.getElementById('statSales').textContent = '$' + (d.sales.total||0).toFixed(0); sb.style.display=''; } else { sb.style.display='none'; }
+    // Casualties stat
+    const cb2 = document.getElementById('statCasualtiesBox');
+    if (d.totalCasualties > 0) { document.getElementById('statCasualties').textContent = d.totalCasualties; cb2.style.display=''; } else { cb2.style.display='none'; }
     const ban = document.getElementById('upgradeBanner');
     if (d.tier === 'free') { ban.classList.remove('hidden'); document.getElementById('pieceCountText').textContent = d.totalPieces + '/20 pieces used'; } else { ban.classList.add('hidden'); }
     const c = document.getElementById('recentPieces'), em = document.getElementById('dashboardEmpty');

@@ -1009,6 +1009,9 @@ app.get('/api/dashboard', auth, (req, res) => {
 
   const stats = { totalPieces, byStatus, recentPieces, totalClays, totalGlazes, tier };
 
+  // Casualty count
+  stats.totalCasualties = db.prepare("SELECT COUNT(*) as c FROM pieces WHERE user_id=? AND status IN ('broken','recycled')").get(req.userId).c;
+
   if (tier === 'top') {
     const sales = db.prepare('SELECT COUNT(*) as count, SUM(price) as total FROM sales WHERE user_id=?').get(req.userId);
     stats.sales = sales;

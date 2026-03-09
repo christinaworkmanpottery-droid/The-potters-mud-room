@@ -281,10 +281,10 @@
       <div class="nav-links">
         <button class="nav-link active" data-page="dashboard" onclick="navigate('dashboard')">Dashboard</button>
         <button class="nav-link" data-page="pieces" onclick="navigate('pieces')">Pieces</button>
+        <button class="nav-link nav-casualty" data-page="casualties" onclick="navigate('casualties')">💀 Casualties</button>
         <button class="nav-link" data-page="clayBodies" onclick="navigate('clayBodies')">Clay</button>
         <button class="nav-link" data-page="glazes" onclick="navigate('glazes')">Glazes</button>
         <button class="nav-link" data-page="firings" onclick="navigate('firings')">Firings</button>
-        <button class="nav-link" data-page="casualties" onclick="navigate('casualties')">💀 Casualties</button>
         <button class="nav-link" data-page="sales" onclick="navigate('sales')">Sales</button>
         <button class="nav-link" data-page="community" onclick="navigate('community')">Community</button>
         <button class="nav-link" data-page="forum" onclick="navigate('forum')">Forum</button>
@@ -316,6 +316,7 @@
         <div class="stat-box"><div class="stat-number" id="statClays">0</div><div class="stat-label">Clay Bodies</div></div>
         <div class="stat-box"><div class="stat-number" id="statGlazes">0</div><div class="stat-label">Glazes</div></div>
         <div class="stat-box" id="statSalesBox"><div class="stat-number" id="statSales">$0</div><div class="stat-label">Total Sales</div></div>
+        <div class="stat-box" id="statCasualtiesBox" style="cursor:pointer" onclick="navigate('casualties')"><div class="stat-number" id="statCasualties" style="color:var(--danger)">0</div><div class="stat-label">💀 Casualties</div></div>
       </div>
       <h2 class="mb-16">Recent Pieces</h2>
       <div id="recentPieces" class="card-grid"></div>
