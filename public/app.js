@@ -157,9 +157,6 @@ async function loadDashboard() {
     document.getElementById('statGlazes').textContent = d.totalGlazes;
     const sb = document.getElementById('statSalesBox');
     if (d.sales?.total) { document.getElementById('statSales').textContent = '$' + (d.sales.total||0).toFixed(0); sb.style.display=''; } else { sb.style.display='none'; }
-    // Casualties stat
-    const cb2 = document.getElementById('statCasualtiesBox');
-    if (d.totalCasualties > 0) { document.getElementById('statCasualties').textContent = d.totalCasualties; cb2.style.display=''; } else { cb2.style.display='none'; }
     const ban = document.getElementById('upgradeBanner');
     if (d.tier === 'free') { ban.classList.remove('hidden'); document.getElementById('pieceCountText').textContent = d.totalPieces + '/20 pieces used'; } else { ban.classList.add('hidden'); }
     const c = document.getElementById('recentPieces'), em = document.getElementById('dashboardEmpty');
@@ -190,10 +187,12 @@ async function loadPieces() {
   try {
     const s = document.getElementById('pieceSearch')?.value||'';
     const st = document.getElementById('pieceStatusFilter')?.value||'';
+    // If "All Casualties" selected, load the casualties page instead
+    if (st === 'casualties') { navigate('casualties'); return; }
     let u = '/api/pieces?';
     if (s) u += 'search=' + encodeURIComponent(s) + '&';
     if (st) u += 'status=' + encodeURIComponent(st) + '&';
-    // Exclude casualties from main pieces list (they have their own page)
+    // Exclude casualties from main pieces list (they have their own view)
     if (!st) u += 'excludeCasualties=1&';
     const pieces = await api(u);
     const c = document.getElementById('piecesList'), em = document.getElementById('piecesEmpty');
@@ -251,7 +250,7 @@ async function viewPiece(id) {
       (p.notes ? df('Notes', p.notes) : '') + '</div>' +
       '<div><div class="card mb-16"><h3 style="margin-bottom:12px">Glazes</h3>' + glist + '</div>' +
       (firings ? '<div class="card mb-16"><h3 style="margin-bottom:12px">Firings</h3>' + firings + '</div>' : '') +
-      ((p.status === 'broken' || p.status === 'recycled') ? '<div class="card" style="border:2px solid var(--danger);background:rgba(220,53,69,0.05)"><h3 style="margin-bottom:12px;color:var(--danger)">💀 Casualty Report</h3>' +
+      ((p.status === 'broken' || p.status === 'recycled') ? '<div class="card" style="border:2px solid var(--danger);background:rgba(220,53,69,0.05)"><h3 style="margin-bottom:12px;color:var(--danger)">Casualty Report</h3>' +
         df('What Happened', p.casualty_type ? CASUALTY_LABELS[p.casualty_type] || p.casualty_type : 'Not specified') +
         (p.casualty_notes ? df('What Went Wrong', p.casualty_notes) : '') +
         (p.casualty_lesson ? '<div class="detail-field" style="background:rgba(40,167,69,0.08);padding:10px;border-radius:var(--radius-sm);margin-top:8px"><div class="detail-label" style="color:var(--success)">🎓 Lesson Learned</div><div class="detail-value">' + esc(p.casualty_lesson) + '</div></div>' : '') +
@@ -598,13 +597,13 @@ async function loadCasualties() {
     casualties.forEach(p => { if (p.casualty_type) typeCounts[p.casualty_type] = (typeCounts[p.casualty_type]||0) + 1; });
     const topIssue = Object.entries(typeCounts).sort((a,b) => b[1]-a[1])[0];
     stats.innerHTML = '<div class="stat-box"><div class="stat-number">' + casualties.length + '</div><div class="stat-label">Total Casualties</div></div>' +
-      '<div class="stat-box"><div class="stat-number">💀 ' + broken + '</div><div class="stat-label">Broken</div></div>' +
-      '<div class="stat-box"><div class="stat-number">♻️ ' + recycled + '</div><div class="stat-label">Recycled</div></div>' +
+      '<div class="stat-box"><div class="stat-number">' + broken + '</div><div class="stat-label">Broken</div></div>' +
+      '<div class="stat-box"><div class="stat-number">' + recycled + '</div><div class="stat-label">Recycled</div></div>' +
       (topIssue ? '<div class="stat-box"><div class="stat-number">⚠️</div><div class="stat-label">Top Issue: ' + esc(CASUALTY_LABELS[topIssue[0]]||topIssue[0]) + ' (' + topIssue[1] + ')</div></div>' : '');
 
     c.innerHTML = casualties.map(p => {
       const ph = p.primaryPhoto;
-      const img = ph ? '<img class="piece-photo" src="/uploads/' + ph.filename + '" loading="lazy">' : '<div class="piece-photo-placeholder">💀</div>';
+      const img = ph ? '<img class="piece-photo" src="/uploads/' + ph.filename + '" loading="lazy">' : '<div class="piece-photo-placeholder">🏺</div>';
       const gl = (p.glazes||[]).map(g => '<span class="glaze-tag">' + esc(g.glaze_name) + '</span>').join('');
       const typeLabel = p.casualty_type ? '<span class="piece-meta-tag" style="background:rgba(220,53,69,0.1);color:var(--danger)">⚠️ ' + esc(CASUALTY_LABELS[p.casualty_type]||p.casualty_type) + '</span>' : '';
       return '<div class="card piece-card" onclick="viewPiece(\'' + p.id + '\')">' + img +

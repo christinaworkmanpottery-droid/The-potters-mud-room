@@ -47,8 +47,6 @@ h1 { font-size: 1.75rem; } h2 { font-size: 1.4rem; } h3 { font-size: 1.15rem; }
 .nav-links { display: flex; align-items: center; gap: 4px; }
 .nav-link { color: rgba(255,255,255,0.7); padding: 8px 14px; border-radius: var(--radius-sm); font-size: 0.9rem; cursor: pointer; transition: all 0.2s; border: none; background: none; font-family: var(--font); }
 .nav-link:hover, .nav-link.active { color: #fff; background: rgba(255,255,255,0.1); }
-.nav-casualty { color: #ff9a9a !important; }
-.nav-casualty:hover, .nav-casualty.active { color: #fff !important; background: rgba(220,53,69,0.3) !important; }
 .nav-user { display: flex; align-items: center; gap: 10px; }
 .tier-badge { padding: 2px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
 .tier-free { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8); }
