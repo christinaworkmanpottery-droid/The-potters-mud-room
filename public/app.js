@@ -38,6 +38,7 @@ function timeAgo(d) {
   return fmtDate(d);
 }
 const STATUS_LABELS = { 'in-progress':'In Progress','leather-hard':'Leather Hard','bone-dry':'Bone Dry','bisque-fired':'Bisque Fired','glazed':'Glazed','glaze-fired':'Glaze Fired','done':'Done','sold':'Sold','broken':'Broken','recycled':'Recycled' };
+const CASUALTY_LABELS = { 'cracked':'Cracked','exploded':'Exploded / Blowout','warped':'Warped','s-crack':'S-Crack','glaze-crawl':'Glaze Crawl','glaze-pinhole':'Glaze Pinholing','glaze-shiver':'Glaze Shivering','glaze-crazing':'Glaze Crazing','glaze-runoff':'Glaze Ran Off','thermal-shock':'Thermal Shock','broke-trimming':'Broke While Trimming','broke-handling':'Broke While Handling','collapsed':'Collapsed','dunting':'Dunting','wrong-color':'Unexpected Color Result','other':'Other' };
 function fmtStatus(s) { return s ? '<span class="status-badge status-' + s + '">' + (STATUS_LABELS[s]||s) + '</span>' : ''; }
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
@@ -128,6 +129,7 @@ function navigate(page) {
     const map = {
       dashboard:'pageDashboard', pieces:'pagePieces', pieceDetail:'pagePieceDetail',
       clayBodies:'pageClayBodies', glazes:'pageGlazes', firings:'pageFirings',
+      casualties:'pageCasualties',
       sales:'pageSales', community:'pageCommunity', forum:'pageForum',
       forumPost:'pageForumPost', profile:'pageProfile', shop:'pageShop',
       upgrade:'pageUpgrade', help:'pageHelp', admin:'pageAdmin'
@@ -137,7 +139,7 @@ function navigate(page) {
     try { document.querySelector('.nav-links')?.classList.remove('open'); } catch(e) {}
   const loaders = {
     dashboard:loadDashboard, pieces:loadPieces, clayBodies:loadClayBodies,
-    glazes:loadGlazes, firings:loadFirings, sales:loadSales,
+    glazes:loadGlazes, firings:loadFirings, casualties:loadCasualties, sales:loadSales,
     community:loadCombos, forum:loadForum, profile:loadProfile,
     shop:loadShop, upgrade:loadUpgrade, admin:loadAdmin
   };
@@ -188,6 +190,8 @@ async function loadPieces() {
     let u = '/api/pieces?';
     if (s) u += 'search=' + encodeURIComponent(s) + '&';
     if (st) u += 'status=' + encodeURIComponent(st) + '&';
+    // Exclude casualties from main pieces list (they have their own page)
+    if (!st) u += 'excludeCasualties=1&';
     const pieces = await api(u);
     const c = document.getElementById('piecesList'), em = document.getElementById('piecesEmpty');
     if (!pieces.length) { c.innerHTML = ''; em.classList.remove('hidden'); }
@@ -243,7 +247,12 @@ async function viewPiece(id) {
       (p.sale_price ? df('Sale Price', '$' + p.sale_price) : '') +
       (p.notes ? df('Notes', p.notes) : '') + '</div>' +
       '<div><div class="card mb-16"><h3 style="margin-bottom:12px">Glazes</h3>' + glist + '</div>' +
-      (firings ? '<div class="card"><h3 style="margin-bottom:12px">Firings</h3>' + firings + '</div>' : '') +
+      (firings ? '<div class="card mb-16"><h3 style="margin-bottom:12px">Firings</h3>' + firings + '</div>' : '') +
+      ((p.status === 'broken' || p.status === 'recycled') ? '<div class="card" style="border:2px solid var(--danger);background:rgba(220,53,69,0.05)"><h3 style="margin-bottom:12px;color:var(--danger)">💀 Casualty Report</h3>' +
+        df('What Happened', p.casualty_type ? CASUALTY_LABELS[p.casualty_type] || p.casualty_type : 'Not specified') +
+        (p.casualty_notes ? df('What Went Wrong', p.casualty_notes) : '') +
+        (p.casualty_lesson ? '<div class="detail-field" style="background:rgba(40,167,69,0.08);padding:10px;border-radius:var(--radius-sm);margin-top:8px"><div class="detail-label" style="color:var(--success)">🎓 Lesson Learned</div><div class="detail-value">' + esc(p.casualty_lesson) + '</div></div>' : '') +
+        '</div>' : '') +
       '</div></div>';
   } catch (err) { toast(err.message, 'error'); }
 }
@@ -269,6 +278,11 @@ function addGlazeSelector(gId, coats, method) {
   if (gId) r.querySelector('.gs').value = gId;
   c.appendChild(r);
 }
+function toggleCasualtyFields() {
+  const status = document.getElementById('pieceStatus').value;
+  const show = (status === 'broken' || status === 'recycled');
+  document.getElementById('casualtyFields').classList.toggle('hidden', !show);
+}
 function openPieceModal(p) {
   document.getElementById('pieceId').value = p?.id||'';
   document.getElementById('pieceModalTitle').textContent = p ? 'Edit Piece' : 'Add New Piece';
@@ -282,6 +296,11 @@ function openPieceModal(p) {
   populateClaySelect('pieceClay', p?.clay_body_id);
   document.getElementById('pieceGlazeSelectors').innerHTML = '';
   (p?.glazes||[]).forEach(g => addGlazeSelector(g.glaze_id, g.coats, g.application_method));
+  // Casualty fields
+  document.getElementById('pieceCasualtyType').value = p?.casualty_type||'';
+  document.getElementById('pieceCasualtyNotes').value = p?.casualty_notes||'';
+  document.getElementById('pieceCasualtyLesson').value = p?.casualty_lesson||'';
+  toggleCasualtyFields();
   openModal('pieceModal');
 }
 async function editPiece(id) { try { openPieceModal(await api('/api/pieces/'+id)); } catch(e) { toast(e.message,'error'); } }
@@ -300,7 +319,10 @@ async function savePiece(e) {
     studio: document.getElementById('pieceStudio').value||null,
     dateStarted: document.getElementById('pieceDateStarted').value||null,
     notes: document.getElementById('pieceNotes').value||null,
-    glazeIds: gIds
+    glazeIds: gIds,
+    casualtyType: document.getElementById('pieceCasualtyType').value||null,
+    casualtyNotes: document.getElementById('pieceCasualtyNotes').value||null,
+    casualtyLesson: document.getElementById('pieceCasualtyLesson').value||null
   };
   try {
     if (id) { await api('/api/pieces/'+id, {method:'PUT',body}); toast('Piece updated!','success'); }
@@ -558,6 +580,42 @@ async function saveFiring(e) {
 }
 
 // ---- Sales ----
+async function loadCasualties() {
+  try {
+    const casualties = await api('/api/casualties');
+    const c = document.getElementById('casualtyList'), em = document.getElementById('casualtyEmpty');
+    const stats = document.getElementById('casualtyStats');
+    if (!casualties.length) { c.innerHTML=''; stats.innerHTML=''; em.classList.remove('hidden'); return; }
+    em.classList.add('hidden');
+
+    // Stats summary
+    const broken = casualties.filter(p => p.status === 'broken').length;
+    const recycled = casualties.filter(p => p.status === 'recycled').length;
+    const typeCounts = {};
+    casualties.forEach(p => { if (p.casualty_type) typeCounts[p.casualty_type] = (typeCounts[p.casualty_type]||0) + 1; });
+    const topIssue = Object.entries(typeCounts).sort((a,b) => b[1]-a[1])[0];
+    stats.innerHTML = '<div class="stat-box"><div class="stat-number">' + casualties.length + '</div><div class="stat-label">Total Casualties</div></div>' +
+      '<div class="stat-box"><div class="stat-number">💀 ' + broken + '</div><div class="stat-label">Broken</div></div>' +
+      '<div class="stat-box"><div class="stat-number">♻️ ' + recycled + '</div><div class="stat-label">Recycled</div></div>' +
+      (topIssue ? '<div class="stat-box"><div class="stat-number">⚠️</div><div class="stat-label">Top Issue: ' + esc(CASUALTY_LABELS[topIssue[0]]||topIssue[0]) + ' (' + topIssue[1] + ')</div></div>' : '');
+
+    c.innerHTML = casualties.map(p => {
+      const ph = p.primaryPhoto;
+      const img = ph ? '<img class="piece-photo" src="/uploads/' + ph.filename + '" loading="lazy">' : '<div class="piece-photo-placeholder">💀</div>';
+      const gl = (p.glazes||[]).map(g => '<span class="glaze-tag">' + esc(g.glaze_name) + '</span>').join('');
+      const typeLabel = p.casualty_type ? '<span class="piece-meta-tag" style="background:rgba(220,53,69,0.1);color:var(--danger)">⚠️ ' + esc(CASUALTY_LABELS[p.casualty_type]||p.casualty_type) + '</span>' : '';
+      return '<div class="card piece-card" onclick="viewPiece(\'' + p.id + '\')">' + img +
+        '<div class="card-header"><div><div class="card-title">' + esc(p.title||'Untitled') + '</div>' +
+        '<div class="text-sm" style="color:var(--text-light)">' + esc(p.clay_body_name||'No clay specified') + '</div></div>' +
+        fmtStatus(p.status) + '</div>' +
+        (typeLabel ? '<div class="piece-meta">' + typeLabel + '</div>' : '') +
+        (gl ? '<div class="piece-meta">' + gl + '</div>' : '') +
+        (p.casualty_lesson ? '<div class="text-sm" style="color:var(--success);padding:8px 0;border-top:1px solid var(--border);margin-top:8px"><strong>🎓 Lesson:</strong> ' + esc(p.casualty_lesson.substring(0,120)) + (p.casualty_lesson.length > 120 ? '...' : '') + '</div>' : '') +
+        '</div>';
+    }).join('');
+  } catch(e) { toast(e.message,'error'); }
+}
+
 async function loadSales() {
   try {
     const sales = await api('/api/sales');

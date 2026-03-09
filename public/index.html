@@ -284,6 +284,7 @@
         <button class="nav-link" data-page="clayBodies" onclick="navigate('clayBodies')">Clay</button>
         <button class="nav-link" data-page="glazes" onclick="navigate('glazes')">Glazes</button>
         <button class="nav-link" data-page="firings" onclick="navigate('firings')">Firings</button>
+        <button class="nav-link" data-page="casualties" onclick="navigate('casualties')">💀 Casualties</button>
         <button class="nav-link" data-page="sales" onclick="navigate('sales')">Sales</button>
         <button class="nav-link" data-page="community" onclick="navigate('community')">Community</button>
         <button class="nav-link" data-page="forum" onclick="navigate('forum')">Forum</button>
@@ -399,6 +400,21 @@
         <div class="empty-state-icon">🔥</div>
         <div class="empty-state-title">No firing logs</div>
         <p>Track your firings to remember what worked.</p>
+      </div>
+    </div>
+
+    <!-- CASUALTIES -->
+    <div id="pageCasualties" class="page">
+      <div class="page-header">
+        <h1>💀 Pottery Casualties</h1>
+      </div>
+      <p style="color:var(--text-light);margin-bottom:16px">RIP to the pieces that didn't make it. Track what went wrong and what you learned — so you don't make the same mistake twice.</p>
+      <div id="casualtyStats" class="stats-row" style="margin-bottom:20px"></div>
+      <div id="casualtyList" class="card-grid"></div>
+      <div id="casualtyEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">🎉</div>
+        <div class="empty-state-title">No casualties yet!</div>
+        <p>That's amazing — keep it up! When a piece doesn't make it, mark it as Broken or Recycled to track what happened.</p>
       </div>
     </div>
 
@@ -769,7 +785,7 @@
         </div>
         <div class="form-group">
           <label>Status</label>
-          <select class="form-select" id="pieceStatus">
+          <select class="form-select" id="pieceStatus" onchange="toggleCasualtyFields()">
             <option value="in-progress">In Progress</option>
             <option value="leather-hard">Leather Hard</option>
             <option value="bone-dry">Bone Dry</option>
@@ -778,7 +794,43 @@
             <option value="glaze-fired">Glaze Fired</option>
             <option value="done">Done</option>
             <option value="sold">Sold</option>
+            <option value="broken">💀 Broken</option>
+            <option value="recycled">♻️ Recycled</option>
           </select>
+        </div>
+      </div>
+      <!-- Casualty Fields (shown when status is broken/recycled) -->
+      <div id="casualtyFields" class="hidden" style="background:var(--primary-light);border-radius:var(--radius);padding:16px;margin-bottom:16px;border:1px solid var(--border)">
+        <h3 style="margin-bottom:12px;display:flex;align-items:center;gap:8px">💀 Casualty Report</h3>
+        <div class="form-group">
+          <label>What Happened?</label>
+          <select class="form-select" id="pieceCasualtyType">
+            <option value="">Select...</option>
+            <option value="cracked">Cracked</option>
+            <option value="exploded">Exploded / Blowout</option>
+            <option value="warped">Warped</option>
+            <option value="s-crack">S-Crack</option>
+            <option value="glaze-crawl">Glaze Crawl</option>
+            <option value="glaze-pinhole">Glaze Pinholing</option>
+            <option value="glaze-shiver">Glaze Shivering</option>
+            <option value="glaze-crazing">Glaze Crazing</option>
+            <option value="glaze-runoff">Glaze Ran Off</option>
+            <option value="thermal-shock">Thermal Shock</option>
+            <option value="broke-trimming">Broke While Trimming</option>
+            <option value="broke-handling">Broke While Handling</option>
+            <option value="collapsed">Collapsed</option>
+            <option value="dunting">Dunting</option>
+            <option value="wrong-color">Unexpected Color Result</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>What Went Wrong? (your best guess)</label>
+          <textarea class="form-textarea" id="pieceCasualtyNotes" placeholder="e.g., Didn't dry evenly, bisque fired too fast, walls too thin at the base..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>🎓 Lesson Learned (what to do differently)</label>
+          <textarea class="form-textarea" id="pieceCasualtyLesson" placeholder="e.g., Next time slow down the bisque firing, make sure walls are even thickness, let it dry longer before firing..."></textarea>
         </div>
       </div>
       <div class="form-row">

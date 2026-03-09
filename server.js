@@ -638,9 +638,10 @@ app.post('/api/glazes/:id/photos', auth, upload.single('photo'), (req, res) => {
 
 // ============ PIECES ============
 app.get('/api/pieces', auth, (req, res) => {
-  const { status, clayBodyId, search, limit, offset } = req.query;
+  const { status, clayBodyId, search, limit, offset, excludeCasualties } = req.query;
   let sql = 'SELECT p.*, cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id WHERE p.user_id=?';
   const params = [req.userId];
+  if (excludeCasualties) { sql += " AND p.status NOT IN ('broken','recycled')"; }
   if (status) { sql += ' AND p.status=?'; params.push(status); }
   if (clayBodyId) { sql += ' AND p.clay_body_id=?'; params.push(clayBodyId); }
   if (search) { sql += ' AND (p.title LIKE ? OR p.description LIKE ? OR p.notes LIKE ?)'; params.push(`%${search}%`, `%${search}%`, `%${search}%`); }
@@ -666,10 +667,11 @@ app.get('/api/pieces/:id', auth, (req, res) => {
 app.post('/api/pieces', auth, (req, res) => {
   const u = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
   if ((u?.tier || 'free') === 'free' && getPieceCount(req.userId) >= 20) return res.status(403).json({ error: 'Free tier limited to 20 pieces. Upgrade to add more!' });
-  const { title, description, clayBodyId, studio, status, form, technique, dimensions, weight, materialCost, firingCost, dateStarted, notes, glazeIds } = req.body;
+  const { title, description, clayBodyId, studio, status, form, technique, dimensions, weight, materialCost, firingCost, dateStarted, notes, glazeIds, casualtyType, casualtyNotes, casualtyLesson } = req.body;
   const id = uuidv4();
-  db.prepare('INSERT INTO pieces (id,user_id,title,description,clay_body_id,studio,status,form,technique,dimensions,weight,material_cost,firing_cost,date_started,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-    .run(id, req.userId, title, description, clayBodyId, studio, status || 'in-progress', form, technique, dimensions, weight, materialCost, firingCost, dateStarted, notes);
+  const isCasualty = (status === 'broken' || status === 'recycled');
+  db.prepare('INSERT INTO pieces (id,user_id,title,description,clay_body_id,studio,status,form,technique,dimensions,weight,material_cost,firing_cost,date_started,notes,casualty_type,casualty_notes,casualty_lesson) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .run(id, req.userId, title, description, clayBodyId, studio, status || 'in-progress', form, technique, dimensions, weight, materialCost, firingCost, dateStarted, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null);
   if (glazeIds?.length) {
     const ins = db.prepare('INSERT INTO piece_glazes (id,piece_id,glaze_id,coats,application_method,layer_order) VALUES (?,?,?,?,?,?)');
     glazeIds.forEach((g, i) => ins.run(uuidv4(), id, g.glazeId, g.coats || 1, g.method, i));
@@ -678,9 +680,10 @@ app.post('/api/pieces', auth, (req, res) => {
 });
 
 app.put('/api/pieces/:id', auth, (req, res) => {
-  const { title, description, clayBodyId, studio, status, form, technique, dimensions, weight, materialCost, firingCost, salePrice, dateStarted, dateCompleted, dateSold, notes, glazeIds } = req.body;
-  const r = db.prepare(`UPDATE pieces SET title=?,description=?,clay_body_id=?,studio=?,status=?,form=?,technique=?,dimensions=?,weight=?,material_cost=?,firing_cost=?,sale_price=?,date_started=?,date_completed=?,date_sold=?,notes=?,updated_at=datetime('now') WHERE id=? AND user_id=?`)
-    .run(title, description, clayBodyId, studio, status, form, technique, dimensions, weight, materialCost, firingCost, salePrice, dateStarted, dateCompleted, dateSold, notes, req.params.id, req.userId);
+  const { title, description, clayBodyId, studio, status, form, technique, dimensions, weight, materialCost, firingCost, salePrice, dateStarted, dateCompleted, dateSold, notes, glazeIds, casualtyType, casualtyNotes, casualtyLesson } = req.body;
+  const isCasualty = (status === 'broken' || status === 'recycled');
+  const r = db.prepare(`UPDATE pieces SET title=?,description=?,clay_body_id=?,studio=?,status=?,form=?,technique=?,dimensions=?,weight=?,material_cost=?,firing_cost=?,sale_price=?,date_started=?,date_completed=?,date_sold=?,notes=?,casualty_type=?,casualty_notes=?,casualty_lesson=?,updated_at=datetime('now') WHERE id=? AND user_id=?`)
+    .run(title, description, clayBodyId, studio, status, form, technique, dimensions, weight, materialCost, firingCost, salePrice, dateStarted, dateCompleted, dateSold, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null, req.params.id, req.userId);
   if (r.changes === 0) return res.status(404).json({ error: 'Not found' });
   if (glazeIds !== undefined) {
     db.prepare('DELETE FROM piece_glazes WHERE piece_id=?').run(req.params.id);
@@ -996,7 +999,7 @@ app.get('/api/dashboard', auth, (req, res) => {
   const tier = u?.tier || 'free';
   const totalPieces = db.prepare('SELECT COUNT(*) as c FROM pieces WHERE user_id=?').get(req.userId).c;
   const byStatus = db.prepare('SELECT status,COUNT(*) as count FROM pieces WHERE user_id=? GROUP BY status').all(req.userId);
-  const recentPieces = db.prepare('SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id WHERE p.user_id=? ORDER BY p.updated_at DESC LIMIT 5').all(req.userId);
+  const recentPieces = db.prepare("SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id WHERE p.user_id=? AND p.status NOT IN ('broken','recycled') ORDER BY p.updated_at DESC LIMIT 5").all(req.userId);
   const totalClays = db.prepare('SELECT COUNT(*) as c FROM clay_bodies WHERE user_id=?').get(req.userId).c;
   const totalGlazes = db.prepare('SELECT COUNT(*) as c FROM glazes WHERE user_id=?').get(req.userId).c;
 
@@ -1011,6 +1014,18 @@ app.get('/api/dashboard', auth, (req, res) => {
     stats.sales = sales;
   }
   res.json(stats);
+});
+
+// ============ CASUALTIES ============
+app.get('/api/casualties', auth, (req, res) => {
+  const pieces = db.prepare(`SELECT p.*, cb.name as clay_body_name 
+    FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id 
+    WHERE p.user_id=? AND p.status IN ('broken','recycled') 
+    ORDER BY p.updated_at DESC`).all(req.userId);
+  const getGl = db.prepare('SELECT pg.*,g.name as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order');
+  const getPh = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order LIMIT 1');
+  pieces.forEach(p => { p.glazes = getGl.all(p.id); p.primaryPhoto = getPh.get(p.id) || null; });
+  res.json(pieces);
 });
 
 // SPA fallback

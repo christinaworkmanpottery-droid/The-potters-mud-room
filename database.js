@@ -426,6 +426,10 @@ function initDB() {
   safeAdd('users', 'plan_expires_at', 'TEXT');
   safeAdd('firing_logs', 'custom_speed_detail', 'TEXT');
   safeAdd('glaze_combos', 'photo_filename2', 'TEXT');
+  // Casualty tracking fields
+  safeAdd('pieces', 'casualty_type', 'TEXT');
+  safeAdd('pieces', 'casualty_notes', 'TEXT');
+  safeAdd('pieces', 'casualty_lesson', 'TEXT');
 
   // Ensure new forum categories exist
   const catInsert = db.prepare('INSERT OR IGNORE INTO forum_categories (id, name, description, sort_order, icon) VALUES (?,?,?,?,?)');
