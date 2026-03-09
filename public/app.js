@@ -37,7 +37,7 @@ function timeAgo(d) {
   if (s < 604800) return Math.floor(s/86400) + 'd ago';
   return fmtDate(d);
 }
-const STATUS_LABELS = { 'in-progress':'In Progress','leather-hard':'Leather Hard','bone-dry':'Bone Dry','bisque-fired':'Bisque Fired','glazed':'Glazed','glaze-fired':'Glaze Fired','done':'Done','sold':'Sold','broken':'Broken','recycled':'Recycled' };
+const STATUS_LABELS = { 'in-progress':'In Progress','leather-hard':'Leather Hard','bone-dry':'Bone Dry','bisque-fired':'Bisque Fired','glazed':'Glazed','glaze-fired':'Glaze Fired','done':'Done','sold':'Sold','broken':'Casualty','recycled':'Recycled' };
 const CASUALTY_LABELS = { 'cracked':'Cracked','exploded':'Exploded / Blowout','warped':'Warped','s-crack':'S-Crack','glaze-crawl':'Glaze Crawl','glaze-pinhole':'Glaze Pinholing','glaze-shiver':'Glaze Shivering','glaze-crazing':'Glaze Crazing','glaze-runoff':'Glaze Ran Off','thermal-shock':'Thermal Shock','broke-trimming':'Broke While Trimming','broke-handling':'Broke While Handling','collapsed':'Collapsed','dunting':'Dunting','wrong-color':'Unexpected Color Result','other':'Other' };
 function fmtStatus(s) { return s ? '<span class="status-badge status-' + s + '">' + (STATUS_LABELS[s]||s) + '</span>' : ''; }
 function openModal(id) { document.getElementById(id).classList.add('open'); }
