@@ -106,7 +106,17 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req,
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(UPLOADS_DIR));
-app.use(express.static(path.join(__dirname, 'public')));
+// Prevent browser caching of HTML/JS/CSS so updates show immediately
+app.use(express.static(path.join(__dirname, 'public'), {
+  etag: false,
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('.css')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
 
 // Simple analytics — track page views
 app.post('/api/analytics/pageview', (req, res) => {
