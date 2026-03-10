@@ -229,8 +229,8 @@ app.delete('/api/block/:userId', auth, (req, res) => {
 
 // ============ STRIPE BILLING ============
 const PRICE_CONFIG = {
-  starter: { amount: 995, name: "Starter Plan — $9.95/mo" },
-  'starter-yearly': { amount: 9500, name: "Starter Plan — $95/year (save $24.40!)", tier: 'starter' },
+  starter: { amount: 695, name: "Starter Plan — Founding Rate $6.95/mo" },
+  'starter-yearly': { amount: 6950, name: "Starter Plan — Founding Rate $69.50/year", tier: 'starter' },
   // Legacy plans (kept for backward compat with existing Stripe subscriptions)
   basic: { amount: 995, name: "Basic Plan — $9.95/mo" },
   mid: { amount: 1295, name: "Mid Plan — $12.95/mo" },
@@ -251,7 +251,7 @@ app.get('/api/billing/plans', (req, res) => {
     foundingMember: true,
     plans: [
       { id: 'free', name: 'Free', price: 0, yearlyPrice: 0, features: ['20 pieces', '1 photo each', 'Personal clay & glaze library', 'Basic search', 'Forum (browse only)', 'Can buy tokens to post'] },
-      { id: 'starter', name: 'Starter', price: 9.95, yearlyPrice: 95.00, foundingPrice: 4.99, foundingYearly: 49.99, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', 'Community glaze library', 'Sales tracking', 'Full forum access (read & post)', '🪙 10 free tokens (roll over while active)', 'Cancel anytime'] }
+      { id: 'starter', name: 'Starter', price: 9.95, yearlyPrice: 95.00, foundingPrice: 6.95, foundingYearly: 69.50, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', 'Community glaze library', 'Sales tracking', 'Full forum access (read & post)', '🪙 10 free tokens (roll over while active)', 'Cancel anytime'] }
     ],
     tokenPacks: [
       { id: 'pack1', tokens: 1, price: 0.50, foundingPrice: 0.25 },
