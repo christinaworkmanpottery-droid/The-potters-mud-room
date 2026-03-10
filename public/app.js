@@ -105,7 +105,7 @@ function showApp() {
   badge.textContent = t.toUpperCase(); badge.className = 'tier-badge tier-' + t;
   // Show/hide tier-gated nav items
   const tier = currentUser?.tier || 'free';
-  const tierLv = { free: 0, basic: 1, mid: 2, top: 3 };
+  const tierLv = { free: 0, basic: 1, mid: 1, starter: 1, top: 1 };
   document.querySelectorAll('[data-min-tier]').forEach(el => {
     const min = el.getAttribute('data-min-tier');
     el.style.display = tierLv[tier] >= tierLv[min] ? '' : 'none';
@@ -941,8 +941,8 @@ async function loadProfile() {
 
     // Tier info
     const tier = d.user.tier || 'free';
-    const tierNames = { free: 'Free', basic: 'Basic (Founding: $4.99/mo)', mid: 'Mid (Founding: $7.99/mo)', top: 'Top (Founding: $11.99/mo)' };
-    let tierHtml = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><span class="tier-badge tier-' + tier + '" style="font-size:0.9rem;padding:4px 12px">' + tier.toUpperCase() + '</span> ' + tierNames[tier] + '</div>';
+    const tierNames = { free: 'Free', starter: 'Starter ($9.95/mo)', basic: 'Starter (Legacy Basic)', mid: 'Starter (Legacy Mid)', top: 'Starter (Legacy Top)' };
+    let tierHtml = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><span class="tier-badge tier-' + tier + '" style="font-size:0.9rem;padding:4px 12px">' + (tier === 'free' ? 'FREE' : 'STARTER') + '</span> ' + (tierNames[tier] || tier) + '</div>';
     if (d.user.plan_expires_at) {
       const exp = new Date(d.user.plan_expires_at);
       const daysLeft = Math.ceil((exp - Date.now()) / 86400000);
@@ -951,7 +951,7 @@ async function loadProfile() {
     if (d.user.billing_period && d.user.billing_period !== 'promo') {
       tierHtml += '<div class="text-sm" style="margin-bottom:8px;color:var(--text-light)">Billing: ' + d.user.billing_period + ' · Cancel anytime</div>';
     }
-    tierHtml += (tier === 'free' ? '<button class="btn btn-primary" onclick="navigate(\'upgrade\')">Upgrade Your Plan</button>' :
+    tierHtml += (tier === 'free' ? '<button class="btn btn-primary" onclick="navigate(\'upgrade\')">Upgrade to Starter</button>' :
        '<div style="display:flex;gap:8px"><button class="btn btn-secondary btn-sm" onclick="navigate(\'upgrade\')">Change Plan</button><button class="btn btn-danger btn-sm" onclick="cancelSubscription()">Cancel Plan</button></div>');
     document.getElementById('profileTierInfo').innerHTML = tierHtml;
 
@@ -969,6 +969,9 @@ async function loadProfile() {
       '<div style="margin-bottom:8px">Your referral code: <strong style="color:var(--primary);font-size:1.1rem">' + esc(refCode) + '</strong></div>' +
       '<div class="text-sm" style="margin-bottom:8px;color:var(--text-light)">Share this code — when someone signs up with it, you both get 5 free forum tokens!</div>' +
       '<div class="text-sm">Friends referred: <strong>' + refCount + '</strong> · Tokens earned: <strong>' + (refCount * 5) + '</strong></div>';
+
+    // Review section
+    loadMyReview();
   } catch(e) { toast(e.message,'error'); }
 }
 
@@ -992,7 +995,7 @@ async function loadUpgrade() {
   try {
     const d = await api('/api/billing/plans');
     const tier = currentUser?.tier || 'free';
-    const tierLv = { free: 0, basic: 1, mid: 2, top: 3 };
+    const tierLv = { free: 0, basic: 1, mid: 1, starter: 1, top: 1 };
     const founding = d.foundingMember;
 
     let html = '';
@@ -1306,6 +1309,9 @@ async function loadAdmin() {
     // Analytics section
     html += '<div class="card mb-16"><h3 style="margin-bottom:12px">📊 Site Traffic</h3><div id="adminAnalytics">Loading...</div></div>';
 
+    // Reviews section
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">⭐ Reviews</h3><div id="adminReviewsList">Loading...</div></div>';
+
     try {
       el.innerHTML = html;
     } catch(renderErr) {
@@ -1316,6 +1322,7 @@ async function loadAdmin() {
     loadPromoCodes();
     loadAdminOrders();
     loadAdminAnalytics();
+    loadAdminReviews();
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -1409,6 +1416,121 @@ async function loadAdminAnalytics() {
     if (el) el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">Analytics will start showing after some traffic</div>';
   }
 }
+
+async function loadAdminReviews() {
+  try {
+    const reviews = await api('/api/admin/reviews');
+    const el = document.getElementById('adminReviewsList');
+    if (!el) return;
+    if (!reviews.length) { el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">No reviews yet</div>'; return; }
+    el.innerHTML = reviews.map(r =>
+      '<div style="padding:12px 0;border-bottom:1px solid var(--border)">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+      '<div><strong>' + esc(r.display_name || r.email) + '</strong> · ' + '★'.repeat(r.rating) + '☆'.repeat(5-r.rating) + '</div>' +
+      '<div class="text-sm" style="color:var(--text-muted)">' + fmtDate(r.created_at) + '</div></div>' +
+      '<p style="color:var(--text-light);margin-bottom:8px">"' + esc(r.body) + '"</p>' +
+      '<div style="display:flex;gap:6px">' +
+      '<button class="btn btn-sm ' + (r.is_approved ? 'btn-success' : 'btn-secondary') + '" onclick="toggleApproveReview(\'' + r.id + '\')">' + (r.is_approved ? '✅ Approved' : 'Approve') + '</button>' +
+      '<button class="btn btn-sm ' + (r.is_featured ? 'btn-primary' : 'btn-secondary') + '" onclick="toggleFeatureReview(\'' + r.id + '\')">' + (r.is_featured ? '⭐ Featured' : 'Feature') + '</button>' +
+      '<button class="btn btn-sm btn-danger" onclick="deleteAdminReview(\'' + r.id + '\')">Delete</button></div></div>'
+    ).join('');
+  } catch(e) { const el = document.getElementById('adminReviewsList'); if (el) el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">Error loading reviews</div>'; }
+}
+
+async function toggleApproveReview(id) {
+  try { await api('/api/admin/reviews/' + id + '/approve', { method: 'POST' }); loadAdminReviews(); } catch(e) { toast(e.message, 'error'); }
+}
+async function toggleFeatureReview(id) {
+  try { await api('/api/admin/reviews/' + id + '/feature', { method: 'POST' }); loadAdminReviews(); } catch(e) { toast(e.message, 'error'); }
+}
+async function deleteAdminReview(id) {
+  if (!confirm('Delete this review?')) return;
+  try { await api('/api/admin/reviews/' + id, { method: 'DELETE' }); loadAdminReviews(); toast('Review deleted', 'success'); } catch(e) { toast(e.message, 'error'); }
+}
+
+// ---- Reviews ----
+async function loadMyReview() {
+  try {
+    const el = document.getElementById('profileReviewSection');
+    if (!el) return;
+    const review = await api('/api/reviews/mine');
+    if (review) {
+      el.innerHTML = '<div style="margin-bottom:12px"><strong>Your Review</strong> ' + '⭐'.repeat(review.rating) + '</div>' +
+        '<p style="color:var(--text-light);margin-bottom:12px">"' + esc(review.body) + '"</p>' +
+        '<div class="text-sm" style="color:var(--text-muted);margin-bottom:12px">' + (review.is_approved ? '✅ Approved' : '⏳ Pending approval') + '</div>' +
+        '<button class="btn btn-secondary btn-sm" onclick="editReview(\'' + review.id + '\',' + review.rating + ',\'' + esc(review.body).replace(/'/g,"\\'") + '\')">Edit Review</button>';
+    } else {
+      el.innerHTML = '<div id="reviewForm">' +
+        '<div style="margin-bottom:12px"><strong>Rate your experience:</strong></div>' +
+        '<div id="starRating" style="font-size:1.8rem;cursor:pointer;margin-bottom:12px">' +
+        '<span onclick="setStars(1)">☆</span><span onclick="setStars(2)">☆</span><span onclick="setStars(3)">☆</span><span onclick="setStars(4)">☆</span><span onclick="setStars(5)">☆</span></div>' +
+        '<input type="hidden" id="reviewRating" value="0">' +
+        '<textarea class="form-textarea" id="reviewBody" placeholder="Tell other potters what you think of The Potter\'s Mud Room..." style="margin-bottom:12px"></textarea>' +
+        '<button class="btn btn-primary btn-sm" onclick="submitReview()">Submit Review</button></div>';
+    }
+  } catch(e) { /* ignore */ }
+}
+
+window._reviewRating = 0;
+function setStars(n) {
+  window._reviewRating = n;
+  document.getElementById('reviewRating').value = n;
+  const spans = document.getElementById('starRating').querySelectorAll('span');
+  spans.forEach((s, i) => { s.textContent = i < n ? '★' : '☆'; s.style.color = i < n ? '#F4A623' : '#ccc'; });
+}
+
+async function submitReview() {
+  try {
+    const rating = parseInt(document.getElementById('reviewRating').value);
+    const body = document.getElementById('reviewBody').value.trim();
+    if (!rating || rating < 1) return toast('Please select a star rating', 'error');
+    if (!body) return toast('Please write a review', 'error');
+    await api('/api/reviews', { method: 'POST', body: { rating, body }});
+    toast('Review submitted! It will appear once approved.', 'success');
+    loadMyReview();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+function editReview(id, rating, body) {
+  const el = document.getElementById('profileReviewSection');
+  el.innerHTML = '<div style="margin-bottom:12px"><strong>Edit your review:</strong></div>' +
+    '<div id="starRating" style="font-size:1.8rem;cursor:pointer;margin-bottom:12px">' +
+    '<span onclick="setStars(1)">☆</span><span onclick="setStars(2)">☆</span><span onclick="setStars(3)">☆</span><span onclick="setStars(4)">☆</span><span onclick="setStars(5)">☆</span></div>' +
+    '<input type="hidden" id="reviewRating" value="' + rating + '">' +
+    '<textarea class="form-textarea" id="reviewBody" style="margin-bottom:12px">' + body + '</textarea>' +
+    '<div style="display:flex;gap:8px"><button class="btn btn-primary btn-sm" onclick="updateReview(\'' + id + '\')">Save</button>' +
+    '<button class="btn btn-secondary btn-sm" onclick="loadMyReview()">Cancel</button></div>';
+  setStars(rating);
+}
+
+async function updateReview(id) {
+  try {
+    const rating = parseInt(document.getElementById('reviewRating').value);
+    const body = document.getElementById('reviewBody').value.trim();
+    if (!rating || rating < 1) return toast('Please select a star rating', 'error');
+    if (!body) return toast('Please write a review', 'error');
+    await api('/api/reviews/' + id, { method: 'PUT', body: { rating, body }});
+    toast('Review updated!', 'success');
+    loadMyReview();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// Landing page reviews
+async function loadLandingReviews() {
+  try {
+    const el = document.getElementById('landingReviews');
+    if (!el) return;
+    const res = await fetch('/api/reviews?featured=1');
+    const reviews = await res.json();
+    if (!reviews.length) return;
+    el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px">' +
+      reviews.map(r => '<div class="card" style="text-align:left"><div style="color:#F4A623;margin-bottom:8px">' + '★'.repeat(r.rating) + '☆'.repeat(5-r.rating) + '</div>' +
+        '<p style="color:var(--text);margin-bottom:8px;font-style:italic">"' + esc(r.body) + '"</p>' +
+        '<div class="text-sm" style="color:var(--text-light)">— ' + esc(r.display_name || 'A Potter') + '</div></div>').join('') +
+      '</div>';
+  } catch(e) { /* ignore */ }
+}
+loadLandingReviews();
 
 // ---- Init ----
 checkAuth();

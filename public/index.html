@@ -42,7 +42,7 @@
       "@type": "Offer",
       "price": "0",
       "priceCurrency": "USD",
-      "description": "Free to start — 20 pieces included"
+      "description": "Free plan — 20 pieces, clay & glaze library, browse the forum"
     },
     "creator": {
       "@type": "Person",
@@ -144,17 +144,234 @@
   </script>
 
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏺</text></svg>">
-  <link rel="stylesheet" href="style.css?v=20260309e">
+  <link rel="stylesheet" href="style.css?v=20260310a">
 </head>
 <body>
 
 <!-- LANDING PAGE (visible to search engines) -->
 <div id="landingPage">
+  <!-- HERO — Clear pitch: who it's for and what it does -->
   <div style="background:var(--bg-dark);color:#fff;padding:60px 20px;text-align:center">
     <div style="max-width:800px;margin:0 auto">
       <div style="font-size:4rem;margin-bottom:16px">🏺</div>
-      <h1 style="font-family:Georgia,serif;font-size:2.5rem;margin-bottom:12px">The Potter's <span style="color:#C67B4E">Mud Room</span></h1>
-      <p style="font-size:0.95rem;color:rgba(255,255,255,0.5);margin-bottom:8px">thepottersmudroom.com — The Potters Mudroom</p>
+      <h1 style="font-family:Georgia,serif;font-size:2.4rem;margin-bottom:12px;line-height:1.2">The Pottery Tracker<br><span style="color:#C67B4E">Built for Potters</span></h1>
+      <p style="font-size:1.15rem;color:rgba(255,255,255,0.85);margin-bottom:16px;line-height:1.6;max-width:600px;margin-left:auto;margin-right:auto">Track every piece, glaze, clay body, and firing — from wet clay to finished work. Built by a real potter who got tired of forgetting which glaze she used.</p>
+      <p style="font-size:0.95rem;color:rgba(255,255,255,0.6);margin-bottom:32px">For wheel throwers, hand builders, ceramic students, and studio potters who want to stop guessing and start tracking.</p>
+      <button class="btn btn-primary btn-lg" onclick="document.getElementById('landingPage').style.display='none';document.getElementById('authScreen').style.display='flex'" style="font-size:1.1rem;padding:16px 40px">Get Started — It's Free</button>
+      <p style="margin-top:12px;color:rgba(255,255,255,0.5);font-size:0.9rem">No credit card required. 20 pieces free forever.</p>
+      <div style="margin-top:24px;display:flex;justify-content:center;gap:16px;align-items:center;flex-wrap:wrap">
+        <a href="https://www.instagram.com/thepottersmudroom" target="_blank" rel="noopener" style="color:#fff;background:rgba(255,255,255,0.15);padding:10px 20px;border-radius:8px;text-decoration:none;font-size:1rem;display:inline-flex;align-items:center;gap:8px">📷 @thepottersmudroom</a>
+        <a href="https://www.christinaworkmanpottery.com" target="_blank" rel="noopener" style="color:#fff;background:rgba(255,255,255,0.15);padding:10px 20px;border-radius:8px;text-decoration:none;font-size:1rem;display:inline-flex;align-items:center;gap:8px">🏺 christinaworkmanpottery.com</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURES — Everything a Potter Needs -->
+  <div style="max-width:900px;margin:0 auto;padding:40px 20px">
+    <h2 style="text-align:center;font-family:Georgia,serif;font-size:1.8rem;margin-bottom:32px;color:var(--text)">Everything a Potter Needs in One Place</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px">
+      <div class="card" style="text-align:center"><div style="font-size:2rem;margin-bottom:8px">🏺</div><h3>Piece Tracking</h3><p class="text-sm" style="color:var(--text-light)">Log every piece with clay body, glazes, technique, photos at each stage, and notes. Never forget what you used again.</p></div>
+      <div class="card" style="text-align:center"><div style="font-size:2rem;margin-bottom:8px">🎨</div><h3>Glaze Library</h3><p class="text-sm" style="color:var(--text-light)">Track commercial glazes and your own recipes. Record brand, SKU, ingredients, percentages. Add result photos.</p></div>
+      <div class="card" style="text-align:center"><div style="font-size:2rem;margin-bottom:8px">🪨</div><h3>Clay Bodies</h3><p class="text-sm" style="color:var(--text-light)">Log every clay you use — wet and fired colors, shrinkage %, cone range, cost per bag. Compare and choose.</p></div>
+      <div class="card" style="text-align:center"><div style="font-size:2rem;margin-bottom:8px">🔥</div><h3>Firing Logs</h3><p class="text-sm" style="color:var(--text-light)">Record every firing — type, cone, atmosphere, kiln, speed, holds. Link firings to specific pieces.</p></div>
+      <div class="card" style="text-align:center"><div style="font-size:2rem;margin-bottom:8px">💬</div><h3>Potter Community</h3><p class="text-sm" style="color:var(--text-light)">Forum for potters — share your work, ask questions, post glaze results, and connect with other ceramicists.</p></div>
+      <div class="card" style="text-align:center"><div style="font-size:2rem;margin-bottom:8px">💰</div><h3>Sales Tracking</h3><p class="text-sm" style="color:var(--text-light)">Log sales by venue, track revenue, export CSV for taxes. Know your numbers and grow your pottery business.</p></div>
+    </div>
+  </div>
+
+  <!-- SCREENSHOTS — See It in Action -->
+  <div style="background:var(--bg-light);padding:40px 20px">
+    <div style="max-width:900px;margin:0 auto">
+      <h2 style="text-align:center;font-family:Georgia,serif;font-size:1.6rem;margin-bottom:8px;color:var(--text)">See It in Action</h2>
+      <p style="text-align:center;color:var(--text-light);margin-bottom:32px;font-size:0.95rem">Here's what your pottery studio looks like inside The Potter's Mud Room.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px">
+        <!-- Screenshot 1: Dashboard -->
+        <div style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,0.08);overflow:hidden;border:1px solid var(--border)">
+          <div style="background:var(--bg-dark);color:#fff;padding:8px 16px;font-size:0.8rem;display:flex;align-items:center;gap:8px"><span style="display:flex;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#ff5f57"></span><span style="width:8px;height:8px;border-radius:50%;background:#febc2e"></span><span style="width:8px;height:8px;border-radius:50%;background:#28c840"></span></span> Dashboard</div>
+          <div style="padding:20px">
+            <div style="font-size:1rem;font-weight:700;margin-bottom:12px">📋 Your Dashboard</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
+              <div style="background:var(--bg-light);padding:10px;border-radius:8px;text-align:center"><div style="font-size:1.2rem;font-weight:700;color:var(--primary)">12</div><div style="font-size:0.7rem;color:var(--text-light)">Pieces</div></div>
+              <div style="background:var(--bg-light);padding:10px;border-radius:8px;text-align:center"><div style="font-size:1.2rem;font-weight:700;color:var(--primary)">5</div><div style="font-size:0.7rem;color:var(--text-light)">Glazes</div></div>
+              <div style="background:var(--bg-light);padding:10px;border-radius:8px;text-align:center"><div style="font-size:1.2rem;font-weight:700;color:var(--primary)">3</div><div style="font-size:0.7rem;color:var(--text-light)">Clay Bodies</div></div>
+            </div>
+            <div style="font-size:0.85rem;color:var(--text-light)">Recent: <span style="color:var(--text)">Speckled bowl</span> · <span style="color:var(--text)">Celadon mug</span> · <span style="color:var(--text)">Raku vase</span></div>
+          </div>
+        </div>
+        <!-- Screenshot 2: Glaze Tracking -->
+        <div style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,0.08);overflow:hidden;border:1px solid var(--border)">
+          <div style="background:var(--bg-dark);color:#fff;padding:8px 16px;font-size:0.8rem;display:flex;align-items:center;gap:8px"><span style="display:flex;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#ff5f57"></span><span style="width:8px;height:8px;border-radius:50%;background:#febc2e"></span><span style="width:8px;height:8px;border-radius:50%;background:#28c840"></span></span> Glazes</div>
+          <div style="padding:20px">
+            <div style="font-size:1rem;font-weight:700;margin-bottom:12px">🎨 Track Every Glaze</div>
+            <div style="background:var(--bg-light);padding:12px;border-radius:8px;margin-bottom:8px"><div style="font-weight:600;font-size:0.9rem">Celadon Green</div><div style="font-size:0.75rem;color:var(--text-light)">Amaco · Cone 6 · Oxidation · Glossy</div></div>
+            <div style="background:var(--bg-light);padding:12px;border-radius:8px;margin-bottom:8px"><div style="font-weight:600;font-size:0.9rem">Temmoku</div><div style="font-size:0.75rem;color:var(--text-light)">Coyote · Cone 6 · Reduction · Satin</div></div>
+            <div style="background:var(--bg-light);padding:12px;border-radius:8px"><div style="font-weight:600;font-size:0.9rem">Shino (recipe)</div><div style="font-size:0.75rem;color:var(--text-light)">Custom recipe · Cone 10 · Reduction</div></div>
+          </div>
+        </div>
+        <!-- Screenshot 3: Firing Log -->
+        <div style="background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,0.08);overflow:hidden;border:1px solid var(--border)">
+          <div style="background:var(--bg-dark);color:#fff;padding:8px 16px;font-size:0.8rem;display:flex;align-items:center;gap:8px"><span style="display:flex;gap:4px"><span style="width:8px;height:8px;border-radius:50%;background:#ff5f57"></span><span style="width:8px;height:8px;border-radius:50%;background:#febc2e"></span><span style="width:8px;height:8px;border-radius:50%;background:#28c840"></span></span> Firing Log</div>
+          <div style="padding:20px">
+            <div style="font-size:1rem;font-weight:700;margin-bottom:12px">🔥 Firing Logs</div>
+            <div style="background:var(--bg-light);padding:12px;border-radius:8px;margin-bottom:8px">
+              <div style="font-weight:600;font-size:0.9rem">Glaze Firing — Cone 6</div>
+              <div style="font-size:0.75rem;color:var(--text-light)">Oxidation · Medium speed · 15 min hold</div>
+              <div style="font-size:0.75rem;color:var(--text-light);margin-top:4px">Piece: Speckled bowl · Kiln: Studio L&L</div>
+            </div>
+            <div style="background:var(--bg-light);padding:12px;border-radius:8px">
+              <div style="font-weight:600;font-size:0.9rem">Bisque Firing — Cone 06</div>
+              <div style="font-size:0.75rem;color:var(--text-light)">Slow speed · No hold</div>
+              <div style="font-size:0.75rem;color:var(--text-light);margin-top:4px">5 pieces loaded</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p style="text-align:center;margin-top:20px;color:var(--text-light);font-size:0.85rem">Screenshots from the app — try it free to see it all.</p>
+    </div>
+  </div>
+
+  <!-- PROBLEM/SOLUTION -->
+  <div style="background:var(--primary-light);padding:40px 20px;text-align:center">
+    <h2 style="font-family:Georgia,serif;font-size:1.6rem;margin-bottom:16px;color:var(--text)">The #1 Problem for Potters?</h2>
+    <p style="font-size:1.1rem;color:var(--text);max-width:600px;margin:0 auto 24px">"Which clay and glaze did I use on that piece?"<br><strong>The Potter's Mud Room solves that.</strong></p>
+    <button class="btn btn-primary btn-lg" onclick="document.getElementById('landingPage').style.display='none';document.getElementById('authScreen').style.display='flex'">Start Tracking Free</button>
+  </div>
+
+  <!-- REVIEWS — What Potters Are Saying -->
+  <div style="max-width:800px;margin:0 auto;padding:40px 20px">
+    <h2 style="text-align:center;font-family:Georgia,serif;font-size:1.6rem;margin-bottom:24px;color:var(--text)">What Potters Are Saying</h2>
+    <div id="landingReviews" style="text-align:center">
+      <p style="color:var(--text-light);font-style:italic">Be one of the first to try The Potter's Mud Room and share your experience!</p>
+    </div>
+  </div>
+
+  <!-- PRICING — 2 Simple Plans -->
+  <div style="max-width:900px;margin:0 auto;padding:40px 20px">
+    <h2 style="text-align:center;font-family:Georgia,serif;font-size:1.6rem;margin-bottom:8px">Simple, Honest Pricing</h2>
+    <p style="text-align:center;color:var(--text-light);margin-bottom:24px">Start free. Upgrade when you're ready. Cancel anytime.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;max-width:650px;margin:0 auto">
+      <div class="card" style="text-align:center;padding:32px 24px">
+        <h3 style="font-size:1.3rem">Free</h3>
+        <div style="font-size:2rem;font-weight:700;color:var(--primary);margin:12px 0">$0</div>
+        <div style="font-size:0.9rem;color:var(--text-light);margin-bottom:16px">Forever free — no catch</div>
+        <ul style="text-align:left;list-style:none;padding:0;margin:0 0 20px 0;font-size:0.9rem;color:var(--text-light)">
+          <li style="padding:6px 0;border-bottom:1px solid var(--border)">✓ 20 pieces</li>
+          <li style="padding:6px 0;border-bottom:1px solid var(--border)">✓ 1 photo per piece</li>
+          <li style="padding:6px 0;border-bottom:1px solid var(--border)">✓ Clay &amp; glaze library</li>
+          <li style="padding:6px 0">✓ Browse the forum</li>
+        </ul>
+        <button class="btn btn-secondary btn-lg" onclick="document.getElementById('landingPage').style.display='none';document.getElementById('authScreen').style.display='flex'" style="width:100%">Sign Up Free</button>
+      </div>
+      <div class="card" style="text-align:center;padding:32px 24px;border:2px solid var(--primary);position:relative">
+        <div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--primary);color:#fff;padding:4px 16px;border-radius:20px;font-size:0.8rem;font-weight:600">MOST POPULAR</div>
+        <h3 style="font-size:1.3rem">Starter</h3>
+        <div style="font-size:2rem;font-weight:700;color:#A0522D;margin:12px 0">$9.95<span style="font-size:0.9rem;font-weight:400">/mo</span></div>
+        <div style="font-size:0.9rem;color:var(--text-light);margin-bottom:16px">Everything you need — one simple plan</div>
+        <ul style="text-align:left;list-style:none;padding:0;margin:0 0 20px 0;font-size:0.9rem;color:var(--text-light)">
+          <li style="padding:6px 0;border-bottom:1px solid var(--border)">✓ <strong>Unlimited</strong> pieces</li>
+          <li style="padding:6px 0;border-bottom:1px solid var(--border)">✓ 3 photos per piece</li>
+          <li style="padding:6px 0;border-bottom:1px solid var(--border)">✓ Firing logs</li>
+          <li style="padding:6px 0;border-bottom:1px solid var(--border)">✓ Glaze recipes</li>
+          <li style="padding:6px 0;border-bottom:1px solid var(--border)">✓ Cost tracking &amp; multi-studio</li>
+          <li style="padding:6px 0;border-bottom:1px solid var(--border)">✓ Community glaze library</li>
+          <li style="padding:6px 0;border-bottom:1px solid var(--border)">✓ Sales tracking &amp; export</li>
+          <li style="padding:6px 0;border-bottom:1px solid var(--border)">✓ Full forum access</li>
+          <li style="padding:6px 0">✓ 🪙 10 free tokens (roll over while active)</li>
+        </ul>
+        <button class="btn btn-primary btn-lg" onclick="document.getElementById('landingPage').style.display='none';document.getElementById('authScreen').style.display='flex'" style="width:100%">Start Free, Upgrade Anytime</button>
+      </div>
+    </div>
+    <p style="text-align:center;margin-top:16px;color:var(--text-light);font-size:0.9rem">Save with yearly plans! Cancel anytime — no questions asked.</p>
+  </div>
+
+  <!-- MEET THE MAKER -->
+  <div style="background:var(--bg-card);border-bottom:1px solid var(--border);padding:40px 20px">
+    <div style="max-width:700px;margin:0 auto;text-align:center">
+      <h2 style="font-family:Georgia,serif;font-size:1.6rem;margin-bottom:16px;color:var(--text)">Meet the Maker</h2>
+      <p style="color:var(--text-light);line-height:1.7;font-size:1.05rem;margin-bottom:16px">
+        Hi, I'm <strong>Christina Workman</strong> — a lifelong ceramicist who has been hand building with clay since a very young age. I specialize in small plates and bowls, and one of the things I love most about working with clay is the element of surprise — you never know what the final result will be until the last firing is complete.
+      </p>
+      <p style="color:var(--text-light);line-height:1.7;font-size:1.05rem;margin-bottom:20px">
+        After years of struggling to remember which clay and glaze I used on each piece (every potter knows this pain!), I decided to build the tool I always wished existed. <strong>The Potter's Mud Room is built by a real potter, for real potters</strong> — not a tech company guessing what we need.
+      </p>
+    </div>
+  </div>
+
+  <!-- FAQ Section -->
+  <div style="max-width:800px;margin:0 auto;padding:40px 20px">
+    <h2 style="text-align:center;font-family:Georgia,serif;font-size:1.6rem;margin-bottom:24px;color:var(--text)">Frequently Asked Questions About The Potter's Mud Room</h2>
+    
+    <div style="margin-bottom:20px">
+      <h3 style="color:var(--text);font-size:1.1rem;margin-bottom:6px">What is The Potter's Mud Room (Potters Mudroom)?</h3>
+      <p style="color:var(--text-light);line-height:1.6">The Potter's Mud Room — also known as "Potters Mudroom" — is a free online pottery tracking app where ceramicists and potters can log their pieces, clay bodies, glazes, firing schedules, and sales all in one place. Think of it as your digital pottery journal and studio organizer.</p>
+    </div>
+    
+    <div style="margin-bottom:20px">
+      <h3 style="color:var(--text);font-size:1.1rem;margin-bottom:6px">Is Potters Mudroom free to use?</h3>
+      <p style="color:var(--text-light);line-height:1.6">Yes! The Potter's Mud Room offers a free tier that includes tracking up to 20 pieces, 1 photo per piece, a personal clay and glaze library, and the ability to browse the potter community forum. No credit card required.</p>
+    </div>
+    
+    <div style="margin-bottom:20px">
+      <h3 style="color:var(--text);font-size:1.1rem;margin-bottom:6px">Who created The Potter's Mud Room?</h3>
+      <p style="color:var(--text-light);line-height:1.6">The Potter's Mud Room was created by <strong>Christina Workman</strong>, a lifelong ceramicist who has been hand building with clay since a very young age. After years of struggling to remember which clay and glaze she used on each piece, she built the tool she always wished existed. Made by a real potter — not a tech company.</p>
+    </div>
+    
+    <div style="margin-bottom:20px">
+      <h3 style="color:var(--text);font-size:1.1rem;margin-bottom:6px">Can I use the Potters Mudroom on my phone?</h3>
+      <p style="color:var(--text-light);line-height:1.6">Absolutely. The Potter's Mud Room works on any device — phone, tablet, or desktop computer. Access your pottery logs from the studio, at shows, or anywhere you have internet.</p>
+    </div>
+    
+    <div style="margin-bottom:20px">
+      <h3 style="color:var(--text);font-size:1.1rem;margin-bottom:6px">Does The Potter's Mud Room have a community?</h3>
+      <p style="color:var(--text-light);line-height:1.6">Yes! The Potters Mudroom includes a forum community where potters can share their work, ask questions, post glaze results, and connect with ceramicists worldwide.</p>
+    </div>
+
+    <div style="margin-bottom:20px">
+      <h3 style="color:var(--text);font-size:1.1rem;margin-bottom:6px">What is a mudroom for potters?</h3>
+      <p style="color:var(--text-light);line-height:1.6">In the pottery world, a mudroom is where the magic (and the mess) happens. The Potter's Mud Room takes that idea digital — it's the mudroom where potters organize everything: pieces, clay bodies, glazes, firings, and sales. Every potter needs a mudroom. This is yours.</p>
+    </div>
+
+    <div style="margin-bottom:20px">
+      <h3 style="color:var(--text);font-size:1.1rem;margin-bottom:6px">How is the Potters Mudroom different from other pottery apps?</h3>
+      <p style="color:var(--text-light);line-height:1.6">Built by a real potter — not a tech company. It includes piece tracking, glaze libraries with photos, firing logs, a pottery community forum, sales tracking, and casualty logging so you can learn from the pieces that didn't make it.</p>
+    </div>
+
+    <div style="margin-bottom:20px">
+      <h3 style="color:var(--text);font-size:1.1rem;margin-bottom:6px">Can I track pottery casualties and failures?</h3>
+      <p style="color:var(--text-light);line-height:1.6">Yes! Log what went wrong (cracking, glaze crawl, explosions, warping, and more), why you think it happened, and what you learned. Every potter has casualties — smart potters learn from them.</p>
+    </div>
+  </div>
+
+  <!-- SEO Content -->
+  <div style="max-width:800px;margin:0 auto;padding:20px 20px 40px">
+    <h2 style="text-align:center;font-family:Georgia,serif;font-size:1.4rem;margin-bottom:16px;color:var(--text)">Welcome to the Potters Mudroom</h2>
+    <p style="color:var(--text-light);line-height:1.7;text-align:center;max-width:700px;margin:0 auto">
+      Whether you call it The Potter's Mud Room, the Potters Mudroom, or just "the mud room" — this is the place where potters come to organize their craft. 
+      Track every piece from wet clay to the final firing. Log your favorite clay bodies, build a glaze library with photos, record every kiln firing, 
+      and track your pottery sales. The Potter's Mud Room is the pottery app that potters have been asking for. Welcome to the mud room. 🏺
+    </p>
+  </div>
+
+  <!-- SOCIAL MEDIA — Follow Us -->
+  <div style="background:var(--bg-card);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:40px 20px;text-align:center">
+    <h2 style="font-family:Georgia,serif;font-size:1.6rem;margin-bottom:8px;color:var(--text)">Follow The Potter's Mud Room</h2>
+    <p style="color:var(--text-light);margin-bottom:24px">Stay connected with the pottery community</p>
+    <div style="display:flex;justify-content:center;gap:16px;flex-wrap:wrap">
+      <a href="https://www.instagram.com/thepottersmudroom" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,#833AB4,#E1306C,#F77737);color:#fff;padding:14px 28px;border-radius:12px;text-decoration:none;font-size:1.05rem;font-weight:600;min-height:48px">📷 @thepottersmudroom</a>
+      <a href="https://www.christinaworkmanpottery.com" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:10px;background:var(--primary);color:#fff;padding:14px 28px;border-radius:12px;text-decoration:none;font-size:1.05rem;font-weight:600;min-height:48px">🏺 Christina Workman Pottery</a>
+    </div>
+  </div>
+
+  <!-- FOOTER CTA -->
+  <div style="background:var(--bg-dark);color:#fff;padding:40px 20px;text-align:center">
+    <h2 style="font-family:Georgia,serif;font-size:1.6rem;margin-bottom:12px">Built by a Potter, for Potters 🏺</h2>
+    <p style="color:rgba(255,255,255,0.7);margin-bottom:20px;max-width:600px;margin-left:auto;margin-right:auto">Stop forgetting which glaze you used. Start tracking your pottery today.</p>
+    <button class="btn btn-primary btn-lg" onclick="document.getElementById('landingPage').style.display='none';document.getElementById('authScreen').style.display='flex'" style="font-size:1.1rem;padding:16px 40px">Join The Mud Room — Free</button>
+    <p style="margin-top:20px;color:rgba(255,255,255,0.4);font-size:0.85rem">thepottersmudroom.com — The Potter's Mud Room — Potters Mudroom</p>
+  </div>
+</div>
+
+<!-- AUTH SCREEN -->;color:rgba(255,255,255,0.5);margin-bottom:8px">thepottersmudroom.com — The Potters Mudroom</p>
       <p style="font-size:1.2rem;color:rgba(255,255,255,0.8);margin-bottom:32px">Track every piece from wet clay to finished work.<br>Clay bodies. Glazes. Firings. Sales. Community.</p>
       <button class="btn btn-primary btn-lg" onclick="document.getElementById('landingPage').style.display='none';document.getElementById('authScreen').style.display='flex'" style="font-size:1.1rem;padding:16px 40px">Get Started — It's Free</button>
       <p style="margin-top:12px;color:rgba(255,255,255,0.5);font-size:0.9rem">No credit card required. 20 pieces free forever.</p>
@@ -799,6 +1016,8 @@
           <div id="profileTierInfo"></div>
           <h3 style="margin:24px 0 16px">Referrals</h3>
           <div id="profileReferralInfo"></div>
+          <h3 style="margin:24px 0 16px">Leave a Review</h3>
+          <div id="profileReviewSection"></div>
           <h3 style="margin:24px 0 16px">Export Your Data</h3>
           <div style="display:flex;flex-wrap:wrap;gap:8px">
             <a href="/api/export/clay-bodies" class="btn btn-secondary btn-sm" style="text-decoration:none" onclick="event.preventDefault();exportData('/api/export/clay-bodies')">📥 Clay Bodies</a>
@@ -1352,6 +1571,6 @@
 <!-- TOAST CONTAINER -->
 <div class="toast-container" id="toastContainer"></div>
 
-<script src="app.js?v=20260309e"></script>
+<script src="app.js?v=20260310a"></script>
 </body>
 </html>

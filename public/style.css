@@ -50,6 +50,8 @@ h1 { font-size: 1.75rem; } h2 { font-size: 1.4rem; } h3 { font-size: 1.15rem; }
 .nav-user { display: flex; align-items: center; gap: 10px; }
 .tier-badge { padding: 2px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
 .tier-free { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8); }
+.tier-starter { background: var(--primary); color: #fff; }
+.tier-basic { background: var(--primary); color: #fff; }
 .tier-mid { background: var(--primary); color: #fff; }
 .tier-top { background: var(--accent); color: #fff; }
 .nav-toggle { display: none; background: none; border: none; color: #fff; font-size: 1.5rem; cursor: pointer; }
