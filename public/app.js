@@ -250,7 +250,7 @@ async function viewPiece(id) {
       (p.notes ? df('Notes', p.notes) : '') + '</div>' +
       '<div><div class="card mb-16"><h3 style="margin-bottom:12px">Glazes</h3>' + glist + '</div>' +
       (firings ? '<div class="card mb-16"><h3 style="margin-bottom:12px">Firings</h3>' + firings + '</div>' : '') +
-      ((p.status === 'broken' || p.status === 'recycled') ? '<div class="card" style="border:2px solid var(--danger);background:rgba(220,53,69,0.05)"><h3 style="margin-bottom:12px;color:var(--danger)">Casualty Report</h3>' +
+      ((p.status === 'broken' || p.status === 'recycled') ? '<div class="card" style="border:2px solid var(--danger);background:rgba(220,53,69,0.05)"><h3 style="margin-bottom:12px;color:var(--danger)">' + (p.status === 'recycled' ? 'Recycle Report' : 'Casualty Report') + '</h3>' +
         df('What Happened', p.casualty_type ? CASUALTY_LABELS[p.casualty_type] || p.casualty_type : 'Not specified') +
         (p.casualty_notes ? df('What Went Wrong', p.casualty_notes) : '') +
         (p.casualty_lesson ? '<div class="detail-field" style="background:rgba(40,167,69,0.08);padding:10px;border-radius:var(--radius-sm);margin-top:8px"><div class="detail-label" style="color:var(--success)">🎓 Lesson Learned</div><div class="detail-value">' + esc(p.casualty_lesson) + '</div></div>' : '') +
@@ -284,6 +284,8 @@ function toggleCasualtyFields() {
   const status = document.getElementById('pieceStatus').value;
   const show = (status === 'broken' || status === 'recycled');
   document.getElementById('casualtyFields').classList.toggle('hidden', !show);
+  const title = document.getElementById('casualtyReportTitle');
+  if (title) title.textContent = status === 'recycled' ? 'Recycle Report' : 'Casualty Report';
 }
 function openPieceModal(p) {
   document.getElementById('pieceId').value = p?.id||'';
