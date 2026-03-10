@@ -24,7 +24,7 @@ function initDB() {
       website TEXT,
       avatar_filename TEXT,
       is_private INTEGER DEFAULT 0,
-      tier TEXT DEFAULT 'free' CHECK(tier IN ('free', 'basic', 'mid', 'top')),
+      tier TEXT DEFAULT 'free' CHECK(tier IN ('free', 'basic', 'mid', 'top', 'starter')),
       forum_tokens INTEGER DEFAULT 0,
       unlimited_tokens_until TEXT,
       stripe_customer_id TEXT,
@@ -435,6 +435,20 @@ function initDB() {
   const catInsert = db.prepare('INSERT OR IGNORE INTO forum_categories (id, name, description, sort_order, icon) VALUES (?,?,?,?,?)');
   catInsert.run('cat-events', 'Events', 'Post pottery events, workshops, shows, and meetups near you!', 11, '📅');
   catInsert.run('cat-jobs', 'Job Board', 'Pottery jobs, studio assistant positions, teaching gigs, and opportunities', 12, '💼');
+
+  // Reviews table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS reviews (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+      body TEXT NOT NULL,
+      is_approved INTEGER DEFAULT 0,
+      is_featured INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
 
   return db;
 }

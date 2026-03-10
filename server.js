@@ -59,7 +59,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req,
         db.prepare('UPDATE users SET tier=?, stripe_customer_id=?, stripe_subscription_id=? WHERE id=?')
           .run(tier, session.customer, session.subscription, userId);
         // Monthly tokens by tier (don't roll over — reset to tier amount)
-        const tierTokens = { basic: 3, mid: 5, top: 10 };
+        const tierTokens = { starter: 10, basic: 3, mid: 5, top: 10 };
         const tokens = tierTokens[tier] || 0;
         if (tokens > 0) {
           db.prepare('UPDATE users SET forum_tokens = ? WHERE id=?').run(tokens, userId);
@@ -148,11 +148,14 @@ function refreshTier(req, res, next) {
   next();
 }
 function requireTier(min) {
-  const lv = { free: 0, basic: 1, mid: 2, top: 3 };
+  // New simplified tiers: free=0, starter=1
+  // Backward compat: basic/mid/top all treated as >= starter
+  const lv = { free: 0, starter: 1, basic: 1, mid: 2, top: 3 };
+  const minLv = min === 'starter' ? 1 : (lv[min] || 0);
   return (req, res, next) => {
     const u = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
     const currentTier = u?.tier || req.userTier;
-    if (lv[currentTier] >= lv[min]) { req.userTier = currentTier; return next(); }
+    if ((lv[currentTier] || 0) >= minLv) { req.userTier = currentTier; return next(); }
     res.status(403).json({ error: `Requires ${min} tier or above` });
   };
 }
@@ -226,6 +229,9 @@ app.delete('/api/block/:userId', auth, (req, res) => {
 
 // ============ STRIPE BILLING ============
 const PRICE_CONFIG = {
+  starter: { amount: 995, name: "Starter Plan — $9.95/mo" },
+  'starter-yearly': { amount: 9500, name: "Starter Plan — $95/year (save $24.40!)", tier: 'starter' },
+  // Legacy plans (kept for backward compat with existing Stripe subscriptions)
   basic: { amount: 995, name: "Basic Plan — $9.95/mo" },
   mid: { amount: 1295, name: "Mid Plan — $12.95/mo" },
   top: { amount: 1995, name: "Top Plan — $19.95/mo" },
@@ -234,6 +240,7 @@ const PRICE_CONFIG = {
   'top-yearly': { amount: 19000, name: "Top Plan — $190/year (save $49.40!)", tier: 'top' }
 };
 const TOKEN_PACKS = {
+  pack1: { amount: 50, tokens: 1, name: "1 Forum Token" },
   pack20: { amount: 299, tokens: 20, name: "20 Forum Tokens" },
   pack50: { amount: 499, tokens: 50, name: "50 Forum Tokens" },
   pack120: { amount: 999, tokens: 120, name: "120 Forum Tokens" }
@@ -244,11 +251,10 @@ app.get('/api/billing/plans', (req, res) => {
     foundingMember: true,
     plans: [
       { id: 'free', name: 'Free', price: 0, yearlyPrice: 0, features: ['20 pieces', '1 photo each', 'Personal clay & glaze library', 'Basic search', 'Forum (browse only)', 'Can buy tokens to post'] },
-      { id: 'basic', name: 'Basic', price: 9.95, yearlyPrice: 99.00, foundingPrice: 4.99, foundingYearly: 49.99, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Forum access (read & post)', '🪙 10 free tokens (roll over while active)', 'Can buy more tokens', 'Cancel anytime'] },
-      { id: 'mid', name: 'Mid', price: 12.95, yearlyPrice: 129.00, foundingPrice: 7.99, foundingYearly: 79.99, features: ['Everything in Basic', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', '🪙 10 free tokens (roll over while active)', 'Cancel anytime'] },
-      { id: 'top', name: 'Top', price: 19.95, yearlyPrice: 199.00, foundingPrice: 11.99, foundingYearly: 109.99, features: ['Everything in Mid', 'Community Glaze Library', 'Sales tracking', 'Import/export data', '🪙 10 free tokens (roll over while active)', 'Cancel anytime'] }
+      { id: 'starter', name: 'Starter', price: 9.95, yearlyPrice: 95.00, foundingPrice: 4.99, foundingYearly: 49.99, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', 'Community glaze library', 'Sales tracking', 'Full forum access (read & post)', '🪙 10 free tokens (roll over while active)', 'Cancel anytime'] }
     ],
     tokenPacks: [
+      { id: 'pack1', tokens: 1, price: 0.50, foundingPrice: 0.25 },
       { id: 'pack20', tokens: 20, price: 2.99, foundingPrice: 1.99 },
       { id: 'pack50', tokens: 50, price: 4.99, foundingPrice: 2.99 },
       { id: 'pack120', tokens: 120, price: 9.99, foundingPrice: 5.99 }
@@ -742,7 +748,7 @@ app.get('/api/firing-logs', auth, (req, res) => {
   res.json(db.prepare('SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id WHERE fl.user_id=? ORDER BY fl.date DESC').all(req.userId));
 });
 
-app.post('/api/firing-logs', auth, requireTier('basic'), (req, res) => {
+app.post('/api/firing-logs', auth, requireTier('starter'), (req, res) => {
   const { pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail, holdUsed, holdDuration, date, results, notes } = req.body;
   const id = uuidv4();
   db.prepare('INSERT INTO firing_logs (id,user_id,piece_id,firing_type,cone,temperature,atmosphere,kiln_name,schedule,duration,firing_speed,custom_speed_detail,hold_used,hold_duration,date,results,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
@@ -751,11 +757,11 @@ app.post('/api/firing-logs', auth, requireTier('basic'), (req, res) => {
 });
 
 // ============ SALES ============
-app.get('/api/sales', auth, requireTier('top'), (req, res) => {
+app.get('/api/sales', auth, requireTier('starter'), (req, res) => {
   res.json(db.prepare('SELECT s.*,p.title as piece_title FROM sales s LEFT JOIN pieces p ON s.piece_id=p.id WHERE s.user_id=? ORDER BY s.date DESC').all(req.userId));
 });
 
-app.post('/api/sales', auth, requireTier('top'), (req, res) => {
+app.post('/api/sales', auth, requireTier('starter'), (req, res) => {
   const { pieceId, date, price, venue, venueType, buyerName, notes } = req.body;
   const id = uuidv4();
   db.prepare('INSERT INTO sales (id,user_id,piece_id,date,price,venue,venue_type,buyer_name,notes) VALUES (?,?,?,?,?,?,?,?,?)').run(id, req.userId, pieceId, date, price, venue, venueType, buyerName, notes);
@@ -763,14 +769,14 @@ app.post('/api/sales', auth, requireTier('top'), (req, res) => {
   res.json({ id });
 });
 
-app.get('/api/sales/summary', auth, requireTier('top'), (req, res) => {
+app.get('/api/sales/summary', auth, requireTier('starter'), (req, res) => {
   const total = db.prepare('SELECT COUNT(*) as count, SUM(price) as total FROM sales WHERE user_id=?').get(req.userId);
   const byVenue = db.prepare('SELECT venue_type,COUNT(*) as count,SUM(price) as total FROM sales WHERE user_id=? GROUP BY venue_type').all(req.userId);
   const byMonth = db.prepare(`SELECT strftime('%Y-%m',date) as month,COUNT(*) as count,SUM(price) as total FROM sales WHERE user_id=? GROUP BY month ORDER BY month DESC LIMIT 12`).all(req.userId);
   res.json({ total, byVenue, byMonth });
 });
 
-app.get('/api/sales/export', auth, requireTier('top'), (req, res) => {
+app.get('/api/sales/export', auth, requireTier('starter'), (req, res) => {
   const sales = db.prepare('SELECT s.*,p.title as piece_title FROM sales s LEFT JOIN pieces p ON s.piece_id=p.id WHERE s.user_id=? ORDER BY s.date DESC').all(req.userId);
   let csv = 'Date,Piece,Price,Venue Type,Venue,Buyer,Notes\n';
   sales.forEach(s => { csv += `"${s.date||''}","${(s.piece_title||'').replace(/"/g,'""')}","${s.price||0}","${s.venue_type||''}","${(s.venue||'').replace(/"/g,'""')}","${(s.buyer_name||'').replace(/"/g,'""')}","${(s.notes||'').replace(/"/g,'""')}"\n`; });
@@ -779,7 +785,7 @@ app.get('/api/sales/export', auth, requireTier('top'), (req, res) => {
   res.send(csv);
 });
 
-app.get('/api/export/pieces', auth, requireTier('mid'), (req, res) => {
+app.get('/api/export/pieces', auth, requireTier('starter'), (req, res) => {
   const pieces = db.prepare('SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id WHERE p.user_id=? ORDER BY p.updated_at DESC').all(req.userId);
   let csv = 'Title,Clay Body,Status,Technique,Form,Studio,Date Started,Date Completed,Material Cost,Firing Cost,Sale Price,Notes\n';
   pieces.forEach(p => { csv += `"${(p.title||'').replace(/"/g,'""')}","${(p.clay_body_name||'').replace(/"/g,'""')}","${p.status||''}","${p.technique||''}","${(p.form||'').replace(/"/g,'""')}","${(p.studio||'').replace(/"/g,'""')}","${p.date_started||''}","${p.date_completed||''}","${p.material_cost||''}","${p.firing_cost||''}","${p.sale_price||''}","${(p.notes||'').replace(/"/g,'""')}"\n`; });
@@ -789,7 +795,7 @@ app.get('/api/export/pieces', auth, requireTier('mid'), (req, res) => {
 });
 
 // ============ COMMUNITY GLAZE COMBOS ============
-app.get('/api/community/combos', auth, requireTier('top'), (req, res) => {
+app.get('/api/community/combos', auth, requireTier('starter'), (req, res) => {
   const { search, cone, atmosphere } = req.query;
   let sql = 'SELECT gc.*,u.display_name as author FROM glaze_combos gc JOIN users u ON gc.user_id=u.id WHERE gc.is_shared=1';
   const params = [];
@@ -803,7 +809,7 @@ app.get('/api/community/combos', auth, requireTier('top'), (req, res) => {
   res.json(combos);
 });
 
-app.post('/api/community/combos', auth, requireTier('top'), upload.array('photos', 2), (req, res) => {
+app.post('/api/community/combos', auth, requireTier('starter'), upload.array('photos', 2), (req, res) => {
   const { name, clayBodyName, cone, atmosphere, description, notes, isShared, layers } = req.body;
   const parsedLayers = typeof layers === 'string' ? JSON.parse(layers) : layers;
   const id = uuidv4();
@@ -1022,7 +1028,7 @@ app.get('/api/dashboard', auth, (req, res) => {
   // Casualty count
   stats.totalCasualties = db.prepare("SELECT COUNT(*) as c FROM pieces WHERE user_id=? AND status IN ('broken','recycled')").get(req.userId).c;
 
-  if (tier === 'top') {
+  if (tier !== 'free') {
     const sales = db.prepare('SELECT COUNT(*) as count, SUM(price) as total FROM sales WHERE user_id=?').get(req.userId);
     stats.sales = sales;
   }
@@ -1039,6 +1045,85 @@ app.get('/api/casualties', auth, (req, res) => {
   const getPh = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order LIMIT 1');
   pieces.forEach(p => { p.glazes = getGl.all(p.id); p.primaryPhoto = getPh.get(p.id) || null; });
   res.json(pieces);
+});
+
+// ============ REVIEWS ============
+app.post('/api/reviews', auth, (req, res) => {
+  try {
+    const { rating, body } = req.body;
+    if (!rating || !body) return res.status(400).json({ error: 'Rating and review text required' });
+    if (rating < 1 || rating > 5) return res.status(400).json({ error: 'Rating must be 1-5' });
+    const existing = db.prepare('SELECT id FROM reviews WHERE user_id=?').get(req.userId);
+    if (existing) return res.status(409).json({ error: 'You already submitted a review. You can edit it instead.' });
+    const id = uuidv4();
+    db.prepare('INSERT INTO reviews (id, user_id, rating, body) VALUES (?,?,?,?)').run(id, req.userId, rating, body);
+    res.json({ id, message: 'Review submitted! It will appear on the site once approved.' });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/reviews', (req, res) => {
+  try {
+    const { featured } = req.query;
+    let sql = 'SELECT r.*, u.display_name, u.avatar_filename FROM reviews r JOIN users u ON r.user_id=u.id WHERE r.is_approved=1';
+    if (featured === '1') sql += ' AND r.is_featured=1';
+    sql += ' ORDER BY r.is_featured DESC, r.created_at DESC LIMIT 20';
+    res.json(db.prepare(sql).all());
+  } catch(e) { res.json([]); }
+});
+
+app.get('/api/reviews/mine', auth, (req, res) => {
+  try {
+    const review = db.prepare('SELECT * FROM reviews WHERE user_id=?').get(req.userId);
+    res.json(review || null);
+  } catch(e) { res.json(null); }
+});
+
+app.put('/api/reviews/:id', auth, (req, res) => {
+  try {
+    const { rating, body } = req.body;
+    if (!rating || !body) return res.status(400).json({ error: 'Rating and review text required' });
+    if (rating < 1 || rating > 5) return res.status(400).json({ error: 'Rating must be 1-5' });
+    const review = db.prepare('SELECT * FROM reviews WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+    if (!review) return res.status(404).json({ error: 'Review not found' });
+    db.prepare('UPDATE reviews SET rating=?, body=?, is_approved=0 WHERE id=?').run(rating, body, req.params.id);
+    res.json({ success: true, message: 'Review updated! It will be re-reviewed before appearing.' });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/admin/reviews', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const reviews = db.prepare('SELECT r.*, u.display_name, u.email FROM reviews r JOIN users u ON r.user_id=u.id ORDER BY r.created_at DESC').all();
+    res.json(reviews);
+  } catch(e) { res.json([]); }
+});
+
+app.post('/api/admin/reviews/:id/approve', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const current = db.prepare('SELECT is_approved FROM reviews WHERE id=?').get(req.params.id);
+    const newVal = current?.is_approved ? 0 : 1;
+    db.prepare('UPDATE reviews SET is_approved=? WHERE id=?').run(newVal, req.params.id);
+    res.json({ success: true, is_approved: newVal });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/reviews/:id/feature', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const current = db.prepare('SELECT is_featured FROM reviews WHERE id=?').get(req.params.id);
+    const newVal = current?.is_featured ? 0 : 1;
+    db.prepare('UPDATE reviews SET is_featured=? WHERE id=?').run(newVal, req.params.id);
+    res.json({ success: true, is_featured: newVal });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/reviews/:id', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    db.prepare('DELETE FROM reviews WHERE id=?').run(req.params.id);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // SPA fallback
