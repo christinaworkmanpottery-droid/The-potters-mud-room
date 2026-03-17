@@ -2573,22 +2573,33 @@ async function deleteContact(id) {
 }
 
 // ============ COMMUNITY MEMBERS ============
+let allMembers = [];
 async function loadCommunityMembers() {
   try {
-    const members = await api('/api/community/members');
-    const c = document.getElementById('membersList'), em = document.getElementById('membersEmpty');
-    if (!members.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
-    em.classList.add('hidden');
-    c.innerHTML = members.map(u =>
-      '<div class="card"><div class="card-header"><div style="display:flex;gap:8px;align-items:center">' +
-      (u.avatar_filename ? '<img src="/uploads/' + u.avatar_filename + '" style="width:40px;height:40px;border-radius:50%;object-fit:cover">' : '<div style="width:40px;height:40px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700">' + (u.display_name||'?')[0].toUpperCase() + '</div>') +
-      '<div><div class="card-title">' + esc(u.display_name||'Member') + '</div>' +
-      (u.location ? '<div class="text-sm" style="color:var(--text-light)">' + esc(u.location) + '</div>' : '') + '</div></div></div>' +
-      (u.bio ? '<div class="text-sm mt-8">' + esc(u.bio) + '</div>' : '') +
-      '<div style="display:flex;gap:4px;margin-top:10px"><button onclick="navigate(\'messageThread\');loadMessageThread(\'' + u.id + '\')" class="btn-small">✉️ Message</button></div>' +
-      '</div>'
-    ).join('');
+    allMembers = await api('/api/community/members');
+    document.getElementById('memberSearch').value = '';
+    renderMembers(allMembers);
   } catch(e) { toast(e.message,'error'); }
+}
+function filterMembers() {
+  const q = (document.getElementById('memberSearch').value || '').toLowerCase();
+  if (!q) return renderMembers(allMembers);
+  renderMembers(allMembers.filter(u => (u.display_name||'').toLowerCase().includes(q) || (u.location||'').toLowerCase().includes(q) || (u.bio||'').toLowerCase().includes(q)));
+}
+function renderMembers(members) {
+  const c = document.getElementById('membersList'), em = document.getElementById('membersEmpty');
+  if (!members.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
+  em.classList.add('hidden');
+  c.innerHTML = members.map(u =>
+    '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg-card)">' +
+    (u.avatar_filename ? '<img src="/uploads/' + u.avatar_filename + '" style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0">' : '<div style="width:44px;height:44px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;flex-shrink:0;color:var(--primary)">' + (u.display_name||'?')[0].toUpperCase() + '</div>') +
+    '<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:0.95rem">' + esc(u.display_name||'Member') + '</div>' +
+    (u.location ? '<div class="text-sm" style="color:var(--text-light)">📍 ' + esc(u.location) + '</div>' : '') +
+    (u.bio ? '<div class="text-sm" style="color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(u.bio) + '</div>' : '') +
+    '</div>' +
+    '<button onclick="navigate(\'messageThread\');loadMessageThread(\'' + u.id + '\')" class="btn btn-sm btn-secondary" style="flex-shrink:0">✉️</button>' +
+    '</div>'
+  ).join('');
 }
 
 // ============ PROFILE - CHANGE PASSWORD ============
