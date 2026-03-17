@@ -135,6 +135,7 @@ function navigate(page) {
       upgrade:'pageUpgrade', help:'pageHelp', admin:'pageAdmin',
       shoppingList:'pageShoppingList', chemicals:'pageChemicals',
       communityMembers:'pageCommunityMembers',
+      memberProfile:'pageMemberProfile',
       notifications:'pageNotifications', messages:'pageMessages', messageThread:'pageMessageThread'
     };
     const el = document.getElementById(map[page]); if (el) el.classList.add('active');
@@ -2602,8 +2603,11 @@ function renderMembers(members) {
   em.classList.add('hidden');
   c.innerHTML = members.map(u =>
     '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg-card)">' +
-    (u.avatar_filename ? '<img src="/uploads/' + u.avatar_filename + '" style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0">' : '<div style="width:44px;height:44px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;flex-shrink:0;color:var(--primary)">' + (u.display_name||'?')[0].toUpperCase() + '</div>') +
-    '<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:0.95rem">' + esc(u.display_name||'Member') +
+    '<div style="cursor:pointer;flex-shrink:0" onclick="viewMemberProfile(\'' + u.id + '\')">' +
+    (u.avatar_filename ? '<img src="/uploads/' + u.avatar_filename + '" style="width:44px;height:44px;border-radius:50%;object-fit:cover">' : '<div style="width:44px;height:44px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;color:var(--primary)">' + (u.display_name||'?')[0].toUpperCase() + '</div>') +
+    '</div>' +
+    '<div style="flex:1;min-width:0;cursor:pointer" onclick="viewMemberProfile(\'' + u.id + '\')">' +
+    '<div style="font-weight:600;font-size:0.95rem;color:var(--primary)">' + esc(u.display_name||'Member') +
     (u.is_private ? ' <span style="font-size:0.75rem;color:var(--text-muted);font-weight:normal">🔒 Private</span>' : '') + '</div>' +
     (u.location ? '<div class="text-sm" style="color:var(--text-light)">📍 ' + esc(u.location) + '</div>' : '') +
     (u.bio ? '<div class="text-sm" style="color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(u.bio) + '</div>' : '') +
@@ -2611,6 +2615,35 @@ function renderMembers(members) {
     '<button onclick="navigate(\'messageThread\');loadMessageThread(\'' + u.id + '\')" class="btn btn-sm btn-secondary" style="flex-shrink:0">✉️</button>' +
     '</div>'
   ).join('');
+}
+
+async function viewMemberProfile(userId) {
+  try {
+    const d = await api('/api/profile/' + userId);
+    const u = d.user;
+    const c = document.getElementById('memberProfileContent');
+    if (u.isPrivate) {
+      c.innerHTML = '<div class="card" style="text-align:center;padding:40px 20px">' +
+        '<div style="font-size:3rem;margin-bottom:12px">🔒</div>' +
+        '<h2>' + esc(u.displayName || 'Member') + '</h2>' +
+        '<p style="color:var(--text-light);margin-top:8px">This profile is private.</p>' +
+        '<button onclick="navigate(\'messageThread\');loadMessageThread(\'' + u.id + '\')" class="btn btn-primary mt-16">✉️ Send Message</button>' +
+        '</div>';
+    } else {
+      c.innerHTML = '<div class="card" style="max-width:500px">' +
+        '<div style="display:flex;gap:16px;align-items:center;margin-bottom:16px">' +
+        (u.avatar_filename ? '<img src="/uploads/' + u.avatar_filename + '" style="width:80px;height:80px;border-radius:50%;object-fit:cover">' : '<div style="width:80px;height:80px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:2rem;color:var(--primary)">' + (u.displayName||u.display_name||'?')[0].toUpperCase() + '</div>') +
+        '<div><h2 style="margin:0">' + esc(u.displayName || u.display_name || 'Member') + '</h2>' +
+        (u.location ? '<div class="text-sm" style="color:var(--text-light);margin-top:4px">📍 ' + esc(u.location) + '</div>' : '') +
+        '</div></div>' +
+        (u.bio ? '<p style="margin-bottom:12px">' + esc(u.bio) + '</p>' : '') +
+        (u.website ? '<p class="text-sm"><a href="' + esc(u.website) + '" target="_blank" style="color:var(--primary)">' + esc(u.website) + '</a></p>' : '') +
+        '<div class="text-sm" style="color:var(--text-muted);margin-top:12px">Member since ' + fmtDate(u.created_at) + '</div>' +
+        '<button onclick="navigate(\'messageThread\');loadMessageThread(\'' + u.id + '\')" class="btn btn-primary mt-16">✉️ Send Message</button>' +
+        '</div>';
+    }
+    navigate('memberProfile');
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 // ============ PROFILE - CHANGE PASSWORD ============
