@@ -442,6 +442,7 @@ function initDB() {
   safeAdd('firing_logs', 'firing_time', 'TEXT');
   safeAdd('firing_logs', 'firing_mode', "TEXT DEFAULT 'kiln-load'");
   safeAdd('firing_logs', 'load_description', 'TEXT');
+  safeAdd('firing_logs', 'firing_mode_notes', 'TEXT');
 
   // Firing photos table
   db.exec(`
@@ -456,6 +457,20 @@ function initDB() {
     )
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_firing_photos ON firing_photos(firing_id)`);
+
+  // Project photos table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS project_photos (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      original_name TEXT,
+      sort_order INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_project_photos ON project_photos(project_id)`);
 
   // Sales improvements (items 26-28)
   safeAdd('sales', 'quantity', 'INTEGER DEFAULT 1');

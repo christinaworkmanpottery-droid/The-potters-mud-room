@@ -415,32 +415,50 @@
   <nav class="nav">
     <div class="nav-inner">
       <div class="nav-brand">🏺 The Potter's <span class="mud">Mud Room</span></div>
-      <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')">☰</button>
-      <div class="nav-links">
-        <button class="nav-link active" data-page="dashboard" onclick="navigate('dashboard')">Dashboard</button>
-        <button class="nav-link" data-page="clayBodies" onclick="navigate('clayBodies')">Clay</button>
-        <button class="nav-link" data-page="glazes" onclick="navigate('glazes')">Glazes</button>
-        <button class="nav-link" data-page="firings" onclick="navigate('firings')">Firings</button>
-        <button class="nav-link" data-page="pieces" onclick="navigate('pieces')">Pieces</button>
-        <button class="nav-link" data-page="sales" onclick="navigate('sales')">Sales</button>
-        <button class="nav-link" data-page="goals" onclick="navigate('goals')">Goals</button>
-        <button class="nav-link" data-page="projects" onclick="navigate('projects')">Projects</button>
-        <button class="nav-link" data-page="events" onclick="navigate('events')">📅 Events</button>
-        <button class="nav-link" data-page="contacts" onclick="navigate('contacts')">Contacts</button>
-        <button class="nav-link" data-page="shoppingList" onclick="navigate('shoppingList')">🛒 Shopping</button>
-        <button class="nav-link" data-page="community" onclick="navigate('community')">Community</button>
-        <button class="nav-link" data-page="forum" onclick="navigate('forum')">Forum</button>
-        <button class="nav-link" data-page="shop" onclick="navigate('shop')">Shop</button>
-        <button class="nav-link" data-page="help" onclick="navigate('help')">Help</button>
-        <button class="nav-link" data-page="upgrade" onclick="navigate('upgrade')">Plans</button>
-        <button class="nav-link" data-page="profile" onclick="navigate('profile')">Profile</button>
-        <button class="nav-link" data-page="admin" onclick="navigate('admin')" id="navAdmin" style="display:none">Admin</button>
+      <div class="nav-controls">
+        <div class="nav-badges">
+          <button class="btn-ghost" onclick="navigate('messages')" title="Messages" style="position:relative;font-size:1.1rem">✉️<span id="msgBadge" class="notif-badge hidden">0</span></button>
+          <button class="btn-ghost" onclick="navigate('notifications')" title="Notifications" style="position:relative;font-size:1.1rem">🔔<span id="notifBadge" class="notif-badge hidden">0</span></button>
+        </div>
+        <button class="nav-toggle" onclick="document.querySelector('.nav-dropdown').classList.toggle('open'); document.querySelector('body').classList.toggle('nav-open')" title="Menu">☰</button>
       </div>
-      <div class="nav-user">
-        <button class="btn-ghost" onclick="navigate('messages')" title="Messages" style="position:relative;font-size:1.1rem">✉️<span id="msgBadge" class="notif-badge hidden">0</span></button>
-        <button class="btn-ghost" onclick="navigate('notifications')" title="Notifications" style="position:relative;font-size:1.1rem">🔔<span id="notifBadge" class="notif-badge hidden">0</span></button>
+    </div>
+    <div class="nav-dropdown">
+      <div class="nav-section">
+        <div class="nav-section-title">Studio</div>
+        <button class="nav-link" data-page="dashboard" onclick="navigate('dashboard'); closeNav()">Dashboard</button>
+        <button class="nav-link" data-page="pieces" onclick="navigate('pieces'); closeNav()">Pieces</button>
+        <button class="nav-link" data-page="clayBodies" onclick="navigate('clayBodies'); closeNav()">Clay</button>
+        <button class="nav-link" data-page="glazes" onclick="navigate('glazes'); closeNav()">Glazes</button>
+        <button class="nav-link" data-page="firings" onclick="navigate('firings'); closeNav()">Firings</button>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Business</div>
+        <button class="nav-link" data-page="sales" onclick="navigate('sales'); closeNav()">Sales</button>
+        <button class="nav-link" data-page="shoppingList" onclick="navigate('shoppingList'); closeNav()">🛒 Shopping</button>
+        <button class="nav-link" data-page="goals" onclick="navigate('goals'); closeNav()">Goals</button>
+        <button class="nav-link" data-page="projects" onclick="navigate('projects'); closeNav()">Projects</button>
+        <button class="nav-link" data-page="events" onclick="navigate('events'); closeNav()">📅 Events</button>
+        <button class="nav-link" data-page="contacts" onclick="navigate('contacts'); closeNav()">Contacts</button>
+        <button class="nav-link" data-page="calendar" onclick="navigate('calendar'); closeNav()">📆 Calendar</button>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Community</div>
+        <button class="nav-link" data-page="community" onclick="navigate('community'); closeNav()">Community</button>
+        <button class="nav-link" data-page="communityMembers" onclick="navigate('communityMembers'); closeNav()">👥 Members</button>
+        <button class="nav-link" data-page="forum" onclick="navigate('forum'); closeNav()">Forum</button>
+        <button class="nav-link" data-page="shop" onclick="navigate('shop'); closeNav()">Shop</button>
+      </div>
+      <div class="nav-section">
+        <div class="nav-section-title">Account</div>
+        <button class="nav-link" data-page="help" onclick="navigate('help'); closeNav()">Help</button>
+        <button class="nav-link" data-page="upgrade" onclick="navigate('upgrade'); closeNav()">Plans</button>
+        <button class="nav-link" data-page="profile" onclick="navigate('profile'); closeNav()">Profile</button>
+        <button class="nav-link" data-page="admin" onclick="navigate('admin'); closeNav()" id="navAdmin" style="display:none">Admin</button>
+        <button class="nav-link" onclick="logout()">Sign Out</button>
+      </div>
+      <div class="nav-footer">
         <span id="navTier" class="tier-badge tier-free">FREE</span>
-        <button class="btn-ghost" onclick="logout()" title="Sign out" style="color:rgba(255,255,255,0.7)">Sign Out</button>
       </div>
     </div>
   </nav>
@@ -599,7 +617,7 @@
         <div style="display:flex;gap:8px;align-items:center">
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('sales','card')" title="Card view">▦</button>
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('sales','list')" title="List view">☰</button>
-          <button class="btn btn-sm btn-secondary" onclick="window.location.href='/api/sales/export?dateFrom='+document.getElementById('salesDateFrom').value+'&dateTo='+document.getElementById('salesDateTo').value">📥 Download</button>
+          <button class="btn btn-sm btn-secondary" onclick="exportData('/api/sales/export?dateFrom='+document.getElementById('salesDateFrom').value+'&dateTo='+document.getElementById('salesDateTo').value)">📥 Download</button>
           <button class="btn btn-primary" onclick="openBulkSaleModal()">+ Quick Sale</button>
           <button class="btn btn-primary" onclick="openSaleModal()">+ Log Sale</button>
         </div>
@@ -897,8 +915,9 @@
     <div id="pageEvents" class="page">
       <div class="page-header">
         <h1>📅 Events</h1>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-sm btn-secondary" onclick="downloadEventsiCal()">📥 Download iCal</button>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-sm btn-secondary" onclick="downloadEventsiCal()">📥 Download Calendar (.ics)</button>
+          <span style="font-size:0.8rem;color:var(--text-light)">Works with Google Calendar, Outlook, Apple Calendar & more</span>
           <button class="btn btn-sm btn-secondary" onclick="printEvents()">🖨️ Print</button>
           <button class="btn btn-primary" onclick="openEventModal()">+ New Event</button>
         </div>
@@ -1501,9 +1520,10 @@
         </div>
         <div class="form-group">
           <label>Firing Mode</label>
-          <select class="form-select" id="firingMode" onchange="document.getElementById('firingLoadDescription').parentElement.classList.toggle('hidden', this.value!=='kiln-load')">
+          <select class="form-select" id="firingMode" onchange="document.getElementById('firingLoadDescription').parentElement.classList.toggle('hidden', this.value!=='kiln-load');document.getElementById('firingModeNotesGroup').classList.toggle('hidden', this.value!=='other')">
             <option value="kiln-load">Kiln Load (Multiple Pieces)</option>
             <option value="per-piece">Per-Piece Firing</option>
+            <option value="other">Other</option>
           </select>
         </div>
       </div>
@@ -1516,6 +1536,10 @@
           <label>Load Description</label>
           <input type="text" class="form-input" id="firingLoadDescription" placeholder="e.g., Full load - 12 mugs, 5 bowls">
         </div>
+      </div>
+      <div class="form-group hidden" id="firingModeNotesGroup">
+        <label>Firing Mode Notes</label>
+        <input type="text" class="form-input" id="firingModeNotes" placeholder="Describe the firing mode">
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -1563,6 +1587,12 @@
           <label>Notes</label>
           <textarea class="form-textarea" id="firingNotes" placeholder="How did it go?"></textarea>
         </div>
+      </div>
+      <div class="form-group">
+        <label>📷 Firing Photos</label>
+        <div id="firingPhotosContainer" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"></div>
+        <input type="file" id="firingPhotoInput" multiple accept="image/*" style="display:none" onchange="uploadFiringPhotos(event)">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('firingPhotoInput').click()">📷 Add Photos</button>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('firingModal')">Cancel</button>
@@ -1763,6 +1793,27 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('projectModal')">Cancel</button>
         <button type="submit" class="btn btn-primary">Save Project</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- PROJECT PHOTO MODAL -->
+<div id="projectPhotoModal" class="modal-overlay" onclick="if(event.target===this)closeModal('projectPhotoModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Add Photos to Project</h2>
+      <button class="modal-close" onclick="closeModal('projectPhotoModal')">&times;</button>
+    </div>
+    <form onsubmit="uploadProjectPhotos(event)">
+      <input type="hidden" id="projectPhotoProjectId">
+      <div class="form-group">
+        <label>Photos (up to 5)</label>
+        <input type="file" id="projectPhotoFile" class="form-input" multiple accept="image/*" required>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('projectPhotoModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Upload Photos</button>
       </div>
     </form>
   </div>

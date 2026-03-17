@@ -860,22 +860,27 @@ app.get('/api/firing-logs', auth, (req, res) => {
   else if (sort === 'cone') orderBy = 'ORDER BY fl.cone ASC, fl.date DESC';
   else orderBy = 'ORDER BY fl.date DESC'; // 'firing_date' is default
   sql += ' ' + orderBy;
-  res.json(db.prepare(sql).all(req.userId));
+  const firings = db.prepare(sql).all(req.userId);
+  const result = firings.map(f => {
+    const photos = db.prepare('SELECT id,filename FROM firing_photos WHERE firing_id=? ORDER BY sort_order ASC').all(f.id);
+    return { ...f, photos };
+  });
+  res.json(result);
 });
 
 app.post('/api/firing-logs', auth, requireTier('starter'), (req, res) => {
-  const { pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail, holdUsed, holdDuration, date, results, notes, firingTime, firingMode, loadDescription } = req.body;
+  const { pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail, holdUsed, holdDuration, date, results, notes, firingTime, firingMode, loadDescription, firingModeNotes } = req.body;
   const id = uuidv4();
-  db.prepare('INSERT INTO firing_logs (id,user_id,piece_id,firing_type,cone,temperature,atmosphere,kiln_name,schedule,duration,firing_speed,custom_speed_detail,hold_used,hold_duration,date,results,notes,firing_time,firing_mode,load_description) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-    .run(id, req.userId, pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null);
+  db.prepare('INSERT INTO firing_logs (id,user_id,piece_id,firing_type,cone,temperature,atmosphere,kiln_name,schedule,duration,firing_speed,custom_speed_detail,hold_used,hold_duration,date,results,notes,firing_time,firing_mode,load_description,firing_mode_notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .run(id, req.userId, pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null, firingModeNotes || null);
   res.json({ id });
 });
 
 // Edit firing log
 app.put('/api/firing-logs/:id', auth, (req, res) => {
-  const { pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail, holdUsed, holdDuration, date, results, notes, firingTime, firingMode, loadDescription } = req.body;
-  db.prepare('UPDATE firing_logs SET piece_id=?,firing_type=?,cone=?,temperature=?,atmosphere=?,kiln_name=?,schedule=?,duration=?,firing_speed=?,custom_speed_detail=?,hold_used=?,hold_duration=?,date=?,results=?,notes=?,firing_time=?,firing_mode=?,load_description=? WHERE id=? AND user_id=?')
-    .run(pieceId || null, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null, req.params.id, req.userId);
+  const { pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail, holdUsed, holdDuration, date, results, notes, firingTime, firingMode, loadDescription, firingModeNotes } = req.body;
+  db.prepare('UPDATE firing_logs SET piece_id=?,firing_type=?,cone=?,temperature=?,atmosphere=?,kiln_name=?,schedule=?,duration=?,firing_speed=?,custom_speed_detail=?,hold_used=?,hold_duration=?,date=?,results=?,notes=?,firing_time=?,firing_mode=?,load_description=?,firing_mode_notes=? WHERE id=? AND user_id=?')
+    .run(pieceId || null, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null, firingModeNotes || null, req.params.id, req.userId);
   res.json({ success: true });
 });
 
@@ -1581,7 +1586,11 @@ app.delete('/api/goals/:id', auth, (req, res) => {
 // ============ PROJECTS ============
 app.get('/api/projects', auth, (req, res) => {
   const projects = db.prepare('SELECT * FROM projects WHERE user_id=? ORDER BY due_date ASC, updated_at DESC').all(req.userId);
-  res.json(projects);
+  const result = projects.map(p => {
+    const photos = db.prepare('SELECT id,filename FROM project_photos WHERE project_id=? ORDER BY sort_order ASC').all(p.id);
+    return { ...p, photos };
+  });
+  res.json(result);
 });
 
 app.post('/api/projects', auth, requireTier('starter'), (req, res) => {
@@ -1601,6 +1610,37 @@ app.put('/api/projects/:id', auth, (req, res) => {
 
 app.delete('/api/projects/:id', auth, (req, res) => {
   db.prepare('DELETE FROM projects WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  res.json({ success: true });
+});
+
+app.post('/api/projects/:id/photos', auth, upload.array('photos', 5), (req, res) => {
+  const projectId = req.params.id;
+  const project = db.prepare('SELECT user_id FROM projects WHERE id=?').get(projectId);
+  if (!project || project.user_id !== req.userId) return res.status(403).json({ error: 'Unauthorized' });
+  for (const f of req.files) {
+    const photoId = uuidv4();
+    db.prepare('INSERT INTO project_photos (id,project_id,filename,original_name) VALUES (?,?,?,?)')
+      .run(photoId, projectId, f.filename, f.originalname);
+  }
+  res.json({ success: true });
+});
+
+app.get('/api/projects/:id/photos', auth, (req, res) => {
+  const projectId = req.params.id;
+  const project = db.prepare('SELECT user_id FROM projects WHERE id=?').get(projectId);
+  if (!project || project.user_id !== req.userId) return res.status(403).json({ error: 'Unauthorized' });
+  const photos = db.prepare('SELECT id,filename FROM project_photos WHERE project_id=? ORDER BY sort_order ASC').all(projectId);
+  res.json(photos);
+});
+
+app.delete('/api/project-photos/:id', auth, (req, res) => {
+  const photo = db.prepare('SELECT p.project_id, pr.user_id FROM project_photos p JOIN projects pr ON p.project_id=pr.id WHERE p.id=?').get(req.params.id);
+  if (!photo || photo.user_id !== req.userId) return res.status(403).json({ error: 'Unauthorized' });
+  const filename = db.prepare('SELECT filename FROM project_photos WHERE id=?').get(req.params.id)?.filename;
+  if (filename) {
+    try { fs.unlinkSync(path.join(uploadsDir, filename)); } catch(e) {}
+  }
+  db.prepare('DELETE FROM project_photos WHERE id=?').run(req.params.id);
   res.json({ success: true });
 });
 

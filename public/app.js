@@ -139,7 +139,6 @@ function navigate(page) {
     };
     const el = document.getElementById(map[page]); if (el) el.classList.add('active');
     try { const nb = document.querySelector('.nav-link[data-page="' + page + '"]'); if (nb) nb.classList.add('active'); } catch(e) {}
-    try { document.querySelector('.nav-links')?.classList.remove('open'); } catch(e) {}
   const loaders = {
     dashboard:loadDashboard, pieces:loadPieces, clayBodies:loadClayBodies,
     glazes:loadGlazes, firings:loadFirings, casualties:loadCasualties, sales:loadSales,
@@ -153,6 +152,10 @@ function navigate(page) {
   if (loaders[page]) loaders[page]();
     trackPageView('/' + page);
   } catch(navErr) { console.error('Navigation error:', navErr); }
+}
+function closeNav() {
+  document.querySelector('.nav-dropdown')?.classList.remove('open');
+  document.body.classList.remove('nav-open');
 }
 
 // ---- Dashboard ----
@@ -667,6 +670,7 @@ async function loadFirings() {
         '</div>'
       ).join('');
     } else {
+      const photosHtml = (photos) => photos && photos.length > 0 ? '<div style="display:flex;gap:6px;margin:8px 0">' + photos.map(p => '<img src="/uploads/' + p.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')">').join('') + '</div>' : '';
       c.innerHTML = firings.map(f =>
         '<div class="card">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
@@ -678,6 +682,7 @@ async function loadFirings() {
         '</div></div>' +
         '<div style="display:flex;gap:4px;flex-shrink:0"><button onclick="editFiring(\'' + f.id + '\')" class="btn-small" title="Edit">✎</button><button onclick="deleteFiring(\'' + f.id + '\')" class="btn-small" title="Delete">✕</button></div>' +
         '</div>' +
+        photosHtml(f.photos) +
         (f.piece_title ? '<div class="text-sm" style="margin-bottom:4px"><span class="piece-meta-tag">' + esc(f.piece_title) + '</span></div>' : '') +
         (f.hold_used ? '<div class="text-sm"><strong>Hold:</strong> Yes' + (f.hold_duration ? ' — ' + esc(f.hold_duration) : '') + '</div>' : '') +
         (f.load_description ? '<div class="text-sm mt-8"><strong>Load:</strong> ' + esc(f.load_description) + '</div>' : '') +
@@ -700,6 +705,8 @@ function openFiringModal(f = null) {
   document.getElementById('firingMode').value = f?.firing_mode || 'kiln-load';
   document.getElementById('firingLoadDescription').value = f?.load_description || '';
   document.getElementById('firingLoadDescription').parentElement.classList.toggle('hidden', (f?.firing_mode || 'kiln-load') !== 'kiln-load');
+  document.getElementById('firingModeNotes').value = f?.firing_mode_notes || '';
+  document.getElementById('firingModeNotesGroup').classList.toggle('hidden', (f?.firing_mode || 'kiln-load') !== 'other');
   document.getElementById('firingHoldUsed').value = f?.hold_used ? '1' : '0';
   document.getElementById('firingHoldDuration').value = f?.hold_duration || '';
   document.getElementById('firingHoldDuration').parentElement.classList.toggle('hidden', !f?.hold_used);
@@ -711,7 +718,51 @@ function openFiringModal(f = null) {
     const s = document.getElementById('firingPiece');
     s.innerHTML = '<option value="">Select piece (optional)...</option>' + pieces.map(p => '<option value="' + p.id + '"' + (f?.piece_id === p.id ? ' selected' : '') + '>' + esc(p.title||'Untitled') + '</option>').join('');
   });
+  if (f?.id) {
+    loadFiringPhotos(f.id);
+  } else {
+    document.getElementById('firingPhotosContainer').innerHTML = '';
+  }
   openModal('firingModal');
+}
+
+async function loadFiringPhotos(firingId) {
+  try {
+    const photos = await api('/api/firing-logs/' + firingId + '/photos');
+    const cont = document.getElementById('firingPhotosContainer');
+    if (!photos || photos.length === 0) {
+      cont.innerHTML = '';
+      return;
+    }
+    cont.innerHTML = photos.map(p => 
+      '<div style="position:relative;display:inline-block;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">' +
+      '<img src="/uploads/' + p.filename + '" style="width:100px;height:100px;object-fit:cover;cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')">' +
+      '<button class="btn-ghost btn-sm" style="position:absolute;top:0;right:0;font-size:0.8rem;background:rgba(0,0,0,0.5);color:white" onclick="deleteFiringPhoto(\'' + p.id + '\');loadFiringPhotos(\'' + firingId + '\')">×</button>' +
+      '</div>'
+    ).join('');
+  } catch(e) { console.error('Error loading firing photos:', e); }
+}
+
+async function uploadFiringPhotos(event) {
+  const firingId = document.getElementById('firingId').value;
+  if (!firingId) { toast('Save firing first before adding photos', 'error'); return; }
+  const files = event.target.files;
+  if (!files.length) return;
+  const formData = new FormData();
+  for (let f of files) formData.append('photos', f);
+  try {
+    await api('/api/firing-logs/' + firingId + '/photos', { method: 'POST', body: formData });
+    toast('Photos uploaded', 'success');
+    await loadFiringPhotos(firingId);
+    event.target.value = '';
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function deleteFiringPhoto(photoId) {
+  try {
+    await api('/api/firing-photos/' + photoId, { method: 'DELETE' });
+    toast('Photo deleted', 'success');
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 function editFiring(id) {
@@ -750,6 +801,7 @@ async function saveFiring(e) {
     firingTime: document.getElementById('firingTime').value || null,
     firingMode: document.getElementById('firingMode').value || 'kiln-load',
     loadDescription: document.getElementById('firingLoadDescription').value || null,
+    firingModeNotes: document.getElementById('firingModeNotes').value || null,
     results: document.getElementById('firingResults').value || null,
     notes: document.getElementById('firingNotes').value || null
   };
@@ -2304,12 +2356,14 @@ async function loadProjects() {
     const c = document.getElementById('projectsList'), em = document.getElementById('projectsEmpty');
     if (!projects.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
+    const photosHtml = (photos) => photos && photos.length > 0 ? '<div style="display:flex;gap:6px;margin:8px 0;flex-wrap:wrap">' + photos.map(p => '<img src="/uploads/' + p.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')">').join('') + '</div>' : '';
     c.innerHTML = projects.map(p =>
       '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(p.title) + '</div>' +
       '<div class="text-sm" style="color:var(--text-light)">' + (p.due_date ? 'Due: ' + fmtDate(p.due_date) : '') + '</div></div>' +
       '<span class="piece-meta-tag">' + (p.status||'active') + '</span></div>' +
+      photosHtml(p.photos) +
       (p.description ? '<div class="text-sm mt-8">' + esc(p.description) + '</div>' : '') +
-      '<div style="display:flex;gap:4px;margin-top:10px"><button onclick="editProject(\'' + p.id + '\')" class="btn-small">✎</button><button onclick="deleteProject(\'' + p.id + '\')" class="btn-small">✕</button></div>' +
+      '<div style="display:flex;gap:4px;margin-top:10px"><button onclick="openProjectPhotoUpload(\'' + p.id + '\')" class="btn-small" title="Add photos">📸</button><button onclick="editProject(\'' + p.id + '\')" class="btn-small">✎</button><button onclick="deleteProject(\'' + p.id + '\')" class="btn-small">✕</button></div>' +
       '</div>'
     ).join('');
   } catch(e) { toast(e.message,'error'); }
@@ -2354,6 +2408,35 @@ async function deleteProject(id) {
   try { await api('/api/projects/' + id, {method:'DELETE'}); toast('Deleted','success'); loadProjects(); } catch(e) { toast(e.message,'error'); }
 }
 
+function openProjectPhotoUpload(projectId) {
+  document.getElementById('projectPhotoProjectId').value = projectId;
+  document.getElementById('projectPhotoFile').value = '';
+  openModal('projectPhotoModal');
+}
+
+async function uploadProjectPhotos(event) {
+  event.preventDefault();
+  const projectId = document.getElementById('projectPhotoProjectId').value;
+  const files = document.getElementById('projectPhotoFile').files;
+  if (!files.length) return;
+  const formData = new FormData();
+  for (let f of files) formData.append('photos', f);
+  try {
+    await api('/api/projects/' + projectId + '/photos', { method: 'POST', body: formData });
+    toast('Photos uploaded', 'success');
+    closeModal('projectPhotoModal');
+    loadProjects();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function deleteProjectPhoto(photoId) {
+  try {
+    await api('/api/project-photos/' + photoId, { method: 'DELETE' });
+    toast('Photo deleted', 'success');
+    loadProjects();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
 // ============ EVENTS ============
 async function loadEvents() {
   try {
@@ -2361,14 +2444,17 @@ async function loadEvents() {
     const c = document.getElementById('eventsList'), em = document.getElementById('eventsEmpty');
     if (!events.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
-    c.innerHTML = events.map(e =>
-      '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(e.title) + '</div>' +
+    c.innerHTML = events.map(e => {
+      const start = e.event_date + (e.start_time ? 'T' + e.start_time : 'T00:00');
+      const end = e.event_date + (e.end_time ? 'T' + e.end_time : 'T23:59');
+      const gCalUrl = 'https://calendar.google.com/calendar/r/eventedit?text=' + encodeURIComponent(e.title) + '&dates=' + start.replace(/[-:]/g,'') + '/' + end.replace(/[-:]/g,'') + (e.location ? '&location=' + encodeURIComponent(e.location) : '') + (e.description ? '&details=' + encodeURIComponent(e.description) : '');
+      return '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(e.title) + '</div>' +
       '<div class="text-sm" style="color:var(--text-light)">' + fmtDate(e.event_date) + (e.start_time ? ' at ' + e.start_time : '') + '</div></div></div>' +
       (e.location ? '<div class="text-sm"><strong>Location:</strong> ' + esc(e.location) + '</div>' : '') +
       (e.description ? '<div class="text-sm mt-8">' + esc(e.description) + '</div>' : '') +
-      '<div style="display:flex;gap:4px;margin-top:10px"><button onclick="editEvent(\'' + e.id + '\')" class="btn-small">✎</button><button onclick="deleteEvent(\'' + e.id + '\')" class="btn-small">✕</button></div>' +
-      '</div>'
-    ).join('');
+      '<div style="display:flex;gap:4px;margin-top:10px"><a href="' + gCalUrl + '" target="_blank" class="btn btn-sm btn-secondary" style="text-decoration:none">📱 Add to Google Calendar</a><button onclick="editEvent(\'' + e.id + '\')" class="btn-small">✎</button><button onclick="deleteEvent(\'' + e.id + '\')" class="btn-small">✕</button></div>' +
+      '</div>';
+    }).join('');
   } catch(e) { toast(e.message,'error'); }
 }
 
