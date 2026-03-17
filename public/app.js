@@ -48,11 +48,9 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s; re
 function checkUrlParams() {
   const p = new URLSearchParams(window.location.search);
   if (p.get('upgraded')) { toast('🎉 Welcome to ' + p.get('upgraded').toUpperCase() + ' tier! Enjoy your new features.', 'success'); }
-  if (p.get('tokens') === 'purchased') { toast('🪙 Forum tokens added to your account!', 'success'); }
-  if (p.get('pass') === 'purchased') { toast('✨ Unlimited posting pass activated for 30 days!', 'success'); }
   if (p.get('purchased')) { toast('🛍️ Purchase complete! Check your email for details.', 'success'); }
   if (p.get('cancelled')) { toast('Purchase cancelled.', ''); }
-  if (p.has('upgraded') || p.has('tokens') || p.has('pass') || p.has('purchased') || p.has('cancelled')) {
+  if (p.has('upgraded') || p.has('purchased') || p.has('cancelled')) {
     window.history.replaceState({}, '', window.location.pathname);
   }
 }
@@ -883,14 +881,6 @@ async function loadForum() {
     } else { toast(e.message,'error'); }
   }
 }
-async function loadTokenBalance() {
-  try {
-    const b = await api('/api/tokens/balance');
-    const el = document.getElementById('tokenBalance');
-    if (b.hasUnlimited) { el.textContent = '✨ Unlimited posting'; el.className = 'piece-meta-tag'; }
-    else { el.textContent = '🪙 ' + b.tokens + ' tokens'; el.className = 'piece-meta-tag'; }
-  } catch(e) {}
-}
 async function loadForumPosts() {
   try {
     const search = document.getElementById('forumSearch')?.value||'';
@@ -1086,20 +1076,13 @@ async function loadProfile() {
        '<div style="display:flex;gap:8px"><button class="btn btn-secondary btn-sm" onclick="navigate(\'upgrade\')">Change Plan</button><button class="btn btn-danger btn-sm" onclick="cancelSubscription()">Cancel Plan</button></div>');
     document.getElementById('profileTierInfo').innerHTML = tierHtml;
 
-    // Token info
-    const tb = await api('/api/tokens/balance');
-    document.getElementById('profileTokenInfo').innerHTML =
-      '<div style="margin-bottom:8px">🪙 <strong>' + tb.tokens + '</strong> tokens' +
-      (tb.hasUnlimited ? ' + <strong>Unlimited posting</strong> until ' + fmtDate(tb.unlimitedUntil) : '') + '</div>' +
-      '<button class="btn btn-secondary btn-sm" onclick="navigate(\'upgrade\')">Buy Tokens</button>';
-
     // Referral section
     const refCode = d.user.referral_code || '';
     const refCount = d.user.referralCount || 0;
     document.getElementById('profileReferralInfo').innerHTML =
       '<div style="margin-bottom:8px">Your referral code: <strong style="color:var(--primary);font-size:1.1rem">' + esc(refCode) + '</strong></div>' +
-      '<div class="text-sm" style="margin-bottom:8px;color:var(--text-light)">Share this code — when someone signs up with it, you both get 5 free forum tokens!</div>' +
-      '<div class="text-sm">Friends referred: <strong>' + refCount + '</strong> · Tokens earned: <strong>' + (refCount * 5) + '</strong></div>';
+      '<div class="text-sm" style="margin-bottom:8px;color:var(--text-light)">Share this code with friends — help grow the potter community!</div>' +
+      '<div class="text-sm">Friends referred: <strong>' + refCount + '</strong></div>';
 
     // Review section
     loadMyReview();
@@ -1172,39 +1155,12 @@ async function loadUpgrade() {
       }
 
       html += '<ul class="plan-features">' + p.features.map(f => '<li>✓ ' + esc(f) + '</li>').join('') +
-        (p.id !== 'free' ? '<li class="yearly-price hidden" style="color:#A0522D;font-weight:600">✓ 🎁 20 bonus tokens on signup (roll over!)</li>' : '') +
         '</ul>' +
         (isCurrent ? '<button class="btn btn-secondary" disabled>Current Plan</button>' :
          p.id === 'free' ? '' :
          isDowngrade ? '' :
          '<button class="btn btn-primary plan-subscribe-btn" data-plan="' + p.id + '" onclick="subscribePlan(window._billingMode===\'yearly\'?\'' + p.id + '-yearly\':\'' + p.id + '\')">' + (d.stripeEnabled ? 'Subscribe' : 'Coming Soon') + '</button>') +
         '</div>';
-    });
-    html += '</div>';
-
-    // Token packs section
-    html += '<h2 class="mt-24 mb-16">🪙 Forum Tokens</h2>' +
-      '<p class="text-sm mb-16" style="color:var(--text-light)">Tokens let you post and reply in the forum. 1 token = 1 post or reply. All membership tokens roll over as long as your membership is active!</p>' +
-      '<div class="card mb-16" style="background:var(--primary-light);padding:14px 18px;font-size:0.9rem">' +
-      '<strong>🎁 Token Bonuses with Membership:</strong><br>' +
-      '• <strong>Any monthly plan</strong> — 10 free tokens that roll over while your membership is active<br>' +
-      '• <strong>Any yearly plan</strong> — 20 free tokens that roll over while your membership is active<br>' +
-      '<span style="color:var(--text-muted);font-size:0.85rem">Purchased token packs are yours to keep too — they never expire for active members.</span></div>' +
-      '<div class="upgrade-plans">';
-    d.tokenPacks.forEach(tp => {
-      const hasFoundingTp = founding && tp.foundingPrice;
-      const tpSavePct = hasFoundingTp ? Math.round((1 - tp.foundingPrice / tp.price) * 100) : 0;
-      html += '<div class="upgrade-plan-card">' +
-        '<div class="plan-name">' + tp.tokens + ' Tokens</div>';
-      if (hasFoundingTp) {
-        html += '<span class="founding-badge">Founding Rate</span>' +
-          '<div class="plan-price-regular">$' + tp.price.toFixed(2) + '</div>' +
-          '<div class="plan-price-founding">$' + tp.foundingPrice.toFixed(2) + '</div>' +
-          '<div class="founding-savings">Save ' + tpSavePct + '%!</div>';
-      } else {
-        html += '<div class="plan-price">$' + tp.price.toFixed(2) + '</div>';
-      }
-      html += '<button class="btn btn-primary btn-sm" onclick="buyTokens(\'' + tp.id + '\')">' + (d.stripeEnabled ? 'Buy' : 'Coming Soon') + '</button></div>';
     });
     html += '</div>';
 
@@ -1413,7 +1369,7 @@ async function loadAdmin() {
 
     // Discount codes section
     html += '<div class="card mb-16"><h3 style="margin-bottom:12px">🏷️ Shop Discount Codes</h3>' +
-      '<p class="text-sm mb-16" style="color:var(--text-light)">Create discount codes for professionals promoting your site. These give a % off in the shop — no free subscriptions or tokens.</p>' +
+      '<p class="text-sm mb-16" style="color:var(--text-light)">Create discount codes for professionals promoting your site. These give a % off in the shop.</p>' +
       '<div class="form-row" style="gap:8px">' +
       '<div class="form-group"><label>Code</label><input type="text" class="form-input" id="discountCode" placeholder="e.g., POTTER20" style="text-transform:uppercase"></div>' +
       '<div class="form-group"><label>Discount %</label><input type="number" class="form-input" id="discountPct" value="10" min="1" max="100"></div>' +
