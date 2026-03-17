@@ -129,10 +129,12 @@ function navigate(page) {
       dashboard:'pageDashboard', pieces:'pagePieces', pieceDetail:'pagePieceDetail',
       clayBodies:'pageClayBodies', glazes:'pageGlazes', firings:'pageFirings',
       casualties:'pageCasualties',
-      sales:'pageSales', community:'pageCommunity', forum:'pageForum',
+      sales:'pageSales', goals:'pageGoals', projects:'pageProjects', events:'pageEvents',
+      contacts:'pageContacts', community:'pageCommunity', forum:'pageForum',
       forumPost:'pageForumPost', profile:'pageProfile', shop:'pageShop',
       upgrade:'pageUpgrade', help:'pageHelp', admin:'pageAdmin',
       shoppingList:'pageShoppingList', chemicals:'pageChemicals',
+      communityMembers:'pageCommunityMembers',
       notifications:'pageNotifications', messages:'pageMessages', messageThread:'pageMessageThread'
     };
     const el = document.getElementById(map[page]); if (el) el.classList.add('active');
@@ -141,9 +143,11 @@ function navigate(page) {
   const loaders = {
     dashboard:loadDashboard, pieces:loadPieces, clayBodies:loadClayBodies,
     glazes:loadGlazes, firings:loadFirings, casualties:loadCasualties, sales:loadSales,
+    goals:loadGoals, projects:loadProjects, events:loadEvents, contacts:loadContacts,
     community:loadCombos, forum:loadForum, profile:loadProfile,
     shop:loadShop, upgrade:loadUpgrade, admin:loadAdmin,
     shoppingList:loadShoppingList, chemicals:loadChemicals,
+    communityMembers:loadCommunityMembers,
     notifications:loadNotifications, messages:loadMessages
   };
   if (loaders[page]) loaders[page]();
@@ -630,9 +634,20 @@ async function deleteGlaze(id) {
 }
 
 // ---- Firings ----
+function printFiringLog() {
+  const el = document.getElementById('firingList');
+  const w = window.open('', '_blank');
+  w.document.write('<html><head><title>Kiln Journal</title><style>body{font-family:Georgia,serif;padding:20px;max-width:800px;margin:0 auto}h1{font-size:1.4rem}.card{border:1px solid #ddd;padding:12px;margin-bottom:8px;border-radius:6px;page-break-inside:avoid}strong{color:#333}.text-sm{font-size:0.85rem;color:#666}@media print{body{padding:0}}</style></head><body>');
+  w.document.write('<h1>🔥 Kiln Journal — The Potter\'s Mud Room</h1>');
+  w.document.write(el ? el.innerHTML : '<p>No firing records</p>');
+  w.document.write('</body></html>');
+  w.document.close();
+  w.print();
+}
 async function loadFirings() {
   try {
-    const firings = await api('/api/firing-logs');
+    const sort = document.getElementById('firingSort')?.value || 'firing_date';
+    const firings = await api('/api/firing-logs?sort=' + encodeURIComponent(sort));
     const c = document.getElementById('firingList'), em = document.getElementById('firingEmpty');
     if (!firings.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
@@ -645,19 +660,27 @@ async function loadFirings() {
         '<span class="text-sm" style="min-width:60px">Cone ' + esc(f.cone||'?') + '</span>' +
         '<span class="text-sm" style="min-width:80px;color:var(--text-light)">' + esc(f.atmosphere||'') + '</span>' +
         '<span class="text-sm" style="min-width:80px">' + fmtDate(f.date) + '</span>' +
+        (f.firing_time ? '<span class="text-sm" style="color:var(--text-muted)">⏱️ ' + esc(f.firing_time) + '</span>' : '') +
         (f.piece_title ? '<span class="piece-meta-tag">' + esc(f.piece_title) + '</span>' : '') +
         (f.kiln_name ? '<span class="text-sm" style="color:var(--text-muted)">' + esc(f.kiln_name) + '</span>' : '') +
+        '<div style="margin-left:auto;display:flex;gap:6px;flex-shrink:0"><button onclick="editFiring(\'' + f.id + '\')" class="btn btn-sm btn-secondary" style="padding:2px 10px;font-size:0.8rem" title="Edit">✎ Edit</button><button onclick="deleteFiring(\'' + f.id + '\')" class="btn btn-sm btn-secondary" style="padding:2px 10px;font-size:0.8rem;color:var(--danger)" title="Delete">✕ Delete</button></div>' +
         '</div>'
       ).join('');
     } else {
       c.innerHTML = firings.map(f =>
-        '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(f.firing_type||'Firing') + ' — Cone ' + esc(f.cone||'?') + '</div>' +
+        '<div class="card">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
+        '<div><div class="card-title">' + esc(f.firing_type||'Firing') + ' — Cone ' + esc(f.cone||'?') + '</div>' +
         '<div class="text-sm" style="color:var(--text-light)">' + (f.kiln_name ? esc(f.kiln_name) + ' · ' : '') + fmtDate(f.date) +
         (f.atmosphere ? ' · ' + esc(f.atmosphere) : '') +
         (f.firing_speed ? ' · ' + esc(f.firing_speed) : '') +
+        (f.firing_time ? ' · ⏱️ ' + esc(f.firing_time) : '') +
         '</div></div>' +
-        (f.piece_title ? '<span class="piece-meta-tag">' + esc(f.piece_title) + '</span>' : '') + '</div>' +
+        '<div style="display:flex;gap:4px;flex-shrink:0"><button onclick="editFiring(\'' + f.id + '\')" class="btn-small" title="Edit">✎</button><button onclick="deleteFiring(\'' + f.id + '\')" class="btn-small" title="Delete">✕</button></div>' +
+        '</div>' +
+        (f.piece_title ? '<div class="text-sm" style="margin-bottom:4px"><span class="piece-meta-tag">' + esc(f.piece_title) + '</span></div>' : '') +
         (f.hold_used ? '<div class="text-sm"><strong>Hold:</strong> Yes' + (f.hold_duration ? ' — ' + esc(f.hold_duration) : '') + '</div>' : '') +
+        (f.load_description ? '<div class="text-sm mt-8"><strong>Load:</strong> ' + esc(f.load_description) + '</div>' : '') +
         (f.results ? '<div class="text-sm mt-8">' + esc(f.results) + '</div>' : '') +
         (f.notes ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(f.notes) + '</div>' : '') +
         '</div>'
@@ -665,42 +688,80 @@ async function loadFirings() {
     }
   } catch(e) { toast(e.message,'error'); }
 }
-function openFiringModal() {
-  document.getElementById('firingType').value = 'bisque';
-  document.getElementById('firingDate').value = new Date().toISOString().split('T')[0];
-  document.getElementById('firingCone').value = '';
-  document.getElementById('firingAtmosphere').value = '';
-  document.getElementById('firingKiln').value = '';
-  document.getElementById('firingSpeed').value = '';
-  document.getElementById('firingHoldUsed').value = '0';
-  document.getElementById('firingHoldDuration').value = '';
-  document.getElementById('firingHoldDuration').parentElement.classList.add('hidden');
+function openFiringModal(f = null) {
+  document.getElementById('firingId').value = f?.id || '';
+  document.getElementById('firingType').value = f?.firing_type || 'bisque';
+  document.getElementById('firingDate').value = f?.date || new Date().toISOString().split('T')[0];
+  document.getElementById('firingCone').value = f?.cone || '';
+  document.getElementById('firingAtmosphere').value = f?.atmosphere || '';
+  document.getElementById('firingKiln').value = f?.kiln_name || '';
+  document.getElementById('firingSpeed').value = f?.firing_speed || '';
+  document.getElementById('firingTime').value = f?.firing_time || '';
+  document.getElementById('firingMode').value = f?.firing_mode || 'kiln-load';
+  document.getElementById('firingLoadDescription').value = f?.load_description || '';
+  document.getElementById('firingLoadDescription').parentElement.classList.toggle('hidden', (f?.firing_mode || 'kiln-load') !== 'kiln-load');
+  document.getElementById('firingHoldUsed').value = f?.hold_used ? '1' : '0';
+  document.getElementById('firingHoldDuration').value = f?.hold_duration || '';
+  document.getElementById('firingHoldDuration').parentElement.classList.toggle('hidden', !f?.hold_used);
+  document.getElementById('firingResults').value = f?.results || '';
+  document.getElementById('firingNotes').value = f?.notes || '';
   const csd = document.getElementById('firingCustomSpeedDetail');
-  if (csd) { csd.value = ''; csd.parentElement.classList.add('hidden'); }
-  document.getElementById('firingNotes').value = '';
+  if (csd) { csd.value = f?.custom_speed_detail || ''; csd.parentElement.classList.toggle('hidden', f?.firing_speed !== 'custom'); }
   api('/api/pieces').then(pieces => {
     const s = document.getElementById('firingPiece');
-    s.innerHTML = '<option value="">Select piece (optional)...</option>' + pieces.map(p => '<option value="' + p.id + '">' + esc(p.title||'Untitled') + '</option>').join('');
+    s.innerHTML = '<option value="">Select piece (optional)...</option>' + pieces.map(p => '<option value="' + p.id + '"' + (f?.piece_id === p.id ? ' selected' : '') + '>' + esc(p.title||'Untitled') + '</option>').join('');
   });
   openModal('firingModal');
 }
+
+function editFiring(id) {
+  api('/api/firing-logs').then(firings => {
+    const f = firings.find(f => f.id === id);
+    if (f) openFiringModal(f);
+  });
+}
+
+async function deleteFiring(id) {
+  if (!confirm('Delete this firing record?')) return;
+  try {
+    await api('/api/firing-logs/' + id, { method: 'DELETE' });
+    toast('Firing deleted', 'success');
+    loadFirings();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
 async function saveFiring(e) {
   e.preventDefault();
+  const firingId = document.getElementById('firingId').value;
   const body = {
-    pieceId:document.getElementById('firingPiece').value||null,
-    firingType:document.getElementById('firingType').value,
-    cone:document.getElementById('firingCone').value||null,
-    atmosphere:document.getElementById('firingAtmosphere').value||null,
-    kilnName:document.getElementById('firingKiln').value||null,
-    firingSpeed:document.getElementById('firingSpeed').value||null,
-    customSpeedDetail:document.getElementById('firingCustomSpeedDetail')?.value||null,
-    holdUsed:document.getElementById('firingHoldUsed').value==='1',
-    holdDuration:document.getElementById('firingHoldDuration').value||null,
-    date:document.getElementById('firingDate').value||null,
-    notes:document.getElementById('firingNotes').value||null
+    pieceId: document.getElementById('firingPiece').value || null,
+    firingType: document.getElementById('firingType').value,
+    cone: document.getElementById('firingCone').value || null,
+    temperature: document.getElementById('firingTemperature')?.value || null,
+    atmosphere: document.getElementById('firingAtmosphere').value || null,
+    kilnName: document.getElementById('firingKiln').value || null,
+    schedule: document.getElementById('firingSchedule')?.value || null,
+    duration: document.getElementById('firingDuration')?.value || null,
+    firingSpeed: document.getElementById('firingSpeed').value || null,
+    customSpeedDetail: document.getElementById('firingCustomSpeedDetail')?.value || null,
+    holdUsed: document.getElementById('firingHoldUsed').value === '1',
+    holdDuration: document.getElementById('firingHoldDuration').value || null,
+    date: document.getElementById('firingDate').value || null,
+    firingTime: document.getElementById('firingTime').value || null,
+    firingMode: document.getElementById('firingMode').value || 'kiln-load',
+    loadDescription: document.getElementById('firingLoadDescription').value || null,
+    results: document.getElementById('firingResults').value || null,
+    notes: document.getElementById('firingNotes').value || null
   };
-  try { await api('/api/firing-logs', {method:'POST',body}); toast('Firing logged!','success'); closeModal('firingModal'); loadFirings(); }
-  catch(e) { toast(e.message,'error'); }
+  try {
+    const method = firingId ? 'PUT' : 'POST';
+    const url = firingId ? '/api/firing-logs/' + firingId : '/api/firing-logs';
+    await api(url, { method, body });
+    toast(firingId ? 'Firing updated!' : 'Firing logged!', 'success');
+    closeModal('firingModal');
+    document.getElementById('firingId').value = '';
+    loadFirings();
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 // ---- Sales ----
@@ -742,12 +803,17 @@ async function loadCasualties() {
 
 async function loadSales() {
   try {
-    const sales = await api('/api/sales');
+    const dateFrom = document.getElementById('salesDateFrom')?.value || '';
+    const dateTo = document.getElementById('salesDateTo')?.value || '';
+    let url = '/api/sales?';
+    if (dateFrom) url += 'dateFrom=' + encodeURIComponent(dateFrom) + '&';
+    if (dateTo) url += 'dateTo=' + encodeURIComponent(dateTo) + '&';
+    const sales = await api(url);
     const c = document.getElementById('salesList'), em = document.getElementById('salesEmpty');
     const sum = document.getElementById('salesSummary');
     if (!sales.length) { c.innerHTML=''; sum.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
-    const total = sales.reduce((s,x) => s + (x.price||0), 0);
+    const total = sales.reduce((s,x) => s + ((x.price||0) * (x.quantity||1)), 0);
     sum.innerHTML = '<div class="stat-box"><div class="stat-number">' + sales.length + '</div><div class="stat-label">Sales</div></div>' +
       '<div class="stat-box"><div class="stat-number">$' + total.toFixed(0) + '</div><div class="stat-label">Revenue</div></div>' +
       '<div class="stat-box"><div class="stat-number">$' + (total/sales.length).toFixed(0) + '</div><div class="stat-label">Avg Price</div></div>';
@@ -756,38 +822,103 @@ async function loadSales() {
     if (mode === 'list') {
       c.innerHTML = sales.map(s =>
         '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">' +
-        '<strong style="min-width:150px">' + esc(s.piece_title||'Unknown piece') + '</strong>' +
-        '<span style="font-weight:700;color:var(--accent);min-width:60px">$' + (s.price||0).toFixed(0) + '</span>' +
+        '<strong style="min-width:150px">' + esc(s.item_description || s.piece_title || 'Unknown piece') + '</strong>' +
+        (s.quantity && s.quantity > 1 ? '<span class="text-sm">Qty: ' + s.quantity + '</span>' : '') +
+        '<span style="font-weight:700;color:var(--accent);min-width:60px">$' + ((s.price||0) * (s.quantity||1)).toFixed(0) + '</span>' +
         '<span class="text-sm" style="min-width:80px">' + fmtDate(s.date) + '</span>' +
         '<span class="text-sm" style="color:var(--text-light)">' + esc(s.venue_type||'') + '</span>' +
         '<span class="text-sm" style="color:var(--text-muted)">' + esc(s.venue||'') + '</span></div>'
       ).join('');
     } else {
       c.innerHTML = sales.map(s =>
-        '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(s.piece_title||'Unknown piece') + '</div>' +
-        '<div class="text-sm" style="color:var(--text-light)">' + fmtDate(s.date) + (s.venue ? ' · ' + esc(s.venue) : '') + '</div></div>' +
-        '<div style="font-family:var(--font-display);font-size:1.2rem;font-weight:700;color:var(--accent)">$' + (s.price||0).toFixed(0) + '</div></div>' +
+        '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(s.item_description || s.piece_title || 'Unknown piece') + '</div>' +
+        '<div class="text-sm" style="color:var(--text-light)">' + fmtDate(s.date) + (s.venue ? ' · ' + esc(s.venue) : '') + (s.event_name ? ' · ' + esc(s.event_name) : '') + '</div></div>' +
+        '<div style="font-family:var(--font-display);font-size:1.2rem;font-weight:700;color:var(--accent)">$' + ((s.price||0) * (s.quantity||1)).toFixed(0) + (s.quantity && s.quantity > 1 ? ' (Qty: ' + s.quantity + ')' : '') + '</div></div>' +
         (s.venue_type ? '<span class="piece-meta-tag">' + esc(s.venue_type) + '</span>' : '') + '</div>'
       ).join('');
     }
   } catch(e) { toast(e.message,'error'); }
 }
 function openSaleModal() {
+  document.getElementById('saleId').value = '';
   document.getElementById('salePrice').value = '';
   document.getElementById('saleDate').value = new Date().toISOString().split('T')[0];
   document.getElementById('saleVenueType').value = '';
   document.getElementById('saleVenue').value = '';
+  document.getElementById('saleQuantity').value = '1';
+  document.getElementById('saleItemDescription').value = '';
+  document.getElementById('saleEventName').value = '';
   api('/api/pieces').then(pieces => {
     const s = document.getElementById('salePiece');
     s.innerHTML = '<option value="">Select piece...</option>' + pieces.map(p => '<option value="' + p.id + '">' + esc(p.title||'Untitled') + '</option>').join('');
   });
   openModal('saleModal');
 }
+
+function openBulkSaleModal() {
+  document.getElementById('bulkEventName').value = '';
+  document.getElementById('bulkEventDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('bulkVenueType').value = '';
+  document.getElementById('bulkLineItems').innerHTML = '<div class="bulk-line-item"><input type="text" placeholder="Item description" class="bulk-item-desc" /><input type="number" placeholder="Qty" class="bulk-qty" min="1" value="1" /><input type="number" placeholder="Price each" class="bulk-price-each" step="0.01" /><button onclick="removeBulkLineItem(this)" class="btn-small">✕</button></div>';
+  openModal('bulkSaleModal');
+}
+
+function addBulkLineItem() {
+  const container = document.getElementById('bulkLineItems');
+  const item = document.createElement('div');
+  item.className = 'bulk-line-item';
+  item.innerHTML = '<input type="text" placeholder="Item description" class="bulk-item-desc" /><input type="number" placeholder="Qty" class="bulk-qty" min="1" value="1" /><input type="number" placeholder="Price each" class="bulk-price-each" step="0.01" /><button onclick="removeBulkLineItem(this)" class="btn-small">✕</button>';
+  container.appendChild(item);
+}
+
+function removeBulkLineItem(btn) {
+  btn.parentElement.remove();
+}
+
+async function saveBulkSale(e) {
+  e.preventDefault();
+  const eventName = document.getElementById('bulkEventName').value;
+  const date = document.getElementById('bulkEventDate').value;
+  const venueType = document.getElementById('bulkVenueType').value;
+  const items = document.querySelectorAll('.bulk-line-item');
+  const lineItems = [];
+  items.forEach(item => {
+    const desc = item.querySelector('.bulk-item-desc').value;
+    const qty = parseInt(item.querySelector('.bulk-qty').value) || 1;
+    const price = parseFloat(item.querySelector('.bulk-price-each').value) || 0;
+    if (desc && price > 0) lineItems.push({ itemDescription: desc, quantity: qty, priceEach: price });
+  });
+  if (!lineItems.length) return toast('Add at least one line item', 'error');
+  try {
+    await api('/api/sales/bulk', { method: 'POST', body: { eventName, date, venueType, lineItems } });
+    toast('Bulk sale recorded!', 'success');
+    closeModal('bulkSaleModal');
+    loadSales();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
 async function saveSale(e) {
   e.preventDefault();
-  const body = { pieceId:document.getElementById('salePiece').value||null, price:parseFloat(document.getElementById('salePrice').value), date:document.getElementById('saleDate').value||null, venueType:document.getElementById('saleVenueType').value||null, venue:document.getElementById('saleVenue').value||null };
-  try { await api('/api/sales', {method:'POST',body}); toast('Sale logged!','success'); closeModal('saleModal'); loadSales(); }
-  catch(e) { toast(e.message,'error'); }
+  const saleId = document.getElementById('saleId').value;
+  const body = {
+    pieceId: document.getElementById('salePiece').value || null,
+    price: parseFloat(document.getElementById('salePrice').value),
+    date: document.getElementById('saleDate').value || null,
+    venueType: document.getElementById('saleVenueType').value || null,
+    venue: document.getElementById('saleVenue').value || null,
+    quantity: parseInt(document.getElementById('saleQuantity').value) || 1,
+    itemDescription: document.getElementById('saleItemDescription').value || null,
+    eventName: document.getElementById('saleEventName').value || null
+  };
+  try {
+    const method = saleId ? 'PUT' : 'POST';
+    const url = saleId ? '/api/sales/' + saleId : '/api/sales';
+    await api(url, { method, body });
+    toast(saleId ? 'Sale updated!' : 'Sale logged!', 'success');
+    closeModal('saleModal');
+    document.getElementById('saleId').value = '';
+    loadSales();
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 // ---- Community Combos ----
@@ -796,9 +927,11 @@ async function loadCombos() {
   try {
     const search = document.getElementById('comboSearch')?.value||'';
     const cone = document.getElementById('comboConeFilter')?.value||'';
+    const filter = document.getElementById('comboFilter')?.value||'community-shared';
     let u = '/api/community/combos?';
     if (search) u += 'search=' + encodeURIComponent(search) + '&';
     if (cone) u += 'cone=' + encodeURIComponent(cone) + '&';
+    if (filter) u += 'filter=' + encodeURIComponent(filter) + '&';
     const combos = await api(u);
     const c = document.getElementById('comboList'), em = document.getElementById('communityEmpty');
     if (!combos.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
@@ -811,41 +944,87 @@ async function loadCombos() {
       (cb.atmosphere ? '<span class="piece-meta-tag">' + esc(cb.atmosphere) + '</span>' : '') +
       '</div></div>' +
       (cb.clay_body_name ? '<div class="text-sm mb-16"><strong>Clay:</strong> ' + esc(cb.clay_body_name) + '</div>' : '') +
-      (cb.photo_filename || cb.photo_filename2 ? '<div style="display:flex;gap:8px;margin-bottom:12px">' + (cb.photo_filename ? '<img src="/uploads/' + cb.photo_filename + '" style="max-width:200px;max-height:200px;border-radius:var(--radius-sm);object-fit:cover;cursor:zoom-in" loading="lazy" onclick="openLightbox(\'/uploads/' + cb.photo_filename + '\')">' : '') + (cb.photo_filename2 ? '<img src="/uploads/' + cb.photo_filename2 + '" style="max-width:200px;max-height:200px;border-radius:var(--radius-sm);object-fit:cover;cursor:zoom-in" loading="lazy" onclick="openLightbox(\'/uploads/' + cb.photo_filename2 + '\')">' : '') + '</div>' : '') +
+      (cb.photo_filename || cb.photo_filename2 ? '<div style="display:flex;gap:8px;margin-bottom:12px">' + (cb.photo_filename ? '<img src="/uploads/' + cb.photo_filename + '" style="max-width:300px;max-height:300px;border-radius:var(--radius-sm);object-fit:cover;cursor:zoom-in" loading="lazy" onclick="openLightbox(\'/uploads/' + cb.photo_filename + '\')">' : '') + (cb.photo_filename2 ? '<img src="/uploads/' + cb.photo_filename2 + '" style="max-width:300px;max-height:300px;border-radius:var(--radius-sm);object-fit:cover;cursor:zoom-in" loading="lazy" onclick="openLightbox(\'/uploads/' + cb.photo_filename2 + '\')">' : '') + '</div>' : '') +
       '<div>' + (cb.layers||[]).map((l,i) => '<div style="margin-bottom:4px"><span style="color:var(--text-muted);font-size:0.8rem">Layer ' + (i+1) + ':</span> <span class="glaze-tag">' + esc(l.glaze_name) + '</span>' + (l.brand ? ' <span class="text-sm">(' + esc(l.brand) + ')</span>' : '') + (l.coats > 1 ? ' · ' + l.coats + ' coats' : '') + '</div>').join('') + '</div>' +
       (cb.description ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(cb.description) + '</div>' : '') +
       '<div style="display:flex;gap:12px;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">' +
       '<button class="btn-ghost btn-sm" onclick="toggleComboLike(\'' + cb.id + '\')" style="' + (cb.user_liked ? 'color:var(--danger)' : '') + '">' + (cb.user_liked ? '❤️' : '🤍') + ' ' + (cb.likes||0) + '</button>' +
       '<button class="btn-ghost btn-sm" onclick="toggleComboComments(\'' + cb.id + '\')">💬 ' + (cb.comment_count||0) + '</button>' +
-      (cb.user_id !== currentUser?.id ? '<button class="btn-ghost btn-sm" onclick="navigate(\'messageThread\');loadMessageThread(\'' + cb.user_id + '\')">✉️ Message</button>' : '') +
+      (cb.user_id === currentUser?.id ? '<button class="btn-ghost btn-sm" onclick="editCombo(\'' + cb.id + '\')">✎ Edit</button><button class="btn-ghost btn-sm" onclick="deleteCombo(\'' + cb.id + '\')">✕ Delete</button>' : '<button class="btn-ghost btn-sm" onclick="navigate(\'messageThread\');loadMessageThread(\'' + cb.user_id + '\')">✉️ Message</button>') +
       '</div>' +
       '<div id="comboComments_' + cb.id + '" class="hidden" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"></div>' +
       '</div>'
     ).join('');
   } catch(e) { toast(e.message,'error'); }
 }
+
+function editCombo(id) {
+  api('/api/community/combos?filter=all-my').then(combos => {
+    const combo = combos.find(c => c.id === id);
+    if (combo) {
+      document.getElementById('comboId').value = combo.id;
+      document.getElementById('comboName').value = combo.name;
+      document.getElementById('comboClay').value = combo.clay_body_name || '';
+      document.getElementById('comboCone').value = combo.cone || '';
+      document.getElementById('comboAtmosphere').value = combo.atmosphere || '';
+      document.getElementById('comboDesc').value = combo.description || '';
+      document.getElementById('comboShared').checked = combo.is_shared;
+      document.getElementById('comboLayers').innerHTML = '';
+      if (combo.layers && combo.layers.length) {
+        combo.layers.forEach(l => addComboLayer(l.glaze_name, l.brand, l.coats));
+      } else {
+        addComboLayer(); addComboLayer();
+      }
+      openModal('comboModal');
+    }
+  });
+}
+
+async function deleteCombo(id) {
+  if (!confirm('Delete this combo?')) return;
+  try {
+    await api('/api/community/combos/' + id, { method: 'DELETE' });
+    toast('Combo deleted', 'success');
+    loadCombos();
+  } catch(e) { toast(e.message, 'error'); }
+}
 function addComboLayer(name, brand, coats) {
   const c = document.getElementById('comboLayers');
   const r = document.createElement('div'); r.className = 'combo-layer-row';
-  r.innerHTML = '<input type="text" class="form-input cl-name" placeholder="Glaze name" value="' + esc(name||'') + '">' +
-    '<input type="text" class="form-input cl-brand" placeholder="Brand" value="' + esc(brand||'') + '" style="width:120px;flex:none">' +
+  r.innerHTML = '<input type="text" class="form-input cl-name" placeholder="Glaze name" value="' + esc(name||'') + '" list="comboGlazeNameList">' +
+    '<input type="text" class="form-input cl-brand" placeholder="Brand" value="' + esc(brand||'') + '" style="width:120px;flex:none" list="comboGlazeBrandList">' +
     '<input type="number" class="form-input cl-coats" placeholder="Coats" min="1" value="' + (coats||1) + '" style="width:70px;flex:none">' +
     '<button type="button" class="remove-row" onclick="this.parentElement.remove()">×</button>';
   c.appendChild(r);
 }
+function populateComboDataLists() {
+  const clayDL = document.getElementById('comboClayList');
+  if (clayDL) clayDL.innerHTML = clayBodies.map(c => '<option value="' + esc(c.name + (c.brand ? ' (' + c.brand + ')' : '')) + '">').join('');
+  let glazeNameDL = document.getElementById('comboGlazeNameList');
+  if (!glazeNameDL) { glazeNameDL = document.createElement('datalist'); glazeNameDL.id = 'comboGlazeNameList'; document.body.appendChild(glazeNameDL); }
+  glazeNameDL.innerHTML = glazes.map(g => '<option value="' + esc(g.name) + '">').join('');
+  let brandDL = document.getElementById('comboGlazeBrandList');
+  if (!brandDL) { brandDL = document.createElement('datalist'); brandDL.id = 'comboGlazeBrandList'; document.body.appendChild(brandDL); }
+  const brands = [...new Set(glazes.map(g => g.brand).filter(Boolean))];
+  brandDL.innerHTML = brands.map(b => '<option value="' + esc(b) + '">').join('');
+}
 function openComboModal() {
+  document.getElementById('comboId').value = '';
   document.getElementById('comboName').value = '';
   document.getElementById('comboClay').value = '';
   document.getElementById('comboCone').value = '';
+  document.getElementById('comboAtmosphere').value = '';
   document.getElementById('comboDesc').value = '';
   document.getElementById('comboShared').checked = true;
   document.getElementById('comboLayers').innerHTML = '';
   if (document.getElementById('comboPhotos')) document.getElementById('comboPhotos').value = '';
+  populateComboDataLists();
   addComboLayer(); addComboLayer();
   openModal('comboModal');
 }
 async function saveCombo(e) {
   e.preventDefault();
+  const comboId = document.getElementById('comboId').value;
   const layers = []; document.querySelectorAll('.combo-layer-row').forEach(r => {
     const n = r.querySelector('.cl-name').value; if(n) layers.push({glazeName:n, brand:r.querySelector('.cl-brand').value||null, coats:parseInt(r.querySelector('.cl-coats').value)||1});
   });
@@ -853,15 +1032,21 @@ async function saveCombo(e) {
   fd.append('name', document.getElementById('comboName').value);
   fd.append('clayBodyName', document.getElementById('comboClay').value || '');
   fd.append('cone', document.getElementById('comboCone').value || '');
+  fd.append('atmosphere', document.getElementById('comboAtmosphere').value || '');
   fd.append('description', document.getElementById('comboDesc').value || '');
   fd.append('isShared', document.getElementById('comboShared').checked);
   fd.append('layers', JSON.stringify(layers));
   const files = document.getElementById('comboPhotos')?.files;
   if (files) { for (let i = 0; i < Math.min(files.length, 2); i++) fd.append('photos', files[i]); }
   try {
-    const r = await fetch('/api/community/combos', { method:'POST', headers:{Authorization:'Bearer '+token}, body:fd });
+    const method = comboId ? 'PUT' : 'POST';
+    const url = comboId ? '/api/community/combos/' + comboId : '/api/community/combos';
+    const r = await fetch(url, { method, headers:{Authorization:'Bearer '+token}, body:fd });
     const d = await r.json(); if (!r.ok) throw new Error(d.error);
-    toast('Combo saved!','success'); closeModal('comboModal'); loadCombos();
+    toast(comboId ? 'Combo updated!' : 'Combo saved!','success');
+    closeModal('comboModal');
+    document.getElementById('comboId').value = '';
+    loadCombos();
   } catch(e) { toast(e.message,'error'); }
 }
 
@@ -1802,6 +1987,17 @@ function copyShoppingList() {
   navigator.clipboard.writeText(text).then(() => toast('Copied to clipboard!','success')).catch(() => toast('Could not copy','error'));
 }
 
+function printShoppingList() {
+  const el = document.getElementById('shoppingListContent');
+  const w = window.open('', '_blank');
+  w.document.write('<html><head><title>Shopping List</title><style>body{font-family:Georgia,serif;padding:20px;max-width:600px;margin:0 auto}h1{font-size:1.4rem}h3{margin:16px 0 8px}.item{padding:6px 0;border-bottom:1px solid #eee}.brand{color:#888;font-size:0.9rem}@media print{body{padding:0}}</style></head><body>');
+  w.document.write('<h1>🛒 Potter\'s Mud Room Shopping List</h1>');
+  w.document.write(el.innerHTML);
+  w.document.write('</body></html>');
+  w.document.close();
+  w.print();
+}
+
 // Glaze chemicals
 let chemicals = [];
 async function loadChemicals() {
@@ -2040,6 +2236,290 @@ async function adminSearchMembers() {
 async function adminCancelMember(userId, email) {
   if (!confirm('Cancel membership for ' + email + '? This will set them back to Free tier immediately.')) return;
   try { await api('/api/admin/members/' + userId + '/cancel', {method:'POST'}); toast('Membership cancelled for ' + email,'success'); adminSearchMembers(); loadAdmin(); } catch(e) { toast(e.message,'error'); }
+}
+
+// ============ GOALS ============
+async function loadGoals() {
+  try {
+    const goals = await api('/api/goals');
+    const c = document.getElementById('goalsList'), em = document.getElementById('goalsEmpty');
+    if (!goals.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
+    em.classList.add('hidden');
+    c.innerHTML = goals.map(g =>
+      '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(g.title) + '</div>' +
+      '<div class="text-sm" style="color:var(--text-light)">' + (g.due_date ? 'Due: ' + fmtDate(g.due_date) : '') + '</div></div>' +
+      '<span class="piece-meta-tag">' + (g.priority||'medium') + '</span></div>' +
+      (g.description ? '<div class="text-sm mt-8">' + esc(g.description) + '</div>' : '') +
+      '<div style="display:flex;gap:4px;margin-top:10px"><button onclick="editGoal(\'' + g.id + '\')" class="btn-small">✎</button><button onclick="deleteGoal(\'' + g.id + '\')" class="btn-small">✕</button></div>' +
+      '</div>'
+    ).join('');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+function openGoalModal(g = null) {
+  document.getElementById('goalId').value = g?.id || '';
+  document.getElementById('goalTitle').value = g?.title || '';
+  document.getElementById('goalDescription').value = g?.description || '';
+  document.getElementById('goalStatus').value = g?.status || 'active';
+  document.getElementById('goalDueDate').value = g?.due_date || '';
+  document.getElementById('goalPriority').value = g?.priority || 'medium';
+  openModal('goalModal');
+}
+
+function editGoal(id) {
+  api('/api/goals').then(goals => {
+    const g = goals.find(x => x.id === id);
+    if (g) openGoalModal(g);
+  });
+}
+
+async function saveGoal(e) {
+  e.preventDefault();
+  const id = document.getElementById('goalId').value;
+  const body = {
+    title: document.getElementById('goalTitle').value,
+    description: document.getElementById('goalDescription').value,
+    status: document.getElementById('goalStatus').value,
+    dueDate: document.getElementById('goalDueDate').value || null,
+    priority: document.getElementById('goalPriority').value
+  };
+  try {
+    if (id) { await api('/api/goals/' + id, {method:'PUT',body}); toast('Goal updated!','success'); }
+    else { await api('/api/goals', {method:'POST',body}); toast('Goal added!','success'); }
+    closeModal('goalModal');
+    document.getElementById('goalId').value = '';
+    loadGoals();
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function deleteGoal(id) {
+  if (!confirm('Delete this goal?')) return;
+  try { await api('/api/goals/' + id, {method:'DELETE'}); toast('Deleted','success'); loadGoals(); } catch(e) { toast(e.message,'error'); }
+}
+
+// ============ PROJECTS ============
+async function loadProjects() {
+  try {
+    const projects = await api('/api/projects');
+    const c = document.getElementById('projectsList'), em = document.getElementById('projectsEmpty');
+    if (!projects.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
+    em.classList.add('hidden');
+    c.innerHTML = projects.map(p =>
+      '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(p.title) + '</div>' +
+      '<div class="text-sm" style="color:var(--text-light)">' + (p.due_date ? 'Due: ' + fmtDate(p.due_date) : '') + '</div></div>' +
+      '<span class="piece-meta-tag">' + (p.status||'active') + '</span></div>' +
+      (p.description ? '<div class="text-sm mt-8">' + esc(p.description) + '</div>' : '') +
+      '<div style="display:flex;gap:4px;margin-top:10px"><button onclick="editProject(\'' + p.id + '\')" class="btn-small">✎</button><button onclick="deleteProject(\'' + p.id + '\')" class="btn-small">✕</button></div>' +
+      '</div>'
+    ).join('');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+function openProjectModal(p = null) {
+  document.getElementById('projectId').value = p?.id || '';
+  document.getElementById('projectTitle').value = p?.title || '';
+  document.getElementById('projectDescription').value = p?.description || '';
+  document.getElementById('projectStatus').value = p?.status || 'active';
+  document.getElementById('projectDueDate').value = p?.due_date || '';
+  openModal('projectModal');
+}
+
+function editProject(id) {
+  api('/api/projects').then(projects => {
+    const p = projects.find(x => x.id === id);
+    if (p) openProjectModal(p);
+  });
+}
+
+async function saveProject(e) {
+  e.preventDefault();
+  const id = document.getElementById('projectId').value;
+  const body = {
+    title: document.getElementById('projectTitle').value,
+    description: document.getElementById('projectDescription').value,
+    status: document.getElementById('projectStatus').value,
+    dueDate: document.getElementById('projectDueDate').value || null
+  };
+  try {
+    if (id) { await api('/api/projects/' + id, {method:'PUT',body}); toast('Project updated!','success'); }
+    else { await api('/api/projects', {method:'POST',body}); toast('Project added!','success'); }
+    closeModal('projectModal');
+    document.getElementById('projectId').value = '';
+    loadProjects();
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function deleteProject(id) {
+  if (!confirm('Delete this project?')) return;
+  try { await api('/api/projects/' + id, {method:'DELETE'}); toast('Deleted','success'); loadProjects(); } catch(e) { toast(e.message,'error'); }
+}
+
+// ============ EVENTS ============
+async function loadEvents() {
+  try {
+    const events = await api('/api/events');
+    const c = document.getElementById('eventsList'), em = document.getElementById('eventsEmpty');
+    if (!events.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
+    em.classList.add('hidden');
+    c.innerHTML = events.map(e =>
+      '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(e.title) + '</div>' +
+      '<div class="text-sm" style="color:var(--text-light)">' + fmtDate(e.event_date) + (e.start_time ? ' at ' + e.start_time : '') + '</div></div></div>' +
+      (e.location ? '<div class="text-sm"><strong>Location:</strong> ' + esc(e.location) + '</div>' : '') +
+      (e.description ? '<div class="text-sm mt-8">' + esc(e.description) + '</div>' : '') +
+      '<div style="display:flex;gap:4px;margin-top:10px"><button onclick="editEvent(\'' + e.id + '\')" class="btn-small">✎</button><button onclick="deleteEvent(\'' + e.id + '\')" class="btn-small">✕</button></div>' +
+      '</div>'
+    ).join('');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+function openEventModal(e = null) {
+  document.getElementById('eventId').value = e?.id || '';
+  document.getElementById('eventTitle').value = e?.title || '';
+  document.getElementById('eventDescription').value = e?.description || '';
+  document.getElementById('eventDate').value = e?.event_date || '';
+  document.getElementById('eventStartTime').value = e?.start_time || '';
+  document.getElementById('eventEndTime').value = e?.end_time || '';
+  document.getElementById('eventLocation').value = e?.location || '';
+  openModal('eventModal');
+}
+
+function editEvent(id) {
+  api('/api/events').then(events => {
+    const e = events.find(x => x.id === id);
+    if (e) openEventModal(e);
+  });
+}
+
+async function saveEvent(e) {
+  e.preventDefault();
+  const id = document.getElementById('eventId').value;
+  const body = {
+    title: document.getElementById('eventTitle').value,
+    description: document.getElementById('eventDescription').value,
+    eventDate: document.getElementById('eventDate').value,
+    startTime: document.getElementById('eventStartTime').value || null,
+    endTime: document.getElementById('eventEndTime').value || null,
+    location: document.getElementById('eventLocation').value || null
+  };
+  try {
+    if (id) { await api('/api/events/' + id, {method:'PUT',body}); toast('Event updated!','success'); }
+    else { await api('/api/events', {method:'POST',body}); toast('Event added!','success'); }
+    closeModal('eventModal');
+    document.getElementById('eventId').value = '';
+    loadEvents();
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function deleteEvent(id) {
+  if (!confirm('Delete this event?')) return;
+  try { await api('/api/events/' + id, {method:'DELETE'}); toast('Deleted','success'); loadEvents(); } catch(e) { toast(e.message,'error'); }
+}
+
+function downloadEventsiCal() {
+  window.location.href = '/api/events/export/ics';
+}
+function printEvents() {
+  const el = document.getElementById('eventsList');
+  const w = window.open('', '_blank');
+  w.document.write('<html><head><title>Events Calendar</title><style>body{font-family:Georgia,serif;padding:20px;max-width:700px;margin:0 auto}h1{font-size:1.4rem}.card{border:1px solid #ddd;padding:12px;margin-bottom:8px;border-radius:6px}@media print{body{padding:0}}</style></head><body>');
+  w.document.write('<h1>📅 Events Calendar</h1>');
+  w.document.write(el ? el.innerHTML : '<p>No events</p>');
+  w.document.write('</body></html>');
+  w.document.close();
+  w.print();
+}
+
+// ============ CONTACTS ============
+async function loadContacts() {
+  try {
+    const contacts = await api('/api/contacts');
+    const c = document.getElementById('contactsList'), em = document.getElementById('contactsEmpty');
+    if (!contacts.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
+    em.classList.add('hidden');
+    c.innerHTML = contacts.map(ct =>
+      '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(ct.name) + '</div>' +
+      (ct.email ? '<div class="text-sm" style="color:var(--text-light)">' + esc(ct.email) + '</div>' : '') +
+      (ct.phone ? '<div class="text-sm" style="color:var(--text-light)">' + esc(ct.phone) + '</div>' : '') + '</div></div>' +
+      (ct.notes ? '<div class="text-sm mt-8">' + esc(ct.notes) + '</div>' : '') +
+      '<div style="display:flex;gap:4px;margin-top:10px"><button onclick="editContact(\'' + ct.id + '\')" class="btn-small">✎</button><button onclick="deleteContact(\'' + ct.id + '\')" class="btn-small">✕</button></div>' +
+      '</div>'
+    ).join('');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+function openContactModal(ct = null) {
+  document.getElementById('contactId').value = ct?.id || '';
+  document.getElementById('contactName').value = ct?.name || '';
+  document.getElementById('contactEmail').value = ct?.email || '';
+  document.getElementById('contactPhone').value = ct?.phone || '';
+  document.getElementById('contactNotes').value = ct?.notes || '';
+  openModal('contactModal');
+}
+
+function editContact(id) {
+  api('/api/contacts').then(contacts => {
+    const ct = contacts.find(x => x.id === id);
+    if (ct) openContactModal(ct);
+  });
+}
+
+async function saveContact(e) {
+  e.preventDefault();
+  const id = document.getElementById('contactId').value;
+  const body = {
+    name: document.getElementById('contactName').value,
+    email: document.getElementById('contactEmail').value || null,
+    phone: document.getElementById('contactPhone').value || null,
+    notes: document.getElementById('contactNotes').value || null
+  };
+  try {
+    if (id) { await api('/api/contacts/' + id, {method:'PUT',body}); toast('Contact updated!','success'); }
+    else { await api('/api/contacts', {method:'POST',body}); toast('Contact added!','success'); }
+    closeModal('contactModal');
+    document.getElementById('contactId').value = '';
+    loadContacts();
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function deleteContact(id) {
+  if (!confirm('Delete this contact?')) return;
+  try { await api('/api/contacts/' + id, {method:'DELETE'}); toast('Deleted','success'); loadContacts(); } catch(e) { toast(e.message,'error'); }
+}
+
+// ============ COMMUNITY MEMBERS ============
+async function loadCommunityMembers() {
+  try {
+    const members = await api('/api/community/members');
+    const c = document.getElementById('membersList'), em = document.getElementById('membersEmpty');
+    if (!members.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
+    em.classList.add('hidden');
+    c.innerHTML = members.map(u =>
+      '<div class="card"><div class="card-header"><div style="display:flex;gap:8px;align-items:center">' +
+      (u.avatar_filename ? '<img src="/uploads/' + u.avatar_filename + '" style="width:40px;height:40px;border-radius:50%;object-fit:cover">' : '<div style="width:40px;height:40px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700">' + (u.display_name||'?')[0].toUpperCase() + '</div>') +
+      '<div><div class="card-title">' + esc(u.display_name||'Member') + '</div>' +
+      (u.location ? '<div class="text-sm" style="color:var(--text-light)">' + esc(u.location) + '</div>' : '') + '</div></div></div>' +
+      (u.bio ? '<div class="text-sm mt-8">' + esc(u.bio) + '</div>' : '') +
+      '<div style="display:flex;gap:4px;margin-top:10px"><button onclick="navigate(\'messageThread\');loadMessageThread(\'' + u.id + '\')" class="btn-small">✉️ Message</button></div>' +
+      '</div>'
+    ).join('');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// ============ PROFILE - CHANGE PASSWORD ============
+async function changePassword(e) {
+  e.preventDefault();
+  const current = document.getElementById('currentPassword').value;
+  const newPwd = document.getElementById('newPassword').value;
+  const confirm = document.getElementById('confirmPassword').value;
+  if (newPwd !== confirm) return toast('Passwords do not match', 'error');
+  try {
+    await api('/api/auth/password', { method: 'PUT', body: { currentPassword: current, newPassword: newPwd } });
+    toast('Password changed successfully!', 'success');
+    document.getElementById('currentPassword').value = '';
+    document.getElementById('newPassword').value = '';
+    document.getElementById('confirmPassword').value = '';
+    closeModal('changePasswordModal');
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 checkAuth();

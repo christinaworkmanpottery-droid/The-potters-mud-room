@@ -192,6 +192,19 @@ app.get('/api/auth/me', auth, (req, res) => {
   res.json({ user: { ...u, displayName: u.display_name, pieceCount: getPieceCount(req.userId) } });
 });
 
+// Change password
+app.put('/api/auth/password', auth, (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Current and new password required' });
+    const u = db.prepare('SELECT password_hash FROM users WHERE id=?').get(req.userId);
+    if (!u || !bcrypt.compareSync(currentPassword, u.password_hash)) return res.status(401).json({ error: 'Current password is incorrect' });
+    const newHash = bcrypt.hashSync(newPassword, 10);
+    db.prepare('UPDATE users SET password_hash=?,updated_at=datetime(\'now\') WHERE id=?').run(newHash, req.userId);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ============ USER PROFILE ============
 app.put('/api/profile', auth, (req, res) => {
   const { displayName, bio, location, website, isPrivate, unitSystem, tempUnit } = req.body;
@@ -839,28 +852,111 @@ app.put('/api/photos/:id/stage', auth, (req, res) => {
 
 // ============ FIRING LOGS ============
 app.get('/api/firing-logs', auth, (req, res) => {
-  res.json(db.prepare('SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id WHERE fl.user_id=? ORDER BY fl.date DESC').all(req.userId));
+  const { sort } = req.query;
+  let sql = 'SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id WHERE fl.user_id=?';
+  let orderBy = 'ORDER BY fl.date DESC'; // default
+  if (sort === 'created_date') orderBy = 'ORDER BY fl.created_at DESC';
+  else if (sort === 'firing_type') orderBy = 'ORDER BY fl.firing_type ASC, fl.date DESC';
+  else if (sort === 'cone') orderBy = 'ORDER BY fl.cone ASC, fl.date DESC';
+  else orderBy = 'ORDER BY fl.date DESC'; // 'firing_date' is default
+  sql += ' ' + orderBy;
+  res.json(db.prepare(sql).all(req.userId));
 });
 
 app.post('/api/firing-logs', auth, requireTier('starter'), (req, res) => {
-  const { pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail, holdUsed, holdDuration, date, results, notes } = req.body;
+  const { pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail, holdUsed, holdDuration, date, results, notes, firingTime, firingMode, loadDescription } = req.body;
   const id = uuidv4();
-  db.prepare('INSERT INTO firing_logs (id,user_id,piece_id,firing_type,cone,temperature,atmosphere,kiln_name,schedule,duration,firing_speed,custom_speed_detail,hold_used,hold_duration,date,results,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-    .run(id, req.userId, pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes);
+  db.prepare('INSERT INTO firing_logs (id,user_id,piece_id,firing_type,cone,temperature,atmosphere,kiln_name,schedule,duration,firing_speed,custom_speed_detail,hold_used,hold_duration,date,results,notes,firing_time,firing_mode,load_description) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .run(id, req.userId, pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null);
   res.json({ id });
+});
+
+// Edit firing log
+app.put('/api/firing-logs/:id', auth, (req, res) => {
+  const { pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail, holdUsed, holdDuration, date, results, notes, firingTime, firingMode, loadDescription } = req.body;
+  db.prepare('UPDATE firing_logs SET piece_id=?,firing_type=?,cone=?,temperature=?,atmosphere=?,kiln_name=?,schedule=?,duration=?,firing_speed=?,custom_speed_detail=?,hold_used=?,hold_duration=?,date=?,results=?,notes=?,firing_time=?,firing_mode=?,load_description=? WHERE id=? AND user_id=?')
+    .run(pieceId || null, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null, req.params.id, req.userId);
+  res.json({ success: true });
+});
+
+// Delete firing log
+app.delete('/api/firing-logs/:id', auth, (req, res) => {
+  db.prepare('DELETE FROM firing_logs WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  res.json({ success: true });
+});
+
+// Firing photos upload
+app.post('/api/firing-logs/:id/photos', auth, upload.array('photos', 3), (req, res) => {
+  if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
+  const photos = [];
+  req.files.forEach((file, idx) => {
+    const photoId = uuidv4();
+    db.prepare('INSERT INTO firing_photos (id,firing_id,filename,original_name,sort_order) VALUES (?,?,?,?,?)')
+      .run(photoId, req.params.id, file.filename, file.originalname, idx);
+    photos.push({ id: photoId, filename: file.filename });
+  });
+  res.json(photos);
+});
+
+// Get firing photos
+app.get('/api/firing-logs/:id/photos', auth, (req, res) => {
+  const photos = db.prepare('SELECT * FROM firing_photos WHERE firing_id=? ORDER BY sort_order').all(req.params.id);
+  res.json(photos);
+});
+
+// Delete firing photo
+app.delete('/api/firing-photos/:id', auth, (req, res) => {
+  const photo = db.prepare('SELECT fp.filename,fp.firing_id,fl.user_id FROM firing_photos fp JOIN firing_logs fl ON fp.firing_id=fl.id WHERE fp.id=?').get(req.params.id);
+  if (!photo || photo.user_id !== req.userId) return res.status(403).json({ error: 'Not authorized' });
+  db.prepare('DELETE FROM firing_photos WHERE id=?').run(req.params.id);
+  try { fs.unlinkSync(path.join(UPLOADS_DIR, photo.filename)); } catch(e) { /* ignore */ }
+  res.json({ success: true });
+});
+
+// Export firing logs as CSV
+app.get('/api/export/firing-logs', auth, (req, res) => {
+  const firings = db.prepare('SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id WHERE fl.user_id=? ORDER BY fl.date DESC').all(req.userId);
+  let csv = 'Date,Firing Type,Cone,Temperature,Kiln,Duration,Firing Time,Atmosphere,Results,Load Description,Notes\n';
+  firings.forEach(f => {
+    csv += `"${f.date||''}","${f.firing_type||''}","${f.cone||''}","${f.temperature||''}","${(f.kiln_name||'').replace(/"/g,'""')}","${f.duration||''}","${f.firing_time||''}","${f.atmosphere||''}","${(f.results||'').replace(/"/g,'""')}","${(f.load_description||'').replace(/"/g,'""')}","${(f.notes||'').replace(/"/g,'""')}"\n`;
+  });
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=potters-mudroom-firing-logs.csv');
+  res.send(csv);
 });
 
 // ============ SALES ============
 app.get('/api/sales', auth, requireTier('starter'), (req, res) => {
-  res.json(db.prepare('SELECT s.*,p.title as piece_title FROM sales s LEFT JOIN pieces p ON s.piece_id=p.id WHERE s.user_id=? ORDER BY s.date DESC').all(req.userId));
+  const { dateFrom, dateTo } = req.query;
+  let sql = 'SELECT s.*,p.title as piece_title FROM sales s LEFT JOIN pieces p ON s.piece_id=p.id WHERE s.user_id=?';
+  const params = [req.userId];
+  if (dateFrom) { sql += ' AND s.date >= ?'; params.push(dateFrom); }
+  if (dateTo) { sql += ' AND s.date <= ?'; params.push(dateTo); }
+  sql += ' ORDER BY s.date DESC';
+  res.json(db.prepare(sql).all(...params));
 });
 
 app.post('/api/sales', auth, requireTier('starter'), (req, res) => {
-  const { pieceId, date, price, venue, venueType, buyerName, notes } = req.body;
+  const { pieceId, date, price, venue, venueType, buyerName, notes, quantity, itemDescription, eventName } = req.body;
   const id = uuidv4();
-  db.prepare('INSERT INTO sales (id,user_id,piece_id,date,price,venue,venue_type,buyer_name,notes) VALUES (?,?,?,?,?,?,?,?,?)').run(id, req.userId, pieceId, date, price, venue, venueType, buyerName, notes);
+  db.prepare('INSERT INTO sales (id,user_id,piece_id,date,price,venue,venue_type,buyer_name,notes,quantity,item_description,event_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+    .run(id, req.userId, pieceId || null, date, price, venue, venueType, buyerName, notes, quantity || 1, itemDescription || null, eventName || null);
   if (pieceId) db.prepare(`UPDATE pieces SET status='sold',sale_price=?,date_sold=?,updated_at=datetime('now') WHERE id=? AND user_id=?`).run(price, date, pieceId, req.userId);
   res.json({ id });
+});
+
+// Bulk sale creation
+app.post('/api/sales/bulk', auth, requireTier('starter'), (req, res) => {
+  const { eventName, date, venueType, lineItems } = req.body;
+  if (!lineItems || !Array.isArray(lineItems)) return res.status(400).json({ error: 'Invalid line items' });
+  const salesIds = [];
+  lineItems.forEach(item => {
+    const id = uuidv4();
+    db.prepare('INSERT INTO sales (id,user_id,date,price,venue_type,quantity,item_description,event_name) VALUES (?,?,?,?,?,?,?,?)')
+      .run(id, req.userId, date, item.priceEach, venueType, item.quantity, item.itemDescription, eventName);
+    salesIds.push(id);
+  });
+  res.json({ ids: salesIds });
 });
 
 app.get('/api/sales/summary', auth, requireTier('starter'), (req, res) => {
@@ -871,9 +967,18 @@ app.get('/api/sales/summary', auth, requireTier('starter'), (req, res) => {
 });
 
 app.get('/api/sales/export', auth, requireTier('starter'), (req, res) => {
-  const sales = db.prepare('SELECT s.*,p.title as piece_title FROM sales s LEFT JOIN pieces p ON s.piece_id=p.id WHERE s.user_id=? ORDER BY s.date DESC').all(req.userId);
-  let csv = 'Date,Piece,Price,Venue Type,Venue,Buyer,Notes\n';
-  sales.forEach(s => { csv += `"${s.date||''}","${(s.piece_title||'').replace(/"/g,'""')}","${s.price||0}","${s.venue_type||''}","${(s.venue||'').replace(/"/g,'""')}","${(s.buyer_name||'').replace(/"/g,'""')}","${(s.notes||'').replace(/"/g,'""')}"\n`; });
+  const { dateFrom, dateTo } = req.query;
+  let sql = 'SELECT s.*,p.title as piece_title FROM sales s LEFT JOIN pieces p ON s.piece_id=p.id WHERE s.user_id=?';
+  const params = [req.userId];
+  if (dateFrom) { sql += ' AND s.date >= ?'; params.push(dateFrom); }
+  if (dateTo) { sql += ' AND s.date <= ?'; params.push(dateTo); }
+  sql += ' ORDER BY s.date DESC';
+  const sales = db.prepare(sql).all(...params);
+  let csv = 'Date,Item Description,Event,Quantity,Price Each,Total,Venue Type,Venue,Buyer,Notes\n';
+  sales.forEach(s => { 
+    const total = (s.quantity || 1) * (s.price || 0);
+    csv += `"${s.date||''}","${(s.item_description||s.piece_title||'').replace(/"/g,'""')}","${(s.event_name||'').replace(/"/g,'""')}","${s.quantity||1}","${s.price||0}","${total}","${s.venue_type||''}","${(s.venue||'').replace(/"/g,'""')}","${(s.buyer_name||'').replace(/"/g,'""')}","${(s.notes||'').replace(/"/g,'""')}"\n`; 
+  });
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename=potters-mudroom-sales.csv');
   res.send(csv);
@@ -890,9 +995,22 @@ app.get('/api/export/pieces', auth, requireTier('starter'), (req, res) => {
 
 // ============ COMMUNITY GLAZE COMBOS ============
 app.get('/api/community/combos', auth, requireTier('starter'), (req, res) => {
-  const { search, cone, atmosphere } = req.query;
-  let sql = 'SELECT gc.*,u.display_name as author FROM glaze_combos gc JOIN users u ON gc.user_id=u.id WHERE gc.is_shared=1';
+  const { search, cone, atmosphere, filter } = req.query;
+  let sql = 'SELECT gc.*,u.display_name as author FROM glaze_combos gc JOIN users u ON gc.user_id=u.id WHERE ';
   const params = [];
+  
+  // Handle filter: "Community Shared", "My Private Combos", "All My Combos"
+  if (filter === 'my-private') {
+    sql += 'gc.user_id=? AND gc.is_shared=0';
+    params.push(req.userId);
+  } else if (filter === 'all-my') {
+    sql += 'gc.user_id=?';
+    params.push(req.userId);
+  } else {
+    // Default: Community Shared
+    sql += 'gc.is_shared=1';
+  }
+  
   if (search) { sql += ' AND (gc.name LIKE ? OR gc.description LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
   if (cone) { sql += ' AND gc.cone=?'; params.push(cone); }
   if (atmosphere) { sql += ' AND gc.atmosphere=?'; params.push(atmosphere); }
@@ -922,6 +1040,37 @@ app.post('/api/community/combos', auth, requireTier('starter'), upload.array('ph
     parsedLayers.forEach((l, i) => ins.run(uuidv4(), id, l.glazeName, l.brand, l.coats || 1, l.method, i));
   }
   res.json({ id });
+});
+
+// Edit combo (owner only)
+app.put('/api/community/combos/:id', auth, upload.array('photos', 2), (req, res) => {
+  const combo = db.prepare('SELECT user_id FROM glaze_combos WHERE id=?').get(req.params.id);
+  if (!combo || combo.user_id !== req.userId) return res.status(403).json({ error: 'Not authorized' });
+  
+  const { name, clayBodyName, cone, atmosphere, description, notes, isShared, layers } = req.body;
+  const photo1 = req.files?.[0]?.filename || null;
+  const photo2 = req.files?.[1]?.filename || null;
+  
+  db.prepare('UPDATE glaze_combos SET name=?,clay_body_name=?,cone=?,atmosphere=?,description=?,notes=?,is_shared=?,photo_filename=COALESCE(?,photo_filename),photo_filename2=COALESCE(?,photo_filename2),updated_at=datetime(\'now\') WHERE id=?')
+    .run(name, clayBodyName, cone, atmosphere, description, notes, isShared === 'true' || isShared === true ? 1 : 0, photo1, photo2, req.params.id);
+  
+  if (layers) {
+    const parsedLayers = typeof layers === 'string' ? JSON.parse(layers) : layers;
+    db.prepare('DELETE FROM glaze_combo_layers WHERE combo_id=?').run(req.params.id);
+    if (parsedLayers?.length) {
+      const ins = db.prepare('INSERT INTO glaze_combo_layers (id,combo_id,glaze_name,brand,coats,application_method,layer_order) VALUES (?,?,?,?,?,?,?)');
+      parsedLayers.forEach((l, i) => ins.run(uuidv4(), req.params.id, l.glazeName, l.brand, l.coats || 1, l.method, i));
+    }
+  }
+  res.json({ success: true });
+});
+
+// Delete combo (owner only)
+app.delete('/api/community/combos/:id', auth, (req, res) => {
+  const combo = db.prepare('SELECT user_id FROM glaze_combos WHERE id=?').get(req.params.id);
+  if (!combo || combo.user_id !== req.userId) return res.status(403).json({ error: 'Not authorized' });
+  db.prepare('DELETE FROM glaze_combos WHERE id=?').run(req.params.id);
+  res.json({ success: true });
 });
 
 // ============ FORUM ============
@@ -1392,6 +1541,148 @@ app.get('/api/admin/members/search', auth, (req, res) => {
   const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, forum_tokens, created_at 
     FROM users WHERE email LIKE ? OR display_name LIKE ? ORDER BY created_at DESC LIMIT 20`).all('%'+q+'%', '%'+q+'%');
   res.json(members);
+});
+
+// ============ COMMUNITY MEMBERS ============
+app.get('/api/community/members', auth, (req, res) => {
+  const members = db.prepare(`
+    SELECT id, display_name, avatar_filename, bio, location, website, is_private, created_at 
+    FROM users WHERE is_private=0 ORDER BY display_name ASC LIMIT 100
+  `).all();
+  res.json(members);
+});
+
+// ============ GOALS ============
+app.get('/api/goals', auth, (req, res) => {
+  const goals = db.prepare('SELECT * FROM goals WHERE user_id=? ORDER BY due_date ASC, updated_at DESC').all(req.userId);
+  res.json(goals);
+});
+
+app.post('/api/goals', auth, requireTier('starter'), (req, res) => {
+  const { title, description, status, dueDate, priority } = req.body;
+  const id = uuidv4();
+  db.prepare('INSERT INTO goals (id,user_id,title,description,status,due_date,priority) VALUES (?,?,?,?,?,?,?)')
+    .run(id, req.userId, title, description, status || 'active', dueDate || null, priority || 'medium');
+  res.json({ id });
+});
+
+app.put('/api/goals/:id', auth, (req, res) => {
+  const { title, description, status, dueDate, priority } = req.body;
+  db.prepare('UPDATE goals SET title=?,description=?,status=?,due_date=?,priority=?,updated_at=datetime(\'now\') WHERE id=? AND user_id=?')
+    .run(title, description, status, dueDate, priority, req.params.id, req.userId);
+  res.json({ success: true });
+});
+
+app.delete('/api/goals/:id', auth, (req, res) => {
+  db.prepare('DELETE FROM goals WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  res.json({ success: true });
+});
+
+// ============ PROJECTS ============
+app.get('/api/projects', auth, (req, res) => {
+  const projects = db.prepare('SELECT * FROM projects WHERE user_id=? ORDER BY due_date ASC, updated_at DESC').all(req.userId);
+  res.json(projects);
+});
+
+app.post('/api/projects', auth, requireTier('starter'), (req, res) => {
+  const { title, description, status, dueDate } = req.body;
+  const id = uuidv4();
+  db.prepare('INSERT INTO projects (id,user_id,title,description,status,due_date) VALUES (?,?,?,?,?,?)')
+    .run(id, req.userId, title, description, status || 'active', dueDate || null);
+  res.json({ id });
+});
+
+app.put('/api/projects/:id', auth, (req, res) => {
+  const { title, description, status, dueDate } = req.body;
+  db.prepare('UPDATE projects SET title=?,description=?,status=?,due_date=?,updated_at=datetime(\'now\') WHERE id=? AND user_id=?')
+    .run(title, description, status, dueDate, req.params.id, req.userId);
+  res.json({ success: true });
+});
+
+app.delete('/api/projects/:id', auth, (req, res) => {
+  db.prepare('DELETE FROM projects WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  res.json({ success: true });
+});
+
+// ============ EVENTS ============
+app.get('/api/events', auth, (req, res) => {
+  const events = db.prepare('SELECT * FROM events WHERE user_id=? ORDER BY event_date ASC').all(req.userId);
+  res.json(events);
+});
+
+app.post('/api/events', auth, requireTier('starter'), (req, res) => {
+  const { title, description, eventDate, startTime, endTime, location } = req.body;
+  const id = uuidv4();
+  db.prepare('INSERT INTO events (id,user_id,title,description,event_date,start_time,end_time,location) VALUES (?,?,?,?,?,?,?,?)')
+    .run(id, req.userId, title, description, eventDate, startTime || null, endTime || null, location || null);
+  res.json({ id });
+});
+
+app.put('/api/events/:id', auth, (req, res) => {
+  const { title, description, eventDate, startTime, endTime, location } = req.body;
+  db.prepare('UPDATE events SET title=?,description=?,event_date=?,start_time=?,end_time=?,location=?,updated_at=datetime(\'now\') WHERE id=? AND user_id=?')
+    .run(title, description, eventDate, startTime, endTime, location, req.params.id, req.userId);
+  res.json({ success: true });
+});
+
+app.delete('/api/events/:id', auth, (req, res) => {
+  db.prepare('DELETE FROM events WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  res.json({ success: true });
+});
+
+// Events export as iCalendar (.ics)
+app.get('/api/events/export/ics', auth, (req, res) => {
+  const events = db.prepare('SELECT * FROM events WHERE user_id=? ORDER BY event_date ASC').all(req.userId);
+  let ics = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//The Potter's Mud Room//EN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:Events
+X-WR-TIMEZONE:UTC
+`;
+  events.forEach(e => {
+    const dtstart = (e.event_date + (e.start_time ? 'T' + e.start_time.replace(/:/g, '') : 'T000000')).replace(/-/g, '');
+    const dtend = (e.event_date + (e.end_time ? 'T' + e.end_time.replace(/:/g, '') : 'T235959')).replace(/-/g, '');
+    ics += `BEGIN:VEVENT
+DTSTART:${dtstart}Z
+DTEND:${dtend}Z
+SUMMARY:${e.title.replace(/[,;\\]/g, '\\$&')}
+DESCRIPTION:${(e.description || '').replace(/[,;\\]/g, '\\$&')}
+LOCATION:${(e.location || '').replace(/[,;\\]/g, '\\$&')}
+END:VEVENT
+`;
+  });
+  ics += 'END:VCALENDAR';
+  res.setHeader('Content-Type', 'text/calendar');
+  res.setHeader('Content-Disposition', 'attachment; filename=events.ics');
+  res.send(ics);
+});
+
+// ============ CONTACTS ============
+app.get('/api/contacts', auth, (req, res) => {
+  const contacts = db.prepare('SELECT * FROM contacts WHERE user_id=? ORDER BY name ASC').all(req.userId);
+  res.json(contacts);
+});
+
+app.post('/api/contacts', auth, requireTier('starter'), (req, res) => {
+  const { name, email, phone, notes } = req.body;
+  const id = uuidv4();
+  db.prepare('INSERT INTO contacts (id,user_id,name,email,phone,notes) VALUES (?,?,?,?,?,?)')
+    .run(id, req.userId, name, email || null, phone || null, notes || null);
+  res.json({ id });
+});
+
+app.put('/api/contacts/:id', auth, (req, res) => {
+  const { name, email, phone, notes } = req.body;
+  db.prepare('UPDATE contacts SET name=?,email=?,phone=?,notes=?,updated_at=datetime(\'now\') WHERE id=? AND user_id=?')
+    .run(name, email, phone, notes, req.params.id, req.userId);
+  res.json({ success: true });
+});
+
+app.delete('/api/contacts/:id', auth, (req, res) => {
+  db.prepare('DELETE FROM contacts WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  res.json({ success: true });
 });
 
 // ============ PUBLIC PROFILE (limited info) ============

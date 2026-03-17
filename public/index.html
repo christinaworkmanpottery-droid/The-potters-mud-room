@@ -144,7 +144,7 @@
   </script>
 
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏺</text></svg>">
-  <link rel="stylesheet" href="style.css?v=20260310d">
+  <link rel="stylesheet" href="style.css?v=20260317f">
   <style>
     .notif-badge{position:absolute;top:-4px;right:-6px;background:var(--danger);color:#fff;font-size:0.65rem;font-weight:700;border-radius:50%;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 4px}
     .notif-item{padding:12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.15s}
@@ -153,6 +153,10 @@
     .msg-bubble{padding:10px 14px;border-radius:16px;max-width:75%;margin-bottom:8px;font-size:0.9rem;line-height:1.4}
     .msg-mine{background:var(--primary);color:#fff;margin-left:auto;border-bottom-right-radius:4px}
     .msg-theirs{background:var(--primary-light);border-bottom-left-radius:4px}
+    .bulk-line-item{display:flex;gap:8px;margin-bottom:8px;align-items:center}
+    .bulk-item-desc{flex:1}
+    .bulk-qty{width:80px}
+    .bulk-price-each{width:100px}
   </style>
 </head>
 <body>
@@ -419,6 +423,10 @@
         <button class="nav-link" data-page="firings" onclick="navigate('firings')">Firings</button>
         <button class="nav-link" data-page="pieces" onclick="navigate('pieces')">Pieces</button>
         <button class="nav-link" data-page="sales" onclick="navigate('sales')">Sales</button>
+        <button class="nav-link" data-page="goals" onclick="navigate('goals')">Goals</button>
+        <button class="nav-link" data-page="projects" onclick="navigate('projects')">Projects</button>
+        <button class="nav-link" data-page="events" onclick="navigate('events')">📅 Events</button>
+        <button class="nav-link" data-page="contacts" onclick="navigate('contacts')">Contacts</button>
         <button class="nav-link" data-page="shoppingList" onclick="navigate('shoppingList')">🛒 Shopping</button>
         <button class="nav-link" data-page="community" onclick="navigate('community')">Community</button>
         <button class="nav-link" data-page="forum" onclick="navigate('forum')">Forum</button>
@@ -548,6 +556,14 @@
       <div class="page-header">
         <h1>Firing Logs</h1>
         <div style="display:flex;gap:8px;align-items:center">
+          <select class="form-select" id="firingSort" style="width:200px" onchange="loadFirings()">
+            <option value="firing_date">Sort by Firing Date</option>
+            <option value="created_date">Sort by Created Date</option>
+            <option value="firing_type">Sort by Firing Type</option>
+            <option value="cone">Sort by Cone</option>
+          </select>
+          <button class="btn btn-sm btn-secondary" onclick="window.location.href='/api/export/firing-logs'">📥 Download</button>
+          <button class="btn btn-sm btn-secondary" onclick="printFiringLog()">🖨️ Print</button>
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('firings','card')" title="Card view">▦</button>
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('firings','list')" title="List view">☰</button>
           <button class="btn btn-primary" onclick="openFiringModal()">+ Log Firing</button>
@@ -583,8 +599,14 @@
         <div style="display:flex;gap:8px;align-items:center">
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('sales','card')" title="Card view">▦</button>
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('sales','list')" title="List view">☰</button>
+          <button class="btn btn-sm btn-secondary" onclick="window.location.href='/api/sales/export?dateFrom='+document.getElementById('salesDateFrom').value+'&dateTo='+document.getElementById('salesDateTo').value">📥 Download</button>
+          <button class="btn btn-primary" onclick="openBulkSaleModal()">+ Quick Sale</button>
           <button class="btn btn-primary" onclick="openSaleModal()">+ Log Sale</button>
         </div>
+      </div>
+      <div class="filter-bar">
+        <input type="date" class="form-input" id="salesDateFrom" placeholder="From" onchange="loadSales()" style="width:150px">
+        <input type="date" class="form-input" id="salesDateTo" placeholder="To" onchange="loadSales()" style="width:150px">
       </div>
       <div id="salesSummary" class="stats-row"></div>
       <div id="salesList" class="card-grid"></div>
@@ -611,6 +633,11 @@
           <option value="06">Cone 06</option>
           <option value="6">Cone 6</option>
           <option value="10">Cone 10</option>
+        </select>
+        <select class="form-select" id="comboFilter" onchange="loadCombos()">
+          <option value="community-shared">Community Shared</option>
+          <option value="my-private">My Private Combos</option>
+          <option value="all-my">All My Combos</option>
         </select>
       </div>
       <div id="comboList" class="card-grid"></div>
@@ -838,6 +865,78 @@
       <div id="upgradeContent"></div>
     </div>
 
+    <!-- GOALS -->
+    <div id="pageGoals" class="page">
+      <div class="page-header">
+        <h1>Goals</h1>
+        <button class="btn btn-primary" onclick="openGoalModal()">+ Add Goal</button>
+      </div>
+      <div id="goalsList" class="card-grid"></div>
+      <div id="goalsEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">🎯</div>
+        <div class="empty-state-title">No goals yet</div>
+        <p>Set your pottery goals and track your progress.</p>
+      </div>
+    </div>
+
+    <!-- PROJECTS -->
+    <div id="pageProjects" class="page">
+      <div class="page-header">
+        <h1>Projects</h1>
+        <button class="btn btn-primary" onclick="openProjectModal()">+ New Project</button>
+      </div>
+      <div id="projectsList" class="card-grid"></div>
+      <div id="projectsEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">📋</div>
+        <div class="empty-state-title">No projects yet</div>
+        <p>Plan your pottery projects here.</p>
+      </div>
+    </div>
+
+    <!-- EVENTS -->
+    <div id="pageEvents" class="page">
+      <div class="page-header">
+        <h1>📅 Events</h1>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-sm btn-secondary" onclick="downloadEventsiCal()">📥 Download iCal</button>
+          <button class="btn btn-sm btn-secondary" onclick="printEvents()">🖨️ Print</button>
+          <button class="btn btn-primary" onclick="openEventModal()">+ New Event</button>
+        </div>
+      </div>
+      <div id="eventsList" class="card-grid"></div>
+      <div id="eventsEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">📅</div>
+        <div class="empty-state-title">No events yet</div>
+        <p>Schedule your pottery events, shows, and workshops.</p>
+      </div>
+    </div>
+
+    <!-- CONTACTS -->
+    <div id="pageContacts" class="page">
+      <div class="page-header">
+        <h1>Contacts</h1>
+        <button class="btn btn-primary" onclick="openContactModal()">+ Add Contact</button>
+      </div>
+      <div id="contactsList" class="card-grid"></div>
+      <div id="contactsEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">👥</div>
+        <div class="empty-state-title">No contacts yet</div>
+        <p>Keep track of your pottery contacts.</p>
+      </div>
+    </div>
+
+    <!-- COMMUNITY MEMBERS DIRECTORY -->
+    <div id="pageCommunityMembers" class="page">
+      <div class="page-header">
+        <h1>Community Members</h1>
+      </div>
+      <div id="membersList" class="card-grid"></div>
+      <div id="membersEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">👥</div>
+        <div class="empty-state-title">No members found</div>
+      </div>
+    </div>
+
     <!-- PROFILE -->
     <div id="pageProfile" class="page">
       <div class="page-header">
@@ -910,6 +1009,10 @@
           </div>
           <p class="text-sm" style="color:var(--text-muted);margin-top:8px">Downloads a CSV file to your computer.</p>
         </div>
+        <div class="card">
+          <h3 style="margin-bottom:16px">Change Password</h3>
+          <button class="btn btn-secondary" onclick="openModal('changePasswordModal')">Update Password</button>
+        </div>
       </div>
     </div>
 
@@ -959,6 +1062,7 @@
       <div class="page-header">
         <h1>🛒 Shopping List</h1>
         <button class="btn btn-secondary" onclick="copyShoppingList()">📋 Copy to Clipboard</button>
+        <button class="btn btn-secondary" onclick="printShoppingList()">🖨️ Print</button>
       </div>
       <p style="color:var(--text-light);margin-bottom:16px">All your out-of-stock clays and glazes in one place.</p>
       <div id="shoppingListContent"></div>
@@ -1340,6 +1444,7 @@
       <button class="modal-close" onclick="closeModal('firingModal')">&times;</button>
     </div>
     <form id="firingForm" onsubmit="saveFiring(event)">
+      <input type="hidden" id="firingId">
       <div class="form-row">
         <div class="form-group">
           <label>Firing Type</label>
@@ -1351,6 +1456,11 @@
             <option value="wood">Wood Fire</option>
             <option value="soda">Soda Firing</option>
             <option value="salt">Salt Firing</option>
+            <option value="maintenance">Maintenance</option>
+            <option value="element-change">Element Change</option>
+            <option value="thermocouple">Thermocouple</option>
+            <option value="preheat">Preheat</option>
+            <option value="soak">Soak</option>
             <option value="other">Other</option>
           </select>
         </div>
@@ -1365,6 +1475,12 @@
           <input type="text" class="form-input" id="firingCone" placeholder="e.g., 6">
         </div>
         <div class="form-group">
+          <label>Temperature</label>
+          <input type="text" class="form-input" id="firingTemperature" placeholder="°F or °C">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
           <label>Atmosphere</label>
           <select class="form-select" id="firingAtmosphere">
             <option value="">Select...</option>
@@ -1373,6 +1489,10 @@
             <option value="neutral">Neutral</option>
           </select>
         </div>
+        <div class="form-group">
+          <label>Firing Time</label>
+          <input type="text" class="form-input" id="firingTime" placeholder="e.g., 10h 15min">
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -1380,8 +1500,31 @@
           <input type="text" class="form-input" id="firingKiln" placeholder="Kiln name/location">
         </div>
         <div class="form-group">
-          <label>Piece</label>
+          <label>Firing Mode</label>
+          <select class="form-select" id="firingMode" onchange="document.getElementById('firingLoadDescription').parentElement.classList.toggle('hidden', this.value!=='kiln-load')">
+            <option value="kiln-load">Kiln Load (Multiple Pieces)</option>
+            <option value="per-piece">Per-Piece Firing</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Piece (Optional)</label>
           <select class="form-select" id="firingPiece"><option value="">Select piece...</option></select>
+        </div>
+        <div class="form-group" id="firingLoadDescriptionGroup">
+          <label>Load Description</label>
+          <input type="text" class="form-input" id="firingLoadDescription" placeholder="e.g., Full load - 12 mugs, 5 bowls">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Schedule</label>
+          <input type="text" class="form-input" id="firingSchedule" placeholder="e.g., Standard slow">
+        </div>
+        <div class="form-group">
+          <label>Duration</label>
+          <input type="text" class="form-input" id="firingDuration" placeholder="e.g., 24 hours">
         </div>
       </div>
       <div class="form-row">
@@ -1411,9 +1554,15 @@
         <label>Hold Duration</label>
         <input type="text" class="form-input" id="firingHoldDuration" placeholder="e.g., 15 min, 1 hour">
       </div>
-      <div class="form-group">
-        <label>Results / Notes</label>
-        <textarea class="form-textarea" id="firingNotes" placeholder="How did it go?"></textarea>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Results</label>
+          <input type="text" class="form-input" id="firingResults" placeholder="Color, glaze effects, etc.">
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea class="form-textarea" id="firingNotes" placeholder="How did it go?"></textarea>
+        </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('firingModal')">Cancel</button>
@@ -1431,14 +1580,25 @@
       <button class="modal-close" onclick="closeModal('saleModal')">&times;</button>
     </div>
     <form id="saleForm" onsubmit="saveSale(event)">
+      <input type="hidden" id="saleId">
       <div class="form-row">
         <div class="form-group">
-          <label>Piece</label>
+          <label>Item Description</label>
+          <input type="text" class="form-input" id="saleItemDescription" placeholder="e.g., Speckled bowl">
+        </div>
+        <div class="form-group">
+          <label>Piece (Optional)</label>
           <select class="form-select" id="salePiece"><option value="">Select piece...</option></select>
         </div>
+      </div>
+      <div class="form-row">
         <div class="form-group">
           <label>Price ($)</label>
           <input type="number" step="0.01" class="form-input" id="salePrice" placeholder="0.00" required>
+        </div>
+        <div class="form-group">
+          <label>Quantity</label>
+          <input type="number" min="1" class="form-input" id="saleQuantity" placeholder="1" value="1">
         </div>
       </div>
       <div class="form-row">
@@ -1446,6 +1606,12 @@
           <label>Date</label>
           <input type="date" class="form-input" id="saleDate">
         </div>
+        <div class="form-group">
+          <label>Event Name</label>
+          <input type="text" class="form-input" id="saleEventName" placeholder="e.g., Summer Market">
+        </div>
+      </div>
+      <div class="form-row">
         <div class="form-group">
           <label>Venue Type</label>
           <select class="form-select" id="saleVenueType">
@@ -1459,14 +1625,220 @@
             <option value="other">Other</option>
           </select>
         </div>
-      </div>
-      <div class="form-group">
-        <label>Venue / Notes</label>
-        <input type="text" class="form-input" id="saleVenue" placeholder="e.g., Etsy, Holiday Market">
+        <div class="form-group">
+          <label>Venue / Location</label>
+          <input type="text" class="form-input" id="saleVenue" placeholder="e.g., Etsy, Holiday Market">
+        </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('saleModal')">Cancel</button>
         <button type="submit" class="btn btn-primary">Save Sale</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- BULK SALE MODAL -->
+<div id="bulkSaleModal" class="modal-overlay" onclick="if(event.target===this)closeModal('bulkSaleModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Quick Sale — Bulk Entry</h2>
+      <button class="modal-close" onclick="closeModal('bulkSaleModal')">&times;</button>
+    </div>
+    <form id="bulkSaleForm" onsubmit="saveBulkSale(event)">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Event Name</label>
+          <input type="text" class="form-input" id="bulkEventName" placeholder="e.g., Summer Market, Holiday Fair">
+        </div>
+        <div class="form-group">
+          <label>Date</label>
+          <input type="date" class="form-input" id="bulkEventDate">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Venue Type</label>
+        <select class="form-select" id="bulkVenueType">
+          <option value="">Select...</option>
+          <option value="online">Online</option>
+          <option value="art-fair">Art Fair</option>
+          <option value="gallery">Gallery</option>
+          <option value="studio">Studio Sale</option>
+          <option value="commission">Commission</option>
+          <option value="gift">Gift</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Line Items</label>
+        <div id="bulkLineItems"></div>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="addBulkLineItem()">+ Add Item</button>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('bulkSaleModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Sale(s)</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- GOAL MODAL -->
+<div id="goalModal" class="modal-overlay" onclick="if(event.target===this)closeModal('goalModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Goal</h2>
+      <button class="modal-close" onclick="closeModal('goalModal')">&times;</button>
+    </div>
+    <form id="goalForm" onsubmit="saveGoal(event)">
+      <input type="hidden" id="goalId">
+      <div class="form-group">
+        <label>Title *</label>
+        <input type="text" class="form-input" id="goalTitle" required placeholder="e.g., Throw 100 bowls">
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea class="form-textarea" id="goalDescription" placeholder="What do you want to achieve?"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Status</label>
+          <select class="form-select" id="goalStatus">
+            <option value="active">Active</option>
+            <option value="completed">Completed</option>
+            <option value="archived">Archived</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Priority</label>
+          <select class="form-select" id="goalPriority">
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Due Date</label>
+          <input type="date" class="form-input" id="goalDueDate">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('goalModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Goal</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- PROJECT MODAL -->
+<div id="projectModal" class="modal-overlay" onclick="if(event.target===this)closeModal('projectModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Project</h2>
+      <button class="modal-close" onclick="closeModal('projectModal')">&times;</button>
+    </div>
+    <form id="projectForm" onsubmit="saveProject(event)">
+      <input type="hidden" id="projectId">
+      <div class="form-group">
+        <label>Title *</label>
+        <input type="text" class="form-input" id="projectTitle" required placeholder="e.g., Dinner set collection">
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea class="form-textarea" id="projectDescription" placeholder="What's this project about?"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Status</label>
+          <select class="form-select" id="projectStatus">
+            <option value="active">Active</option>
+            <option value="completed">Completed</option>
+            <option value="archived">Archived</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Due Date</label>
+          <input type="date" class="form-input" id="projectDueDate">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('projectModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Project</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- EVENT MODAL -->
+<div id="eventModal" class="modal-overlay" onclick="if(event.target===this)closeModal('eventModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Event</h2>
+      <button class="modal-close" onclick="closeModal('eventModal')">&times;</button>
+    </div>
+    <form id="eventForm" onsubmit="saveEvent(event)">
+      <input type="hidden" id="eventId">
+      <div class="form-group">
+        <label>Title *</label>
+        <input type="text" class="form-input" id="eventTitle" required placeholder="e.g., Summer Art Fair">
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea class="form-textarea" id="eventDescription" placeholder="Event details..."></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date *</label>
+          <input type="date" class="form-input" id="eventDate" required>
+        </div>
+        <div class="form-group">
+          <label>Start Time</label>
+          <input type="time" class="form-input" id="eventStartTime">
+        </div>
+        <div class="form-group">
+          <label>End Time</label>
+          <input type="time" class="form-input" id="eventEndTime">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Location</label>
+        <input type="text" class="form-input" id="eventLocation" placeholder="Where is it?">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('eventModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Event</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- CONTACT MODAL -->
+<div id="contactModal" class="modal-overlay" onclick="if(event.target===this)closeModal('contactModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Contact</h2>
+      <button class="modal-close" onclick="closeModal('contactModal')">&times;</button>
+    </div>
+    <form id="contactForm" onsubmit="saveContact(event)">
+      <input type="hidden" id="contactId">
+      <div class="form-group">
+        <label>Name *</label>
+        <input type="text" class="form-input" id="contactName" required placeholder="Name">
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" class="form-input" id="contactEmail" placeholder="email@example.com">
+      </div>
+      <div class="form-group">
+        <label>Phone</label>
+        <input type="tel" class="form-input" id="contactPhone" placeholder="Phone number">
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea class="form-textarea" id="contactNotes" placeholder="Notes..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('contactModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Contact</button>
       </div>
     </form>
   </div>
@@ -1480,6 +1852,7 @@
       <button class="modal-close" onclick="closeModal('comboModal')">&times;</button>
     </div>
     <form id="comboForm" onsubmit="saveCombo(event)">
+      <input type="hidden" id="comboId">
       <div class="form-group">
         <label>Combo Name *</label>
         <input type="text" class="form-input" id="comboName" placeholder="e.g., Ocean Blue over Tenmoku" required>
@@ -1487,11 +1860,21 @@
       <div class="form-row">
         <div class="form-group">
           <label>Clay Body</label>
-          <input type="text" class="form-input" id="comboClay" placeholder="What clay was it on?">
+          <input type="text" class="form-input" id="comboClay" placeholder="What clay was it on?" list="comboClayList">
+          <datalist id="comboClayList"></datalist>
         </div>
         <div class="form-group">
           <label>Cone</label>
           <input type="text" class="form-input" id="comboCone" placeholder="e.g., 6">
+        </div>
+        <div class="form-group">
+          <label>Atmosphere</label>
+          <select class="form-select" id="comboAtmosphere">
+            <option value="">Select...</option>
+            <option value="oxidation">Oxidation</option>
+            <option value="reduction">Reduction</option>
+            <option value="neutral">Neutral</option>
+          </select>
         </div>
       </div>
       <div class="form-group">
@@ -1715,6 +2098,34 @@
   </div>
 </div>
 
-<script src="app.js?v=20260317e"></script>
+<!-- CHANGE PASSWORD MODAL -->
+<div id="changePasswordModal" class="modal-overlay" onclick="if(event.target===this)closeModal('changePasswordModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Change Password</h2>
+      <button class="modal-close" onclick="closeModal('changePasswordModal')">&times;</button>
+    </div>
+    <form id="changePasswordForm" onsubmit="changePassword(event)">
+      <div class="form-group">
+        <label>Current Password</label>
+        <input type="password" class="form-input" id="currentPassword" required>
+      </div>
+      <div class="form-group">
+        <label>New Password</label>
+        <input type="password" class="form-input" id="newPassword" required>
+      </div>
+      <div class="form-group">
+        <label>Confirm New Password</label>
+        <input type="password" class="form-input" id="confirmPassword" required>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('changePasswordModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Update Password</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="app.js?v=20260317g"></script>
 </body>
 </html>

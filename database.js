@@ -166,7 +166,7 @@ function initDB() {
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
       piece_id TEXT,
-      firing_type TEXT CHECK(firing_type IN ('bisque', 'glaze', 'raku', 'pit', 'wood', 'soda', 'salt', 'other')),
+      firing_type TEXT CHECK(firing_type IN ('bisque', 'glaze', 'raku', 'pit', 'wood', 'soda', 'salt', 'maintenance', 'element-change', 'thermocouple', 'preheat', 'soak', 'other')),
       cone TEXT,
       temperature TEXT,
       atmosphere TEXT CHECK(atmosphere IN ('oxidation', 'reduction', 'neutral', NULL)),
@@ -437,6 +437,98 @@ function initDB() {
   safeAdd('clay_bodies', 'source_url', 'TEXT');
   safeAdd('clay_bodies', 'in_stock', 'INTEGER DEFAULT 1');
   safeAdd('clay_bodies', 'buy_url', 'TEXT');
+
+  // Firing log improvements (items 18-25)
+  safeAdd('firing_logs', 'firing_time', 'TEXT');
+  safeAdd('firing_logs', 'firing_mode', "TEXT DEFAULT 'kiln-load'");
+  safeAdd('firing_logs', 'load_description', 'TEXT');
+
+  // Firing photos table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS firing_photos (
+      id TEXT PRIMARY KEY,
+      firing_id TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      original_name TEXT,
+      sort_order INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (firing_id) REFERENCES firing_logs(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_firing_photos ON firing_photos(firing_id)`);
+
+  // Sales improvements (items 26-28)
+  safeAdd('sales', 'quantity', 'INTEGER DEFAULT 1');
+  safeAdd('sales', 'item_description', 'TEXT');
+  safeAdd('sales', 'event_name', 'TEXT');
+
+  // Goals table (item 36)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS goals (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      status TEXT DEFAULT 'active' CHECK(status IN ('active', 'completed', 'archived')),
+      due_date TEXT,
+      priority TEXT DEFAULT 'medium' CHECK(priority IN ('low', 'medium', 'high')),
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_goals_user ON goals(user_id)`);
+
+  // Projects table (item 37)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS projects (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      status TEXT DEFAULT 'active' CHECK(status IN ('active', 'completed', 'archived')),
+      due_date TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id)`);
+
+  // Events table (item 39)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS events (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      event_date TEXT NOT NULL,
+      start_time TEXT,
+      end_time TEXT,
+      location TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_events_user ON events(user_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date)`);
+
+  // Contacts table (item 40)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS contacts (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      email TEXT,
+      phone TEXT,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_contacts_user ON contacts(user_id)`);
 
   // Part 1 revamp — new fields for glazes
   safeAdd('glazes', 'opacity', 'TEXT');

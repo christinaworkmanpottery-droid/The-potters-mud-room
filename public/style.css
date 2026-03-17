@@ -202,3 +202,7 @@ h1 { font-size: 1.75rem; } h2 { font-size: 1.4rem; } h3 { font-size: 1.15rem; }
 /* Yearly savings badge */
 .yearly-savings { display: inline-block; background: var(--accent-light); color: #558B2F; font-size: 0.8rem; padding: 2px 8px; border-radius: 20px; margin-top: 4px; font-weight: 600; }
 .billing-toggle { min-width: 120px; }
+
+/* Small action buttons for inline edit/delete */
+.btn-small { background:none; border:1px solid var(--border); color:var(--text-light); padding:2px 8px; border-radius:var(--radius-sm); cursor:pointer; font-size:0.8rem; transition:all 0.15s; }
+.btn-small:hover { background:var(--primary-light); color:var(--primary); border-color:var(--primary); }
