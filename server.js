@@ -1550,16 +1550,28 @@ app.get('/api/admin/members/search', auth, (req, res) => {
 
 // ============ COMMUNITY MEMBERS ============
 app.get('/api/community/members', auth, (req, res) => {
-  const members = db.prepare(`
-    SELECT id, display_name, username, avatar_filename, bio, location, website, is_private, created_at 
-    FROM users ORDER BY display_name ASC LIMIT 200
-  `).all();
-  // Show limited info for private profiles
-  const result = members.map(m => {
-    if (m.is_private) return { id: m.id, display_name: m.username || m.display_name, avatar_filename: m.avatar_filename, bio: null, location: null, website: null, is_private: 1 };
-    return { ...m, display_name: m.username || m.display_name };
-  });
-  res.json(result);
+  try {
+    const members = db.prepare(`
+      SELECT id, display_name, username, avatar_filename, bio, location, website, is_private, created_at 
+      FROM users ORDER BY display_name ASC LIMIT 200
+    `).all();
+    const result = members.map(m => {
+      if (m.is_private) return { id: m.id, display_name: m.username || m.display_name, avatar_filename: m.avatar_filename, bio: null, location: null, website: null, is_private: 1 };
+      return { ...m, display_name: m.username || m.display_name };
+    });
+    res.json(result);
+  } catch(e) {
+    // Fallback if username column doesn't exist yet
+    const members = db.prepare(`
+      SELECT id, display_name, avatar_filename, bio, location, website, is_private, created_at 
+      FROM users ORDER BY display_name ASC LIMIT 200
+    `).all();
+    const result = members.map(m => {
+      if (m.is_private) return { id: m.id, display_name: m.display_name, avatar_filename: m.avatar_filename, bio: null, location: null, website: null, is_private: 1 };
+      return m;
+    });
+    res.json(result);
+  }
 });
 
 // ============ GOALS ============
