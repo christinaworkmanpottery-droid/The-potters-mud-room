@@ -422,6 +422,7 @@ function initDB() {
   safeAdd('promo_codes', 'token_amount', 'INTEGER DEFAULT 0');
   safeAdd('promo_codes', 'promo_type', "TEXT DEFAULT 'tier'");
   safeAdd('users', 'profile_photo', 'TEXT');
+  safeAdd('users', 'username', 'TEXT');
   safeAdd('users', 'billing_period', "TEXT DEFAULT 'monthly'");
   safeAdd('users', 'plan_expires_at', 'TEXT');
   safeAdd('firing_logs', 'custom_speed_detail', 'TEXT');

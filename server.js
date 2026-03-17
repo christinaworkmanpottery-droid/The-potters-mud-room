@@ -187,7 +187,7 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.get('/api/auth/me', auth, (req, res) => {
-  const u = db.prepare('SELECT id,email,display_name,bio,location,website,avatar_filename,is_private,tier,forum_tokens,unlimited_tokens_until,unit_system,temp_unit,created_at FROM users WHERE id=?').get(req.userId);
+  const u = db.prepare('SELECT id,email,display_name,username,bio,location,website,avatar_filename,is_private,tier,forum_tokens,unlimited_tokens_until,unit_system,temp_unit,created_at FROM users WHERE id=?').get(req.userId);
   if (!u) return res.status(404).json({ error: 'Not found' });
   res.json({ user: { ...u, displayName: u.display_name, pieceCount: getPieceCount(req.userId) } });
 });
@@ -207,9 +207,9 @@ app.put('/api/auth/password', auth, (req, res) => {
 
 // ============ USER PROFILE ============
 app.put('/api/profile', auth, (req, res) => {
-  const { displayName, bio, location, website, isPrivate, unitSystem, tempUnit } = req.body;
-  db.prepare(`UPDATE users SET display_name=?,bio=?,location=?,website=?,is_private=?,unit_system=?,temp_unit=?,updated_at=datetime('now') WHERE id=?`)
-    .run(displayName, bio, location, website, isPrivate ? 1 : 0, unitSystem || 'imperial', tempUnit || 'fahrenheit', req.userId);
+  const { displayName, username, bio, location, website, isPrivate, unitSystem, tempUnit } = req.body;
+  db.prepare(`UPDATE users SET display_name=?,username=?,bio=?,location=?,website=?,is_private=?,unit_system=?,temp_unit=?,updated_at=datetime('now') WHERE id=?`)
+    .run(displayName, username || null, bio, location, website, isPrivate ? 1 : 0, unitSystem || 'imperial', tempUnit || 'fahrenheit', req.userId);
   res.json({ success: true });
 });
 
@@ -1551,10 +1551,15 @@ app.get('/api/admin/members/search', auth, (req, res) => {
 // ============ COMMUNITY MEMBERS ============
 app.get('/api/community/members', auth, (req, res) => {
   const members = db.prepare(`
-    SELECT id, display_name, avatar_filename, bio, location, website, is_private, created_at 
-    FROM users WHERE is_private=0 ORDER BY display_name ASC LIMIT 100
+    SELECT id, display_name, username, avatar_filename, bio, location, website, is_private, created_at 
+    FROM users ORDER BY display_name ASC LIMIT 200
   `).all();
-  res.json(members);
+  // Show limited info for private profiles
+  const result = members.map(m => {
+    if (m.is_private) return { id: m.id, display_name: m.username || m.display_name, avatar_filename: m.avatar_filename, bio: null, location: null, website: null, is_private: 1 };
+    return { ...m, display_name: m.username || m.display_name };
+  });
+  res.json(result);
 });
 
 // ============ GOALS ============

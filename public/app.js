@@ -1290,6 +1290,7 @@ async function loadProfile() {
     const d = await api('/api/auth/me');
     currentUser = d.user;
     document.getElementById('profileName').value = d.user.display_name || '';
+    document.getElementById('profileUsername').value = d.user.username || '';
     document.getElementById('profileBio').value = d.user.bio || '';
     document.getElementById('profileLocation').value = d.user.location || '';
     document.getElementById('profileWebsite').value = d.user.website || '';
@@ -1340,6 +1341,7 @@ async function saveProfile() {
   try {
     await api('/api/profile', { method: 'PUT', body: {
       displayName: document.getElementById('profileName').value,
+      username: document.getElementById('profileUsername').value || null,
       bio: document.getElementById('profileBio').value || null,
       location: document.getElementById('profileLocation').value || null,
       website: document.getElementById('profileWebsite').value || null,
@@ -2593,7 +2595,8 @@ function renderMembers(members) {
   c.innerHTML = members.map(u =>
     '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg-card)">' +
     (u.avatar_filename ? '<img src="/uploads/' + u.avatar_filename + '" style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0">' : '<div style="width:44px;height:44px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;flex-shrink:0;color:var(--primary)">' + (u.display_name||'?')[0].toUpperCase() + '</div>') +
-    '<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:0.95rem">' + esc(u.display_name||'Member') + '</div>' +
+    '<div style="flex:1;min-width:0"><div style="font-weight:600;font-size:0.95rem">' + esc(u.display_name||'Member') +
+    (u.is_private ? ' <span style="font-size:0.75rem;color:var(--text-muted);font-weight:normal">🔒 Private</span>' : '') + '</div>' +
     (u.location ? '<div class="text-sm" style="color:var(--text-light)">📍 ' + esc(u.location) + '</div>' : '') +
     (u.bio ? '<div class="text-sm" style="color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(u.bio) + '</div>' : '') +
     '</div>' +
