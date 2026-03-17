@@ -405,10 +405,10 @@
       <button class="nav-toggle" onclick="document.querySelector('.nav-links').classList.toggle('open')">☰</button>
       <div class="nav-links">
         <button class="nav-link active" data-page="dashboard" onclick="navigate('dashboard')">Dashboard</button>
-        <button class="nav-link" data-page="pieces" onclick="navigate('pieces')">Pieces</button>
         <button class="nav-link" data-page="clayBodies" onclick="navigate('clayBodies')">Clay</button>
         <button class="nav-link" data-page="glazes" onclick="navigate('glazes')">Glazes</button>
         <button class="nav-link" data-page="firings" onclick="navigate('firings')">Firings</button>
+        <button class="nav-link" data-page="pieces" onclick="navigate('pieces')">Pieces</button>
         <button class="nav-link" data-page="sales" onclick="navigate('sales')">Sales</button>
         <button class="nav-link" data-page="community" onclick="navigate('community')">Community</button>
         <button class="nav-link" data-page="forum" onclick="navigate('forum')">Forum</button>
@@ -455,7 +455,11 @@
     <div id="pagePieces" class="page">
       <div class="page-header">
         <h1>My Pieces</h1>
-        <button class="btn btn-primary" onclick="openPieceModal()">+ New Piece</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('pieces','card')" title="Card view">▦</button>
+          <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('pieces','list')" title="List view">☰</button>
+          <button class="btn btn-primary" onclick="openPieceModal()">+ New Piece</button>
+        </div>
       </div>
       <div class="filter-bar">
         <input type="text" class="form-input" placeholder="Search pieces..." id="pieceSearch" oninput="debounceLoadPieces()">
@@ -492,7 +496,11 @@
     <div id="pageClayBodies" class="page">
       <div class="page-header">
         <h1>Clay Bodies</h1>
-        <button class="btn btn-primary" onclick="openClayModal()">+ Add Clay</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('clay','card')" title="Card view">▦</button>
+          <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('clay','list')" title="List view">☰</button>
+          <button class="btn btn-primary" onclick="openClayModal()">+ Add Clay</button>
+        </div>
       </div>
       <div id="clayList" class="card-grid"></div>
       <div id="clayEmpty" class="empty-state hidden">
@@ -506,7 +514,13 @@
     <div id="pageGlazes" class="page">
       <div class="page-header">
         <h1>Glazes</h1>
-        <button class="btn btn-primary" onclick="openGlazeModal()">+ Add Glaze</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('glazes','card')" title="Card view">▦</button>
+          <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('glazes','list')" title="List view">☰</button>
+          <button class="btn btn-sm btn-secondary" onclick="navigate('chemicals')">🧪 Chemicals</button>
+          <button class="btn btn-sm btn-secondary" onclick="navigate('shoppingList')">🛒 Shopping List</button>
+          <button class="btn btn-primary" onclick="openGlazeModal()">+ Add Glaze</button>
+        </div>
       </div>
       <div id="glazeList" class="card-grid"></div>
       <div id="glazeEmpty" class="empty-state hidden">
@@ -520,7 +534,11 @@
     <div id="pageFirings" class="page">
       <div class="page-header">
         <h1>Firing Logs</h1>
-        <button class="btn btn-primary" onclick="openFiringModal()">+ Log Firing</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('firings','card')" title="Card view">▦</button>
+          <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('firings','list')" title="List view">☰</button>
+          <button class="btn btn-primary" onclick="openFiringModal()">+ Log Firing</button>
+        </div>
       </div>
       <div id="firingList" class="card-grid"></div>
       <div id="firingEmpty" class="empty-state hidden">
@@ -549,7 +567,11 @@
     <div id="pageSales" class="page">
       <div class="page-header">
         <h1>Sales</h1>
-        <button class="btn btn-primary" onclick="openSaleModal()">+ Log Sale</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('sales','card')" title="Card view">▦</button>
+          <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('sales','list')" title="List view">☰</button>
+          <button class="btn btn-primary" onclick="openSaleModal()">+ Log Sale</button>
+        </div>
       </div>
       <div id="salesSummary" class="stats-row"></div>
       <div id="salesList" class="card-grid"></div>
@@ -588,7 +610,6 @@
       <div class="page-header">
         <h1>The Mud Room Forum</h1>
         <div style="display:flex;gap:8px;align-items:center">
-          <span id="tokenBalance" class="piece-meta-tag">🪙 0 tokens</span>
           <button class="btn btn-primary" onclick="openForumPostModal()">+ New Post</button>
         </div>
       </div>
@@ -600,8 +621,7 @@
       </div>
       <div id="forumCategories" class="stats-row mb-16"></div>
       <div class="card mb-16" style="background:var(--primary-light);padding:14px 18px;font-size:0.9rem">
-        <strong>🪙 Why tokens?</strong> Posting costs 1 token to keep the community high-quality and free from spam, misinformation, and low-effort posts. Every post here is from a real potter who cares. 
-        Any monthly membership includes <strong>10 free tokens</strong>. Any yearly membership includes <strong>20 free tokens</strong>. Tokens roll over as long as your membership is active! Free accounts can <a href="#" onclick="navigate('upgrade');return false" style="color:var(--primary);font-weight:600">buy token packs</a>.
+        <strong>💬 Welcome to the forum!</strong> Posting is free for all members. Share your work, ask questions, help fellow potters. Be kind and keep it clay-related!
       </div>
       <div id="forumPosts"></div>
       <div id="forumEmpty" class="empty-state hidden">
@@ -684,12 +704,8 @@
           <h2 style="margin-bottom:12px">💬 Forum</h2>
           <p>Connect with other potters:</p>
           <ul style="margin:12px 0;padding-left:20px;line-height:2">
-            <li><strong>Browse for free</strong> — everyone can read posts</li>
-            <li><strong>Post & reply</strong> — costs 1 forum token each</li>
+            <li><strong>Post & reply for free</strong> — all members can participate</li>
             <li><strong>Add photos & short videos</strong> to your posts</li>
-            <li>Any <strong>monthly membership</strong> includes <strong>10 free tokens</strong> that roll over</li>
-            <li>Any <strong>yearly membership</strong> includes <strong>20 free tokens</strong> that roll over</li>
-            <li>Buy extra token packs on the <strong>Plans</strong> page</li>
           </ul>
           <p>Categories include General Chat, Glazes & Combos, Show Your Work, Pottery Casualties 💀 (we've all been there), and more!</p>
         </div>
@@ -762,8 +778,8 @@
           </div>
           
           <div style="margin-bottom:16px">
-            <p><strong>Q: What are forum tokens?</strong></p>
-            <p style="color:var(--text-light)">A: Forum tokens are used to post and reply in the community forum. 1 token = 1 post or reply. Any monthly membership includes 10 free tokens, and any yearly membership includes 20 free tokens — they roll over as long as your membership is active. You can also buy extra token packs on the Plans page.</p>
+            <p><strong>Q: Is the forum free?</strong></p>
+            <p style="color:var(--text-light)">A: Yes! All registered members can post and reply in the forum for free. No tokens needed — just sign up and start sharing!</p>
           </div>
           
           <div>
@@ -888,6 +904,31 @@
         <h1>🔧 Admin Dashboard</h1>
       </div>
       <div id="adminContent"></div>
+    </div>
+
+    <!-- SHOPPING LIST -->
+    <div id="pageShoppingList" class="page">
+      <div class="page-header">
+        <h1>🛒 Shopping List</h1>
+        <button class="btn btn-secondary" onclick="copyShoppingList()">📋 Copy to Clipboard</button>
+      </div>
+      <p style="color:var(--text-light);margin-bottom:16px">All your out-of-stock clays and glazes in one place.</p>
+      <div id="shoppingListContent"></div>
+    </div>
+
+    <!-- GLAZE CHEMICALS -->
+    <div id="pageChemicals" class="page">
+      <div class="page-header">
+        <h1>🧪 Glaze Chemicals Inventory</h1>
+        <button class="btn btn-primary" onclick="openChemicalModal()">+ Add Chemical</button>
+      </div>
+      <p style="color:var(--text-light);margin-bottom:16px">Track your glaze-mixing materials. When viewing recipes, you'll see which ingredients you have on hand.</p>
+      <div id="chemicalList" class="card-grid"></div>
+      <div id="chemicalEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">🧪</div>
+        <div class="empty-state-title">No chemicals yet</div>
+        <p>Add your glaze-mixing materials here.</p>
+      </div>
     </div>
 
   </div>
@@ -1060,13 +1101,36 @@
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>Cost per Bag</label>
-          <input type="number" step="0.01" class="form-input" id="clayCost" placeholder="$">
+          <label>Absorption %</label>
+          <input type="number" step="0.1" class="form-input" id="clayAbsorption" placeholder="e.g., 2.5">
         </div>
         <div class="form-group">
           <label>Bag Weight</label>
           <input type="text" class="form-input" id="clayWeight" placeholder="e.g., 25 lbs">
         </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Cost per Bag</label>
+          <input type="number" step="0.01" class="form-input" id="clayCost" placeholder="$">
+        </div>
+        <div class="form-group">
+          <label>Source (where to buy)</label>
+          <input type="text" class="form-input" id="claySource" placeholder="e.g., Sheffield Pottery">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Source URL</label>
+          <input type="url" class="form-input" id="claySourceUrl" placeholder="https://...">
+        </div>
+        <div class="form-group">
+          <label>Buy Link</label>
+          <input type="url" class="form-input" id="clayBuyUrl" placeholder="https://... (quick buy link)">
+        </div>
+      </div>
+      <div class="form-group">
+        <label><input type="checkbox" id="clayInStock" checked> In Stock</label>
       </div>
       <div class="form-group">
         <label>Notes</label>
@@ -1142,10 +1206,69 @@
           </select>
         </div>
       </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Opacity</label>
+          <select class="form-select" id="glazeOpacity">
+            <option value="">Select...</option>
+            <option value="transparent">Transparent</option>
+            <option value="translucent">Translucent</option>
+            <option value="opaque">Opaque</option>
+            <option value="varies">Varies</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Stock Status</label>
+          <select class="form-select" id="glazeStockStatus">
+            <option value="">Select...</option>
+            <option value="in-stock">In Stock</option>
+            <option value="need-to-buy">Need to Buy</option>
+            <option value="low-stock">Low Stock</option>
+            <option value="discontinued">Discontinued</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Source (where to buy)</label>
+          <input type="text" class="form-input" id="glazeSource" placeholder="e.g., Glazy, Amaco">
+        </div>
+        <div class="form-group">
+          <label>Source URL</label>
+          <input type="url" class="form-input" id="glazeSourceUrl" placeholder="e.g., https://glazy.org/recipes/3166">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Buy Link</label>
+          <input type="url" class="form-input" id="glazeBuyUrl" placeholder="https://... (quick buy link)">
+        </div>
+        <div class="form-group">
+          <label><input type="checkbox" id="glazeInStock" checked> In Stock</label>
+        </div>
+      </div>
       <div id="recipeFields" class="hidden">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Recipe Status</label>
+            <select class="form-select" id="glazeRecipeStatus">
+              <option value="">Select...</option>
+              <option value="not-tested">Not Tested</option>
+              <option value="testing">Testing</option>
+              <option value="production">Production</option>
+              <option value="retired">Retired</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Recipe Notes</label>
+            <input type="text" class="form-input" id="glazeRecipeNotes" placeholder="Notes about this recipe...">
+          </div>
+        </div>
         <div class="form-group">
           <label>Recipe Ingredients</label>
           <div id="ingredientList"></div>
+          <div id="ingredientTotal" style="margin-top:8px;font-weight:600;font-size:0.9rem"></div>
           <button type="button" class="btn btn-secondary btn-sm mt-8" onclick="addIngredient()">+ Add Ingredient</button>
         </div>
       </div>
@@ -1410,7 +1533,6 @@
         <label>Photos &amp; Videos (optional, up to 5)</label>
         <input type="file" id="forumPostPhotos" accept="image/*,video/mp4,video/mov,video/webm" multiple class="form-input">
       </div>
-      <div class="text-sm" style="color:var(--text-muted)">🪙 This will use 1 forum token</div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('forumPostModal')">Cancel</button>
         <button type="submit" class="btn btn-primary">Post</button>
@@ -1422,6 +1544,129 @@
 <!-- TOAST CONTAINER -->
 <div class="toast-container" id="toastContainer"></div>
 
-<script src="app.js?v=20260310d"></script>
+<!-- LIGHTBOX -->
+<div id="lightboxModal" class="modal-overlay" onclick="closeLightbox()" style="background:rgba(0,0,0,0.9);display:none;z-index:2000;cursor:zoom-out">
+  <img id="lightboxImg" src="" style="max-width:95%;max-height:95%;object-fit:contain;margin:auto" onclick="event.stopPropagation()">
+  <button style="position:absolute;top:16px;right:20px;background:none;border:none;color:white;font-size:2rem;cursor:pointer" onclick="closeLightbox()">&times;</button>
+</div>
+
+<!-- CHEMICAL MODAL -->
+<div id="chemicalModal" class="modal-overlay" onclick="if(event.target===this)closeModal('chemicalModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="chemicalModalTitle">Add Chemical</h2>
+      <button class="modal-close" onclick="closeModal('chemicalModal')">&times;</button>
+    </div>
+    <form id="chemicalForm" onsubmit="saveChemical(event)">
+      <input type="hidden" id="chemicalId">
+      <div class="form-group">
+        <label>Name *</label>
+        <input type="text" class="form-input" id="chemicalName" placeholder="e.g., Silica, Cobalt Oxide" required>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Quantity</label>
+          <input type="number" step="0.1" class="form-input" id="chemicalQty" placeholder="Amount on hand">
+        </div>
+        <div class="form-group">
+          <label>Unit</label>
+          <select class="form-select" id="chemicalUnit">
+            <option value="oz">oz</option>
+            <option value="lbs">lbs</option>
+            <option value="g">g</option>
+            <option value="kg">kg</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Source</label>
+          <input type="text" class="form-input" id="chemicalSource" placeholder="Where to buy">
+        </div>
+        <div class="form-group">
+          <label>Source URL</label>
+          <input type="url" class="form-input" id="chemicalSourceUrl" placeholder="https://...">
+        </div>
+      </div>
+      <div class="form-group">
+        <label><input type="checkbox" id="chemicalInStock" checked> In Stock</label>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea class="form-textarea" id="chemicalNotes" placeholder="Notes..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('chemicalModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Chemical</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- CLAY PHOTO UPLOAD MODAL -->
+<div id="clayPhotoModal" class="modal-overlay" onclick="if(event.target===this)closeModal('clayPhotoModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Add Clay Photo</h2>
+      <button class="modal-close" onclick="closeModal('clayPhotoModal')">&times;</button>
+    </div>
+    <form id="clayPhotoForm" onsubmit="uploadClayPhoto(event)">
+      <input type="hidden" id="clayPhotoClayId">
+      <div class="form-group">
+        <label>Photo Label</label>
+        <select class="form-select" id="clayPhotoLabel">
+          <option value="raw">Raw Clay</option>
+          <option value="bisque">Bisque Fired</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <input type="text" class="form-input" id="clayPhotoNotes" placeholder="e.g., Standard 266, cone 6 reduction">
+      </div>
+      <div class="form-group">
+        <input type="file" id="clayPhotoFile" accept="image/*" class="form-input">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('clayPhotoModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Upload Photo</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- GLAZE PHOTO UPLOAD MODAL -->
+<div id="glazePhotoModal" class="modal-overlay" onclick="if(event.target===this)closeModal('glazePhotoModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Add Glaze Photo</h2>
+      <button class="modal-close" onclick="closeModal('glazePhotoModal')">&times;</button>
+    </div>
+    <form id="glazePhotoForm" onsubmit="uploadGlazePhotoModal(event)">
+      <input type="hidden" id="glazePhotoGlazeId">
+      <div class="form-group">
+        <label>Photo Label</label>
+        <select class="form-select" id="glazePhotoLabel">
+          <option value="">General</option>
+          <option value="light-clay">Light Clay Tester</option>
+          <option value="dark-clay">Dark Clay Tester</option>
+          <option value="detail">Detail Shot</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <input type="text" class="form-input" id="glazePhotoNotes" placeholder="e.g., Over Standard 266 at cone 6">
+      </div>
+      <div class="form-group">
+        <input type="file" id="glazePhotoFile" accept="image/*" class="form-input">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('glazePhotoModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Upload Photo</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="app.js?v=20260317a"></script>
 </body>
 </html>

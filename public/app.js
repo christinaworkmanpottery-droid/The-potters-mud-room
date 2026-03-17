@@ -132,7 +132,8 @@ function navigate(page) {
       casualties:'pageCasualties',
       sales:'pageSales', community:'pageCommunity', forum:'pageForum',
       forumPost:'pageForumPost', profile:'pageProfile', shop:'pageShop',
-      upgrade:'pageUpgrade', help:'pageHelp', admin:'pageAdmin'
+      upgrade:'pageUpgrade', help:'pageHelp', admin:'pageAdmin',
+      shoppingList:'pageShoppingList', chemicals:'pageChemicals'
     };
     const el = document.getElementById(map[page]); if (el) el.classList.add('active');
     try { const nb = document.querySelector('.nav-link[data-page="' + page + '"]'); if (nb) nb.classList.add('active'); } catch(e) {}
@@ -141,7 +142,8 @@ function navigate(page) {
     dashboard:loadDashboard, pieces:loadPieces, clayBodies:loadClayBodies,
     glazes:loadGlazes, firings:loadFirings, casualties:loadCasualties, sales:loadSales,
     community:loadCombos, forum:loadForum, profile:loadProfile,
-    shop:loadShop, upgrade:loadUpgrade, admin:loadAdmin
+    shop:loadShop, upgrade:loadUpgrade, admin:loadAdmin,
+    shoppingList:loadShoppingList, chemicals:loadChemicals
   };
   if (loaders[page]) loaders[page]();
     trackPageView('/' + page);
@@ -197,8 +199,23 @@ async function loadPieces() {
     const pieces = await api(u);
     const c = document.getElementById('piecesList'), em = document.getElementById('piecesEmpty');
     if (!pieces.length) { c.innerHTML = ''; em.classList.remove('hidden'); }
-    else { em.classList.add('hidden'); c.innerHTML = pieces.map(pieceCard).join(''); }
+    else {
+      em.classList.add('hidden');
+      const mode = getViewMode('pieces');
+      c.className = mode === 'list' ? '' : 'card-grid';
+      c.innerHTML = pieces.map(p => mode === 'list' ? pieceListRow(p) : pieceCard(p)).join('');
+    }
   } catch (err) { toast(err.message, 'error'); }
+}
+function pieceListRow(p) {
+  return '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="viewPiece(\'' + p.id + '\')">' +
+    '<strong style="min-width:150px">' + esc(p.title||'Untitled') + '</strong>' +
+    '<span class="text-sm" style="color:var(--text-light);min-width:100px">' + esc(p.clay_body_name||'') + '</span>' +
+    fmtStatus(p.status) +
+    '<span class="text-sm" style="min-width:80px">' + esc(p.technique||'') + '</span>' +
+    '<span class="text-sm" style="min-width:80px;color:var(--text-muted)">' + fmtDate(p.date_started) + '</span>' +
+    '<span style="margin-left:auto;display:flex;gap:4px">' +
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();duplicatePiece(\'' + p.id + '\')">📋</button></span></div>';
 }
 function debounceLoadPieces() { clearTimeout(debounceTimer); debounceTimer = setTimeout(loadPieces, 300); }
 
@@ -208,8 +225,13 @@ async function viewPiece(id) {
     const p = await api('/api/pieces/' + id);
     navigate('pieceDetail');
     const photos = (p.photos||[]).map(ph =>
-      '<div class="detail-photo-wrap"><img class="detail-photo" src="/uploads/' + ph.filename + '" title="' + esc(ph.stage||'') + '">' +
-      '<span class="photo-stage-label">' + esc(ph.stage||'') + '</span></div>'
+      '<div class="detail-photo-wrap" style="position:relative">' +
+      '<img class="detail-photo" src="/uploads/' + ph.filename + '" title="' + esc(ph.stage||'') + '" onclick="openLightbox(\'/uploads/' + ph.filename + '\')" style="cursor:zoom-in">' +
+      '<span class="photo-stage-label">' + esc(ph.stage||'') + '</span>' +
+      '<div style="position:absolute;top:4px;right:4px;display:flex;gap:2px">' +
+      '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();editPhotoStage(\'' + ph.id + '\',\'' + esc(ph.stage||'') + '\',\'' + p.id + '\')" title="Edit stage">✏️</button>' +
+      '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deletePhoto(\'' + ph.id + '\',\'' + p.id + '\')" title="Delete photo">🗑️</button>' +
+      '</div></div>'
     ).join('');
     const glist = (p.glazes||[]).map(g =>
       '<div style="margin-bottom:6px"><span class="glaze-tag' + (g.glaze_type==='recipe'?' recipe':'') + '">' + esc(g.glaze_name) + '</span>' +
@@ -236,6 +258,7 @@ async function viewPiece(id) {
       '<div class="text-sm" style="color:var(--text-light);margin-top:4px">' + esc(p.clay_body_name||'') + ' ' + fmtStatus(p.status) + '</div></div>' +
       '<div style="display:flex;gap:8px">' +
       (canAddPhoto ? '<button class="btn btn-secondary btn-sm" onclick="openPhotoUpload(\'' + p.id + '\')">📸 Photo</button>' : '') +
+      '<button class="btn btn-secondary btn-sm" onclick="duplicatePiece(\'' + p.id + '\')">📋 Duplicate</button>' +
       '<button class="btn btn-primary btn-sm" onclick="editPiece(\'' + p.id + '\')">✏️ Edit</button>' +
       '<button class="btn btn-danger btn-sm" onclick="deletePiece(\'' + p.id + '\')">🗑️</button></div></div>' +
       (photos ? '<div class="detail-photos mb-16">' + photos + '</div>' : '') +
@@ -380,6 +403,50 @@ async function uploadPhoto(e) {
 }
 
 // ---- Clay Bodies ----
+function clayCardView(cl) {
+  const stockBadge = cl.in_stock ? '' : '<span class="piece-meta-tag" style="background:rgba(220,53,69,0.1);color:var(--danger)">Out of Stock</span>';
+  const photos = (cl.photos||[]).map(p =>
+    '<div style="position:relative;display:inline-block"><img src="/uploads/' + p.filename + '" class="glaze-thumb" loading="lazy" onclick="openLightbox(\'/uploads/' + p.filename + '\')" style="cursor:zoom-in">' +
+    '<div style="font-size:0.7rem;color:var(--text-muted);text-align:center">' + esc(p.photo_label||'') + '</div>' +
+    (p.notes ? '<div style="font-size:0.65rem;color:var(--text-light)">' + esc(p.notes) + '</div>' : '') +
+    '<button class="btn-ghost btn-sm" style="position:absolute;top:0;right:0;font-size:0.7rem" onclick="event.stopPropagation();deleteClayPhoto(\'' + p.id + '\')">×</button></div>'
+  ).join('');
+  return '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(cl.name) + ' ' + stockBadge + '</div>' +
+    '<div class="text-sm" style="color:var(--text-light)">' + esc(cl.brand||'') + (cl.clay_type ? ' · ' + esc(cl.clay_type) : '') + '</div></div>' +
+    '<div style="display:flex;gap:4px">' +
+    '<button class="btn-ghost btn-sm" onclick="openClayPhotoUpload(\'' + cl.id + '\')" title="Add photo">📸</button>' +
+    '<button class="btn-ghost btn-sm" onclick="duplicateClay(\'' + cl.id + '\')" title="Duplicate">📋</button>' +
+    '<button class="btn-ghost btn-sm" onclick="editClayById(\'' + cl.id + '\')">✏️</button>' +
+    '<button class="btn-ghost btn-sm" onclick="deleteClay(\'' + cl.id + '\')">🗑️</button></div></div>' +
+    (photos ? '<div style="display:flex;gap:6px;margin-bottom:10px">' + photos + '</div>' : '') +
+    '<div style="display:flex;gap:16px;flex-wrap:wrap">' +
+    (cl.color_wet ? '<div><span class="detail-label">Wet</span><div>' + esc(cl.color_wet) + '</div></div>' : '') +
+    (cl.color_fired ? '<div><span class="detail-label">Fired</span><div>' + esc(cl.color_fired) + '</div></div>' : '') +
+    (cl.cone_range ? '<div><span class="detail-label">Cone</span><div>' + esc(cl.cone_range) + '</div></div>' : '') +
+    (cl.shrinkage_pct ? '<div><span class="detail-label">Shrinkage</span><div>' + cl.shrinkage_pct + '%</div></div>' : '') +
+    (cl.absorption_pct ? '<div><span class="detail-label">Absorption</span><div>' + cl.absorption_pct + '%</div></div>' : '') +
+    (cl.cost_per_bag ? '<div><span class="detail-label">Cost</span><div>$' + cl.cost_per_bag + (cl.bag_weight ? ' / ' + esc(cl.bag_weight) : '') + '</div></div>' : '') +
+    '</div>' +
+    (cl.source ? '<div class="text-sm mt-8">📍 ' + esc(cl.source) + (cl.source_url ? ' — <a href="' + esc(cl.source_url) + '" target="_blank" style="color:var(--primary)">visit</a>' : '') + '</div>' : '') +
+    (cl.buy_url ? '<div class="text-sm mt-4"><a href="' + esc(cl.buy_url) + '" target="_blank" class="btn btn-primary btn-sm">🛒 Buy</a></div>' : '') +
+    (cl.notes ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(cl.notes) + '</div>' : '') +
+    '<div class="mt-8" style="display:flex;gap:4px"><button class="btn-ghost btn-sm" onclick="toggleClayStock(\'' + cl.id + '\',' + (cl.in_stock ? 'false' : 'true') + ')" style="font-size:0.75rem">' + (cl.in_stock ? '📦 Mark Out of Stock' : '✅ Mark In Stock') + '</button></div>' +
+    '</div>';
+}
+function clayListView(cl) {
+  const stock = cl.in_stock ? '✅' : '❌';
+  return '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">' +
+    '<span style="min-width:24px">' + stock + '</span>' +
+    '<strong style="min-width:150px">' + esc(cl.name) + '</strong>' +
+    '<span class="text-sm" style="color:var(--text-light);min-width:100px">' + esc(cl.brand||'') + '</span>' +
+    '<span class="text-sm" style="min-width:80px">' + esc(cl.clay_type||'') + '</span>' +
+    '<span class="text-sm" style="min-width:60px">' + (cl.cone_range ? 'Cone ' + esc(cl.cone_range) : '') + '</span>' +
+    '<span class="text-sm" style="min-width:70px">' + (cl.shrinkage_pct ? cl.shrinkage_pct + '% shrink' : '') + '</span>' +
+    '<span style="margin-left:auto;display:flex;gap:4px">' +
+    '<button class="btn-ghost btn-sm" onclick="duplicateClay(\'' + cl.id + '\')">📋</button>' +
+    '<button class="btn-ghost btn-sm" onclick="editClayById(\'' + cl.id + '\')">✏️</button>' +
+    '<button class="btn-ghost btn-sm" onclick="deleteClay(\'' + cl.id + '\')">🗑️</button></span></div>';
+}
 async function loadClayBodies() {
   try {
     clayBodies = await api('/api/clay-bodies');
@@ -387,19 +454,9 @@ async function loadClayBodies() {
     const c = document.getElementById('clayList'), em = document.getElementById('clayEmpty');
     if (!clayBodies.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
-    c.innerHTML = clayBodies.map(cl => {
-      return '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(cl.name) + '</div>' +
-        '<div class="text-sm" style="color:var(--text-light)">' + esc(cl.brand||'') + (cl.clay_type ? ' · ' + esc(cl.clay_type) : '') + '</div></div>' +
-        '<div style="display:flex;gap:4px"><button class="btn-ghost btn-sm" onclick="editClayById(\'' + cl.id + '\')">✏️</button>' +
-        '<button class="btn-ghost btn-sm" onclick="deleteClay(\'' + cl.id + '\')">🗑️</button></div></div>' +
-        '<div style="display:flex;gap:16px;flex-wrap:wrap">' +
-        (cl.color_wet ? '<div><span class="detail-label">Wet</span><div>' + esc(cl.color_wet) + '</div></div>' : '') +
-        (cl.color_fired ? '<div><span class="detail-label">Fired</span><div>' + esc(cl.color_fired) + '</div></div>' : '') +
-        (cl.cone_range ? '<div><span class="detail-label">Cone</span><div>' + esc(cl.cone_range) + '</div></div>' : '') +
-        (cl.shrinkage_pct ? '<div><span class="detail-label">Shrinkage</span><div>' + cl.shrinkage_pct + '%</div></div>' : '') +
-        (cl.cost_per_bag ? '<div><span class="detail-label">Cost</span><div>$' + cl.cost_per_bag + (cl.bag_weight ? ' / ' + esc(cl.bag_weight) : '') + '</div></div>' : '') +
-        '</div>' + (cl.notes ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(cl.notes) + '</div>' : '') + '</div>';
-    }).join('');
+    const mode = getViewMode('clay');
+    c.className = mode === 'list' ? '' : 'card-grid';
+    c.innerHTML = clayBodies.map(cl => mode === 'list' ? clayListView(cl) : clayCardView(cl)).join('');
   } catch(e) { toast(e.message,'error'); }
 }
 function editClayById(id) { const c = clayBodies.find(x=>x.id===id); if(c) openClayModal(c); }
@@ -413,15 +470,20 @@ function openClayModal(c) {
   document.getElementById('clayColorFired').value = c?.color_fired||'';
   document.getElementById('clayConeRange').value = c?.cone_range||'';
   document.getElementById('clayShrinkage').value = c?.shrinkage_pct||'';
+  document.getElementById('clayAbsorption').value = c?.absorption_pct||'';
   document.getElementById('clayCost').value = c?.cost_per_bag||'';
   document.getElementById('clayWeight').value = c?.bag_weight||'';
+  document.getElementById('claySource').value = c?.source||'';
+  document.getElementById('claySourceUrl').value = c?.source_url||'';
+  document.getElementById('clayBuyUrl').value = c?.buy_url||'';
+  document.getElementById('clayInStock').checked = c?.in_stock !== 0;
   document.getElementById('clayNotes').value = c?.notes||'';
   openModal('clayModal');
 }
 async function saveClay(e) {
   e.preventDefault();
   const id = document.getElementById('clayId').value;
-  const body = { name:document.getElementById('clayName').value, brand:document.getElementById('clayBrand').value||null, clayType:document.getElementById('clayType').value||null, colorWet:document.getElementById('clayColorWet').value||null, colorFired:document.getElementById('clayColorFired').value||null, coneRange:document.getElementById('clayConeRange').value||null, shrinkagePct:parseFloat(document.getElementById('clayShrinkage').value)||null, costPerBag:parseFloat(document.getElementById('clayCost').value)||null, bagWeight:document.getElementById('clayWeight').value||null, notes:document.getElementById('clayNotes').value||null };
+  const body = { name:document.getElementById('clayName').value, brand:document.getElementById('clayBrand').value||null, clayType:document.getElementById('clayType').value||null, colorWet:document.getElementById('clayColorWet').value||null, colorFired:document.getElementById('clayColorFired').value||null, coneRange:document.getElementById('clayConeRange').value||null, shrinkagePct:parseFloat(document.getElementById('clayShrinkage').value)||null, absorptionPct:parseFloat(document.getElementById('clayAbsorption').value)||null, costPerBag:parseFloat(document.getElementById('clayCost').value)||null, bagWeight:document.getElementById('clayWeight').value||null, source:document.getElementById('claySource').value||null, sourceUrl:document.getElementById('claySourceUrl').value||null, buyUrl:document.getElementById('clayBuyUrl').value||null, inStock:document.getElementById('clayInStock').checked, notes:document.getElementById('clayNotes').value||null };
   try {
     if (id) { await api('/api/clay-bodies/'+id, {method:'PUT',body}); toast('Clay updated!','success'); }
     else { await api('/api/clay-bodies', {method:'POST',body}); toast('Clay added!','success'); }
@@ -434,6 +496,68 @@ async function deleteClay(id) {
 }
 
 // ---- Glazes ----
+const RECIPE_STATUS_LABELS = {'not-tested':'Not Tested','testing':'Testing','production':'Production','retired':'Retired','archived':'Archived'};
+const STOCK_STATUS_LABELS = {'in-stock':'In Stock','need-to-buy':'Need to Buy','low-stock':'Low Stock','discontinued':'Discontinued'};
+
+function glazeCardView(g) {
+  const photos = (g.photos||[]).map(p =>
+    '<div style="position:relative;display:inline-block">' +
+    '<img src="/uploads/' + p.filename + '" class="glaze-thumb" loading="lazy" onclick="openLightbox(\'/uploads/' + p.filename + '\')" style="cursor:zoom-in">' +
+    (p.photo_label ? '<div style="font-size:0.65rem;color:var(--text-muted);text-align:center">' + esc(p.photo_label) + '</div>' : '') +
+    (p.notes ? '<div style="font-size:0.6rem;color:var(--text-light)">' + esc(p.notes) + '</div>' : '') +
+    '<button class="btn-ghost btn-sm" style="position:absolute;top:0;right:0;font-size:0.7rem" onclick="event.stopPropagation();deleteGlazePhoto(\'' + p.id + '\')">×</button></div>'
+  ).join('');
+  const stockBadge = g.stock_status && g.stock_status !== 'in-stock' ? '<span class="piece-meta-tag" style="background:rgba(220,53,69,0.1);color:var(--danger)">' + esc(STOCK_STATUS_LABELS[g.stock_status]||g.stock_status) + '</span>' : '';
+  const recipeStatusBadge = g.recipe_status && g.glaze_type === 'recipe' ? '<span class="piece-meta-tag" style="background:rgba(108,117,125,0.1);color:#6c757d">' + esc(RECIPE_STATUS_LABELS[g.recipe_status]||g.recipe_status) + '</span>' : '';
+  let ingredientTotal = '';
+  if (g.ingredients?.length) {
+    const total = g.ingredients.reduce((s,i) => s + (i.percentage||0), 0);
+    const color = Math.abs(total-100)<0.1 ? 'var(--success)' : (Math.abs(total-100)<5 ? '#F4A623' : 'var(--danger)');
+    ingredientTotal = ' <span style="color:'+color+';font-weight:600;font-size:0.8rem">('+total.toFixed(1)+'%)</span>';
+  }
+  return '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(g.name) +
+    ' <span class="glaze-tag' + (g.glaze_type==='recipe'?' recipe':'') + '">' + g.glaze_type + '</span> ' + stockBadge + ' ' + recipeStatusBadge + '</div>' +
+    '<div class="text-sm" style="color:var(--text-light)">' + esc(g.brand||'') + (g.sku ? ' · SKU: ' + esc(g.sku) : '') + (g.color_description ? ' · ' + esc(g.color_description) : '') + '</div></div>' +
+    '<div style="display:flex;gap:4px">' +
+    '<button class="btn-ghost btn-sm" onclick="openGlazePhotoUpload(\'' + g.id + '\')" title="Add photo">📸</button>' +
+    '<button class="btn-ghost btn-sm" onclick="duplicateGlaze(\'' + g.id + '\')" title="Duplicate">📋</button>' +
+    '<button class="btn-ghost btn-sm" onclick="editGlazeById(\'' + g.id + '\')">✏️</button>' +
+    '<button class="btn-ghost btn-sm" onclick="deleteGlaze(\'' + g.id + '\')">🗑️</button></div></div>' +
+    (photos ? '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">' + photos + '</div>' : '') +
+    '<div style="display:flex;gap:16px;flex-wrap:wrap">' +
+    (g.cone_range ? '<div><span class="detail-label">Cone</span><div>' + esc(g.cone_range) + '</div></div>' : '') +
+    (g.atmosphere ? '<div><span class="detail-label">Atmosphere</span><div>' + esc(g.atmosphere) + '</div></div>' : '') +
+    (g.surface ? '<div><span class="detail-label">Surface</span><div>' + esc(g.surface) + '</div></div>' : '') +
+    (g.opacity ? '<div><span class="detail-label">Opacity</span><div>' + esc(g.opacity) + '</div></div>' : '') +
+    '</div>' +
+    (g.source ? '<div class="text-sm mt-8">📍 ' + esc(g.source) + (g.source_url ? ' — <a href="' + esc(g.source_url) + '" target="_blank" style="color:var(--primary)">visit</a>' : '') + '</div>' : '') +
+    (g.buy_url ? '<div class="text-sm mt-4"><a href="' + esc(g.buy_url) + '" target="_blank" class="btn btn-primary btn-sm">🛒 Buy</a></div>' : '') +
+    (g.ingredients?.length ? '<div class="mt-8"><span class="detail-label">Recipe' + ingredientTotal + '</span><div class="text-sm">' + g.ingredients.map(i=>esc(i.ingredient_name) + (i.percentage ? ' '+i.percentage+'%' : '')).join(', ') + '</div></div>' : '') +
+    (g.recipe_notes ? '<div class="text-sm mt-4" style="color:var(--text-light)">📝 ' + esc(g.recipe_notes) + '</div>' : '') +
+    (g.notes ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(g.notes) + '</div>' : '') +
+    '<div class="mt-8" style="display:flex;gap:4px;flex-wrap:wrap">' +
+    '<select class="form-select" style="width:auto;font-size:0.75rem;padding:2px 6px" onchange="toggleGlazeStock(\'' + g.id + '\',this.value)">' +
+    '<option value=""' + (!g.stock_status?' selected':'') + '>Stock…</option>' +
+    '<option value="in-stock"' + (g.stock_status==='in-stock'?' selected':'') + '>In Stock</option>' +
+    '<option value="need-to-buy"' + (g.stock_status==='need-to-buy'?' selected':'') + '>Need to Buy</option>' +
+    '<option value="low-stock"' + (g.stock_status==='low-stock'?' selected':'') + '>Low Stock</option>' +
+    '<option value="discontinued"' + (g.stock_status==='discontinued'?' selected':'') + '>Discontinued</option></select></div></div>';
+}
+function glazeListView(g) {
+  const stock = g.stock_status === 'need-to-buy' ? '🛒' : (g.stock_status === 'low-stock' ? '⚠️' : (g.stock_status === 'discontinued' ? '❌' : '✅'));
+  return '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">' +
+    '<span style="min-width:24px">' + stock + '</span>' +
+    '<strong style="min-width:150px">' + esc(g.name) + '</strong>' +
+    '<span class="glaze-tag' + (g.glaze_type==='recipe'?' recipe':'') + '" style="font-size:0.7rem">' + g.glaze_type + '</span>' +
+    '<span class="text-sm" style="color:var(--text-light);min-width:80px">' + esc(g.brand||'') + '</span>' +
+    '<span class="text-sm" style="min-width:60px">' + (g.cone_range ? 'Cone ' + esc(g.cone_range) : '') + '</span>' +
+    '<span class="text-sm" style="min-width:60px">' + esc(g.surface||'') + '</span>' +
+    '<span class="text-sm" style="min-width:70px">' + esc(g.opacity||'') + '</span>' +
+    '<span style="margin-left:auto;display:flex;gap:4px">' +
+    '<button class="btn-ghost btn-sm" onclick="duplicateGlaze(\'' + g.id + '\')">📋</button>' +
+    '<button class="btn-ghost btn-sm" onclick="editGlazeById(\'' + g.id + '\')">✏️</button>' +
+    '<button class="btn-ghost btn-sm" onclick="deleteGlaze(\'' + g.id + '\')">🗑️</button></span></div>';
+}
 async function loadGlazes() {
   try {
     glazes = await api('/api/glazes');
@@ -441,40 +565,10 @@ async function loadGlazes() {
     const c = document.getElementById('glazeList'), em = document.getElementById('glazeEmpty');
     if (!glazes.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
-    c.innerHTML = glazes.map(g => {
-      const photos = (g.photos||[]).map(p => '<img src="/uploads/' + p.filename + '" class="glaze-thumb" loading="lazy">').join('');
-      return '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(g.name) +
-        ' <span class="glaze-tag' + (g.glaze_type==='recipe'?' recipe':'') + '">' + g.glaze_type + '</span></div>' +
-        '<div class="text-sm" style="color:var(--text-light)">' + esc(g.brand||'') + (g.sku ? ' · SKU: ' + esc(g.sku) : '') + (g.color_description ? ' · ' + esc(g.color_description) : '') + '</div></div>' +
-        '<div style="display:flex;gap:4px"><button class="btn-ghost btn-sm" onclick="editGlazeById(\'' + g.id + '\')">✏️</button>' +
-        '<button class="btn-ghost btn-sm" onclick="deleteGlaze(\'' + g.id + '\')">🗑️</button></div></div>' +
-        (photos ? '<div style="display:flex;gap:6px;margin-bottom:10px">' + photos + '</div>' : '') +
-        '<div style="display:flex;gap:16px;flex-wrap:wrap">' +
-        (g.cone_range ? '<div><span class="detail-label">Cone</span><div>' + esc(g.cone_range) + '</div></div>' : '') +
-        (g.atmosphere ? '<div><span class="detail-label">Atmosphere</span><div>' + esc(g.atmosphere) + '</div></div>' : '') +
-        (g.surface ? '<div><span class="detail-label">Surface</span><div>' + esc(g.surface) + '</div></div>' : '') +
-        '</div>' +
-        (g.ingredients?.length ? '<div class="mt-8"><span class="detail-label">Recipe</span><div class="text-sm">' + g.ingredients.map(i=>esc(i.ingredient_name) + (i.percentage ? ' '+i.percentage+'%' : '')).join(', ') + '</div></div>' : '') +
-        (g.notes ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(g.notes) + '</div>' : '') +
-        (currentUser?.tier !== 'free' && (g.photos||[]).length < 3 ? '<button class="btn btn-secondary btn-sm mt-8" onclick="uploadGlazePhoto(\'' + g.id + '\')">📸 Add Photo</button>' : '') +
-        '</div>';
-    }).join('');
+    const mode = getViewMode('glazes');
+    c.className = mode === 'list' ? '' : 'card-grid';
+    c.innerHTML = glazes.map(g => mode === 'list' ? glazeListView(g) : glazeCardView(g)).join('');
   } catch(e) { toast(e.message,'error'); }
-}
-
-function uploadGlazePhoto(gId) {
-  const input = document.createElement('input');
-  input.type = 'file'; input.accept = 'image/*';
-  input.onchange = async () => {
-    const f = input.files[0]; if (!f) return;
-    const fd = new FormData(); fd.append('photo', f);
-    try {
-      const r = await fetch('/api/glazes/' + gId + '/photos', { method:'POST', headers:{Authorization:'Bearer '+token}, body:fd });
-      const d = await r.json(); if (!r.ok) throw new Error(d.error);
-      toast('Glaze photo uploaded!','success'); loadGlazes();
-    } catch(e) { toast(e.message,'error'); }
-  };
-  input.click();
 }
 
 function editGlazeById(id) { const g = glazes.find(x=>x.id===id); if(g) openGlazeModal(g); }
@@ -489,10 +583,19 @@ function openGlazeModal(g) {
   document.getElementById('glazeCone').value = g?.cone_range||'';
   document.getElementById('glazeAtmosphere').value = g?.atmosphere||'';
   document.getElementById('glazeSurface').value = g?.surface||'';
+  document.getElementById('glazeOpacity').value = g?.opacity||'';
+  document.getElementById('glazeStockStatus').value = g?.stock_status||'';
+  document.getElementById('glazeSource').value = g?.source||'';
+  document.getElementById('glazeSourceUrl').value = g?.source_url||'';
+  document.getElementById('glazeBuyUrl').value = g?.buy_url||'';
+  document.getElementById('glazeInStock').checked = g?.in_stock !== 0;
   document.getElementById('glazeNotes').value = g?.notes||'';
   toggleRecipeFields();
+  const rs = document.getElementById('glazeRecipeStatus'); if(rs) rs.value = g?.recipe_status||'';
+  const rn = document.getElementById('glazeRecipeNotes'); if(rn) rn.value = g?.recipe_notes||'';
   document.getElementById('ingredientList').innerHTML = '';
   (g?.ingredients||[]).forEach(i => addIngredient(i.ingredient_name, i.percentage));
+  updateIngredientTotal();
   openModal('glazeModal');
 }
 function toggleRecipeFields() {
@@ -502,9 +605,10 @@ function addIngredient(name, pct) {
   const c = document.getElementById('ingredientList');
   const r = document.createElement('div'); r.className = 'ingredient-row';
   r.innerHTML = '<input type="text" class="form-input ing-name" placeholder="Ingredient" value="' + esc(name||'') + '">' +
-    '<input type="number" class="form-input ing-pct" placeholder="%" step="0.1" value="' + (pct||'') + '" style="width:80px;flex:none">' +
-    '<button type="button" class="remove-row" onclick="this.parentElement.remove()">×</button>';
+    '<input type="number" class="form-input ing-pct" placeholder="%" step="0.1" value="' + (pct||'') + '" style="width:80px;flex:none" oninput="updateIngredientTotal()">' +
+    '<button type="button" class="remove-row" onclick="this.parentElement.remove();updateIngredientTotal()">×</button>';
   c.appendChild(r);
+  updateIngredientTotal();
 }
 async function saveGlaze(e) {
   e.preventDefault();
@@ -512,7 +616,7 @@ async function saveGlaze(e) {
   const ings = []; document.querySelectorAll('.ingredient-row').forEach(r => {
     const n = r.querySelector('.ing-name').value; if(n) ings.push({name:n, percentage:parseFloat(r.querySelector('.ing-pct').value)||null});
   });
-  const body = { name:document.getElementById('glazeName').value, glazeType:document.getElementById('glazeType').value, brand:document.getElementById('glazeBrand').value||null, sku:document.getElementById('glazeSku').value||null, colorDescription:document.getElementById('glazeColor').value||null, coneRange:document.getElementById('glazeCone').value||null, atmosphere:document.getElementById('glazeAtmosphere').value||null, surface:document.getElementById('glazeSurface').value||null, notes:document.getElementById('glazeNotes').value||null, ingredients:ings };
+  const body = { name:document.getElementById('glazeName').value, glazeType:document.getElementById('glazeType').value, brand:document.getElementById('glazeBrand').value||null, sku:document.getElementById('glazeSku').value||null, colorDescription:document.getElementById('glazeColor').value||null, coneRange:document.getElementById('glazeCone').value||null, atmosphere:document.getElementById('glazeAtmosphere').value||null, surface:document.getElementById('glazeSurface').value||null, opacity:document.getElementById('glazeOpacity').value||null, recipeStatus:document.getElementById('glazeRecipeStatus')?.value||null, recipeNotes:document.getElementById('glazeRecipeNotes')?.value||null, stockStatus:document.getElementById('glazeStockStatus').value||null, source:document.getElementById('glazeSource').value||null, sourceUrl:document.getElementById('glazeSourceUrl').value||null, buyUrl:document.getElementById('glazeBuyUrl').value||null, inStock:document.getElementById('glazeInStock').checked, notes:document.getElementById('glazeNotes').value||null, ingredients:ings };
   try {
     if (id) { await api('/api/glazes/'+id, {method:'PUT',body}); toast('Glaze updated!','success'); }
     else { await api('/api/glazes', {method:'POST',body}); toast('Glaze added!','success'); }
@@ -531,18 +635,33 @@ async function loadFirings() {
     const c = document.getElementById('firingList'), em = document.getElementById('firingEmpty');
     if (!firings.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
-    c.innerHTML = firings.map(f =>
-      '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(f.firing_type||'Firing') + ' — Cone ' + esc(f.cone||'?') + '</div>' +
-      '<div class="text-sm" style="color:var(--text-light)">' + (f.kiln_name ? esc(f.kiln_name) + ' · ' : '') + fmtDate(f.date) +
-      (f.atmosphere ? ' · ' + esc(f.atmosphere) : '') +
-      (f.firing_speed ? ' · ' + esc(f.firing_speed) : '') +
-      '</div></div>' +
-      (f.piece_title ? '<span class="piece-meta-tag">' + esc(f.piece_title) + '</span>' : '') + '</div>' +
-      (f.hold_used ? '<div class="text-sm"><strong>Hold:</strong> Yes' + (f.hold_duration ? ' — ' + esc(f.hold_duration) : '') + '</div>' : '') +
-      (f.results ? '<div class="text-sm mt-8">' + esc(f.results) + '</div>' : '') +
-      (f.notes ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(f.notes) + '</div>' : '') +
-      '</div>'
-    ).join('');
+    const mode = getViewMode('firings');
+    c.className = mode === 'list' ? '' : 'card-grid';
+    if (mode === 'list') {
+      c.innerHTML = firings.map(f =>
+        '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">' +
+        '<strong style="min-width:100px">' + esc(f.firing_type||'Firing') + '</strong>' +
+        '<span class="text-sm" style="min-width:60px">Cone ' + esc(f.cone||'?') + '</span>' +
+        '<span class="text-sm" style="min-width:80px;color:var(--text-light)">' + esc(f.atmosphere||'') + '</span>' +
+        '<span class="text-sm" style="min-width:80px">' + fmtDate(f.date) + '</span>' +
+        (f.piece_title ? '<span class="piece-meta-tag">' + esc(f.piece_title) + '</span>' : '') +
+        (f.kiln_name ? '<span class="text-sm" style="color:var(--text-muted)">' + esc(f.kiln_name) + '</span>' : '') +
+        '</div>'
+      ).join('');
+    } else {
+      c.innerHTML = firings.map(f =>
+        '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(f.firing_type||'Firing') + ' — Cone ' + esc(f.cone||'?') + '</div>' +
+        '<div class="text-sm" style="color:var(--text-light)">' + (f.kiln_name ? esc(f.kiln_name) + ' · ' : '') + fmtDate(f.date) +
+        (f.atmosphere ? ' · ' + esc(f.atmosphere) : '') +
+        (f.firing_speed ? ' · ' + esc(f.firing_speed) : '') +
+        '</div></div>' +
+        (f.piece_title ? '<span class="piece-meta-tag">' + esc(f.piece_title) + '</span>' : '') + '</div>' +
+        (f.hold_used ? '<div class="text-sm"><strong>Hold:</strong> Yes' + (f.hold_duration ? ' — ' + esc(f.hold_duration) : '') + '</div>' : '') +
+        (f.results ? '<div class="text-sm mt-8">' + esc(f.results) + '</div>' : '') +
+        (f.notes ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(f.notes) + '</div>' : '') +
+        '</div>'
+      ).join('');
+    }
   } catch(e) { toast(e.message,'error'); }
 }
 function openFiringModal() {
@@ -631,12 +750,25 @@ async function loadSales() {
     sum.innerHTML = '<div class="stat-box"><div class="stat-number">' + sales.length + '</div><div class="stat-label">Sales</div></div>' +
       '<div class="stat-box"><div class="stat-number">$' + total.toFixed(0) + '</div><div class="stat-label">Revenue</div></div>' +
       '<div class="stat-box"><div class="stat-number">$' + (total/sales.length).toFixed(0) + '</div><div class="stat-label">Avg Price</div></div>';
-    c.innerHTML = sales.map(s =>
-      '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(s.piece_title||'Unknown piece') + '</div>' +
-      '<div class="text-sm" style="color:var(--text-light)">' + fmtDate(s.date) + (s.venue ? ' · ' + esc(s.venue) : '') + '</div></div>' +
-      '<div style="font-family:var(--font-display);font-size:1.2rem;font-weight:700;color:var(--accent)">$' + (s.price||0).toFixed(0) + '</div></div>' +
-      (s.venue_type ? '<span class="piece-meta-tag">' + esc(s.venue_type) + '</span>' : '') + '</div>'
-    ).join('');
+    const mode = getViewMode('sales');
+    c.className = mode === 'list' ? '' : 'card-grid';
+    if (mode === 'list') {
+      c.innerHTML = sales.map(s =>
+        '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">' +
+        '<strong style="min-width:150px">' + esc(s.piece_title||'Unknown piece') + '</strong>' +
+        '<span style="font-weight:700;color:var(--accent);min-width:60px">$' + (s.price||0).toFixed(0) + '</span>' +
+        '<span class="text-sm" style="min-width:80px">' + fmtDate(s.date) + '</span>' +
+        '<span class="text-sm" style="color:var(--text-light)">' + esc(s.venue_type||'') + '</span>' +
+        '<span class="text-sm" style="color:var(--text-muted)">' + esc(s.venue||'') + '</span></div>'
+      ).join('');
+    } else {
+      c.innerHTML = sales.map(s =>
+        '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(s.piece_title||'Unknown piece') + '</div>' +
+        '<div class="text-sm" style="color:var(--text-light)">' + fmtDate(s.date) + (s.venue ? ' · ' + esc(s.venue) : '') + '</div></div>' +
+        '<div style="font-family:var(--font-display);font-size:1.2rem;font-weight:700;color:var(--accent)">$' + (s.price||0).toFixed(0) + '</div></div>' +
+        (s.venue_type ? '<span class="piece-meta-tag">' + esc(s.venue_type) + '</span>' : '') + '</div>'
+      ).join('');
+    }
   } catch(e) { toast(e.message,'error'); }
 }
 function openSaleModal() {
@@ -744,8 +876,6 @@ async function loadForum() {
       '<div class="stat-label" style="font-weight:600;color:var(--text)">' + esc(c.name) + '</div>' +
       '<div class="text-sm" style="color:var(--text-muted)">' + c.postCount + ' posts</div></div>'
     ).join('');
-    // Load token balance
-    loadTokenBalance();
     loadForumPosts();
   } catch(e) {
     if (e.message.includes('Requires')) {
@@ -832,8 +962,7 @@ async function viewForumPost(id) {
       '<div class="card mt-16"><h3 style="margin-bottom:12px">Reply</h3>' +
       '<textarea class="form-textarea" id="replyBody" placeholder="Write your reply..." style="min-height:80px"></textarea>' +
       '<div class="form-group mt-8"><label class="text-sm" style="color:var(--text-muted);margin-bottom:4px;display:block">📸 Add photos or short videos (up to 3)</label><input type="file" id="replyPhotos" accept="image/*,video/mp4,video/mov,video/webm" multiple class="form-input" style="font-size:0.85rem"></div>' +
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">' +
-      '<span class="text-sm" style="color:var(--text-muted)">🪙 Uses 1 forum token</span>' +
+      '<div style="display:flex;justify-content:flex-end;margin-top:8px">' +
       '<button class="btn btn-primary" onclick="submitReply(\'' + post.id + '\')">Reply</button></div></div>';
   } catch(e) { toast(e.message,'error'); }
 }
@@ -882,7 +1011,7 @@ async function saveForumPost(e) {
   try {
     const r = await fetch('/api/forum/posts', { method:'POST', headers:{Authorization:'Bearer '+token}, body:fd });
     const d = await r.json(); if (!r.ok) throw new Error(d.error);
-    toast('Post published!','success'); closeModal('forumPostModal'); loadForumPosts(); loadTokenBalance();
+    toast('Post published!','success'); closeModal('forumPostModal'); loadForumPosts();
   } catch(e) { toast(e.message,'error'); }
 }
 
@@ -1535,4 +1664,242 @@ async function loadLandingReviews() {
 loadLandingReviews();
 
 // ---- Init ----
+// View toggle
+function toggleView(section, mode) {
+  localStorage.setItem('viewMode_' + section, mode);
+  // Reload the section
+  if (section === 'pieces') loadPieces();
+  else if (section === 'clay') loadClayBodies();
+  else if (section === 'glazes') loadGlazes();
+  else if (section === 'firings') loadFirings();
+  else if (section === 'sales') loadSales();
+}
+function getViewMode(section) { return localStorage.getItem('viewMode_' + section) || 'card'; }
+
+// Lightbox
+function openLightbox(src) {
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightboxModal').style.display = 'flex';
+}
+function closeLightbox() { document.getElementById('lightboxModal').style.display = 'none'; }
+
+// Photo management
+async function deletePhoto(photoId, pieceId) {
+  if (!confirm('Delete this photo?')) return;
+  try { await api('/api/photos/' + photoId, {method:'DELETE'}); toast('Photo deleted','success'); viewPiece(pieceId); } catch(e) { toast(e.message,'error'); }
+}
+async function editPhotoStage(photoId, currentStage, pieceId) {
+  const stage = prompt('Enter stage (wet, leather-hard, bone-dry, bisque, glazed, finished, detail, other):', currentStage);
+  if (stage === null) return;
+  try { await api('/api/photos/' + photoId + '/stage', {method:'PUT', body:{stage}}); toast('Stage updated','success'); viewPiece(pieceId); } catch(e) { toast(e.message,'error'); }
+}
+async function deleteGlazePhoto(photoId) {
+  if (!confirm('Delete this photo?')) return;
+  try { await api('/api/glaze-photos/' + photoId, {method:'DELETE'}); toast('Photo deleted','success'); loadGlazes(); } catch(e) { toast(e.message,'error'); }
+}
+async function deleteClayPhoto(photoId) {
+  if (!confirm('Delete this photo?')) return;
+  try { await api('/api/clay-photos/' + photoId, {method:'DELETE'}); toast('Photo deleted','success'); loadClayBodies(); } catch(e) { toast(e.message,'error'); }
+}
+
+// Clay photo upload
+function openClayPhotoUpload(clayId) {
+  document.getElementById('clayPhotoClayId').value = clayId;
+  document.getElementById('clayPhotoFile').value = '';
+  document.getElementById('clayPhotoLabel').value = 'raw';
+  document.getElementById('clayPhotoNotes').value = '';
+  openModal('clayPhotoModal');
+}
+async function uploadClayPhoto(e) {
+  e.preventDefault();
+  const clayId = document.getElementById('clayPhotoClayId').value;
+  const f = document.getElementById('clayPhotoFile').files[0]; if (!f) return;
+  const fd = new FormData(); fd.append('photo', f);
+  fd.append('label', document.getElementById('clayPhotoLabel').value);
+  fd.append('notes', document.getElementById('clayPhotoNotes').value);
+  try {
+    const r = await fetch('/api/clay-bodies/' + clayId + '/photos', {method:'POST', headers:{Authorization:'Bearer '+token}, body:fd});
+    const d = await r.json(); if (!r.ok) throw new Error(d.error);
+    toast('Photo uploaded!','success'); closeModal('clayPhotoModal'); loadClayBodies();
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// Glaze photo modal upload
+function openGlazePhotoUpload(glazeId) {
+  document.getElementById('glazePhotoGlazeId').value = glazeId;
+  document.getElementById('glazePhotoFile').value = '';
+  document.getElementById('glazePhotoLabel').value = '';
+  document.getElementById('glazePhotoNotes').value = '';
+  openModal('glazePhotoModal');
+}
+async function uploadGlazePhotoModal(e) {
+  e.preventDefault();
+  const glazeId = document.getElementById('glazePhotoGlazeId').value;
+  const f = document.getElementById('glazePhotoFile').files[0]; if (!f) return;
+  const fd = new FormData(); fd.append('photo', f);
+  fd.append('label', document.getElementById('glazePhotoLabel').value);
+  fd.append('notes', document.getElementById('glazePhotoNotes').value);
+  try {
+    const r = await fetch('/api/glazes/' + glazeId + '/photos', {method:'POST', headers:{Authorization:'Bearer '+token}, body:fd});
+    const d = await r.json(); if (!r.ok) throw new Error(d.error);
+    toast('Photo uploaded!','success'); closeModal('glazePhotoModal'); loadGlazes();
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// Duplicate piece
+async function duplicatePiece(id) {
+  try {
+    const p = await api('/api/pieces/' + id);
+    openPieceModal({
+      title: (p.title||'') + ' (copy)',
+      clay_body_id: p.clay_body_id,
+      status: 'in-progress',
+      technique: p.technique,
+      form: p.form,
+      studio: p.studio,
+      notes: p.notes,
+      glazes: p.glazes
+    });
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// Duplicate clay
+function duplicateClay(id) {
+  const c = clayBodies.find(x=>x.id===id);
+  if (!c) return;
+  openClayModal({...c, id: undefined, name: (c.name||'') + ' (copy)'});
+}
+
+// Duplicate glaze
+function duplicateGlaze(id) {
+  const g = glazes.find(x=>x.id===id);
+  if (!g) return;
+  openGlazeModal({...g, id: undefined, name: (g.name||'') + ' (copy)', ingredients: g.ingredients||[]});
+}
+
+// Ingredient total
+function updateIngredientTotal() {
+  const rows = document.querySelectorAll('.ingredient-row .ing-pct');
+  let total = 0;
+  rows.forEach(r => { total += parseFloat(r.value) || 0; });
+  const el = document.getElementById('ingredientTotal');
+  if (el) {
+    const color = Math.abs(total - 100) < 0.1 ? 'var(--success)' : (Math.abs(total - 100) < 5 ? '#F4A623' : 'var(--danger)');
+    el.innerHTML = '<span style="color:' + color + '">Total: ' + total.toFixed(1) + '%</span>' + (Math.abs(total-100) < 0.1 ? ' ✓' : '');
+  }
+}
+
+// Shopping list
+async function loadShoppingList() {
+  try {
+    const d = await api('/api/shopping-list');
+    const el = document.getElementById('shoppingListContent');
+    let html = '';
+    if (d.clays.length) {
+      html += '<h3 style="margin-bottom:12px">🪨 Clays to Buy</h3>';
+      html += d.clays.map(c =>
+        '<div class="card" style="margin-bottom:8px"><div class="card-header"><div><div class="card-title">' + esc(c.name) + '</div>' +
+        '<div class="text-sm" style="color:var(--text-light)">' + esc(c.brand||'') + (c.source ? ' · ' + esc(c.source) : '') + '</div></div>' +
+        (c.buy_url ? '<a href="' + esc(c.buy_url) + '" target="_blank" class="btn btn-primary btn-sm">Buy →</a>' :
+         c.source_url ? '<a href="' + esc(c.source_url) + '" target="_blank" class="btn btn-secondary btn-sm">Source →</a>' : '') +
+        '</div></div>'
+      ).join('');
+    }
+    if (d.glazes.length) {
+      html += '<h3 style="margin:20px 0 12px">🎨 Glazes to Buy</h3>';
+      html += d.glazes.map(g =>
+        '<div class="card" style="margin-bottom:8px"><div class="card-header"><div><div class="card-title">' + esc(g.name) + '</div>' +
+        '<div class="text-sm" style="color:var(--text-light)">' + esc(g.brand||'') + (g.source ? ' · ' + esc(g.source) : '') + '</div></div>' +
+        (g.buy_url ? '<a href="' + esc(g.buy_url) + '" target="_blank" class="btn btn-primary btn-sm">Buy →</a>' :
+         g.source_url ? '<a href="' + esc(g.source_url) + '" target="_blank" class="btn btn-secondary btn-sm">Source →</a>' : '') +
+        '</div></div>'
+      ).join('');
+    }
+    if (!d.clays.length && !d.glazes.length) {
+      html = '<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-title">All stocked up!</div><p>Mark items as out of stock or "need to buy" to see them here.</p></div>';
+    }
+    el.innerHTML = html;
+  } catch(e) { toast(e.message,'error'); }
+}
+
+function copyShoppingList() {
+  const el = document.getElementById('shoppingListContent');
+  const items = el.querySelectorAll('.card-title');
+  if (!items.length) { toast('Nothing to copy',''); return; }
+  let text = '🛒 Potter\'s Mud Room Shopping List\n\n';
+  items.forEach(i => { text += '• ' + i.textContent + '\n'; });
+  navigator.clipboard.writeText(text).then(() => toast('Copied to clipboard!','success')).catch(() => toast('Could not copy','error'));
+}
+
+// Glaze chemicals
+let chemicals = [];
+async function loadChemicals() {
+  try {
+    chemicals = await api('/api/glaze-chemicals');
+    const c = document.getElementById('chemicalList'), em = document.getElementById('chemicalEmpty');
+    if (!chemicals.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
+    em.classList.add('hidden');
+    c.innerHTML = chemicals.map(ch =>
+      '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(ch.name) +
+      ' <span class="piece-meta-tag" style="' + (ch.in_stock ? 'background:rgba(40,167,69,0.1);color:var(--success)' : 'background:rgba(220,53,69,0.1);color:var(--danger)') + '">' +
+      (ch.in_stock ? 'In Stock' : 'Out of Stock') + '</span></div>' +
+      '<div class="text-sm" style="color:var(--text-light)">' +
+      (ch.quantity ? ch.quantity + ' ' + (ch.unit||'oz') : '') +
+      (ch.source ? ' · ' + esc(ch.source) : '') + '</div></div>' +
+      '<div style="display:flex;gap:4px">' +
+      (ch.source_url ? '<a href="' + esc(ch.source_url) + '" target="_blank" class="btn-ghost btn-sm" title="Source">🔗</a>' : '') +
+      '<button class="btn-ghost btn-sm" onclick="editChemical(\'' + ch.id + '\')">✏️</button>' +
+      '<button class="btn-ghost btn-sm" onclick="deleteChemical(\'' + ch.id + '\')">🗑️</button></div></div>' +
+      (ch.notes ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(ch.notes) + '</div>' : '') +
+      '</div>'
+    ).join('');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+function openChemicalModal(ch) {
+  document.getElementById('chemicalId').value = ch?.id||'';
+  document.getElementById('chemicalModalTitle').textContent = ch ? 'Edit Chemical' : 'Add Chemical';
+  document.getElementById('chemicalName').value = ch?.name||'';
+  document.getElementById('chemicalQty').value = ch?.quantity||'';
+  document.getElementById('chemicalUnit').value = ch?.unit||'oz';
+  document.getElementById('chemicalSource').value = ch?.source||'';
+  document.getElementById('chemicalSourceUrl').value = ch?.source_url||'';
+  document.getElementById('chemicalInStock').checked = ch?.in_stock !== 0;
+  document.getElementById('chemicalNotes').value = ch?.notes||'';
+  openModal('chemicalModal');
+}
+function editChemical(id) { const ch = chemicals.find(x=>x.id===id); if(ch) openChemicalModal(ch); }
+async function saveChemical(e) {
+  e.preventDefault();
+  const id = document.getElementById('chemicalId').value;
+  const body = {
+    name: document.getElementById('chemicalName').value,
+    quantity: parseFloat(document.getElementById('chemicalQty').value)||null,
+    unit: document.getElementById('chemicalUnit').value,
+    source: document.getElementById('chemicalSource').value||null,
+    sourceUrl: document.getElementById('chemicalSourceUrl').value||null,
+    inStock: document.getElementById('chemicalInStock').checked,
+    notes: document.getElementById('chemicalNotes').value||null
+  };
+  try {
+    if (id) { await api('/api/glaze-chemicals/'+id, {method:'PUT',body}); toast('Chemical updated!','success'); }
+    else { await api('/api/glaze-chemicals', {method:'POST',body}); toast('Chemical added!','success'); }
+    closeModal('chemicalModal'); loadChemicals();
+  } catch(e) { toast(e.message,'error'); }
+}
+async function deleteChemical(id) {
+  if (!confirm('Delete this chemical?')) return;
+  try { await api('/api/glaze-chemicals/'+id, {method:'DELETE'}); toast('Deleted','success'); loadChemicals(); } catch(e) { toast(e.message,'error'); }
+}
+
+// Glaze stock quick toggle
+async function toggleGlazeStock(id, status) {
+  try { await api('/api/glazes/'+id+'/stock', {method:'PUT', body:{stockStatus:status}}); loadGlazes(); } catch(e) { toast(e.message,'error'); }
+}
+
+// Clay stock quick toggle
+async function toggleClayStock(id, val) {
+  try { await api('/api/clay-bodies/'+id+'/stock', {method:'PUT', body:{inStock:val}}); loadClayBodies(); } catch(e) { toast(e.message,'error'); }
+}
+
 checkAuth();

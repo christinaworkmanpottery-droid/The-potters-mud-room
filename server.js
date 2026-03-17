@@ -544,8 +544,8 @@ app.post('/api/profile/photo', auth, upload.single('photo'), (req, res) => {
 // ============ EXPORT (all tiers — glazes and pieces) ============
 app.get('/api/export/glazes', auth, (req, res) => {
   const glazes = db.prepare('SELECT * FROM glazes WHERE user_id=? ORDER BY name').all(req.userId);
-  let csv = 'Name,Type,Brand,SKU,Color,Cone Range,Atmosphere,Surface,Notes\n';
-  glazes.forEach(g => { csv += `"${(g.name||'').replace(/"/g,'""')}","${g.glaze_type||''}","${(g.brand||'').replace(/"/g,'""')}","${g.sku||''}","${(g.color_description||'').replace(/"/g,'""')}","${g.cone_range||''}","${g.atmosphere||''}","${g.surface||''}","${(g.notes||'').replace(/"/g,'""')}"\n`; });
+  let csv = 'Name,Type,Brand,SKU,Color,Cone Range,Atmosphere,Surface,Opacity,Recipe Status,Stock Status,Source,Source URL,In Stock,Buy URL,Notes\n';
+  glazes.forEach(g => { csv += `"${(g.name||'').replace(/"/g,'""')}","${g.glaze_type||''}","${(g.brand||'').replace(/"/g,'""')}","${g.sku||''}","${(g.color_description||'').replace(/"/g,'""')}","${g.cone_range||''}","${g.atmosphere||''}","${g.surface||''}","${g.opacity||''}","${g.recipe_status||''}","${g.stock_status||''}","${(g.source||'').replace(/"/g,'""')}","${g.source_url||''}","${g.in_stock?'Yes':'No'}","${g.buy_url||''}","${(g.notes||'').replace(/"/g,'""')}"\n`; });
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename=potters-mudroom-glazes.csv');
   res.send(csv);
@@ -553,8 +553,8 @@ app.get('/api/export/glazes', auth, (req, res) => {
 
 app.get('/api/export/clay-bodies', auth, (req, res) => {
   const clays = db.prepare('SELECT * FROM clay_bodies WHERE user_id=? ORDER BY name').all(req.userId);
-  let csv = 'Name,Brand,Type,Wet Color,Fired Color,Shrinkage %,Cone Range,Cost Per Bag,Bag Weight,Notes\n';
-  clays.forEach(c => { csv += `"${(c.name||'').replace(/"/g,'""')}","${(c.brand||'').replace(/"/g,'""')}","${c.clay_type||''}","${c.color_wet||''}","${c.color_fired||''}","${c.shrinkage_pct||''}","${c.cone_range||''}","${c.cost_per_bag||''}","${c.bag_weight||''}","${(c.notes||'').replace(/"/g,'""')}"\n`; });
+  let csv = 'Name,Brand,Type,Wet Color,Fired Color,Shrinkage %,Absorption %,Cone Range,Cost Per Bag,Bag Weight,Source,Source URL,In Stock,Buy URL,Notes\n';
+  clays.forEach(c => { csv += `"${(c.name||'').replace(/"/g,'""')}","${(c.brand||'').replace(/"/g,'""')}","${c.clay_type||''}","${c.color_wet||''}","${c.color_fired||''}","${c.shrinkage_pct||''}","${c.absorption_pct||''}","${c.cone_range||''}","${c.cost_per_bag||''}","${c.bag_weight||''}","${(c.source||'').replace(/"/g,'""')}","${c.source_url||''}","${c.in_stock?'Yes':'No'}","${c.buy_url||''}","${(c.notes||'').replace(/"/g,'""')}"\n`; });
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename=potters-mudroom-clay-bodies.csv');
   res.send(csv);
@@ -571,29 +571,63 @@ app.get('/api/export/firing-logs', auth, (req, res) => {
 
 // ============ CLAY BODIES ============
 app.get('/api/clay-bodies', auth, (req, res) => {
-  res.json(db.prepare('SELECT * FROM clay_bodies WHERE user_id=? ORDER BY name').all(req.userId));
+  const clays = db.prepare('SELECT * FROM clay_bodies WHERE user_id=? ORDER BY name').all(req.userId);
+  const getPhotos = db.prepare('SELECT * FROM clay_photos WHERE clay_id=? ORDER BY sort_order');
+  clays.forEach(c => { c.photos = getPhotos.all(c.id); });
+  res.json(clays);
 });
 
 app.post('/api/clay-bodies', auth, (req, res) => {
-  const { name, brand, colorWet, colorFired, shrinkagePct, coneRange, clayType, costPerBag, bagWeight, notes } = req.body;
+  const { name, brand, colorWet, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, costPerBag, bagWeight, source, sourceUrl, inStock, buyUrl, notes } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });
   const id = uuidv4();
-  db.prepare('INSERT INTO clay_bodies (id,user_id,name,brand,color_wet,color_fired,shrinkage_pct,cone_range,clay_type,cost_per_bag,bag_weight,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
-    .run(id, req.userId, name, brand, colorWet, colorFired, shrinkagePct, coneRange, clayType, costPerBag, bagWeight, notes);
+  db.prepare('INSERT INTO clay_bodies (id,user_id,name,brand,color_wet,color_fired,shrinkage_pct,absorption_pct,cone_range,clay_type,cost_per_bag,bag_weight,source,source_url,in_stock,buy_url,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .run(id, req.userId, name, brand, colorWet, colorFired, shrinkagePct, absorptionPct||null, coneRange, clayType, costPerBag, bagWeight, source||null, sourceUrl||null, inStock!==undefined?(inStock?1:0):1, buyUrl||null, notes);
   res.json({ id, name });
 });
 
 app.put('/api/clay-bodies/:id', auth, (req, res) => {
-  const { name, brand, colorWet, colorFired, shrinkagePct, coneRange, clayType, costPerBag, bagWeight, notes } = req.body;
-  const r = db.prepare(`UPDATE clay_bodies SET name=?,brand=?,color_wet=?,color_fired=?,shrinkage_pct=?,cone_range=?,clay_type=?,cost_per_bag=?,bag_weight=?,notes=?,updated_at=datetime('now') WHERE id=? AND user_id=?`)
-    .run(name, brand, colorWet, colorFired, shrinkagePct, coneRange, clayType, costPerBag, bagWeight, notes, req.params.id, req.userId);
+  const { name, brand, colorWet, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, costPerBag, bagWeight, source, sourceUrl, inStock, buyUrl, notes } = req.body;
+  const r = db.prepare(`UPDATE clay_bodies SET name=?,brand=?,color_wet=?,color_fired=?,shrinkage_pct=?,absorption_pct=?,cone_range=?,clay_type=?,cost_per_bag=?,bag_weight=?,source=?,source_url=?,in_stock=?,buy_url=?,notes=?,updated_at=datetime('now') WHERE id=? AND user_id=?`)
+    .run(name, brand, colorWet, colorFired, shrinkagePct, absorptionPct||null, coneRange, clayType, costPerBag, bagWeight, source||null, sourceUrl||null, inStock!==undefined?(inStock?1:0):1, buyUrl||null, notes, req.params.id, req.userId);
   if (r.changes === 0) return res.status(404).json({ error: 'Not found' });
   res.json({ success: true });
 });
 
 app.delete('/api/clay-bodies/:id', auth, (req, res) => {
+  // Delete clay photos files
+  const photos = db.prepare('SELECT filename FROM clay_photos WHERE clay_id=?').all(req.params.id);
+  photos.forEach(p => { const f = path.join(UPLOADS_DIR, p.filename); if (fs.existsSync(f)) fs.unlinkSync(f); });
+  db.prepare('DELETE FROM clay_photos WHERE clay_id=?').run(req.params.id);
   const r = db.prepare('DELETE FROM clay_bodies WHERE id=? AND user_id=?').run(req.params.id, req.userId);
   if (r.changes === 0) return res.status(404).json({ error: 'Not found' });
+  res.json({ success: true });
+});
+
+// Clay photo upload
+app.post('/api/clay-bodies/:id/photos', auth, upload.single('photo'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No photo' });
+  const count = db.prepare('SELECT COUNT(*) as c FROM clay_photos WHERE clay_id=?').get(req.params.id).c;
+  if (count >= 2) return res.status(403).json({ error: 'Max 2 photos per clay (raw & bisque)' });
+  const id = uuidv4();
+  db.prepare('INSERT INTO clay_photos (id,clay_id,filename,original_name,photo_label,notes,sort_order) VALUES (?,?,?,?,?,?,?)')
+    .run(id, req.params.id, req.file.filename, req.file.originalname, req.body.label||null, req.body.notes||null, count);
+  res.json({ id, filename: req.file.filename });
+});
+
+// Clay photo delete
+app.delete('/api/clay-photos/:id', auth, (req, res) => {
+  const ph = db.prepare('SELECT cp.* FROM clay_photos cp JOIN clay_bodies cb ON cp.clay_id=cb.id WHERE cp.id=? AND cb.user_id=?').get(req.params.id, req.userId);
+  if (!ph) return res.status(404).json({ error: 'Not found' });
+  const f = path.join(UPLOADS_DIR, ph.filename); if (fs.existsSync(f)) fs.unlinkSync(f);
+  db.prepare('DELETE FROM clay_photos WHERE id=?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// Clay stock toggle
+app.put('/api/clay-bodies/:id/stock', auth, (req, res) => {
+  const { inStock } = req.body;
+  db.prepare('UPDATE clay_bodies SET in_stock=? WHERE id=? AND user_id=?').run(inStock ? 1 : 0, req.params.id, req.userId);
   res.json({ success: true });
 });
 
@@ -607,11 +641,11 @@ app.get('/api/glazes', auth, (req, res) => {
 });
 
 app.post('/api/glazes', auth, (req, res) => {
-  const { name, glazeType, brand, sku, colorDescription, coneRange, atmosphere, surface, notes, ingredients } = req.body;
+  const { name, glazeType, brand, sku, colorDescription, coneRange, atmosphere, surface, opacity, recipeStatus, recipeNotes, stockStatus, source, sourceUrl, inStock, buyUrl, notes, ingredients } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });
   const id = uuidv4();
-  db.prepare('INSERT INTO glazes (id,user_id,name,glaze_type,brand,sku,color_description,cone_range,atmosphere,surface,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
-    .run(id, req.userId, name, glazeType || 'commercial', brand, sku, colorDescription, coneRange, atmosphere, surface, notes);
+  db.prepare('INSERT INTO glazes (id,user_id,name,glaze_type,brand,sku,color_description,cone_range,atmosphere,surface,opacity,recipe_status,recipe_notes,stock_status,source,source_url,in_stock,buy_url,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .run(id, req.userId, name, glazeType || 'commercial', brand, sku, colorDescription, coneRange, atmosphere, surface, opacity||null, recipeStatus||null, recipeNotes||null, stockStatus||null, source||null, sourceUrl||null, inStock!==undefined?(inStock?1:0):1, buyUrl||null, notes);
   if (glazeType === 'recipe' && ingredients?.length) {
     const ins = db.prepare('INSERT INTO glaze_ingredients (id,glaze_id,ingredient_name,percentage,amount,sort_order) VALUES (?,?,?,?,?,?)');
     ingredients.forEach((i, idx) => ins.run(uuidv4(), id, i.name, i.percentage, i.amount, idx));
@@ -620,9 +654,9 @@ app.post('/api/glazes', auth, (req, res) => {
 });
 
 app.put('/api/glazes/:id', auth, (req, res) => {
-  const { name, glazeType, brand, sku, colorDescription, coneRange, atmosphere, surface, notes, ingredients } = req.body;
-  const r = db.prepare(`UPDATE glazes SET name=?,glaze_type=?,brand=?,sku=?,color_description=?,cone_range=?,atmosphere=?,surface=?,notes=?,updated_at=datetime('now') WHERE id=? AND user_id=?`)
-    .run(name, glazeType, brand, sku, colorDescription, coneRange, atmosphere, surface, notes, req.params.id, req.userId);
+  const { name, glazeType, brand, sku, colorDescription, coneRange, atmosphere, surface, opacity, recipeStatus, recipeNotes, stockStatus, source, sourceUrl, inStock, buyUrl, notes, ingredients } = req.body;
+  const r = db.prepare(`UPDATE glazes SET name=?,glaze_type=?,brand=?,sku=?,color_description=?,cone_range=?,atmosphere=?,surface=?,opacity=?,recipe_status=?,recipe_notes=?,stock_status=?,source=?,source_url=?,in_stock=?,buy_url=?,notes=?,updated_at=datetime('now') WHERE id=? AND user_id=?`)
+    .run(name, glazeType, brand, sku, colorDescription, coneRange, atmosphere, surface, opacity||null, recipeStatus||null, recipeNotes||null, stockStatus||null, source||null, sourceUrl||null, inStock!==undefined?(inStock?1:0):1, buyUrl||null, notes, req.params.id, req.userId);
   if (r.changes === 0) return res.status(404).json({ error: 'Not found' });
   if (glazeType === 'recipe') {
     db.prepare('DELETE FROM glaze_ingredients WHERE glaze_id=?').run(req.params.id);
@@ -648,8 +682,59 @@ app.post('/api/glazes/:id/photos', auth, upload.single('photo'), (req, res) => {
   const count = db.prepare('SELECT COUNT(*) as c FROM glaze_photos WHERE glaze_id=?').get(req.params.id).c;
   if (count >= 3) return res.status(403).json({ error: 'Max 3 photos per glaze' });
   const id = uuidv4();
-  db.prepare('INSERT INTO glaze_photos (id,glaze_id,filename,original_name,sort_order) VALUES (?,?,?,?,?)').run(id, req.params.id, req.file.filename, req.file.originalname, count);
+  db.prepare('INSERT INTO glaze_photos (id,glaze_id,filename,original_name,photo_label,notes,sort_order) VALUES (?,?,?,?,?,?,?)').run(id, req.params.id, req.file.filename, req.file.originalname, req.body.label||null, req.body.notes||null, count);
   res.json({ id, filename: req.file.filename });
+});
+
+// Glaze photo delete
+app.delete('/api/glaze-photos/:id', auth, (req, res) => {
+  const ph = db.prepare('SELECT gp.* FROM glaze_photos gp JOIN glazes g ON gp.glaze_id=g.id WHERE gp.id=? AND g.user_id=?').get(req.params.id, req.userId);
+  if (!ph) return res.status(404).json({ error: 'Not found' });
+  const f = path.join(UPLOADS_DIR, ph.filename); if (fs.existsSync(f)) fs.unlinkSync(f);
+  db.prepare('DELETE FROM glaze_photos WHERE id=?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// Glaze stock toggle
+app.put('/api/glazes/:id/stock', auth, (req, res) => {
+  const { stockStatus } = req.body;
+  db.prepare('UPDATE glazes SET stock_status=? WHERE id=? AND user_id=?').run(stockStatus||null, req.params.id, req.userId);
+  res.json({ success: true });
+});
+
+// Shopping list — all out-of-stock clays and glazes
+app.get('/api/shopping-list', auth, (req, res) => {
+  const clays = db.prepare('SELECT id,name,brand,source,source_url,buy_url FROM clay_bodies WHERE user_id=? AND in_stock=0').all(req.userId);
+  const glazes = db.prepare('SELECT id,name,brand,source,source_url,buy_url,stock_status FROM glazes WHERE user_id=? AND (stock_status=? OR in_stock=0)').all(req.userId, 'need-to-buy');
+  res.json({ clays, glazes });
+});
+
+// ============ GLAZE CHEMICALS INVENTORY ============
+app.get('/api/glaze-chemicals', auth, (req, res) => {
+  res.json(db.prepare('SELECT * FROM glaze_chemicals WHERE user_id=? ORDER BY name').all(req.userId));
+});
+
+app.post('/api/glaze-chemicals', auth, (req, res) => {
+  const { name, quantity, unit, source, sourceUrl, inStock, notes } = req.body;
+  if (!name) return res.status(400).json({ error: 'Name required' });
+  const id = uuidv4();
+  db.prepare('INSERT INTO glaze_chemicals (id,user_id,name,quantity,unit,source,source_url,in_stock,notes) VALUES (?,?,?,?,?,?,?,?,?)')
+    .run(id, req.userId, name, quantity||null, unit||'oz', source||null, sourceUrl||null, inStock!==undefined?(inStock?1:0):1, notes||null);
+  res.json({ id, name });
+});
+
+app.put('/api/glaze-chemicals/:id', auth, (req, res) => {
+  const { name, quantity, unit, source, sourceUrl, inStock, notes } = req.body;
+  const r = db.prepare(`UPDATE glaze_chemicals SET name=?,quantity=?,unit=?,source=?,source_url=?,in_stock=?,notes=?,updated_at=datetime('now') WHERE id=? AND user_id=?`)
+    .run(name, quantity||null, unit||'oz', source||null, sourceUrl||null, inStock!==undefined?(inStock?1:0):1, notes||null, req.params.id, req.userId);
+  if (r.changes === 0) return res.status(404).json({ error: 'Not found' });
+  res.json({ success: true });
+});
+
+app.delete('/api/glaze-chemicals/:id', auth, (req, res) => {
+  const r = db.prepare('DELETE FROM glaze_chemicals WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  if (r.changes === 0) return res.status(404).json({ error: 'Not found' });
+  res.json({ success: true });
 });
 
 // ============ PIECES ============
@@ -740,6 +825,15 @@ app.delete('/api/photos/:id', auth, (req, res) => {
   if (!ph) return res.status(404).json({ error: 'Not found' });
   const f = path.join(UPLOADS_DIR, ph.filename); if (fs.existsSync(f)) fs.unlinkSync(f);
   db.prepare('DELETE FROM piece_photos WHERE id=?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// Update piece photo stage
+app.put('/api/photos/:id/stage', auth, (req, res) => {
+  const { stage } = req.body;
+  const ph = db.prepare('SELECT pp.* FROM piece_photos pp JOIN pieces p ON pp.piece_id=p.id WHERE pp.id=? AND p.user_id=?').get(req.params.id, req.userId);
+  if (!ph) return res.status(404).json({ error: 'Not found' });
+  db.prepare('UPDATE piece_photos SET stage=? WHERE id=?').run(stage, req.params.id);
   res.json({ success: true });
 });
 
@@ -886,10 +980,8 @@ function useToken(userId) {
 }
 
 app.post('/api/forum/posts', auth, upload.array('photos', 5), (req, res) => {
-  if (!canPost(req.userId)) return res.status(403).json({ error: 'You need forum tokens to post. Purchase tokens to participate!' });
   const { title, body, categoryId } = req.body;
   if (!title || !body) return res.status(400).json({ error: 'Title and body required' });
-  if (!useToken(req.userId)) return res.status(403).json({ error: 'No tokens available' });
   const id = uuidv4();
   db.prepare('INSERT INTO forum_posts (id,user_id,category_id,title,body) VALUES (?,?,?,?,?)').run(id, req.userId, categoryId, title, body);
   if (req.files?.length) {
@@ -900,10 +992,8 @@ app.post('/api/forum/posts', auth, upload.array('photos', 5), (req, res) => {
 });
 
 app.post('/api/forum/posts/:id/reply', auth, upload.array('photos', 3), (req, res) => {
-  if (!canPost(req.userId)) return res.status(403).json({ error: 'You need forum tokens to reply. Purchase tokens to participate!' });
   const { body } = req.body;
   if (!body) return res.status(400).json({ error: 'Reply body required' });
-  if (!useToken(req.userId)) return res.status(403).json({ error: 'No tokens available' });
   const id = uuidv4();
   db.prepare('INSERT INTO forum_replies (id,post_id,user_id,body) VALUES (?,?,?,?)').run(id, req.params.id, req.userId, body);
   db.prepare(`UPDATE forum_posts SET reply_count=reply_count+1, updated_at=datetime('now') WHERE id=?`).run(req.params.id);

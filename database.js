@@ -431,6 +431,62 @@ function initDB() {
   safeAdd('pieces', 'casualty_notes', 'TEXT');
   safeAdd('pieces', 'casualty_lesson', 'TEXT');
 
+  // Part 1 revamp — new fields for clays
+  safeAdd('clay_bodies', 'absorption_pct', 'REAL');
+  safeAdd('clay_bodies', 'source', 'TEXT');
+  safeAdd('clay_bodies', 'source_url', 'TEXT');
+  safeAdd('clay_bodies', 'in_stock', 'INTEGER DEFAULT 1');
+  safeAdd('clay_bodies', 'buy_url', 'TEXT');
+
+  // Part 1 revamp — new fields for glazes
+  safeAdd('glazes', 'opacity', 'TEXT');
+  safeAdd('glazes', 'recipe_status', 'TEXT');
+  safeAdd('glazes', 'recipe_notes', 'TEXT');
+  safeAdd('glazes', 'stock_status', 'TEXT');
+  safeAdd('glazes', 'source', 'TEXT');
+  safeAdd('glazes', 'source_url', 'TEXT');
+  safeAdd('glazes', 'in_stock', 'INTEGER DEFAULT 1');
+  safeAdd('glazes', 'buy_url', 'TEXT');
+
+  // Part 1 revamp — photo labels/notes for glaze_photos
+  safeAdd('glaze_photos', 'photo_label', 'TEXT');
+  safeAdd('glaze_photos', 'notes', 'TEXT');
+
+  // Part 1 revamp — clay photos table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS clay_photos (
+      id TEXT PRIMARY KEY,
+      clay_id TEXT NOT NULL,
+      filename TEXT NOT NULL,
+      original_name TEXT,
+      photo_label TEXT,
+      notes TEXT,
+      sort_order INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (clay_id) REFERENCES clay_bodies(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_clay_photos ON clay_photos(clay_id)`);
+
+  // Part 1 revamp — glaze chemical inventory
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS glaze_chemicals (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      quantity REAL,
+      unit TEXT DEFAULT 'oz',
+      source TEXT,
+      source_url TEXT,
+      in_stock INTEGER DEFAULT 1,
+      notes TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_chemicals_user ON glaze_chemicals(user_id)`);
+
   // Ensure new forum categories exist
   const catInsert = db.prepare('INSERT OR IGNORE INTO forum_categories (id, name, description, sort_order, icon) VALUES (?,?,?,?,?)');
   catInsert.run('cat-events', 'Events', 'Post pottery events, workshops, shows, and meetups near you!', 11, '📅');
