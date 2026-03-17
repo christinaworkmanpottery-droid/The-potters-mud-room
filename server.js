@@ -899,7 +899,13 @@ app.get('/api/community/combos', auth, requireTier('starter'), (req, res) => {
   sql += ' ORDER BY gc.likes DESC, gc.created_at DESC';
   const combos = db.prepare(sql).all(...params);
   const getL = db.prepare('SELECT * FROM glaze_combo_layers WHERE combo_id=? ORDER BY layer_order');
-  combos.forEach(c => { c.layers = getL.all(c.id); });
+  const getLike = db.prepare('SELECT id FROM combo_likes WHERE combo_id=? AND user_id=?');
+  const getCommentCount = db.prepare('SELECT COUNT(*) as c FROM combo_comments WHERE combo_id=?');
+  combos.forEach(c => {
+    c.layers = getL.all(c.id);
+    c.user_liked = !!getLike.get(c.id, req.userId);
+    c.comment_count = getCommentCount.get(c.id).c;
+  });
   res.json(combos);
 });
 
@@ -997,6 +1003,7 @@ app.post('/api/forum/posts/:id/reply', auth, upload.array('photos', 3), (req, re
   const id = uuidv4();
   db.prepare('INSERT INTO forum_replies (id,post_id,user_id,body) VALUES (?,?,?,?)').run(id, req.params.id, req.userId, body);
   db.prepare(`UPDATE forum_posts SET reply_count=reply_count+1, updated_at=datetime('now') WHERE id=?`).run(req.params.id);
+  notifyForumReply(req.params.id, req.userId);
   if (req.files?.length) {
     const ins = db.prepare('INSERT INTO forum_photos (id,reply_id,filename,original_name) VALUES (?,?,?,?)');
     req.files.forEach(f => ins.run(uuidv4(), id, f.filename, f.originalname));
@@ -1214,6 +1221,189 @@ app.delete('/api/admin/reviews/:id', auth, (req, res) => {
     db.prepare('DELETE FROM reviews WHERE id=?').run(req.params.id);
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============ COMBO LIKES & COMMENTS ============
+app.post('/api/community/combos/:id/like', auth, (req, res) => {
+  try {
+    const existing = db.prepare('SELECT id FROM combo_likes WHERE combo_id=? AND user_id=?').get(req.params.id, req.userId);
+    if (existing) {
+      db.prepare('DELETE FROM combo_likes WHERE id=?').run(existing.id);
+      db.prepare('UPDATE glaze_combos SET likes=MAX(0,likes-1) WHERE id=?').run(req.params.id);
+      res.json({ liked: false });
+    } else {
+      db.prepare('INSERT INTO combo_likes (id,combo_id,user_id) VALUES (?,?,?)').run(uuidv4(), req.params.id, req.userId);
+      db.prepare('UPDATE glaze_combos SET likes=likes+1 WHERE id=?').run(req.params.id);
+      // Notify combo owner
+      const combo = db.prepare('SELECT user_id,name FROM glaze_combos WHERE id=?').get(req.params.id);
+      if (combo && combo.user_id !== req.userId) {
+        const fromUser = db.prepare('SELECT display_name FROM users WHERE id=?').get(req.userId);
+        db.prepare('INSERT INTO notifications (id,user_id,type,message,link,from_user_id) VALUES (?,?,?,?,?,?)')
+          .run(uuidv4(), combo.user_id, 'combo_like', (fromUser?.display_name||'Someone') + ' liked your glaze combo "' + combo.name + '"', 'community', req.userId);
+      }
+      res.json({ liked: true });
+    }
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/community/combos/:id/comments', auth, (req, res) => {
+  const comments = db.prepare(`SELECT cc.*, u.display_name as author_name, u.avatar_filename as author_avatar 
+    FROM combo_comments cc JOIN users u ON cc.user_id=u.id WHERE cc.combo_id=? ORDER BY cc.created_at`).all(req.params.id);
+  res.json(comments);
+});
+
+app.post('/api/community/combos/:id/comments', auth, (req, res) => {
+  const { body } = req.body;
+  if (!body?.trim()) return res.status(400).json({ error: 'Comment required' });
+  const id = uuidv4();
+  db.prepare('INSERT INTO combo_comments (id,combo_id,user_id,body) VALUES (?,?,?,?)').run(id, req.params.id, req.userId, body.trim());
+  // Notify combo owner
+  const combo = db.prepare('SELECT user_id,name FROM glaze_combos WHERE id=?').get(req.params.id);
+  if (combo && combo.user_id !== req.userId) {
+    const fromUser = db.prepare('SELECT display_name FROM users WHERE id=?').get(req.userId);
+    db.prepare('INSERT INTO notifications (id,user_id,type,message,link,from_user_id) VALUES (?,?,?,?,?,?)')
+      .run(uuidv4(), combo.user_id, 'combo_comment', (fromUser?.display_name||'Someone') + ' commented on your glaze combo "' + combo.name + '"', 'community', req.userId);
+  }
+  res.json({ id });
+});
+
+app.delete('/api/community/comments/:id', auth, (req, res) => {
+  const c = db.prepare('SELECT user_id FROM combo_comments WHERE id=?').get(req.params.id);
+  if (!c) return res.status(404).json({ error: 'Not found' });
+  if (c.user_id !== req.userId && !isAdmin(req)) return res.status(403).json({ error: 'Not yours' });
+  db.prepare('DELETE FROM combo_comments WHERE id=?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// ============ FORUM LIKES & NOTIFICATIONS ============
+// Like a forum post
+app.post('/api/forum/posts/:id/like', auth, (req, res) => {
+  // reuse combo_likes pattern — store in a generic way
+  try {
+    const existing = db.prepare('SELECT id FROM combo_likes WHERE combo_id=? AND user_id=?').get('fp_'+req.params.id, req.userId);
+    if (existing) {
+      db.prepare('DELETE FROM combo_likes WHERE id=?').run(existing.id);
+      res.json({ liked: false });
+    } else {
+      db.prepare('INSERT INTO combo_likes (id,combo_id,user_id) VALUES (?,?,?)').run(uuidv4(), 'fp_'+req.params.id, req.userId);
+      // Notify post author
+      const post = db.prepare('SELECT user_id,title FROM forum_posts WHERE id=?').get(req.params.id);
+      if (post && post.user_id !== req.userId) {
+        const fromUser = db.prepare('SELECT display_name FROM users WHERE id=?').get(req.userId);
+        db.prepare('INSERT INTO notifications (id,user_id,type,message,link,from_user_id) VALUES (?,?,?,?,?,?)')
+          .run(uuidv4(), post.user_id, 'forum_like', (fromUser?.display_name||'Someone') + ' liked your post "' + post.title + '"', 'forum', req.userId);
+      }
+      res.json({ liked: true });
+    }
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Notify on forum reply (add to existing reply endpoint is complex, so add a post-reply notification hook)
+// We'll add notifications inside the existing reply endpoint via a helper
+function notifyForumReply(postId, replyUserId) {
+  try {
+    const post = db.prepare('SELECT user_id,title FROM forum_posts WHERE id=?').get(postId);
+    if (post && post.user_id !== replyUserId) {
+      const fromUser = db.prepare('SELECT display_name FROM users WHERE id=?').get(replyUserId);
+      db.prepare('INSERT INTO notifications (id,user_id,type,message,link,from_user_id) VALUES (?,?,?,?,?,?)')
+        .run(uuidv4(), post.user_id, 'forum_reply', (fromUser?.display_name||'Someone') + ' replied to your post "' + post.title + '"', 'forumPost_'+postId, replyUserId);
+    }
+  } catch(e) { /* silent */ }
+}
+
+// ============ NOTIFICATIONS ============
+app.get('/api/notifications', auth, (req, res) => {
+  const notifs = db.prepare('SELECT * FROM notifications WHERE user_id=? ORDER BY created_at DESC LIMIT 50').all(req.userId);
+  const unread = db.prepare('SELECT COUNT(*) as c FROM notifications WHERE user_id=? AND is_read=0').get(req.userId).c;
+  res.json({ notifications: notifs, unread });
+});
+
+app.post('/api/notifications/read', auth, (req, res) => {
+  db.prepare('UPDATE notifications SET is_read=1 WHERE user_id=?').run(req.userId);
+  res.json({ success: true });
+});
+
+app.post('/api/notifications/:id/read', auth, (req, res) => {
+  db.prepare('UPDATE notifications SET is_read=1 WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  res.json({ success: true });
+});
+
+// ============ IN-APP MESSAGING ============
+app.get('/api/messages', auth, (req, res) => {
+  // Get conversation list (latest message per conversation partner)
+  const conversations = db.prepare(`
+    SELECT m.*, 
+      CASE WHEN m.from_user_id=? THEN m.to_user_id ELSE m.from_user_id END as partner_id,
+      u.display_name as partner_name, u.avatar_filename as partner_avatar
+    FROM messages m
+    JOIN users u ON u.id = CASE WHEN m.from_user_id=? THEN m.to_user_id ELSE m.from_user_id END
+    WHERE m.from_user_id=? OR m.to_user_id=?
+    ORDER BY m.created_at DESC
+  `).all(req.userId, req.userId, req.userId, req.userId);
+  // Deduplicate to latest per partner
+  const seen = new Set();
+  const convos = [];
+  conversations.forEach(c => {
+    if (!seen.has(c.partner_id)) { seen.add(c.partner_id); convos.push(c); }
+  });
+  const unread = db.prepare('SELECT COUNT(*) as c FROM messages WHERE to_user_id=? AND is_read=0').get(req.userId).c;
+  res.json({ conversations: convos, unread });
+});
+
+app.get('/api/messages/:userId', auth, (req, res) => {
+  const msgs = db.prepare(`SELECT m.*, u.display_name as from_name, u.avatar_filename as from_avatar
+    FROM messages m JOIN users u ON m.from_user_id=u.id
+    WHERE (m.from_user_id=? AND m.to_user_id=?) OR (m.from_user_id=? AND m.to_user_id=?)
+    ORDER BY m.created_at`).all(req.userId, req.params.userId, req.params.userId, req.userId);
+  // Mark as read
+  db.prepare('UPDATE messages SET is_read=1 WHERE to_user_id=? AND from_user_id=?').run(req.userId, req.params.userId);
+  const partner = db.prepare('SELECT id,display_name,avatar_filename FROM users WHERE id=?').get(req.params.userId);
+  res.json({ messages: msgs, partner });
+});
+
+app.post('/api/messages/:userId', auth, (req, res) => {
+  const { body } = req.body;
+  if (!body?.trim()) return res.status(400).json({ error: 'Message required' });
+  // Check not blocked
+  const blocked = db.prepare('SELECT id FROM blocked_users WHERE (user_id=? AND blocked_user_id=?) OR (user_id=? AND blocked_user_id=?)').get(req.userId, req.params.userId, req.params.userId, req.userId);
+  if (blocked) return res.status(403).json({ error: 'Cannot message this user' });
+  const id = uuidv4();
+  db.prepare('INSERT INTO messages (id,from_user_id,to_user_id,body) VALUES (?,?,?,?)').run(id, req.userId, req.params.userId, body.trim());
+  // Notify recipient
+  const fromUser = db.prepare('SELECT display_name FROM users WHERE id=?').get(req.userId);
+  db.prepare('INSERT INTO notifications (id,user_id,type,message,link,from_user_id) VALUES (?,?,?,?,?,?)')
+    .run(uuidv4(), req.params.userId, 'message', (fromUser?.display_name||'Someone') + ' sent you a message', 'messages_'+req.userId, req.userId);
+  res.json({ id });
+});
+
+// ============ ADMIN: CANCEL MEMBERSHIP & SEARCH ============
+app.post('/api/admin/members/:id/cancel', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    db.prepare(`UPDATE users SET tier='free', stripe_subscription_id=NULL, plan_expires_at=NULL, billing_period=NULL WHERE id=?`).run(req.params.id);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/admin/members/search', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  const { q } = req.query;
+  if (!q) return res.json([]);
+  const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, forum_tokens, created_at 
+    FROM users WHERE email LIKE ? OR display_name LIKE ? ORDER BY created_at DESC LIMIT 20`).all('%'+q+'%', '%'+q+'%');
+  res.json(members);
+});
+
+// ============ PUBLIC PROFILE (limited info) ============
+app.get('/api/users/:id/profile', auth, (req, res) => {
+  const user = db.prepare('SELECT id, display_name, avatar_filename, bio, location, website, is_private, created_at FROM users WHERE id=?').get(req.params.id);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  // If private, only show basic info
+  if (user.is_private && user.id !== req.userId) {
+    res.json({ id: user.id, display_name: user.display_name, avatar_filename: user.avatar_filename, is_private: true });
+  } else {
+    res.json(user);
+  }
 });
 
 // SPA fallback

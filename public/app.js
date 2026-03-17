@@ -110,6 +110,7 @@ function showApp() {
   });
   checkUrlParams();
   loadDashboard(); loadClayBodies(); loadGlazes();
+  pollNotificationBadges();
   // Show admin nav for Christina
   const adminNav = document.getElementById('navAdmin');
   if (adminNav && currentUser?.email === 'christinaworkmanpottery@gmail.com') adminNav.style.display = '';
@@ -131,7 +132,8 @@ function navigate(page) {
       sales:'pageSales', community:'pageCommunity', forum:'pageForum',
       forumPost:'pageForumPost', profile:'pageProfile', shop:'pageShop',
       upgrade:'pageUpgrade', help:'pageHelp', admin:'pageAdmin',
-      shoppingList:'pageShoppingList', chemicals:'pageChemicals'
+      shoppingList:'pageShoppingList', chemicals:'pageChemicals',
+      notifications:'pageNotifications', messages:'pageMessages', messageThread:'pageMessageThread'
     };
     const el = document.getElementById(map[page]); if (el) el.classList.add('active');
     try { const nb = document.querySelector('.nav-link[data-page="' + page + '"]'); if (nb) nb.classList.add('active'); } catch(e) {}
@@ -141,7 +143,8 @@ function navigate(page) {
     glazes:loadGlazes, firings:loadFirings, casualties:loadCasualties, sales:loadSales,
     community:loadCombos, forum:loadForum, profile:loadProfile,
     shop:loadShop, upgrade:loadUpgrade, admin:loadAdmin,
-    shoppingList:loadShoppingList, chemicals:loadChemicals
+    shoppingList:loadShoppingList, chemicals:loadChemicals,
+    notifications:loadNotifications, messages:loadMessages
   };
   if (loaders[page]) loaders[page]();
     trackPageView('/' + page);
@@ -808,9 +811,16 @@ async function loadCombos() {
       (cb.atmosphere ? '<span class="piece-meta-tag">' + esc(cb.atmosphere) + '</span>' : '') +
       '</div></div>' +
       (cb.clay_body_name ? '<div class="text-sm mb-16"><strong>Clay:</strong> ' + esc(cb.clay_body_name) + '</div>' : '') +
-      (cb.photo_filename || cb.photo_filename2 ? '<div style="display:flex;gap:8px;margin-bottom:12px">' + (cb.photo_filename ? '<img src="/uploads/' + cb.photo_filename + '" style="max-width:200px;max-height:200px;border-radius:var(--radius-sm);object-fit:cover" loading="lazy">' : '') + (cb.photo_filename2 ? '<img src="/uploads/' + cb.photo_filename2 + '" style="max-width:200px;max-height:200px;border-radius:var(--radius-sm);object-fit:cover" loading="lazy">' : '') + '</div>' : '') +
+      (cb.photo_filename || cb.photo_filename2 ? '<div style="display:flex;gap:8px;margin-bottom:12px">' + (cb.photo_filename ? '<img src="/uploads/' + cb.photo_filename + '" style="max-width:200px;max-height:200px;border-radius:var(--radius-sm);object-fit:cover;cursor:zoom-in" loading="lazy" onclick="openLightbox(\'/uploads/' + cb.photo_filename + '\')">' : '') + (cb.photo_filename2 ? '<img src="/uploads/' + cb.photo_filename2 + '" style="max-width:200px;max-height:200px;border-radius:var(--radius-sm);object-fit:cover;cursor:zoom-in" loading="lazy" onclick="openLightbox(\'/uploads/' + cb.photo_filename2 + '\')">' : '') + '</div>' : '') +
       '<div>' + (cb.layers||[]).map((l,i) => '<div style="margin-bottom:4px"><span style="color:var(--text-muted);font-size:0.8rem">Layer ' + (i+1) + ':</span> <span class="glaze-tag">' + esc(l.glaze_name) + '</span>' + (l.brand ? ' <span class="text-sm">(' + esc(l.brand) + ')</span>' : '') + (l.coats > 1 ? ' · ' + l.coats + ' coats' : '') + '</div>').join('') + '</div>' +
-      (cb.description ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(cb.description) + '</div>' : '') + '</div>'
+      (cb.description ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(cb.description) + '</div>' : '') +
+      '<div style="display:flex;gap:12px;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">' +
+      '<button class="btn-ghost btn-sm" onclick="toggleComboLike(\'' + cb.id + '\')" style="' + (cb.user_liked ? 'color:var(--danger)' : '') + '">' + (cb.user_liked ? '❤️' : '🤍') + ' ' + (cb.likes||0) + '</button>' +
+      '<button class="btn-ghost btn-sm" onclick="toggleComboComments(\'' + cb.id + '\')">💬 ' + (cb.comment_count||0) + '</button>' +
+      (cb.user_id !== currentUser?.id ? '<button class="btn-ghost btn-sm" onclick="navigate(\'messageThread\');loadMessageThread(\'' + cb.user_id + '\')">✉️ Message</button>' : '') +
+      '</div>' +
+      '<div id="comboComments_' + cb.id + '" class="hidden" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"></div>' +
+      '</div>'
     ).join('');
   } catch(e) { toast(e.message,'error'); }
 }
@@ -1340,7 +1350,12 @@ async function loadAdmin() {
     const m = data.members || [];
     const s = data.stats || { total: 0, byTier: { free: 0, basic: 0, mid: 0, top: 0 }, recent7d: 0, recent30d: 0 };
     
-    let html = '<div class="stats-bar" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">' +
+    let html = '<div class="card mb-16" style="padding:14px"><h3 style="margin-bottom:10px">🔍 Search Members</h3>' +
+      '<div style="display:flex;gap:8px"><input type="text" class="form-input" id="adminSearchInput" placeholder="Search by name or email..." onkeydown="if(event.key===\'Enter\')adminSearchMembers()">' +
+      '<button class="btn btn-primary btn-sm" onclick="adminSearchMembers()">Search</button></div>' +
+      '<div id="adminSearchResults" class="mt-8"></div></div>';
+
+    html += '<div class="stats-bar" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">' +
       '<div class="stat-box"><div class="stat-number">' + s.total + '</div><div class="stat-label">Total Members</div></div>' +
       '<div class="stat-box"><div class="stat-number">' + s.recent7d + '</div><div class="stat-label">Last 7 Days</div></div>' +
       '<div class="stat-box"><div class="stat-number">' + s.recent30d + '</div><div class="stat-label">Last 30 Days</div></div>' +
@@ -1353,7 +1368,7 @@ async function loadAdmin() {
     // Members table
     html += '<div class="card mb-16"><h3 style="margin-bottom:12px">All Members</h3>';
     html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
-    html += '<tr style="border-bottom:2px solid var(--border);text-align:left"><th style="padding:8px">Name</th><th style="padding:8px">Email</th><th style="padding:8px">Tier</th><th style="padding:8px">Billing</th><th style="padding:8px">Tokens</th><th style="padding:8px">Joined</th></tr>';
+    html += '<tr style="border-bottom:2px solid var(--border);text-align:left"><th style="padding:8px">Name</th><th style="padding:8px">Email</th><th style="padding:8px">Tier</th><th style="padding:8px">Billing</th><th style="padding:8px">Joined</th><th style="padding:8px">Actions</th></tr>';
     m.forEach(u => {
       const tier = u.tier || 'free';
       html += '<tr style="border-bottom:1px solid var(--border)">' +
@@ -1362,8 +1377,8 @@ async function loadAdmin() {
         '<td style="padding:8px"><span class="tier-badge tier-' + tier + '" style="font-size:0.75rem">' + tier.toUpperCase() + '</span>' +
         (u.stripe_subscription_id ? ' 💳' : '') + '</td>' +
         '<td style="padding:8px">' + (u.billing_period || '—') + '</td>' +
-        '<td style="padding:8px">' + (u.forum_tokens || 0) + '</td>' +
-        '<td style="padding:8px">' + fmtDate(u.created_at) + '</td></tr>';
+        '<td style="padding:8px">' + fmtDate(u.created_at) + '</td>' +
+        '<td style="padding:8px">' + (tier !== 'free' ? '<button class="btn btn-danger btn-sm" style="font-size:0.7rem" onclick="adminCancelMember(\'' + u.id + '\',\'' + esc(u.email).replace(/'/g,"\\'") + '\')">Cancel</button>' : '') + '</td></tr>';
     });
     html += '</table></div></div>';
 
@@ -1856,6 +1871,175 @@ async function toggleGlazeStock(id, status) {
 // Clay stock quick toggle
 async function toggleClayStock(id, val) {
   try { await api('/api/clay-bodies/'+id+'/stock', {method:'PUT', body:{inStock:val}}); loadClayBodies(); } catch(e) { toast(e.message,'error'); }
+}
+
+// ---- Combo Likes & Comments ----
+async function toggleComboLike(comboId) {
+  try { await api('/api/community/combos/' + comboId + '/like', {method:'POST'}); loadCombos(); } catch(e) { toast(e.message,'error'); }
+}
+async function toggleComboComments(comboId) {
+  const el = document.getElementById('comboComments_' + comboId);
+  if (!el) return;
+  if (!el.classList.contains('hidden')) { el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">Loading...</div>';
+  try {
+    const comments = await api('/api/community/combos/' + comboId + '/comments');
+    let html = comments.map(c => {
+      const avatar = c.author_avatar ? '<img src="/uploads/' + c.author_avatar + '" style="width:28px;height:28px;border-radius:50%;object-fit:cover">' : '<div style="width:28px;height:28px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:0.8rem">' + (c.author_name||'?')[0].toUpperCase() + '</div>';
+      const deleteBtn = (c.user_id === currentUser?.id || currentUser?.email === 'christinaworkmanpottery@gmail.com') ? '<button class="btn-ghost btn-sm" onclick="deleteComboComment(\'' + c.id + '\',\'' + comboId + '\')" style="font-size:0.7rem">🗑️</button>' : '';
+      return '<div style="display:flex;gap:8px;margin-bottom:10px">' + avatar +
+        '<div style="flex:1"><div style="display:flex;justify-content:space-between"><strong class="text-sm">' + esc(c.author_name||'Anonymous') + '</strong><div>' + deleteBtn + '<span class="text-sm" style="color:var(--text-muted)">' + timeAgo(c.created_at) + '</span></div></div>' +
+        '<div class="text-sm" style="margin-top:2px">' + esc(c.body) + '</div></div></div>';
+    }).join('');
+    html += '<div style="display:flex;gap:8px;margin-top:8px"><input type="text" class="form-input" id="comboComment_' + comboId + '" placeholder="Ask a question or comment..." style="font-size:0.85rem">' +
+      '<button class="btn btn-primary btn-sm" onclick="postComboComment(\'' + comboId + '\')">Post</button></div>';
+    el.innerHTML = html;
+  } catch(e) { el.innerHTML = '<div class="text-sm" style="color:var(--danger)">' + esc(e.message) + '</div>'; }
+}
+async function postComboComment(comboId) {
+  const input = document.getElementById('comboComment_' + comboId);
+  if (!input?.value.trim()) return;
+  try {
+    await api('/api/community/combos/' + comboId + '/comments', {method:'POST', body:{body:input.value.trim()}});
+    toggleComboComments(comboId); // reload
+    toggleComboComments(comboId);
+    loadCombos(); // update count
+  } catch(e) { toast(e.message,'error'); }
+}
+async function deleteComboComment(commentId, comboId) {
+  if (!confirm('Delete this comment?')) return;
+  try { await api('/api/community/comments/' + commentId, {method:'DELETE'}); toggleComboComments(comboId); toggleComboComments(comboId); loadCombos(); } catch(e) { toast(e.message,'error'); }
+}
+
+// ---- Forum Like ----
+async function toggleForumLike(postId) {
+  try { const d = await api('/api/forum/posts/' + postId + '/like', {method:'POST'}); return d.liked; } catch(e) { toast(e.message,'error'); }
+}
+
+// ---- Notifications ----
+async function pollNotificationBadges() {
+  try {
+    const n = await api('/api/notifications');
+    const badge = document.getElementById('notifBadge');
+    if (n.unread > 0) { badge.textContent = n.unread; badge.classList.remove('hidden'); } else { badge.classList.add('hidden'); }
+  } catch(e) {}
+  try {
+    const m = await api('/api/messages');
+    const badge = document.getElementById('msgBadge');
+    if (m.unread > 0) { badge.textContent = m.unread; badge.classList.remove('hidden'); } else { badge.classList.add('hidden'); }
+  } catch(e) {}
+  // Poll every 60 seconds
+  setTimeout(pollNotificationBadges, 60000);
+}
+
+async function loadNotifications() {
+  try {
+    const d = await api('/api/notifications');
+    const c = document.getElementById('notificationList'), em = document.getElementById('notificationsEmpty');
+    if (!d.notifications.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
+    em.classList.add('hidden');
+    c.innerHTML = d.notifications.map(n =>
+      '<div class="notif-item' + (n.is_read ? '' : ' unread') + '" onclick="handleNotifClick(\'' + esc(n.id) + '\',\'' + esc(n.link||'') + '\')">' +
+      '<div style="display:flex;justify-content:space-between"><div>' +
+      (n.type==='combo_like' ? '❤️ ' : n.type==='combo_comment' ? '💬 ' : n.type==='forum_like' ? '❤️ ' : n.type==='forum_reply' ? '💬 ' : n.type==='message' ? '✉️ ' : '🔔 ') +
+      esc(n.message) + '</div><span class="text-sm" style="color:var(--text-muted);white-space:nowrap;margin-left:12px">' + timeAgo(n.created_at) + '</span></div></div>'
+    ).join('');
+    // Mark all as read
+    api('/api/notifications/read', {method:'POST'}).then(() => {
+      const badge = document.getElementById('notifBadge'); badge.classList.add('hidden');
+    });
+  } catch(e) { toast(e.message,'error'); }
+}
+
+function handleNotifClick(notifId, link) {
+  if (!link) return;
+  if (link === 'community') navigate('community');
+  else if (link === 'forum') navigate('forum');
+  else if (link.startsWith('forumPost_')) viewForumPost(link.replace('forumPost_',''));
+  else if (link.startsWith('messages_')) { navigate('messageThread'); loadMessageThread(link.replace('messages_','')); }
+}
+
+async function markAllNotificationsRead() {
+  try { await api('/api/notifications/read', {method:'POST'}); toast('All marked read','success'); loadNotifications(); } catch(e) { toast(e.message,'error'); }
+}
+
+// ---- In-App Messaging ----
+async function loadMessages() {
+  try {
+    const d = await api('/api/messages');
+    const c = document.getElementById('messageList'), em = document.getElementById('messagesEmpty');
+    if (!d.conversations.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
+    em.classList.add('hidden');
+    c.innerHTML = d.conversations.map(m => {
+      const avatar = m.partner_avatar ? '<img src="/uploads/' + m.partner_avatar + '" style="width:40px;height:40px;border-radius:50%;object-fit:cover">' : '<div style="width:40px;height:40px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700">' + (m.partner_name||'?')[0].toUpperCase() + '</div>';
+      const isUnread = !m.is_read && m.to_user_id === currentUser?.id;
+      return '<div class="notif-item' + (isUnread ? ' unread' : '') + '" onclick="navigate(\'messageThread\');loadMessageThread(\'' + m.partner_id + '\')">' +
+        '<div style="display:flex;gap:12px;align-items:center">' + avatar +
+        '<div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between"><strong>' + esc(m.partner_name||'Unknown') + '</strong>' +
+        '<span class="text-sm" style="color:var(--text-muted)">' + timeAgo(m.created_at) + '</span></div>' +
+        '<div class="text-sm" style="color:var(--text-light);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(m.body.substring(0,80)) + '</div></div></div></div>';
+    }).join('');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function loadMessageThread(userId) {
+  try {
+    const d = await api('/api/messages/' + userId);
+    const el = document.getElementById('messageThreadContent');
+    const partner = d.partner || {};
+    const avatar = partner.avatar_filename ? '<img src="/uploads/' + partner.avatar_filename + '" style="width:36px;height:36px;border-radius:50%;object-fit:cover">' : '<div style="width:36px;height:36px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700">' + (partner.display_name||'?')[0].toUpperCase() + '</div>';
+    let html = '<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px">' + avatar + '<h2>' + esc(partner.display_name||'Unknown') + '</h2></div>';
+    html += '<div style="max-height:400px;overflow-y:auto;padding:12px;background:var(--bg);border-radius:var(--radius-sm);margin-bottom:16px" id="msgThreadScroll">';
+    if (!d.messages.length) html += '<div class="text-sm" style="color:var(--text-muted);text-align:center;padding:20px">No messages yet. Start the conversation!</div>';
+    d.messages.forEach(m => {
+      const mine = m.from_user_id === currentUser?.id;
+      html += '<div style="display:flex;' + (mine ? 'justify-content:flex-end' : '') + '">' +
+        '<div class="msg-bubble ' + (mine ? 'msg-mine' : 'msg-theirs') + '">' + esc(m.body) +
+        '<div style="font-size:0.7rem;opacity:0.7;margin-top:4px">' + timeAgo(m.created_at) + '</div></div></div>';
+    });
+    html += '</div>';
+    html += '<div style="display:flex;gap:8px"><input type="text" class="form-input" id="msgInput" placeholder="Type a message..." onkeydown="if(event.key===\'Enter\')sendMessage(\'' + userId + '\')">' +
+      '<button class="btn btn-primary" onclick="sendMessage(\'' + userId + '\')">Send</button></div>';
+    el.innerHTML = html;
+    // Scroll to bottom
+    const scroll = document.getElementById('msgThreadScroll');
+    if (scroll) scroll.scrollTop = scroll.scrollHeight;
+    pollNotificationBadges();
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function sendMessage(userId) {
+  const input = document.getElementById('msgInput');
+  if (!input?.value.trim()) return;
+  try {
+    await api('/api/messages/' + userId, {method:'POST', body:{body:input.value.trim()}});
+    input.value = '';
+    loadMessageThread(userId);
+  } catch(e) { toast(e.message,'error'); }
+}
+
+// ---- Admin Search & Cancel ----
+async function adminSearchMembers() {
+  const q = document.getElementById('adminSearchInput')?.value;
+  if (!q) return;
+  try {
+    const results = await api('/api/admin/members/search?q=' + encodeURIComponent(q));
+    const el = document.getElementById('adminSearchResults');
+    if (!results.length) { el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">No results</div>'; return; }
+    el.innerHTML = results.map(u =>
+      '<div class="card" style="padding:10px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">' +
+      '<div><strong>' + esc(u.display_name||'') + '</strong> · ' + esc(u.email) + ' · <span class="tier-badge tier-' + (u.tier||'free') + '" style="font-size:0.7rem">' + (u.tier||'free').toUpperCase() + '</span></div>' +
+      '<div style="display:flex;gap:4px">' +
+      (u.tier !== 'free' ? '<button class="btn btn-danger btn-sm" onclick="adminCancelMember(\'' + u.id + '\',\'' + esc(u.email) + '\')">Cancel Membership</button>' : '<span class="text-sm" style="color:var(--text-muted)">Free tier</span>') +
+      '</div></div>'
+    ).join('');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function adminCancelMember(userId, email) {
+  if (!confirm('Cancel membership for ' + email + '? This will set them back to Free tier immediately.')) return;
+  try { await api('/api/admin/members/' + userId + '/cancel', {method:'POST'}); toast('Membership cancelled for ' + email,'success'); adminSearchMembers(); loadAdmin(); } catch(e) { toast(e.message,'error'); }
 }
 
 checkAuth();

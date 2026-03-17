@@ -145,6 +145,15 @@
 
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏺</text></svg>">
   <link rel="stylesheet" href="style.css?v=20260310d">
+  <style>
+    .notif-badge{position:absolute;top:-4px;right:-6px;background:var(--danger);color:#fff;font-size:0.65rem;font-weight:700;border-radius:50%;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+    .notif-item{padding:12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.15s}
+    .notif-item:hover{background:var(--primary-light)}
+    .notif-item.unread{background:rgba(139,90,43,0.05);border-left:3px solid var(--primary)}
+    .msg-bubble{padding:10px 14px;border-radius:16px;max-width:75%;margin-bottom:8px;font-size:0.9rem;line-height:1.4}
+    .msg-mine{background:var(--primary);color:#fff;margin-left:auto;border-bottom-right-radius:4px}
+    .msg-theirs{background:var(--primary-light);border-bottom-left-radius:4px}
+  </style>
 </head>
 <body>
 
@@ -420,6 +429,8 @@
         <button class="nav-link" data-page="admin" onclick="navigate('admin')" id="navAdmin" style="display:none">Admin</button>
       </div>
       <div class="nav-user">
+        <button class="btn-ghost" onclick="navigate('messages')" title="Messages" style="position:relative;font-size:1.1rem">✉️<span id="msgBadge" class="notif-badge hidden">0</span></button>
+        <button class="btn-ghost" onclick="navigate('notifications')" title="Notifications" style="position:relative;font-size:1.1rem">🔔<span id="notifBadge" class="notif-badge hidden">0</span></button>
         <span id="navTier" class="tier-badge tier-free">FREE</span>
         <button class="btn-ghost" onclick="logout()" title="Sign out" style="color:rgba(255,255,255,0.7)">Sign Out</button>
       </div>
@@ -908,6 +919,39 @@
         <h1>🔧 Admin Dashboard</h1>
       </div>
       <div id="adminContent"></div>
+    </div>
+
+    <!-- NOTIFICATIONS -->
+    <div id="pageNotifications" class="page">
+      <div class="page-header">
+        <h1>🔔 Notifications</h1>
+        <button class="btn btn-secondary btn-sm" onclick="markAllNotificationsRead()">Mark All Read</button>
+      </div>
+      <div id="notificationList"></div>
+      <div id="notificationsEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">🔔</div>
+        <div class="empty-state-title">No notifications yet</div>
+        <p>You'll see likes, comments, and messages here.</p>
+      </div>
+    </div>
+
+    <!-- MESSAGES -->
+    <div id="pageMessages" class="page">
+      <div class="page-header">
+        <h1>✉️ Messages</h1>
+      </div>
+      <div id="messageList"></div>
+      <div id="messagesEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">✉️</div>
+        <div class="empty-state-title">No messages yet</div>
+        <p>Send a message to another potter from their profile or forum posts.</p>
+      </div>
+    </div>
+
+    <!-- MESSAGE THREAD -->
+    <div id="pageMessageThread" class="page">
+      <button class="detail-back" onclick="navigate('messages')">← Back to Messages</button>
+      <div id="messageThreadContent"></div>
     </div>
 
     <!-- SHOPPING LIST -->
@@ -1671,6 +1715,6 @@
   </div>
 </div>
 
-<script src="app.js?v=20260317d"></script>
+<script src="app.js?v=20260317e"></script>
 </body>
 </html>

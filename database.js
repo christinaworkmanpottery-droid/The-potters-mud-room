@@ -487,6 +487,66 @@ function initDB() {
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_chemicals_user ON glaze_chemicals(user_id)`);
 
+  // Combo likes (user-specific, prevents double-liking)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS combo_likes (
+      id TEXT PRIMARY KEY,
+      combo_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (combo_id) REFERENCES glaze_combos(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      UNIQUE(combo_id, user_id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_combo_likes ON combo_likes(combo_id)`);
+
+  // Combo comments
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS combo_comments (
+      id TEXT PRIMARY KEY,
+      combo_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      body TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (combo_id) REFERENCES glaze_combos(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_combo_comments ON combo_comments(combo_id)`);
+
+  // In-app notifications
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      message TEXT NOT NULL,
+      link TEXT,
+      is_read INTEGER DEFAULT 0,
+      from_user_id TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read)`);
+
+  // In-app messages
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id TEXT PRIMARY KEY,
+      from_user_id TEXT NOT NULL,
+      to_user_id TEXT NOT NULL,
+      body TEXT NOT NULL,
+      is_read INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (from_user_id) REFERENCES users(id),
+      FOREIGN KEY (to_user_id) REFERENCES users(id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_messages_to ON messages(to_user_id, is_read)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(from_user_id, to_user_id)`);
+
   // Ensure new forum categories exist
   const catInsert = db.prepare('INSERT OR IGNORE INTO forum_categories (id, name, description, sort_order, icon) VALUES (?,?,?,?,?)');
   catInsert.run('cat-events', 'Events', 'Post pottery events, workshops, shows, and meetups near you!', 11, '📅');
