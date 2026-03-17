@@ -500,6 +500,7 @@
         <div style="display:flex;gap:8px;align-items:center">
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('clay','card')" title="Card view">▦</button>
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('clay','list')" title="List view">☰</button>
+          <button class="btn btn-sm btn-secondary" onclick="navigate('shoppingList')">🛒 Shopping List</button>
           <button class="btn btn-primary" onclick="openClayModal()">+ Add Clay</button>
         </div>
       </div>
@@ -587,7 +588,10 @@
     <div id="pageCommunity" class="page">
       <div class="page-header">
         <h1>Community Glaze Library</h1>
-        <button class="btn btn-primary" onclick="openComboModal()">+ Share Combo</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-sm btn-secondary" onclick="navigate('shoppingList')">🛒 Shopping List</button>
+          <button class="btn btn-primary" onclick="openComboModal()">+ Share Combo</button>
+        </div>
       </div>
       <div class="filter-bar">
         <input type="text" class="form-input" placeholder="Search combos..." id="comboSearch" oninput="debounceLoadCombos()">
@@ -1667,6 +1671,6 @@
   </div>
 </div>
 
-<script src="app.js?v=20260317c"></script>
+<script src="app.js?v=20260317d"></script>
 </body>
 </html>
