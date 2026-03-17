@@ -2503,8 +2503,16 @@ async function deleteEvent(id) {
   try { await api('/api/events/' + id, {method:'DELETE'}); toast('Deleted','success'); loadEvents(); } catch(e) { toast(e.message,'error'); }
 }
 
-function downloadEventsiCal() {
-  window.location.href = '/api/events/export/ics';
+async function downloadEventsiCal() {
+  try {
+    const res = await fetch('/api/events/export/ics', { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!res.ok) throw new Error('Download failed');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'pottery-events.ics'; a.click();
+    URL.revokeObjectURL(url);
+    toast('Calendar downloaded! Open the .ics file to add to your calendar app.', 'success');
+  } catch(e) { toast(e.message, 'error'); }
 }
 function printEvents() {
   const el = document.getElementById('eventsList');

@@ -579,7 +579,7 @@
             <option value="firing_type">Sort by Firing Type</option>
             <option value="cone">Sort by Cone</option>
           </select>
-          <button class="btn btn-sm btn-secondary" onclick="window.location.href='/api/export/firing-logs'">📥 Download</button>
+          <button class="btn btn-sm btn-secondary" onclick="exportData('/api/export/firing-logs')">📥 Download</button>
           <button class="btn btn-sm btn-secondary" onclick="printFiringLog()">🖨️ Print</button>
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('firings','card')" title="Card view">▦</button>
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('firings','list')" title="List view">☰</button>
@@ -2183,6 +2183,6 @@
   </div>
 </div>
 
-<script src="app.js?v=20260317j"></script>
+<script src="app.js?v=20260317k"></script>
 </body>
 </html>
