@@ -674,6 +674,99 @@ function initDB() {
     )
   `);
 
+  // Blog posts table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS blog_posts (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      slug TEXT UNIQUE NOT NULL,
+      content TEXT NOT NULL,
+      excerpt TEXT,
+      author TEXT DEFAULT 'Christina Workman',
+      published_at TEXT DEFAULT (datetime('now')),
+      is_published INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_blog_slug ON blog_posts(slug)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_blog_published ON blog_posts(is_published, published_at)`);
+
+  // Featured potter table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS featured_potter (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      quote TEXT,
+      featured_date TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+
+  // Newsletter subscribers table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS newsletter_subscribers (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      subscribed_at TEXT DEFAULT (datetime('now')),
+      is_active INTEGER DEFAULT 1
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_newsletter_email ON newsletter_subscribers(email)`);
+
+  // Referral rewards table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS referral_rewards (
+      id TEXT PRIMARY KEY,
+      referrer_id TEXT NOT NULL,
+      referred_id TEXT NOT NULL,
+      tokens_awarded INTEGER DEFAULT 5,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (referrer_id) REFERENCES users(id),
+      FOREIGN KEY (referred_id) REFERENCES users(id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_referral_referrer ON referral_rewards(referrer_id)`);
+
+  // Shareable combo columns
+  safeAdd('glaze_combos', 'share_id', 'TEXT');
+  safeAdd('glaze_combos', 'is_public', 'INTEGER DEFAULT 0');
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_combos_share_id ON glaze_combos(share_id)`);
+
+  // Referral code on users (may already exist from CREATE TABLE, but safe to add)
+  safeAdd('users', 'referral_code', 'TEXT');
+  safeAdd('users', 'referred_by', 'TEXT');
+
+  // Seed starter blog posts (INSERT OR IGNORE by slug)
+  const blogInsert = db.prepare(`INSERT OR IGNORE INTO blog_posts (id, title, slug, content, excerpt, author, is_published, published_at) VALUES (?,?,?,?,?,?,1,datetime('now'))`);
+
+  blogInsert.run(
+    'blog-001',
+    '5 Tips for Tracking Your Pottery',
+    '5-tips-for-tracking-your-pottery',
+    `Every potter knows the frustration: you pull a beautiful piece out of the kiln, someone asks "what glaze is that?" — and you have absolutely no idea.\n\nTracking your pottery process might seem tedious, but it's the single best habit you can build as a ceramicist. Here are 5 tips to get started:\n\n**1. Log Every Piece Immediately**\nDon't wait until after the firing. The moment you finish forming a piece, record the clay body, technique, and any notes about the process. Future-you will thank past-you.\n\n**2. Photograph at Every Stage**\nWet clay looks completely different from bisque, which looks completely different from glazed. Take a quick photo at each stage — it only takes seconds and creates an invaluable visual record.\n\n**3. Track Your Clay Bodies**\nDifferent clays behave differently. Log the brand, type, cone range, and how each clay performs. Over time, you'll build a personal reference library that's worth its weight in... clay.\n\n**4. Build a Glaze Library**\nKeep detailed records of every glaze you use — commercial name, brand, how many coats, application method, and most importantly, result photos. This is how you go from guessing to knowing.\n\n**5. Note Your Failures Too**\nCracked pots, crawling glazes, unexpected colors — these "casualties" are your best teachers. Log what went wrong and what you think caused it. That's how you grow.\n\nThe Potter's Mud Room was built specifically for this. Start tracking today — it's free.`,
+    'Every potter knows the frustration of pulling a beautiful piece from the kiln and having no idea what glaze was used. Here are 5 tips to start tracking your pottery process.',
+    'Christina Workman'
+  );
+
+  blogInsert.run(
+    'blog-002',
+    'How to Build a Glaze Library That Actually Works',
+    'how-to-build-a-glaze-library-that-actually-works',
+    `If you're like most potters, your glaze "library" is a collection of bottles with faded labels, a few sticky notes, and a vague memory of which ones looked good together.\n\nLet's fix that.\n\n**Start With What You Have**\nDon't try to catalog every glaze in existence. Start with the 5-10 glazes you actually use regularly. For each one, record:\n- Brand and name\n- Cone range\n- Atmosphere (oxidation/reduction)\n- Surface finish (gloss, satin, matte)\n- How it looks on different clay bodies\n\n**Test Tiles Are Your Best Friend**\nMake test tiles with every clay body you use, and dip them in your glazes. Photograph the results. This is your real glaze library — not the manufacturer's catalog, but YOUR results in YOUR kiln.\n\n**Track Combinations**\nSome of the most beautiful effects come from layering glazes. When you find a combo that works, record it! Note which glaze went on first, how many coats of each, and the firing details.\n\n**Organize by What Matters to YOU**\nSome potters organize by color. Others by cone. Others by brand. There's no wrong answer — just pick a system and stick with it.\n\n**Share What You Learn**\nThe pottery community thrives on shared knowledge. When you find an amazing glaze combo, share it! Other potters will appreciate it, and you'll build connections.\n\nThe Potter's Mud Room has a built-in glaze library with room for photos, recipes, ingredients, and combo tracking. It's the glaze library you've been wishing for.`,
+    'Most potters have a messy collection of bottles and sticky notes instead of a real glaze library. Here\'s how to build one that actually works.',
+    'Christina Workman'
+  );
+
+  blogInsert.run(
+    'blog-003',
+    'From Studio to Sale: Tracking Your Pottery Business',
+    'from-studio-to-sale-tracking-your-pottery-business',
+    `Making pottery is art. Selling pottery is business. And if you want your art to pay the bills, you need to treat it like both.\n\n**Know Your Costs**\nEvery piece has costs: clay, glaze, kiln electricity/gas, studio rent, your time. If you don't track these, you're probably underpricing your work. Most potters are.\n\n**Price With Confidence**\nOnce you know your costs, pricing becomes less stressful. A simple formula: (material cost + firing cost + time × your hourly rate) × 2 for wholesale, × 3 for retail. Adjust from there.\n\n**Track Every Sale**\nWhether it's an art fair, online order, gallery consignment, or a friend buying from your studio — log it. Track the date, price, venue, and which piece sold. Over time, this data tells you:\n- What forms/glazes sell best\n- Which venues are most profitable\n- Your busiest selling seasons\n- Your average sale price\n\n**Art Fairs and Markets**\nBulk sale tracking is essential for art fairs. Record everything during the event while it's fresh — the item, quantity, and price. Your future self (and your accountant) will thank you.\n\n**Export for Taxes**\nCome tax season, you need organized records. Being able to export your sales data as a CSV saves hours of headache.\n\n**The Potter's Mud Room includes sales tracking with CSV export, cost tracking per piece, and venue analytics. Because potters deserve business tools built for how we actually work.**`,
+    'Making pottery is art. Selling pottery is business. Here\'s how to track your pottery business from studio to sale.',
+    'Christina Workman'
+  );
+
   return db;
 }
 

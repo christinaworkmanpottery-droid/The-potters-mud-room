@@ -44,13 +44,19 @@ function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-// Check URL params for post-checkout messages
+// Check URL params for post-checkout messages and referral codes
 function checkUrlParams() {
   const p = new URLSearchParams(window.location.search);
   if (p.get('upgraded')) { toast('🎉 Welcome to ' + p.get('upgraded').toUpperCase() + ' tier! Enjoy your new features.', 'success'); }
   if (p.get('purchased')) { toast('🛍️ Purchase complete! Check your email for details.', 'success'); }
   if (p.get('cancelled')) { toast('Purchase cancelled.', ''); }
-  if (p.has('upgraded') || p.has('purchased') || p.has('cancelled')) {
+  // Detect referral code
+  if (p.get('ref')) {
+    sessionStorage.setItem('referral_code', p.get('ref'));
+  }
+  if (p.has('upgraded') || p.has('purchased') || p.has('cancelled') || p.has('ref')) {
+    const ref = p.get('ref');
+    const clean = window.location.pathname + (ref ? '?ref=' + ref : '');
     window.history.replaceState({}, '', window.location.pathname);
   }
 }
@@ -74,9 +80,11 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
   const errEl = document.getElementById('authError');
   errEl.classList.add('hidden');
   try {
+    const referredBy = sessionStorage.getItem('referral_code') || null;
     const data = await api(isSignUp ? '/api/auth/register' : '/api/auth/login', {
-      method: 'POST', body: isSignUp ? { email, password, displayName: name } : { email, password }
+      method: 'POST', body: isSignUp ? { email, password, displayName: name, referredBy } : { email, password }
     });
+    if (isSignUp && referredBy) sessionStorage.removeItem('referral_code');
     token = data.token;
     localStorage.setItem('mudlog_token', token);
     currentUser = data.user;
@@ -136,7 +144,8 @@ function navigate(page) {
       shoppingList:'pageShoppingList', chemicals:'pageChemicals',
       communityMembers:'pageCommunityMembers',
       memberProfile:'pageMemberProfile',
-      notifications:'pageNotifications', messages:'pageMessages', messageThread:'pageMessageThread'
+      notifications:'pageNotifications', messages:'pageMessages', messageThread:'pageMessageThread',
+      blog:'pageBlog', blogPost:'pageBlogPost', publicCombo:'pagePublicCombo'
     };
     const el = document.getElementById(map[page]); if (el) el.classList.add('active');
     try { const nb = document.querySelector('.nav-link[data-page="' + page + '"]'); if (nb) nb.classList.add('active'); } catch(e) {}
@@ -148,7 +157,8 @@ function navigate(page) {
     shop:loadShop, upgrade:loadUpgrade, admin:loadAdmin,
     shoppingList:loadShoppingList, chemicals:loadChemicals,
     communityMembers:loadCommunityMembers,
-    notifications:loadNotifications, messages:loadMessages
+    notifications:loadNotifications, messages:loadMessages,
+    blog:loadBlog
   };
   if (loaders[page]) loaders[page]();
     trackPageView('/' + page);
@@ -1003,7 +1013,11 @@ async function loadCombos() {
       '<div style="display:flex;gap:12px;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">' +
       '<button class="btn-ghost btn-sm" onclick="toggleComboLike(\'' + cb.id + '\')" style="' + (cb.user_liked ? 'color:var(--danger)' : '') + '">' + (cb.user_liked ? '❤️' : '🤍') + ' ' + (cb.likes||0) + '</button>' +
       '<button class="btn-ghost btn-sm" onclick="toggleComboComments(\'' + cb.id + '\')">💬 ' + (cb.comment_count||0) + '</button>' +
-      (cb.user_id === currentUser?.id ? '<button class="btn-ghost btn-sm" onclick="editCombo(\'' + cb.id + '\')">✎ Edit</button><button class="btn-ghost btn-sm" onclick="deleteCombo(\'' + cb.id + '\')">✕ Delete</button>' : '<button class="btn-ghost btn-sm" onclick="navigate(\'messageThread\');loadMessageThread(\'' + cb.user_id + '\')">✉️ Message</button>') +
+      (cb.user_id === currentUser?.id ?
+        '<button class="btn-ghost btn-sm" onclick="toggleComboPublic(\'' + cb.id + '\',' + (cb.is_public ? 'false' : 'true') + ')" title="' + (cb.is_public ? 'Make private' : 'Make public & shareable') + '">' + (cb.is_public ? '🔓 Public' : '🔒 Private') + '</button>' +
+        (cb.is_public && cb.share_id ? '<button class="btn-ghost btn-sm" onclick="copyComboLink(\'' + cb.share_id + '\')" title="Copy share link">🔗 Share</button>' : '') +
+        '<button class="btn-ghost btn-sm" onclick="editCombo(\'' + cb.id + '\')">✎ Edit</button><button class="btn-ghost btn-sm" onclick="deleteCombo(\'' + cb.id + '\')">✕ Delete</button>'
+        : '<button class="btn-ghost btn-sm" onclick="navigate(\'messageThread\');loadMessageThread(\'' + cb.user_id + '\')">✉️ Message</button>') +
       '</div>' +
       '<div id="comboComments_' + cb.id + '" class="hidden" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"></div>' +
       '</div>'
@@ -1325,13 +1339,21 @@ async function loadProfile() {
        '<div style="display:flex;gap:8px"><button class="btn btn-secondary btn-sm" onclick="navigate(\'upgrade\')">Change Plan</button><button class="btn btn-danger btn-sm" onclick="cancelSubscription()">Cancel Plan</button></div>');
     document.getElementById('profileTierInfo').innerHTML = tierHtml;
 
-    // Referral section
+    // Referral section - Share & Earn
     const refCode = d.user.referral_code || '';
     const refCount = d.user.referralCount || 0;
+    const refTokens = d.user.referralTokensEarned || 0;
+    const refLink = 'https://thepottersmudroom.com?ref=' + refCode;
     document.getElementById('profileReferralInfo').innerHTML =
-      '<div style="margin-bottom:8px">Your referral code: <strong style="color:var(--primary);font-size:1.1rem">' + esc(refCode) + '</strong></div>' +
-      '<div class="text-sm" style="margin-bottom:8px;color:var(--text-light)">Share this code with friends — help grow the potter community!</div>' +
-      '<div class="text-sm">Friends referred: <strong>' + refCount + '</strong></div>';
+      '<div style="background:var(--primary-light);border-radius:var(--radius);padding:16px;margin-bottom:12px">' +
+      '<h4 style="margin-bottom:8px;color:var(--primary)">🎁 Share & Earn</h4>' +
+      '<p class="text-sm" style="margin-bottom:12px;color:var(--text-light)">Share your link — when someone signs up, you BOTH get <strong>5 bonus tokens</strong>!</p>' +
+      '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">' +
+      '<input type="text" class="form-input" value="' + esc(refLink) + '" readonly id="refLinkInput" style="font-size:0.85rem;flex:1" onclick="this.select()">' +
+      '<button class="btn btn-primary btn-sm" onclick="copyReferralLink()">📋 Copy</button></div>' +
+      '<div style="display:flex;gap:20px">' +
+      '<div class="text-sm"><strong>' + refCount + '</strong> friends referred</div>' +
+      '<div class="text-sm"><strong>' + refTokens + '</strong> tokens earned</div></div></div>';
 
     // Review section
     loadMyReview();
@@ -1654,6 +1676,26 @@ async function loadAdmin() {
     // Reviews section
     html += '<div class="card mb-16"><h3 style="margin-bottom:12px">⭐ Reviews</h3><div id="adminReviewsList">Loading...</div></div>';
 
+    // Blog management section
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">📝 Blog Posts</h3>' +
+      '<button class="btn btn-primary btn-sm mb-16" onclick="openBlogPostEditor()">+ New Post</button>' +
+      '<div id="adminBlogList">Loading...</div></div>';
+
+    // Featured potter section
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">🌟 Featured Potter</h3>' +
+      '<p class="text-sm mb-16" style="color:var(--text-light)">Select a user to feature on the landing page.</p>' +
+      '<div class="form-row" style="gap:8px">' +
+      '<div class="form-group"><label>User Email</label><input type="text" class="form-input" id="featuredPotterEmail" placeholder="user@example.com"></div>' +
+      '<div class="form-group"><label>Quote</label><input type="text" class="form-input" id="featuredPotterQuote" placeholder="A quote from the potter..."></div></div>' +
+      '<button class="btn btn-primary btn-sm" onclick="setFeaturedPotter()">Set Featured Potter</button>' +
+      '<div id="featuredPotterHistory" class="mt-16"></div></div>';
+
+    // Newsletter section
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">📬 Newsletter Subscribers</h3>' +
+      '<div id="adminNewsletterStats">Loading...</div>' +
+      '<button class="btn btn-secondary btn-sm mt-8" onclick="exportNewsletterCSV()">📥 Export CSV</button>' +
+      '<div id="adminNewsletterList" class="mt-16"></div></div>';
+
     try {
       el.innerHTML = html;
     } catch(renderErr) {
@@ -1665,6 +1707,9 @@ async function loadAdmin() {
     loadAdminOrders();
     loadAdminAnalytics();
     loadAdminReviews();
+    loadAdminBlogPosts();
+    loadAdminFeaturedPotter();
+    loadAdminNewsletter();
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -1855,6 +1900,137 @@ async function updateReview(id) {
     toast('Review updated!', 'success');
     loadMyReview();
   } catch(e) { toast(e.message, 'error'); }
+}
+
+// ---- Admin: Blog Management ----
+async function loadAdminBlogPosts() {
+  try {
+    const posts = await api('/api/admin/blog/posts');
+    const el = document.getElementById('adminBlogList');
+    if (!el) return;
+    if (!posts.length) { el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">No blog posts yet</div>'; return; }
+    el.innerHTML = posts.map(p =>
+      '<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">' +
+      '<div><strong>' + esc(p.title) + '</strong> <span class="text-sm" style="color:' + (p.is_published ? 'var(--success)' : 'var(--text-muted)') + '">' + (p.is_published ? '✅ Published' : '📝 Draft') + '</span>' +
+      '<div class="text-sm" style="color:var(--text-muted)">' + fmtDate(p.published_at) + ' · /' + esc(p.slug) + '</div></div>' +
+      '<div style="display:flex;gap:4px">' +
+      '<button class="btn btn-sm btn-secondary" onclick="editBlogPost(\'' + p.id + '\')">✏️</button>' +
+      '<button class="btn btn-sm btn-danger" onclick="deleteBlogPost(\'' + p.id + '\')">🗑️</button></div></div>'
+    ).join('');
+  } catch(e) {}
+}
+
+let _editingBlogId = null;
+function openBlogPostEditor(post) {
+  _editingBlogId = post?.id || null;
+  const html = '<div class="modal-overlay open" id="blogEditorOverlay" onclick="if(event.target===this){this.remove()}">' +
+    '<div class="modal" style="max-width:700px">' +
+    '<div class="modal-header"><h2>' + (post ? 'Edit Post' : 'New Blog Post') + '</h2><button class="modal-close" onclick="document.getElementById(\'blogEditorOverlay\').remove()">&times;</button></div>' +
+    '<div class="form-group"><label>Title</label><input type="text" class="form-input" id="blogEdTitle" value="' + esc(post?.title || '') + '"></div>' +
+    '<div class="form-group"><label>Slug</label><input type="text" class="form-input" id="blogEdSlug" value="' + esc(post?.slug || '') + '" placeholder="auto-generated from title"></div>' +
+    '<div class="form-group"><label>Excerpt</label><input type="text" class="form-input" id="blogEdExcerpt" value="' + esc(post?.excerpt || '') + '"></div>' +
+    '<div class="form-group"><label>Author</label><input type="text" class="form-input" id="blogEdAuthor" value="' + esc(post?.author || 'Christina Workman') + '"></div>' +
+    '<div class="form-group"><label>Content (use **bold**, *italic*, ## headers, - lists)</label>' +
+    '<textarea class="form-textarea" id="blogEdContent" rows="12" style="font-family:monospace;font-size:0.85rem">' + esc(post?.content || '') + '</textarea></div>' +
+    '<div class="form-group"><label><input type="checkbox" id="blogEdPublished"' + (post?.is_published ? ' checked' : '') + '> Published</label></div>' +
+    '<div class="modal-footer"><button class="btn btn-secondary" onclick="document.getElementById(\'blogEditorOverlay\').remove()">Cancel</button>' +
+    '<button class="btn btn-primary" onclick="saveBlogPost()">Save Post</button></div></div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+async function editBlogPost(id) {
+  try {
+    const posts = await api('/api/admin/blog/posts');
+    const post = posts.find(p => p.id === id);
+    if (post) openBlogPostEditor(post);
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function saveBlogPost() {
+  const body = {
+    title: document.getElementById('blogEdTitle').value,
+    slug: document.getElementById('blogEdSlug').value || null,
+    excerpt: document.getElementById('blogEdExcerpt').value || null,
+    author: document.getElementById('blogEdAuthor').value || null,
+    content: document.getElementById('blogEdContent').value,
+    isPublished: document.getElementById('blogEdPublished').checked
+  };
+  if (!body.title || !body.content) return toast('Title and content required', 'error');
+  try {
+    if (_editingBlogId) {
+      await api('/api/admin/blog/posts/' + _editingBlogId, { method: 'PUT', body });
+      toast('Post updated!', 'success');
+    } else {
+      await api('/api/admin/blog/posts', { method: 'POST', body });
+      toast('Post created!', 'success');
+    }
+    document.getElementById('blogEditorOverlay').remove();
+    loadAdminBlogPosts();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function deleteBlogPost(id) {
+  if (!confirm('Delete this blog post?')) return;
+  try {
+    await api('/api/admin/blog/posts/' + id, { method: 'DELETE' });
+    toast('Post deleted', 'success');
+    loadAdminBlogPosts();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ---- Admin: Featured Potter ----
+async function setFeaturedPotter() {
+  const email = document.getElementById('featuredPotterEmail').value.trim();
+  const quote = document.getElementById('featuredPotterQuote').value.trim();
+  if (!email) return toast('Enter a user email', 'error');
+  try {
+    // Search for user by email
+    const users = await api('/api/admin/members/search?q=' + encodeURIComponent(email));
+    if (!users.length) return toast('User not found', 'error');
+    const user = users.find(u => u.email === email) || users[0];
+    await api('/api/admin/featured-potter', { method: 'POST', body: { userId: user.id, quote: quote || null } });
+    toast('Featured potter set!', 'success');
+    document.getElementById('featuredPotterEmail').value = '';
+    document.getElementById('featuredPotterQuote').value = '';
+    loadAdminFeaturedPotter();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function loadAdminFeaturedPotter() {
+  try {
+    const history = await api('/api/admin/featured-potter');
+    const el = document.getElementById('featuredPotterHistory');
+    if (!el) return;
+    if (!history.length) { el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">No featured potters yet</div>'; return; }
+    el.innerHTML = '<h4 style="margin-bottom:8px">Recent Featured Potters</h4>' +
+      history.map(fp =>
+        '<div style="padding:6px 0;border-bottom:1px solid var(--border);font-size:0.85rem">' +
+        '<strong>' + esc(fp.display_name) + '</strong> (' + esc(fp.email) + ')' +
+        (fp.quote ? ' — "' + esc(fp.quote) + '"' : '') +
+        ' · ' + fmtDate(fp.featured_date) + '</div>'
+      ).join('');
+  } catch(e) {}
+}
+
+// ---- Admin: Newsletter ----
+async function loadAdminNewsletter() {
+  try {
+    const d = await api('/api/admin/newsletter');
+    const stats = document.getElementById('adminNewsletterStats');
+    if (stats) stats.innerHTML = '<div class="stat-box" style="display:inline-block"><div class="stat-number">' + d.total + '</div><div class="stat-label">Active Subscribers</div></div>';
+    const el = document.getElementById('adminNewsletterList');
+    if (!el) return;
+    if (!d.subscribers.length) { el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">No subscribers yet</div>'; return; }
+    el.innerHTML = d.subscribers.slice(0, 50).map(s =>
+      '<div style="padding:4px 0;border-bottom:1px solid var(--border);font-size:0.85rem;display:flex;justify-content:space-between">' +
+      '<span>' + esc(s.email) + '</span><span class="text-sm" style="color:var(--text-muted)">' + fmtDate(s.subscribed_at) + '</span></div>'
+    ).join('');
+    if (d.subscribers.length > 50) el.innerHTML += '<div class="text-sm" style="color:var(--text-muted);margin-top:8px">... and ' + (d.subscribers.length - 50) + ' more. Export CSV for full list.</div>';
+  } catch(e) {}
+}
+
+function exportNewsletterCSV() {
+  exportData('/api/admin/newsletter/export');
 }
 
 // Landing page reviews
@@ -2662,5 +2838,245 @@ async function changePassword(e) {
     closeModal('changePasswordModal');
   } catch(e) { toast(e.message, 'error'); }
 }
+
+// ============ REFERRAL LINK COPY ============
+function copyReferralLink() {
+  const input = document.getElementById('refLinkInput');
+  if (input) {
+    navigator.clipboard.writeText(input.value).then(() => toast('Referral link copied!', 'success')).catch(() => {
+      input.select(); document.execCommand('copy'); toast('Referral link copied!', 'success');
+    });
+  }
+}
+
+// ============ NEWSLETTER SIGNUP ============
+async function subscribeNewsletter(e) {
+  e.preventDefault();
+  const email = document.getElementById('newsletterEmail').value.trim();
+  const btn = document.getElementById('newsletterBtn');
+  const msg = document.getElementById('newsletterMsg');
+  if (!email) return;
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    const res = await fetch('/api/newsletter/subscribe', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ email })
+    });
+    const d = await res.json();
+    if (d.success) {
+      msg.textContent = d.message || '🎉 Subscribed!';
+      msg.style.color = 'var(--success)';
+      msg.style.display = '';
+      document.getElementById('newsletterEmail').value = '';
+    } else {
+      msg.textContent = d.error || 'Something went wrong';
+      msg.style.color = 'var(--danger)';
+      msg.style.display = '';
+    }
+  } catch(err) {
+    msg.textContent = 'Something went wrong. Try again.';
+    msg.style.color = 'var(--danger)';
+    msg.style.display = '';
+  }
+  btn.disabled = false; btn.textContent = 'Subscribe';
+}
+
+// ============ BLOG ============
+async function loadBlog() {
+  try {
+    const posts = await api('/api/blog/posts');
+    const el = document.getElementById('blogPostsList');
+    const em = document.getElementById('blogEmpty');
+    if (!posts.length) { el.innerHTML = ''; em.classList.remove('hidden'); return; }
+    em.classList.add('hidden');
+    el.innerHTML = posts.map(p =>
+      '<div class="card" style="cursor:pointer" onclick="viewBlogPost(\'' + esc(p.slug) + '\')">' +
+      '<h3 style="margin-bottom:8px;color:var(--primary)">' + esc(p.title) + '</h3>' +
+      '<p style="color:var(--text-light);font-size:0.9rem;margin-bottom:8px">' + esc(p.excerpt || '') + '</p>' +
+      '<div class="text-sm" style="color:var(--text-muted)">By ' + esc(p.author || 'Christina Workman') + ' · ' + fmtDate(p.published_at) + '</div>' +
+      '</div>'
+    ).join('');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function viewBlogPost(slug) {
+  try {
+    const post = await api('/api/blog/posts/' + slug);
+    navigate('blogPost');
+    const el = document.getElementById('blogPostContent');
+    // Simple markdown-ish rendering
+    const rendered = renderMarkdown(post.content || '');
+    el.innerHTML = '<article class="card" style="max-width:700px">' +
+      '<h1 style="font-size:1.8rem;font-family:Georgia,serif;margin-bottom:12px;color:var(--text)">' + esc(post.title) + '</h1>' +
+      '<div class="text-sm" style="color:var(--text-muted);margin-bottom:24px">By ' + esc(post.author || 'Christina Workman') + ' · ' + fmtDate(post.published_at) + '</div>' +
+      '<div style="line-height:1.8;color:var(--text);font-size:1rem">' + rendered + '</div>' +
+      '<div style="margin-top:32px;padding-top:20px;border-top:1px solid var(--border);text-align:center">' +
+      '<p style="color:var(--text-light);margin-bottom:12px">Ready to start tracking your pottery?</p>' +
+      '<button class="btn btn-primary" onclick="navigate(\'dashboard\')">Start Tracking — It\'s Free 🏺</button></div>' +
+      '</article>' +
+      '<script type="application/ld+json">' + JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "Article",
+        "headline": post.title,
+        "author": { "@type": "Person", "name": post.author || "Christina Workman" },
+        "datePublished": post.published_at,
+        "dateModified": post.updated_at || post.published_at,
+        "publisher": { "@type": "Organization", "name": "The Potter's Mud Room", "url": "https://thepottersmudroom.com" },
+        "mainEntityOfPage": "https://thepottersmudroom.com/#blog/" + post.slug,
+        "image": "https://thepottersmudroom.com/og-image.png",
+        "description": post.excerpt || post.title
+      }) + '<\/script>';
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// Simple markdown renderer (bold, italic, headers, newlines, lists)
+function renderMarkdown(text) {
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^### (.+)$/gm, '<h3 style="margin:20px 0 8px;font-size:1.1rem">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 style="margin:24px 0 10px;font-size:1.3rem;font-family:Georgia,serif">$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1 style="margin:24px 0 12px;font-size:1.5rem;font-family:Georgia,serif">$1</h1>')
+    .replace(/^- (.+)$/gm, '<li style="margin-left:20px;margin-bottom:4px">$1</li>')
+    .replace(/\n\n/g, '</p><p style="margin-bottom:16px">')
+    .replace(/\n/g, '<br>');
+}
+
+// Landing page blog posts
+async function loadLandingBlogPosts() {
+  try {
+    const res = await fetch('/api/blog/posts');
+    const posts = await res.json();
+    const el = document.getElementById('landingBlogPosts');
+    if (!el || !posts.length) return;
+    el.innerHTML = posts.slice(0, 3).map(p =>
+      '<div class="card" style="cursor:pointer" onclick="showBlogPostFromLanding(\'' + esc(p.slug) + '\')">' +
+      '<h3 style="margin-bottom:8px;color:var(--primary);font-size:1.05rem">' + esc(p.title) + '</h3>' +
+      '<p style="color:var(--text-light);font-size:0.85rem;margin-bottom:8px;line-height:1.5">' + esc((p.excerpt || '').substring(0, 140)) + '...</p>' +
+      '<div class="text-sm" style="color:var(--text-muted)">By ' + esc(p.author || 'Christina Workman') + '</div>' +
+      '</div>'
+    ).join('');
+  } catch(e) { /* ignore */ }
+}
+
+// Show blog from landing page (before login)
+function showBlogFromLanding() {
+  document.getElementById('landingPage').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('mainApp').classList.remove('hidden');
+  navigate('blog');
+  // If not logged in, just show blog publicly
+  if (!token) {
+    loadBlog();
+  }
+}
+
+function showBlogPostFromLanding(slug) {
+  document.getElementById('landingPage').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('mainApp').classList.remove('hidden');
+  viewBlogPost(slug);
+}
+
+// ============ FEATURED POTTER ============
+async function loadFeaturedPotter() {
+  try {
+    const res = await fetch('/api/featured-potter');
+    const data = await res.json();
+    const section = document.getElementById('featuredPotterSection');
+    const card = document.getElementById('featuredPotterCard');
+    if (!data || !section || !card) return;
+    section.style.display = '';
+    const avatar = data.avatar_filename
+      ? '<img src="/uploads/' + data.avatar_filename + '" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--primary)">'
+      : '<div style="width:80px;height:80px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:2rem;color:#fff">' + ((data.display_name||'?')[0]).toUpperCase() + '</div>';
+    card.innerHTML = '<div class="card" style="max-width:500px;margin:0 auto;text-align:center;padding:24px">' +
+      '<div style="margin-bottom:16px">' + avatar + '</div>' +
+      '<h3 style="color:var(--primary);margin-bottom:8px">' + esc(data.display_name || 'A Potter') + '</h3>' +
+      (data.quote ? '<p style="font-style:italic;color:var(--text);margin-bottom:12px;font-size:1.05rem">"' + esc(data.quote) + '"</p>' : '') +
+      '<div class="text-sm" style="color:var(--text-light)">' + (data.pieceCount || 0) + ' pieces logged in The Potter\'s Mud Room</div>' +
+      '</div>';
+  } catch(e) { /* ignore */ }
+}
+
+// ============ SHAREABLE COMBOS ============
+async function toggleComboPublic(comboId, isPublic) {
+  try {
+    const d = await api('/api/community/combos/' + comboId + '/public', { method: 'PUT', body: { isPublic } });
+    if (d.shareId && isPublic) {
+      const link = 'https://thepottersmudroom.com/combo/' + d.shareId;
+      toast('Combo is now public! Link: ' + link, 'success');
+    } else {
+      toast('Combo is now private.', 'success');
+    }
+    loadCombos();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+function copyComboLink(shareId) {
+  const link = 'https://thepottersmudroom.com/combo/' + shareId;
+  navigator.clipboard.writeText(link).then(() => toast('Share link copied!', 'success')).catch(() => toast('Could not copy', 'error'));
+}
+
+async function loadPublicCombo(shareId) {
+  try {
+    const res = await fetch('/api/combos/public/' + shareId);
+    const combo = await res.json();
+    if (res.status === 404) { document.getElementById('publicComboContent').innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔒</div><div class="empty-state-title">Combo not found</div><p>This combo may be private or doesn\'t exist.</p></div>'; return; }
+    navigate('publicCombo');
+    const el = document.getElementById('publicComboContent');
+    let html = '<div class="card" style="max-width:600px;margin:0 auto">';
+    if (combo.photo_filename) html += '<img src="/uploads/' + combo.photo_filename + '" style="width:100%;max-height:400px;object-fit:cover;border-radius:var(--radius-sm);margin-bottom:16px">';
+    html += '<h2 style="color:var(--primary);margin-bottom:8px">' + esc(combo.name) + '</h2>';
+    html += '<div class="text-sm" style="color:var(--text-muted);margin-bottom:16px">By ' + esc(combo.author || 'A Potter') + '</div>';
+    if (combo.clay_body_name) html += '<div style="margin-bottom:8px"><strong>Clay:</strong> ' + esc(combo.clay_body_name) + '</div>';
+    if (combo.cone) html += '<div style="margin-bottom:8px"><strong>Cone:</strong> ' + esc(combo.cone) + '</div>';
+    if (combo.atmosphere) html += '<div style="margin-bottom:8px"><strong>Atmosphere:</strong> ' + esc(combo.atmosphere) + '</div>';
+    if (combo.layers?.length) {
+      html += '<div style="margin:16px 0"><strong>Glaze Layers:</strong>';
+      combo.layers.forEach((l, i) => {
+        html += '<div style="background:var(--bg-light);padding:8px 12px;border-radius:var(--radius-sm);margin-top:6px">' +
+          '<span style="font-weight:600">Layer ' + (i+1) + ':</span> ' + esc(l.glaze_name) +
+          (l.brand ? ' (' + esc(l.brand) + ')' : '') +
+          ' · ' + (l.coats || 1) + ' coat' + ((l.coats||1) > 1 ? 's' : '') +
+          (l.application_method ? ' · ' + esc(l.application_method) : '') + '</div>';
+      });
+      html += '</div>';
+    }
+    if (combo.description) html += '<div style="margin-top:12px"><strong>Description:</strong> ' + esc(combo.description) + '</div>';
+    if (combo.notes) html += '<div style="margin-top:8px"><strong>Notes:</strong> ' + esc(combo.notes) + '</div>';
+    html += '<div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border);text-align:center">' +
+      '<p style="color:var(--text-light);margin-bottom:12px">Track your own glaze combos in The Potter\'s Mud Room</p>' +
+      '<button class="btn btn-primary btn-lg" onclick="document.getElementById(\'landingPage\').style.display=\'\';document.getElementById(\'mainApp\').classList.add(\'hidden\')">Join The Potter\'s Mud Room — Free 🏺</button></div>';
+    html += '</div>';
+    el.innerHTML = html;
+  } catch(e) { toast(e.message || 'Error loading combo', 'error'); }
+}
+
+// ============ INIT LANDING PAGE FEATURES ============
+// Detect referral code from URL on page load
+(function() {
+  const p = new URLSearchParams(window.location.search);
+  if (p.get('ref')) sessionStorage.setItem('referral_code', p.get('ref'));
+  // Detect /combo/SHAREID route
+  const path = window.location.pathname;
+  if (path.startsWith('/combo/')) {
+    const shareId = path.replace('/combo/', '');
+    if (shareId) {
+      document.getElementById('landingPage').style.display = 'none';
+      document.getElementById('mainApp').classList.remove('hidden');
+      loadPublicCombo(shareId);
+    }
+  }
+  // Detect #blog hash
+  if (window.location.hash === '#blog') {
+    showBlogFromLanding();
+  }
+})();
+
+// Load landing page features
+loadLandingBlogPosts();
+loadFeaturedPotter();
 
 checkAuth();

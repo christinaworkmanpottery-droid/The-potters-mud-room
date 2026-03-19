@@ -161,15 +161,46 @@ function requireTier(min) {
 }
 function getPieceCount(uid) { return db.prepare('SELECT COUNT(*) as c FROM pieces WHERE user_id=?').get(uid).c; }
 
+// Helper: generate unique referral code
+function generateReferralCode() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code;
+  do {
+    code = '';
+    for (let i = 0; i < 8; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  } while (db.prepare('SELECT id FROM users WHERE referral_code=?').get(code));
+  return code;
+}
+
 // ============ AUTH ============
 app.post('/api/auth/register', (req, res) => {
   try {
-    const { password, displayName } = req.body;
+    const { password, displayName, referredBy } = req.body;
     const email = (req.body.email || '').trim().toLowerCase();
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
     if (db.prepare('SELECT id FROM users WHERE email=?').get(email)) return res.status(409).json({ error: 'Email already registered' });
     const id = uuidv4(), hash = bcrypt.hashSync(password, 10);
-    db.prepare('INSERT INTO users (id,email,password_hash,display_name) VALUES (?,?,?,?)').run(id, email, hash, displayName || email.split('@')[0]);
+    const refCode = generateReferralCode();
+    db.prepare('INSERT INTO users (id,email,password_hash,display_name,referral_code,referred_by) VALUES (?,?,?,?,?,?)')
+      .run(id, email, hash, displayName || email.split('@')[0], refCode, referredBy || null);
+
+    // Process referral rewards
+    if (referredBy) {
+      const referrer = db.prepare('SELECT id FROM users WHERE referral_code=?').get(referredBy);
+      if (referrer) {
+        // Award 5 tokens to both referrer and new user
+        db.prepare('UPDATE users SET forum_tokens = forum_tokens + 5 WHERE id=?').run(referrer.id);
+        db.prepare('UPDATE users SET forum_tokens = forum_tokens + 5 WHERE id=?').run(id);
+        db.prepare('INSERT INTO referral_rewards (id, referrer_id, referred_id, tokens_awarded) VALUES (?,?,?,?)').run(uuidv4(), referrer.id, id, 5);
+      }
+    }
+
+    // Ensure all existing users have referral codes (backfill)
+    const usersWithoutCodes = db.prepare('SELECT id FROM users WHERE referral_code IS NULL').all();
+    usersWithoutCodes.forEach(u => {
+      db.prepare('UPDATE users SET referral_code=? WHERE id=?').run(generateReferralCode(), u.id);
+    });
+
     const token = jwt.sign({ userId: id, tier: 'free' }, JWT_SECRET, { expiresIn: '30d' });
     res.json({ token, user: { id, email, displayName: displayName || email.split('@')[0], tier: 'free' } });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -187,9 +218,17 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.get('/api/auth/me', auth, (req, res) => {
-  const u = db.prepare('SELECT id,email,display_name,username,bio,location,website,avatar_filename,is_private,tier,forum_tokens,unlimited_tokens_until,unit_system,temp_unit,created_at FROM users WHERE id=?').get(req.userId);
+  const u = db.prepare('SELECT id,email,display_name,username,bio,location,website,avatar_filename,is_private,tier,forum_tokens,unlimited_tokens_until,unit_system,temp_unit,referral_code,created_at FROM users WHERE id=?').get(req.userId);
   if (!u) return res.status(404).json({ error: 'Not found' });
-  res.json({ user: { ...u, displayName: u.display_name, pieceCount: getPieceCount(req.userId) } });
+  // Ensure referral code exists
+  if (!u.referral_code) {
+    const code = generateReferralCode();
+    db.prepare('UPDATE users SET referral_code=? WHERE id=?').run(code, req.userId);
+    u.referral_code = code;
+  }
+  // Get referral stats
+  const referralStats = db.prepare('SELECT COUNT(*) as count, SUM(tokens_awarded) as totalTokens FROM referral_rewards WHERE referrer_id=?').get(req.userId);
+  res.json({ user: { ...u, displayName: u.display_name, pieceCount: getPieceCount(req.userId), referralCount: referralStats?.count || 0, referralTokensEarned: referralStats?.totalTokens || 0 } });
 });
 
 // Change password
@@ -1755,6 +1794,211 @@ app.get('/api/users/:id/profile', auth, (req, res) => {
     res.json(user);
   }
 });
+
+// ============ REFERRAL STATS ============
+app.get('/api/referrals/stats', auth, (req, res) => {
+  try {
+    const stats = db.prepare('SELECT COUNT(*) as count, SUM(tokens_awarded) as totalTokens FROM referral_rewards WHERE referrer_id=?').get(req.userId);
+    const referrals = db.prepare(`SELECT rr.*, u.display_name, u.email, u.created_at as user_joined 
+      FROM referral_rewards rr JOIN users u ON rr.referred_id=u.id 
+      WHERE rr.referrer_id=? ORDER BY rr.created_at DESC LIMIT 20`).all(req.userId);
+    const user = db.prepare('SELECT referral_code FROM users WHERE id=?').get(req.userId);
+    res.json({ referralCode: user?.referral_code, count: stats?.count || 0, tokensEarned: stats?.totalTokens || 0, referrals });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============ SHAREABLE GLAZE COMBOS (Public) ============
+// Helper: generate unique share ID
+function generateShareId() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let code;
+  do {
+    code = '';
+    for (let i = 0; i < 10; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  } while (db.prepare('SELECT id FROM glaze_combos WHERE share_id=?').get(code));
+  return code;
+}
+
+// Toggle combo public/private
+app.put('/api/community/combos/:id/public', auth, (req, res) => {
+  try {
+    const combo = db.prepare('SELECT user_id, share_id, is_public FROM glaze_combos WHERE id=?').get(req.params.id);
+    if (!combo || combo.user_id !== req.userId) return res.status(403).json({ error: 'Not authorized' });
+    const newPublic = req.body.isPublic ? 1 : 0;
+    let shareId = combo.share_id;
+    if (newPublic && !shareId) shareId = generateShareId();
+    db.prepare('UPDATE glaze_combos SET is_public=?, share_id=? WHERE id=?').run(newPublic, shareId, req.params.id);
+    res.json({ success: true, isPublic: newPublic, shareId });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Public combo endpoint (no auth required)
+app.get('/api/combos/public/:shareId', (req, res) => {
+  try {
+    const combo = db.prepare(`SELECT gc.*, u.display_name as author, u.avatar_filename as author_avatar 
+      FROM glaze_combos gc JOIN users u ON gc.user_id=u.id 
+      WHERE gc.share_id=? AND gc.is_public=1`).get(req.params.shareId);
+    if (!combo) return res.status(404).json({ error: 'Combo not found or is private' });
+    const layers = db.prepare('SELECT * FROM glaze_combo_layers WHERE combo_id=? ORDER BY layer_order').all(combo.id);
+    combo.layers = layers;
+    res.json(combo);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============ BLOG SYSTEM ============
+// Public: list published blog posts
+app.get('/api/blog/posts', (req, res) => {
+  try {
+    const posts = db.prepare('SELECT id, title, slug, excerpt, author, published_at FROM blog_posts WHERE is_published=1 ORDER BY published_at DESC').all();
+    res.json(posts);
+  } catch(e) { res.json([]); }
+});
+
+// Public: get single blog post by slug
+app.get('/api/blog/posts/:slug', (req, res) => {
+  try {
+    const post = db.prepare('SELECT * FROM blog_posts WHERE slug=? AND is_published=1').get(req.params.slug);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+    res.json(post);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Admin: list all blog posts (including unpublished)
+app.get('/api/admin/blog/posts', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const posts = db.prepare('SELECT * FROM blog_posts ORDER BY created_at DESC').all();
+    res.json(posts);
+  } catch(e) { res.json([]); }
+});
+
+// Admin: create blog post
+app.post('/api/admin/blog/posts', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const { title, slug, content, excerpt, author, isPublished } = req.body;
+    if (!title || !content) return res.status(400).json({ error: 'Title and content required' });
+    const finalSlug = slug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const id = uuidv4();
+    db.prepare('INSERT INTO blog_posts (id, title, slug, content, excerpt, author, is_published) VALUES (?,?,?,?,?,?,?)')
+      .run(id, title, finalSlug, content, excerpt || content.substring(0, 200) + '...', author || 'Christina Workman', isPublished ? 1 : 0);
+    res.json({ id, slug: finalSlug });
+  } catch(e) {
+    if (e.message.includes('UNIQUE')) return res.status(409).json({ error: 'A post with that slug already exists' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Admin: update blog post
+app.put('/api/admin/blog/posts/:id', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const { title, slug, content, excerpt, author, isPublished } = req.body;
+    db.prepare(`UPDATE blog_posts SET title=?, slug=?, content=?, excerpt=?, author=?, is_published=?, updated_at=datetime('now') WHERE id=?`)
+      .run(title, slug, content, excerpt, author || 'Christina Workman', isPublished ? 1 : 0, req.params.id);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Admin: delete blog post
+app.delete('/api/admin/blog/posts/:id', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    db.prepare('DELETE FROM blog_posts WHERE id=?').run(req.params.id);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============ FEATURED POTTER ============
+// Public: get current featured potter
+app.get('/api/featured-potter', (req, res) => {
+  try {
+    const featured = db.prepare(`SELECT fp.*, u.display_name, u.avatar_filename, u.profile_photo, u.bio
+      FROM featured_potter fp JOIN users u ON fp.user_id=u.id 
+      ORDER BY fp.featured_date DESC LIMIT 1`).get();
+    if (!featured) return res.json(null);
+    const pieceCount = db.prepare('SELECT COUNT(*) as c FROM pieces WHERE user_id=?').get(featured.user_id)?.c || 0;
+    res.json({ ...featured, pieceCount });
+  } catch(e) { res.json(null); }
+});
+
+// Admin: set featured potter
+app.post('/api/admin/featured-potter', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const { userId, quote } = req.body;
+    if (!userId) return res.status(400).json({ error: 'User ID required' });
+    const user = db.prepare('SELECT id FROM users WHERE id=?').get(userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const id = uuidv4();
+    db.prepare('INSERT INTO featured_potter (id, user_id, quote) VALUES (?,?,?)').run(id, userId, quote || null);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Admin: get featured potter history
+app.get('/api/admin/featured-potter', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const history = db.prepare(`SELECT fp.*, u.display_name, u.email 
+      FROM featured_potter fp JOIN users u ON fp.user_id=u.id 
+      ORDER BY fp.featured_date DESC LIMIT 20`).all();
+    res.json(history);
+  } catch(e) { res.json([]); }
+});
+
+// ============ NEWSLETTER SIGNUP ============
+// Public: subscribe
+app.post('/api/newsletter/subscribe', (req, res) => {
+  try {
+    const email = (req.body.email || '').trim().toLowerCase();
+    if (!email || !email.includes('@')) return res.status(400).json({ error: 'Valid email required' });
+    const existing = db.prepare('SELECT id, is_active FROM newsletter_subscribers WHERE email=?').get(email);
+    if (existing) {
+      if (existing.is_active) return res.json({ success: true, message: 'You\'re already subscribed!' });
+      db.prepare('UPDATE newsletter_subscribers SET is_active=1 WHERE id=?').run(existing.id);
+      return res.json({ success: true, message: 'Welcome back! You\'re re-subscribed.' });
+    }
+    const id = uuidv4();
+    db.prepare('INSERT INTO newsletter_subscribers (id, email) VALUES (?,?)').run(id, email);
+    res.json({ success: true, message: 'You\'re in! Watch your inbox for pottery tips.' });
+  } catch(e) {
+    if (e.message.includes('UNIQUE')) return res.json({ success: true, message: 'You\'re already subscribed!' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Admin: view subscribers
+app.get('/api/admin/newsletter', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const subscribers = db.prepare('SELECT * FROM newsletter_subscribers WHERE is_active=1 ORDER BY subscribed_at DESC').all();
+    const total = subscribers.length;
+    res.json({ subscribers, total });
+  } catch(e) { res.json({ subscribers: [], total: 0 }); }
+});
+
+// Admin: export subscribers as CSV
+app.get('/api/admin/newsletter/export', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const subscribers = db.prepare('SELECT email, subscribed_at FROM newsletter_subscribers WHERE is_active=1 ORDER BY subscribed_at DESC').all();
+    let csv = 'Email,Subscribed At\n';
+    subscribers.forEach(s => { csv += `"${s.email}","${s.subscribed_at}"\n`; });
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=newsletter-subscribers.csv');
+    res.send(csv);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ============ BACKFILL REFERRAL CODES ============
+// Ensure all existing users have referral codes at startup
+try {
+  const usersWithoutCodes = db.prepare('SELECT id FROM users WHERE referral_code IS NULL').all();
+  usersWithoutCodes.forEach(u => {
+    db.prepare('UPDATE users SET referral_code=? WHERE id=?').run(generateReferralCode(), u.id);
+  });
+} catch(e) { /* ignore if table doesn't exist yet */ }
 
 // SPA fallback
 app.get('*', (req, res) => {

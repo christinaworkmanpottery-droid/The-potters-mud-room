@@ -26,6 +26,9 @@
 
   <!-- Pinterest -->
   <meta name="pinterest-rich-pin" content="true">
+  <meta property="og:see_also" content="https://thepottersmudroom.com">
+  <meta property="article:author" content="Christina Workman">
+  <meta property="article:publisher" content="https://thepottersmudroom.com">
 
   <!-- Structured Data for Google -->
   <script type="application/ld+json">
@@ -144,7 +147,7 @@
   </script>
 
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏺</text></svg>">
-  <link rel="stylesheet" href="style.css?v=20260317f">
+  <link rel="stylesheet" href="style.css?v=20260319a">
   <style>
     .notif-badge{position:absolute;top:-4px;right:-6px;background:var(--danger);color:#fff;font-size:0.65rem;font-weight:700;border-radius:50%;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 4px}
     .notif-item{padding:12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.15s}
@@ -174,6 +177,7 @@
       <p style="margin-top:12px;color:rgba(255,255,255,0.5);font-size:0.9rem">No credit card required. 20 pieces free forever.</p>
       <div style="margin-top:24px;display:flex;justify-content:center;gap:16px;align-items:center;flex-wrap:wrap">
         <a href="https://www.instagram.com/thepottersmudroom" target="_blank" rel="noopener" style="color:#fff;background:rgba(255,255,255,0.15);padding:10px 20px;border-radius:8px;text-decoration:none;font-size:1rem;display:inline-flex;align-items:center;gap:8px">📷 @thepottersmudroom</a>
+        <a href="#blog" onclick="showBlogFromLanding()" style="color:#fff;background:rgba(255,255,255,0.15);padding:10px 20px;border-radius:8px;text-decoration:none;font-size:1rem;display:inline-flex;align-items:center;gap:8px">📝 From the Studio</a>
       </div>
     </div>
   </div>
@@ -255,6 +259,22 @@
     <div id="landingReviews" style="text-align:center">
       <p style="color:var(--text-light);font-style:italic">Be one of the first to try The Potter's Mud Room and share your experience!</p>
     </div>
+  </div>
+
+  <!-- FEATURED POTTER SPOTLIGHT -->
+  <div id="featuredPotterSection" style="display:none;background:var(--primary-light);padding:40px 20px">
+    <div style="max-width:700px;margin:0 auto;text-align:center">
+      <h2 style="font-family:Georgia,serif;font-size:1.6rem;margin-bottom:24px;color:var(--text)">🌟 Featured Potter</h2>
+      <div id="featuredPotterCard"></div>
+    </div>
+  </div>
+
+  <!-- FROM THE STUDIO (Blog Posts) -->
+  <div style="max-width:900px;margin:0 auto;padding:40px 20px">
+    <h2 style="text-align:center;font-family:Georgia,serif;font-size:1.6rem;margin-bottom:8px;color:var(--text)">📝 From the Studio</h2>
+    <p style="text-align:center;color:var(--text-light);margin-bottom:24px;font-size:0.95rem">Pottery tips, glazing advice, and studio wisdom from real potters.</p>
+    <div id="landingBlogPosts" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px"></div>
+    <p style="text-align:center;margin-top:20px"><a href="#blog" onclick="showBlogFromLanding()" style="color:var(--primary);font-weight:600;text-decoration:none">View All Posts →</a></p>
   </div>
 
   <!-- PRICING — 2 Simple Plans -->
@@ -375,6 +395,19 @@
     </div>
   </div>
 
+  <!-- NEWSLETTER SIGNUP -->
+  <div style="background:var(--bg-light);padding:40px 20px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+    <div style="max-width:500px;margin:0 auto;text-align:center">
+      <h2 style="font-family:Georgia,serif;font-size:1.4rem;margin-bottom:8px;color:var(--text)">📬 Get Free Pottery Tips</h2>
+      <p style="color:var(--text-light);margin-bottom:20px;font-size:0.95rem">Join potters getting studio tips, glazing advice, and community updates. No spam — just clay talk.</p>
+      <form onsubmit="subscribeNewsletter(event)" style="display:flex;gap:8px;max-width:400px;margin:0 auto">
+        <input type="email" id="newsletterEmail" class="form-input" placeholder="your@email.com" required style="flex:1">
+        <button type="submit" class="btn btn-primary" id="newsletterBtn">Subscribe</button>
+      </form>
+      <p id="newsletterMsg" style="margin-top:10px;font-size:0.85rem;color:var(--success);display:none"></p>
+    </div>
+  </div>
+
   <!-- FOOTER CTA -->
   <div style="background:var(--bg-dark);color:#fff;padding:40px 20px;text-align:center">
     <h2 style="font-family:Georgia,serif;font-size:1.6rem;margin-bottom:12px">Built by a Potter, for Potters 🏺</h2>
@@ -446,6 +479,7 @@
         <button class="nav-link" data-page="community" onclick="navigate('community'); closeNav()">Community</button>
         <button class="nav-link" data-page="communityMembers" onclick="navigate('communityMembers'); closeNav()">👥 Members</button>
         <button class="nav-link" data-page="forum" onclick="navigate('forum'); closeNav()">Forum</button>
+        <button class="nav-link" data-page="blog" onclick="navigate('blog'); closeNav()">📝 Blog</button>
         <button class="nav-link" data-page="shop" onclick="navigate('shop'); closeNav()">Shop</button>
       </div>
       <div class="nav-section">
@@ -1056,6 +1090,31 @@
         <h1>🔧 Admin Dashboard</h1>
       </div>
       <div id="adminContent"></div>
+    </div>
+
+    <!-- BLOG -->
+    <div id="pageBlog" class="page">
+      <div class="page-header">
+        <h1>📝 From the Studio</h1>
+      </div>
+      <p style="color:var(--text-light);margin-bottom:24px">Pottery tips, glazing advice, and studio wisdom.</p>
+      <div id="blogPostsList" class="card-grid"></div>
+      <div id="blogEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">📝</div>
+        <div class="empty-state-title">No posts yet</div>
+        <p>Check back soon for pottery tips and studio wisdom!</p>
+      </div>
+    </div>
+
+    <!-- BLOG POST (single) -->
+    <div id="pageBlogPost" class="page">
+      <button class="detail-back" onclick="navigate('blog')">← Back to Blog</button>
+      <div id="blogPostContent"></div>
+    </div>
+
+    <!-- PUBLIC COMBO VIEW -->
+    <div id="pagePublicCombo" class="page">
+      <div id="publicComboContent"></div>
     </div>
 
     <!-- NOTIFICATIONS -->
@@ -2192,6 +2251,6 @@
   </div>
 </div>
 
-<script src="app.js?v=20260317l"></script>
+<script src="app.js?v=20260319a"></script>
 </body>
 </html>
