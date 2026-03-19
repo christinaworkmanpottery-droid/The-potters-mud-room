@@ -242,8 +242,10 @@ app.delete('/api/block/:userId', auth, (req, res) => {
 
 // ============ STRIPE BILLING ============
 const PRICE_CONFIG = {
-  starter: { amount: 695, name: "Starter Plan — Founding Rate $6.95/mo" },
-  'starter-yearly': { amount: 6950, name: "Starter Plan — Founding Rate $69.50/year", tier: 'starter' },
+  starter: { amount: 695, name: "Starter Plan — $6.95/mo" },
+  'starter-yearly': { amount: 6950, name: "Starter Plan — $69.50/year (save $14!)", tier: 'starter' },
+  'starter-founding': { amount: 348, name: "Starter Plan — Founding Rate $3.48/mo", tier: 'starter' },
+  'starter-founding-yearly': { amount: 3475, name: "Starter Plan — Founding Rate $34.75/year", tier: 'starter' },
   // Legacy plans (kept for backward compat with existing Stripe subscriptions)
   basic: { amount: 995, name: "Basic Plan — $9.95/mo" },
   mid: { amount: 1295, name: "Mid Plan — $12.95/mo" },
@@ -264,13 +266,13 @@ app.get('/api/billing/plans', (req, res) => {
     foundingMember: true,
     plans: [
       { id: 'free', name: 'Free', price: 0, yearlyPrice: 0, features: ['20 pieces', '1 photo each', 'Personal clay & glaze library', 'Basic search', 'Forum (browse only)', 'Can buy tokens to post'] },
-      { id: 'starter', name: 'Starter', price: 9.95, yearlyPrice: 95.00, foundingPrice: 6.95, foundingYearly: 69.50, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', 'Community glaze library', 'Sales tracking', 'Full forum access (read & post)', '🪙 10 free tokens (roll over while active)', 'Cancel anytime'] }
+      { id: 'starter', name: 'Starter', price: 6.95, yearlyPrice: 69.50, foundingPrice: 3.48, foundingYearly: 34.75, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', 'Community glaze library', 'Sales tracking', 'Full forum access (read & post)', '🪙 10 free tokens (roll over while active)', 'Cancel anytime'] }
     ],
     tokenPacks: [
       { id: 'pack1', tokens: 1, price: 0.50, foundingPrice: 0.25 },
-      { id: 'pack20', tokens: 20, price: 2.99, foundingPrice: 1.99 },
-      { id: 'pack50', tokens: 50, price: 4.99, foundingPrice: 2.99 },
-      { id: 'pack120', tokens: 120, price: 9.99, foundingPrice: 5.99 }
+      { id: 'pack20', tokens: 20, price: 2.99, foundingPrice: 1.50 },
+      { id: 'pack50', tokens: 50, price: 4.99, foundingPrice: 2.50 },
+      { id: 'pack120', tokens: 120, price: 9.99, foundingPrice: 5.00 }
     ],
     unlimitedPass: { price: 4.99, days: 30 },
     stripeEnabled: !!stripe
