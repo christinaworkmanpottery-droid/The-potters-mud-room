@@ -1342,18 +1342,19 @@ async function loadProfile() {
     // Referral section - Share & Earn
     const refCode = d.user.referral_code || '';
     const refCount = d.user.referralCount || 0;
-    const refTokens = d.user.referralTokensEarned || 0;
+    const freeMonths = d.user.freeMonthsRemaining || 0;
     const refLink = 'https://thepottersmudroom.com?ref=' + refCode;
     document.getElementById('profileReferralInfo').innerHTML =
       '<div style="background:var(--primary-light);border-radius:var(--radius);padding:16px;margin-bottom:12px">' +
-      '<h4 style="margin-bottom:8px;color:var(--primary)">🎁 Share & Earn</h4>' +
-      '<p class="text-sm" style="margin-bottom:12px;color:var(--text-light)">Share your link — when someone signs up, you BOTH get <strong>5 bonus tokens</strong>!</p>' +
+      '<h4 style="margin-bottom:8px;color:var(--primary)">🎁 Share & Earn — Free Months!</h4>' +
+      '<p class="text-sm" style="margin-bottom:12px;color:var(--text-light)">Share your link — when someone signs up, you BOTH get a <strong>free month</strong> of Starter!</p>' +
       '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">' +
       '<input type="text" class="form-input" value="' + esc(refLink) + '" readonly id="refLinkInput" style="font-size:0.85rem;flex:1" onclick="this.select()">' +
       '<button class="btn btn-primary btn-sm" onclick="copyReferralLink()">📋 Copy</button></div>' +
       '<div style="display:flex;gap:20px">' +
       '<div class="text-sm"><strong>' + refCount + '</strong> friends referred</div>' +
-      '<div class="text-sm"><strong>' + refTokens + '</strong> tokens earned</div></div></div>';
+      (freeMonths > 0 ? '<div class="text-sm" style="color:var(--accent)"><strong>' + freeMonths + '</strong> free month' + (freeMonths > 1 ? 's' : '') + ' earned 🎉</div>' : '') +
+      '</div></div>';
 
     // Review section
     loadMyReview();

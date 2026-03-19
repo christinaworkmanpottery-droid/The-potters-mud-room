@@ -184,14 +184,17 @@ app.post('/api/auth/register', (req, res) => {
     db.prepare('INSERT INTO users (id,email,password_hash,display_name,referral_code,referred_by) VALUES (?,?,?,?,?,?)')
       .run(id, email, hash, displayName || email.split('@')[0], refCode, referredBy || null);
 
-    // Process referral rewards
+    // Process referral rewards — both get 1 free month of starter
     if (referredBy) {
       const referrer = db.prepare('SELECT id FROM users WHERE referral_code=?').get(referredBy);
       if (referrer) {
-        // Award 5 tokens to both referrer and new user
-        db.prepare('UPDATE users SET forum_tokens = forum_tokens + 5 WHERE id=?').run(referrer.id);
-        db.prepare('UPDATE users SET forum_tokens = forum_tokens + 5 WHERE id=?').run(id);
-        db.prepare('INSERT INTO referral_rewards (id, referrer_id, referred_id, tokens_awarded) VALUES (?,?,?,?)').run(uuidv4(), referrer.id, id, 5);
+        // Give referrer 1 free month of starter (or extend if already on starter)
+        const referrerUser = db.prepare('SELECT tier, free_months_remaining FROM users WHERE id=?').get(referrer.id);
+        const refFreeMonths = (referrerUser?.free_months_remaining || 0) + 1;
+        db.prepare('UPDATE users SET tier = CASE WHEN tier = \'free\' THEN \'starter\' ELSE tier END, free_months_remaining = ? WHERE id=?').run(refFreeMonths, referrer.id);
+        // Give new user 1 free month of starter
+        db.prepare('UPDATE users SET tier = \'starter\', free_months_remaining = 1 WHERE id=?').run(id);
+        db.prepare('INSERT INTO referral_rewards (id, referrer_id, referred_id, reward_type) VALUES (?,?,?,?)').run(uuidv4(), referrer.id, id, 'free_month');
       }
     }
 
@@ -227,8 +230,8 @@ app.get('/api/auth/me', auth, (req, res) => {
     u.referral_code = code;
   }
   // Get referral stats
-  const referralStats = db.prepare('SELECT COUNT(*) as count, SUM(tokens_awarded) as totalTokens FROM referral_rewards WHERE referrer_id=?').get(req.userId);
-  res.json({ user: { ...u, displayName: u.display_name, pieceCount: getPieceCount(req.userId), referralCount: referralStats?.count || 0, referralTokensEarned: referralStats?.totalTokens || 0 } });
+  const referralStats = db.prepare('SELECT COUNT(*) as count FROM referral_rewards WHERE referrer_id=?').get(req.userId);
+  res.json({ user: { ...u, displayName: u.display_name, pieceCount: getPieceCount(req.userId), referralCount: referralStats?.count || 0, freeMonthsRemaining: u.free_months_remaining || 0 } });
 });
 
 // Change password
@@ -1798,12 +1801,12 @@ app.get('/api/users/:id/profile', auth, (req, res) => {
 // ============ REFERRAL STATS ============
 app.get('/api/referrals/stats', auth, (req, res) => {
   try {
-    const stats = db.prepare('SELECT COUNT(*) as count, SUM(tokens_awarded) as totalTokens FROM referral_rewards WHERE referrer_id=?').get(req.userId);
+    const stats = db.prepare('SELECT COUNT(*) as count FROM referral_rewards WHERE referrer_id=?').get(req.userId);
     const referrals = db.prepare(`SELECT rr.*, u.display_name, u.email, u.created_at as user_joined 
       FROM referral_rewards rr JOIN users u ON rr.referred_id=u.id 
       WHERE rr.referrer_id=? ORDER BY rr.created_at DESC LIMIT 20`).all(req.userId);
-    const user = db.prepare('SELECT referral_code FROM users WHERE id=?').get(req.userId);
-    res.json({ referralCode: user?.referral_code, count: stats?.count || 0, tokensEarned: stats?.totalTokens || 0, referrals });
+    const user = db.prepare('SELECT referral_code, free_months_remaining FROM users WHERE id=?').get(req.userId);
+    res.json({ referralCode: user?.referral_code, count: stats?.count || 0, freeMonthsRemaining: user?.free_months_remaining || 0, referrals });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 

@@ -736,6 +736,8 @@ function initDB() {
   // Referral code on users (may already exist from CREATE TABLE, but safe to add)
   safeAdd('users', 'referral_code', 'TEXT');
   safeAdd('users', 'referred_by', 'TEXT');
+  safeAdd('users', 'free_months_remaining', 'INTEGER DEFAULT 0');
+  safeAdd('referral_rewards', 'reward_type', "TEXT DEFAULT 'free_month'");
 
   // Seed starter blog posts (INSERT OR IGNORE by slug)
   const blogInsert = db.prepare(`INSERT OR IGNORE INTO blog_posts (id, title, slug, content, excerpt, author, is_published, published_at) VALUES (?,?,?,?,?,?,1,datetime('now'))`);
