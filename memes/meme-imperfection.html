@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+body { margin: 0; padding: 0; background: #000; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+.meme {
+  width: 1080px; height: 1080px;
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column;
+  font-family: Georgia, serif;
+}
+.bg {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background-image: url('https://images.unsplash.com/photo-1565193566173-7a0ee3dbe261?w=1080&h=1080&fit=crop');
+  background-size: cover; background-position: center;
+}
+.overlay {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(62,39,35,0.65);
+}
+.content {
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column; height: 100%;
+  padding: 80px 80px 60px;
+  box-sizing: border-box;
+  justify-content: center; align-items: center;
+  text-align: center;
+}
+.quote-mark {
+  font-size: 110px; color: rgba(193,68,14,0.35);
+  line-height: 0.6; margin-bottom: 25px;
+}
+.quote {
+  font-size: 50px; color: #FFF8F0;
+  line-height: 1.4; max-width: 850px;
+  text-shadow: 0 2px 20px rgba(0,0,0,0.5);
+  margin-bottom: 50px;
+}
+.accent { color: #C1440E; }
+.divider {
+  width: 80px; height: 3px;
+  background: linear-gradient(90deg, transparent, #C1440E, transparent);
+  margin: 0 auto 30px;
+}
+.brand {
+  font-size: 22px; color: #FFF8F0;
+  letter-spacing: 5px; text-transform: uppercase;
+  font-family: Georgia, serif; font-weight: bold;
+}
+.handle {
+  font-size: 16px; color: rgba(255,248,240,0.5);
+  letter-spacing: 2px; margin-top: 10px;
+  font-family: Arial, sans-serif;
+}
+</style></head><body>
+<div class="meme">
+  <div class="bg"></div>
+  <div class="overlay"></div>
+  <div class="content">
+    <div class="quote-mark">"</div>
+    <div class="quote">Every crack tells a story.<br>Every glaze is a surprise.<br><span class="accent">That's why we do this.</span></div>
+    <div class="divider"></div>
+    <div class="brand">THE POTTER'S MUD ROOM</div>
+    <div class="handle">@thepottersmudroom</div>
+  </div>
+</div>
+</body></html>

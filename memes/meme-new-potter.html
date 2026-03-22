@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+body { margin: 0; padding: 0; background: #000; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+.meme {
+  width: 1080px; height: 1080px;
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column;
+  font-family: Georgia, serif;
+}
+.bg {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background-image: url('https://images.unsplash.com/photo-1490312278390-ab64016e0aa9?w=1080&h=1080&fit=crop');
+  background-size: cover; background-position: center;
+}
+.overlay {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(62,39,35,0.70);
+}
+.content {
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column; height: 100%;
+  padding: 55px 65px 45px;
+  box-sizing: border-box;
+}
+.tag {
+  font-size: 16px; color: #C1440E;
+  letter-spacing: 4px; text-transform: uppercase;
+  font-family: Arial, sans-serif; margin-bottom: 14px;
+  background: rgba(255,248,240,0.12);
+  display: inline-block; padding: 6px 18px;
+  border-radius: 16px;
+}
+.title {
+  font-size: 40px; color: #FFF8F0;
+  line-height: 1.2; margin-bottom: 35px;
+  text-shadow: 0 2px 15px rgba(0,0,0,0.4);
+}
+.tips {
+  flex: 1; display: flex; flex-direction: column;
+  justify-content: center; gap: 22px;
+}
+.tip {
+  display: flex; align-items: flex-start; gap: 16px;
+}
+.tip-num {
+  font-family: Georgia, serif; font-size: 36px;
+  font-weight: bold; color: #C1440E;
+  min-width: 38px; text-align: right;
+  line-height: 1.1; opacity: 0.8;
+}
+.tip-text {
+  font-family: Arial, sans-serif; font-size: 25px;
+  color: #FFF8F0; line-height: 1.35;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.3);
+}
+.divider {
+  width: 60px; height: 2px;
+  background: linear-gradient(90deg, transparent, #C1440E, transparent);
+  margin: 20px 0;
+}
+.bottom { margin-top: auto; text-align: center; }
+.brand {
+  font-size: 22px; color: #FFF8F0;
+  letter-spacing: 4px; text-transform: uppercase;
+  font-family: Georgia, serif; font-weight: bold;
+}
+.handle {
+  font-size: 16px; color: rgba(255,248,240,0.5);
+  letter-spacing: 2px; margin-top: 6px;
+  font-family: Arial, sans-serif;
+}
+</style></head><body>
+<div class="meme">
+  <div class="bg"></div>
+  <div class="overlay"></div>
+  <div class="content">
+    <div><span class="tag">🏺 New Potter Tips</span></div>
+    <div class="title">5 Things Every New<br>Potter Should Know</div>
+    <div class="tips">
+      <div class="tip"><span class="tip-num">1</span><span class="tip-text">Wedge your clay. Every. Single. Time.</span></div>
+      <div class="tip"><span class="tip-num">2</span><span class="tip-text">Slow down — rushing causes cracks</span></div>
+      <div class="tip"><span class="tip-num">3</span><span class="tip-text">Keep a clay journal (future you will thank you)</span></div>
+      <div class="tip"><span class="tip-num">4</span><span class="tip-text">Test your glazes on tiles before your pieces</span></div>
+      <div class="tip"><span class="tip-num">5</span><span class="tip-text">Your first 100 pots will humble you — keep going</span></div>
+    </div>
+    <div class="bottom">
+      <div class="divider" style="margin: 20px auto;"></div>
+      <div class="brand">THE POTTER'S MUD ROOM</div>
+      <div class="handle">@thepottersmudroom</div>
+    </div>
+  </div>
+</div>
+</body></html>
