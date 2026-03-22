@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Potter's Mud Room — Social Media Content</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: linear-gradient(180deg, #3E2723 0%, #2A1B17 100%);
+  color: #FFF8F0; font-family: Arial, sans-serif;
+  padding: 40px 20px; min-height: 100vh;
+}
+h1 {
+  font-family: Georgia, serif; font-size: 36px; text-align: center;
+  color: #FFF8F0; margin-bottom: 8px;
+}
+.subtitle {
+  text-align: center; color: rgba(255,248,240,0.6); margin-bottom: 40px;
+  font-size: 16px;
+}
+.instructions {
+  text-align: center; background: rgba(193,68,14,0.15);
+  padding: 20px 30px; border-radius: 12px;
+  max-width: 620px; margin: 0 auto 40px;
+  border: 1px solid rgba(193,68,14,0.3);
+  line-height: 1.6;
+}
+.instructions strong { color: #C1440E; }
+.grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 30px; max-width: 1200px; margin: 0 auto;
+}
+.card {
+  background: rgba(255,248,240,0.05); border-radius: 12px;
+  overflow: hidden; border: 1px solid rgba(193,68,14,0.2);
+  transition: transform 0.2s, border-color 0.2s;
+}
+.card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(193,68,14,0.5);
+}
+.card img { width: 100%; display: block; cursor: pointer; }
+.card .info { padding: 16px; }
+.card .info h3 {
+  font-family: Georgia, serif; color: #C1440E;
+  margin: 0 0 8px; font-size: 18px;
+}
+.card .info p {
+  color: rgba(255,248,240,0.6); margin: 0; font-size: 14px;
+  line-height: 1.4;
+}
+.footer-brand {
+  text-align: center; margin-top: 50px; padding-top: 30px;
+  border-top: 1px solid rgba(193,68,14,0.2);
+}
+.footer-brand .name {
+  font-family: Georgia, serif; font-size: 20px; color: #C1440E;
+  letter-spacing: 3px; font-weight: bold;
+}
+.footer-brand .handle {
+  font-size: 14px; color: rgba(255,248,240,0.4); margin-top: 4px;
+}
+@media (max-width: 480px) {
+  body { padding: 20px 12px; }
+  h1 { font-size: 28px; }
+  .grid { grid-template-columns: 1fr; gap: 20px; }
+}
+</style>
+</head><body>
+
+<h1>🏺 Your Social Media Content</h1>
+<p class="subtitle">Tap or click any image to open full size, then save it to your device</p>
+
+<div class="instructions">
+  <strong>📱 On your phone:</strong> Tap the image → it opens full size → long-press → "Save Image"<br><br>
+  <strong>💻 On computer:</strong> Right-click the image → "Save Image As..."
+</div>
+
+<div class="grid">
+  <div class="card">
+    <a href="/memes-gallery/meme-wedging.png" target="_blank"><img src="/memes-gallery/meme-wedging.png" alt="Quick Tips: Wedging Clay"></a>
+    <div class="info">
+      <h3>Quick Tips: Wedging Clay</h3>
+      <p>5 essential tips for proper wedging technique — from palm pressure to air pocket elimination</p>
+    </div>
+  </div>
+  <div class="card">
+    <a href="/memes-gallery/meme-glaze.png" target="_blank"><img src="/memes-gallery/meme-glaze.png" alt="Quick Tips: Glaze Application"></a>
+    <div class="info">
+      <h3>Quick Tips: Glaze Application</h3>
+      <p>5 tips for applying glaze evenly — dipping, brushing, and keeping your kiln shelf clean</p>
+    </div>
+  </div>
+  <div class="card">
+    <a href="/memes-gallery/meme-cracks.png" target="_blank"><img src="/memes-gallery/meme-cracks.png" alt="Quick Tips: Preventing Cracks"></a>
+    <div class="info">
+      <h3>Quick Tips: Preventing Cracks</h3>
+      <p>5 tips to stop your pots from cracking — drying, wall thickness, and bisque firing</p>
+    </div>
+  </div>
+  <div class="card">
+    <a href="/memes-gallery/meme-funny.png" target="_blank"><img src="/memes-gallery/meme-funny.png" alt="Pottery Therapy"></a>
+    <div class="info">
+      <h3>🏺 Pottery Therapy</h3>
+      <p>"My therapist charges $200/hr. My kiln charges $5 in electricity." — every potter, ever</p>
+    </div>
+  </div>
+</div>
+
+<div class="footer-brand">
+  <div class="name">THE POTTER'S MUD ROOM</div>
+  <div class="handle">@thepottersmudroom</div>
+</div>
+
+</body></html>

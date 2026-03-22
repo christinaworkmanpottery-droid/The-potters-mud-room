@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { width: 1080px; height: 1080px; overflow: hidden; }
+.container {
+  width: 1080px; height: 1080px;
+  background: linear-gradient(135deg, #5C1F04 0%, #C1440E 60%, #A63A0C 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+  padding: 60px 70px 40px;
+  position: relative;
+}
+.container::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at 50% 10%, rgba(255,248,240,0.07) 0%, transparent 50%);
+  pointer-events: none;
+}
+.header { text-align: center; z-index: 1; }
+.label {
+  font-family: Arial, sans-serif; font-size: 22px; font-weight: bold;
+  color: #3E2723; background: #FFF8F0; display: inline-block;
+  padding: 8px 28px; border-radius: 20px; letter-spacing: 3px;
+  text-transform: uppercase; margin-bottom: 18px;
+}
+h1 {
+  font-family: Georgia, serif; font-size: 48px; color: #FFF8F0;
+  text-shadow: 2px 2px 8px rgba(0,0,0,0.3); line-height: 1.15;
+}
+.tips { z-index: 1; width: 100%; }
+.tip {
+  display: flex; align-items: flex-start; gap: 18px;
+  margin-bottom: 22px; padding: 0 10px;
+}
+.tip-num {
+  font-family: Georgia, serif; font-size: 38px; font-weight: bold;
+  color: #FFF8F0; opacity: 0.4; min-width: 40px; text-align: right;
+  line-height: 1.1;
+}
+.tip-text {
+  font-family: Arial, sans-serif; font-size: 28px; color: #FFF8F0;
+  line-height: 1.35;
+}
+.footer {
+  text-align: center; z-index: 1;
+  border-top: 2px solid rgba(255,248,240,0.2); padding-top: 18px; width: 100%;
+}
+.brand {
+  font-family: Georgia, serif; font-size: 24px; color: #FFF8F0;
+  letter-spacing: 4px; font-weight: bold;
+}
+.handle {
+  font-family: Arial, sans-serif; font-size: 18px; color: rgba(255,248,240,0.6);
+  margin-top: 4px;
+}
+</style>
+</head><body>
+<div class="container">
+  <div class="header">
+    <div class="label">Quick Tips</div>
+    <h1>Preventing Cracks</h1>
+  </div>
+  <div class="tips">
+    <div class="tip"><span class="tip-num">1</span><span class="tip-text">Dry pieces slowly and evenly. Cover with loose plastic and rotate daily — patience saves pots.</span></div>
+    <div class="tip"><span class="tip-num">2</span><span class="tip-text">Keep walls a consistent thickness. Thin spots dry faster and crack where they meet thick ones.</span></div>
+    <div class="tip"><span class="tip-num">3</span><span class="tip-text">Score and slip like your piece depends on it — because it does. No shortcuts on joins.</span></div>
+    <div class="tip"><span class="tip-num">4</span><span class="tip-text">Avoid drafts and direct sunlight during drying. A closet or shelf works better than a windowsill.</span></div>
+    <div class="tip"><span class="tip-num">5</span><span class="tip-text">Bisque fire slowly through the quartz inversion (1063°F). Ramp up 100°/hr until past it.</span></div>
+  </div>
+  <div class="footer">
+    <div class="brand">THE POTTER'S MUD ROOM</div>
+    <div class="handle">@thepottersmudroom</div>
+  </div>
+</div>
+</body></html>
