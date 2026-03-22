@@ -642,6 +642,16 @@ function openGlazeModal(g) {
   document.getElementById('ingredientList').innerHTML = '';
   (g?.ingredients||[]).forEach(i => addIngredient(i.ingredient_name, i.percentage));
   updateIngredientTotal();
+  // Clay tests section (only shown when editing existing glaze)
+  const claySection = document.getElementById('glazeClayTestsSection');
+  if (g?.id) {
+    claySection.classList.remove('hidden');
+    renderModalClayTests(g.clay_tests || []);
+    populateModalClayTestDropdown();
+    document.getElementById('modalClayTestForm').classList.add('hidden');
+  } else {
+    claySection.classList.add('hidden');
+  }
   openModal('glazeModal');
 }
 function toggleRecipeFields() {
@@ -2378,6 +2388,111 @@ async function deleteClayTest(glazeId, testId) {
     await api('/api/glazes/' + glazeId + '/clay-tests/' + testId, { method: 'DELETE' });
     toast('Removed', 'success');
     loadGlazes();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ---- Modal clay test functions ----
+function renderModalClayTests(tests) {
+  const el = document.getElementById('glazeClayTestsList');
+  if (!el) return;
+  if (!tests.length) {
+    el.innerHTML = '<div class="text-sm" style="color:var(--text-muted);font-style:italic">No clay bodies tested yet</div>';
+    return;
+  }
+  el.innerHTML = tests.map(t =>
+    '<div style="background:var(--bg-light);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start">' +
+    (t.photo_filename ? '<img src="/uploads/' + t.photo_filename + '" style="width:40px;height:40px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in;flex-shrink:0" onclick="openLightbox(\'/uploads/' + t.photo_filename + '\')">' : '') +
+    '<div style="flex:1;min-width:0">' +
+    '<div style="font-weight:600;font-size:0.85rem">' + esc(t.clay_name) + '</div>' +
+    (t.result_notes ? '<div class="text-sm" style="color:var(--text-light)">' + esc(t.result_notes) + '</div>' : '') +
+    '</div>' +
+    '<button type="button" class="btn-ghost btn-sm" onclick="deleteModalClayTest(\'' + t.id + '\')" style="color:var(--text-muted);flex-shrink:0" title="Remove">×</button>' +
+    '</div>'
+  ).join('');
+}
+
+async function populateModalClayTestDropdown() {
+  try {
+    const clays = await api('/api/clay-bodies');
+    const sel = document.getElementById('modalClayTestSelect');
+    if (!sel) return;
+    while (sel.options.length > 2) sel.remove(2);
+    clays.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name + (c.brand ? ' (' + c.brand + ')' : '') + (c.clay_type ? ' — ' + c.clay_type : '');
+      sel.appendChild(opt);
+    });
+  } catch(e) { /* silent */ }
+}
+
+function toggleModalClayTestForm() {
+  const form = document.getElementById('modalClayTestForm');
+  if (form) form.classList.toggle('hidden');
+}
+
+function toggleModalClayTestManual() {
+  const sel = document.getElementById('modalClayTestSelect');
+  const manual = document.getElementById('modalClayTestManualName');
+  if (!sel || !manual) return;
+  if (sel.value === '__manual__') {
+    manual.classList.remove('hidden');
+    manual.focus();
+  } else {
+    manual.classList.add('hidden');
+    manual.value = '';
+  }
+}
+
+async function saveModalClayTest() {
+  const glazeId = document.getElementById('glazeId').value;
+  if (!glazeId) return toast('Save the glaze first', 'error');
+  const sel = document.getElementById('modalClayTestSelect');
+  const manualInput = document.getElementById('modalClayTestManualName');
+  const notesEl = document.getElementById('modalClayTestNotes');
+  const photoEl = document.getElementById('modalClayTestPhoto');
+
+  const formData = new FormData();
+  if (sel.value === '__manual__') {
+    if (!manualInput.value.trim()) return toast('Enter a clay name', 'error');
+    formData.append('clay_name', manualInput.value.trim());
+  } else if (sel.value) {
+    formData.append('clay_body_id', sel.value);
+  } else {
+    return toast('Select a clay body or enter manually', 'error');
+  }
+  if (notesEl.value.trim()) formData.append('result_notes', notesEl.value.trim());
+  if (photoEl.files.length) formData.append('photo', photoEl.files[0]);
+
+  try {
+    await api('/api/glazes/' + glazeId + '/clay-tests', { method: 'POST', body: formData });
+    toast('Clay test added!', 'success');
+    // Refresh the clay tests in both the modal and the card view
+    const tests = await api('/api/glazes/' + glazeId + '/clay-tests');
+    renderModalClayTests(tests);
+    // Also update the glazes array in memory
+    const g = glazes.find(x => x.id === glazeId);
+    if (g) g.clay_tests = tests;
+    // Reset form fields
+    sel.value = '';
+    manualInput.classList.add('hidden');
+    manualInput.value = '';
+    notesEl.value = '';
+    photoEl.value = '';
+    document.getElementById('modalClayTestForm').classList.add('hidden');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function deleteModalClayTest(testId) {
+  if (!confirm('Remove this clay body test?')) return;
+  const glazeId = document.getElementById('glazeId').value;
+  try {
+    await api('/api/glazes/' + glazeId + '/clay-tests/' + testId, { method: 'DELETE' });
+    toast('Removed', 'success');
+    const tests = await api('/api/glazes/' + glazeId + '/clay-tests');
+    renderModalClayTests(tests);
+    const g = glazes.find(x => x.id === glazeId);
+    if (g) g.clay_tests = tests;
   } catch(e) { toast(e.message, 'error'); }
 }
 

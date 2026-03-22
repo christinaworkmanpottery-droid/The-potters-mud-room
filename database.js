@@ -739,6 +739,22 @@ function initDB() {
   safeAdd('users', 'free_months_remaining', 'INTEGER DEFAULT 0');
   safeAdd('referral_rewards', 'reward_type', "TEXT DEFAULT 'free_month'");
 
+  // Glaze clay body tests — track how glazes perform on different clay bodies
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS glaze_clay_tests (
+      id TEXT PRIMARY KEY,
+      glaze_id TEXT NOT NULL,
+      clay_body_id TEXT,
+      clay_name TEXT NOT NULL,
+      result_notes TEXT,
+      photo_filename TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (glaze_id) REFERENCES glazes(id) ON DELETE CASCADE,
+      FOREIGN KEY (clay_body_id) REFERENCES clay_bodies(id) ON DELETE SET NULL
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_glaze_clay_tests_glaze ON glaze_clay_tests(glaze_id)`);
+
   // Seed starter blog posts (INSERT OR IGNORE by slug)
   const blogInsert = db.prepare(`INSERT OR IGNORE INTO blog_posts (id, title, slug, content, excerpt, author, is_published, published_at) VALUES (?,?,?,?,?,?,1,datetime('now'))`);
 

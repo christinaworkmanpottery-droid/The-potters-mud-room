@@ -1517,6 +1517,24 @@
           <button type="button" class="btn btn-secondary btn-sm mt-8" onclick="addIngredient()">+ Add Ingredient</button>
         </div>
       </div>
+      <!-- Clay Bodies Tested (in-modal, shown when editing existing glaze) -->
+      <div id="glazeClayTestsSection" class="hidden" style="border-top:1px solid var(--border);padding-top:12px;margin-top:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <label style="font-weight:600;margin:0">🪨 Clay Bodies Tested</label>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="toggleModalClayTestForm()">+ Add</button>
+        </div>
+        <div id="glazeClayTestsList"></div>
+        <div id="modalClayTestForm" class="hidden" style="background:var(--bg-light);padding:12px;border-radius:var(--radius-sm);margin-top:8px">
+          <select id="modalClayTestSelect" class="form-select" style="margin-bottom:6px" onchange="toggleModalClayTestManual()">
+            <option value="">— Select from your clay library —</option>
+            <option value="__manual__">✏️ Enter manually</option>
+          </select>
+          <input type="text" id="modalClayTestManualName" class="form-input hidden" placeholder="Clay name (e.g. Standard 266)" style="margin-bottom:6px">
+          <textarea id="modalClayTestNotes" class="form-input" placeholder="Results / Notes" rows="2" style="margin-bottom:6px"></textarea>
+          <input type="file" id="modalClayTestPhoto" accept="image/*" style="margin-bottom:6px;font-size:0.85rem">
+          <button type="button" class="btn btn-primary btn-sm" onclick="saveModalClayTest()">Save Clay Test</button>
+        </div>
+      </div>
       <div class="form-group">
         <label>Notes</label>
         <textarea class="form-textarea" id="glazeNotes" placeholder="Notes about this glaze..."></textarea>
