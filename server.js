@@ -58,23 +58,6 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req,
         const tier = session.metadata.tier;
         db.prepare('UPDATE users SET tier=?, stripe_customer_id=?, stripe_subscription_id=? WHERE id=?')
           .run(tier, session.customer, session.subscription, userId);
-        // Monthly tokens by tier (don't roll over — reset to tier amount)
-        const tierTokens = { starter: 10, basic: 3, mid: 5, top: 10 };
-        const tokens = tierTokens[tier] || 0;
-        if (tokens > 0) {
-          db.prepare('UPDATE users SET forum_tokens = ? WHERE id=?').run(tokens, userId);
-        }
-      } else if (purchaseType === 'token_pack') {
-        const amount = parseInt(session.metadata.tokenAmount) || 0;
-        db.prepare('UPDATE users SET forum_tokens = forum_tokens + ? WHERE id=?').run(amount, userId);
-        db.prepare('INSERT INTO token_purchases (id, user_id, amount, price_paid, purchase_type) VALUES (?,?,?,?,?)')
-          .run(uuidv4(), userId, amount, session.amount_total / 100, 'pack');
-      } else if (purchaseType === 'unlimited_pass') {
-        const until = new Date();
-        until.setDate(until.getDate() + 30);
-        db.prepare('UPDATE users SET unlimited_tokens_until=? WHERE id=?').run(until.toISOString(), userId);
-        db.prepare('INSERT INTO token_purchases (id, user_id, amount, price_paid, purchase_type) VALUES (?,?,?,?,?)')
-          .run(uuidv4(), userId, 0, session.amount_total / 100, 'unlimited_30day');
       } else if (purchaseType === 'merchant') {
         // Record merchant purchase
         const productId = session.metadata.productId;
@@ -221,7 +204,7 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.get('/api/auth/me', auth, (req, res) => {
-  const u = db.prepare('SELECT id,email,display_name,username,bio,location,website,avatar_filename,is_private,tier,forum_tokens,unlimited_tokens_until,unit_system,temp_unit,referral_code,created_at FROM users WHERE id=?').get(req.userId);
+  const u = db.prepare('SELECT id,email,display_name,username,bio,location,website,avatar_filename,is_private,tier,unit_system,temp_unit,referral_code,created_at FROM users WHERE id=?').get(req.userId);
   if (!u) return res.status(404).json({ error: 'Not found' });
   // Ensure referral code exists
   if (!u.referral_code) {
@@ -296,27 +279,14 @@ const PRICE_CONFIG = {
   'mid-yearly': { amount: 12500, name: "Mid Plan — $125/year (save $30.40!)", tier: 'mid' },
   'top-yearly': { amount: 19000, name: "Top Plan — $190/year (save $49.40!)", tier: 'top' }
 };
-const TOKEN_PACKS = {
-  pack1: { amount: 50, tokens: 1, name: "1 Forum Token" },
-  pack20: { amount: 299, tokens: 20, name: "20 Forum Tokens" },
-  pack50: { amount: 499, tokens: 50, name: "50 Forum Tokens" },
-  pack120: { amount: 999, tokens: 120, name: "120 Forum Tokens" }
-};
 
 app.get('/api/billing/plans', (req, res) => {
   res.json({
     foundingMember: true,
     plans: [
-      { id: 'free', name: 'Free', price: 0, yearlyPrice: 0, features: ['20 pieces', '1 photo each', 'Personal clay & glaze library', 'Basic search', 'Forum (browse only)', 'Can buy tokens to post'] },
-      { id: 'starter', name: 'Starter', price: 6.95, yearlyPrice: 69.50, foundingPrice: 3.48, foundingYearly: 34.75, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', 'Community glaze library', 'Sales tracking', 'Full forum access (read & post)', '🪙 10 free tokens (roll over while active)', 'Cancel anytime'] }
+      { id: 'free', name: 'Free', price: 0, yearlyPrice: 0, features: ['20 pieces', '1 photo each', 'Personal clay & glaze library', 'Basic search', 'Community forum access'] },
+      { id: 'starter', name: 'Starter', price: 6.95, yearlyPrice: 69.50, foundingPrice: 3.48, foundingYearly: 34.75, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', 'Community glaze library', 'Sales tracking', 'Full forum access (read & post)', 'Cancel anytime'] }
     ],
-    tokenPacks: [
-      { id: 'pack1', tokens: 1, price: 0.50, foundingPrice: 0.25 },
-      { id: 'pack20', tokens: 20, price: 2.99, foundingPrice: 1.50 },
-      { id: 'pack50', tokens: 50, price: 4.99, foundingPrice: 2.50 },
-      { id: 'pack120', tokens: 120, price: 9.99, foundingPrice: 5.00 }
-    ],
-    unlimitedPass: { price: 4.99, days: 30 },
     stripeEnabled: !!stripe
   });
 });
@@ -350,57 +320,6 @@ app.post('/api/billing/checkout', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/billing/tokens', auth, async (req, res) => {
-  if (!stripe) return res.status(400).json({ error: 'Stripe not configured yet — coming soon!' });
-  const { packId } = req.body;
-  const pack = TOKEN_PACKS[packId];
-  if (!pack) return res.status(400).json({ error: 'Invalid pack' });
-
-  try {
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      mode: 'payment',
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: { name: pack.name },
-          unit_amount: pack.amount,
-        },
-        quantity: 1,
-      }],
-      metadata: { userId: req.userId, purchaseType: 'token_pack', tokenAmount: pack.tokens.toString() },
-      success_url: `${APP_URL}?tokens=purchased`,
-      cancel_url: `${APP_URL}?cancelled=true`,
-    });
-    res.json({ url: session.url });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post('/api/billing/unlimited-pass', auth, async (req, res) => {
-  if (!stripe) return res.status(400).json({ error: 'Stripe not configured yet — coming soon!' });
-  const u = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
-  if (u.tier === 'free') return res.status(403).json({ error: 'Unlimited posting pass requires a paid subscription' });
-
-  try {
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      mode: 'payment',
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          product_data: { name: 'Unlimited Posting Pass — 30 days' },
-          unit_amount: 499,
-        },
-        quantity: 1,
-      }],
-      metadata: { userId: req.userId, purchaseType: 'unlimited_pass' },
-      success_url: `${APP_URL}?pass=purchased`,
-      cancel_url: `${APP_URL}?cancelled=true`,
-    });
-    res.json({ url: session.url });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
 app.post('/api/billing/cancel', auth, async (req, res) => {
   if (!stripe) return res.status(400).json({ error: 'Stripe not configured' });
   const u = db.prepare('SELECT stripe_subscription_id FROM users WHERE id=?').get(req.userId);
@@ -423,7 +342,7 @@ function isAdmin(req) {
 app.get('/api/admin/members', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
-    const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, forum_tokens, 
+    const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, 
       avatar_filename, created_at, updated_at, stripe_customer_id, stripe_subscription_id 
       FROM users ORDER BY created_at DESC`).all();
     const stats = {
@@ -476,26 +395,6 @@ app.get('/api/admin/analytics', auth, (req, res) => {
   } catch(e) { res.json({ today:0, week:0, month:0, total:0, byDay:[], topReferrers:[], topPages:[], uniqueIPs:0, signupsByDay:[] }); }
 });
 
-app.post('/api/admin/set-unlimited', auth, (req, res) => {
-  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
-  const { userId, email } = req.body;
-  const target = userId || (email ? db.prepare('SELECT id FROM users WHERE email=?').get(email)?.id : null);
-  if (!target) return res.status(404).json({ error: 'User not found' });
-  const until = new Date(); until.setFullYear(until.getFullYear() + 100);
-  db.prepare('UPDATE users SET unlimited_tokens_until=?, forum_tokens=999999 WHERE id=?').run(until.toISOString(), target);
-  res.json({ success: true, message: 'Unlimited tokens set' });
-});
-
-app.post('/api/admin/give-tokens', auth, (req, res) => {
-  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
-  const { email, amount } = req.body;
-  if (!email || !amount) return res.status(400).json({ error: 'Email and amount required' });
-  const u = db.prepare('SELECT id FROM users WHERE email=?').get(email);
-  if (!u) return res.status(404).json({ error: 'User not found' });
-  db.prepare('UPDATE users SET forum_tokens = forum_tokens + ? WHERE id=?').run(amount, u.id);
-  res.json({ success: true });
-});
-
 // ============ PROMO CODES ============
 // Redeem a promo code
 app.post('/api/promo/redeem', auth, (req, res) => {
@@ -515,11 +414,10 @@ app.post('/api/promo/redeem', auth, (req, res) => {
   db.prepare('UPDATE promo_codes SET times_used = times_used + 1 WHERE id=?').run(promo.id);
 
   if (promo.promo_type === 'tokens') {
-    const amt = promo.token_amount || 0;
-    db.prepare('UPDATE users SET forum_tokens = forum_tokens + ? WHERE id=?').run(amt, req.userId);
+    // Token promos are no longer supported — treat as a generic redemption
     const u = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
     const token = jwt.sign({ userId: req.userId, tier: u.tier }, JWT_SECRET, { expiresIn: '30d' });
-    return res.json({ success: true, promoType: 'tokens', tokensAwarded: amt, token, message: 'You received ' + amt + ' forum tokens!' });
+    return res.json({ success: true, promoType: 'tokens', token, message: 'Promo code redeemed!' });
   }
 
   db.prepare('UPDATE users SET tier=? WHERE id=?').run(promo.tier, req.userId);
@@ -693,7 +591,8 @@ app.get('/api/glazes', auth, (req, res) => {
   const glazes = db.prepare('SELECT * FROM glazes WHERE user_id=? ORDER BY name').all(req.userId);
   const getIng = db.prepare('SELECT * FROM glaze_ingredients WHERE glaze_id=? ORDER BY sort_order');
   const getPhotos = db.prepare('SELECT * FROM glaze_photos WHERE glaze_id=? ORDER BY sort_order');
-  glazes.forEach(g => { if (g.glaze_type === 'recipe') g.ingredients = getIng.all(g.id); g.photos = getPhotos.all(g.id); });
+  const getClayTests = db.prepare('SELECT * FROM glaze_clay_tests WHERE glaze_id=? ORDER BY created_at DESC');
+  glazes.forEach(g => { if (g.glaze_type === 'recipe') g.ingredients = getIng.all(g.id); g.photos = getPhotos.all(g.id); g.clay_tests = getClayTests.all(g.id); });
   res.json(glazes);
 });
 
@@ -756,6 +655,47 @@ app.delete('/api/glaze-photos/:id', auth, (req, res) => {
 app.put('/api/glazes/:id/stock', auth, (req, res) => {
   const { stockStatus } = req.body;
   db.prepare('UPDATE glazes SET stock_status=? WHERE id=? AND user_id=?').run(stockStatus||null, req.params.id, req.userId);
+  res.json({ success: true });
+});
+
+// ============ GLAZE CLAY BODY TESTS ============
+app.get('/api/glazes/:id/clay-tests', auth, (req, res) => {
+  const glaze = db.prepare('SELECT id FROM glazes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!glaze) return res.status(404).json({ error: 'Glaze not found' });
+  const tests = db.prepare('SELECT * FROM glaze_clay_tests WHERE glaze_id=? ORDER BY created_at DESC').all(req.params.id);
+  res.json(tests);
+});
+
+app.post('/api/glazes/:id/clay-tests', auth, upload.single('photo'), (req, res) => {
+  const glaze = db.prepare('SELECT id FROM glazes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!glaze) return res.status(404).json({ error: 'Glaze not found' });
+  const { clay_body_id, clay_name, result_notes } = req.body;
+  let finalClayName = clay_name || null;
+  let finalClayBodyId = clay_body_id || null;
+  // If clay_body_id provided, look up the name from clay_bodies table
+  if (finalClayBodyId) {
+    const clay = db.prepare('SELECT name FROM clay_bodies WHERE id=?').get(finalClayBodyId);
+    if (clay) finalClayName = clay.name;
+    else finalClayBodyId = null; // invalid clay_body_id, treat as manual
+  }
+  if (!finalClayName) return res.status(400).json({ error: 'Clay name or clay body selection required' });
+  const id = uuidv4();
+  const photoFilename = req.file ? req.file.filename : null;
+  db.prepare('INSERT INTO glaze_clay_tests (id,glaze_id,clay_body_id,clay_name,result_notes,photo_filename) VALUES (?,?,?,?,?,?)')
+    .run(id, req.params.id, finalClayBodyId, finalClayName, result_notes || null, photoFilename);
+  res.json({ id, clay_name: finalClayName });
+});
+
+app.delete('/api/glazes/:id/clay-tests/:testId', auth, (req, res) => {
+  const glaze = db.prepare('SELECT id FROM glazes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!glaze) return res.status(404).json({ error: 'Glaze not found' });
+  const test = db.prepare('SELECT photo_filename FROM glaze_clay_tests WHERE id=? AND glaze_id=?').get(req.params.testId, req.params.id);
+  if (!test) return res.status(404).json({ error: 'Test not found' });
+  if (test.photo_filename) {
+    const f = path.join(UPLOADS_DIR, test.photo_filename);
+    if (fs.existsSync(f)) fs.unlinkSync(f);
+  }
+  db.prepare('DELETE FROM glaze_clay_tests WHERE id=?').run(req.params.testId);
   res.json({ success: true });
 });
 
@@ -1165,24 +1105,6 @@ app.get('/api/forum/posts/:id', auth, (req, res) => {
   res.json(post);
 });
 
-function canPost(userId) {
-  const u = db.prepare('SELECT forum_tokens,unlimited_tokens_until,tier FROM users WHERE id=?').get(userId);
-  if (!u) return false;
-  if (u.unlimited_tokens_until && new Date(u.unlimited_tokens_until) > new Date()) return true;
-  if (u.forum_tokens > 0) return true;
-  return false;
-}
-
-function useToken(userId) {
-  const u = db.prepare('SELECT forum_tokens,unlimited_tokens_until FROM users WHERE id=?').get(userId);
-  if (u.unlimited_tokens_until && new Date(u.unlimited_tokens_until) > new Date()) return true;
-  if (u.forum_tokens > 0) {
-    db.prepare('UPDATE users SET forum_tokens=forum_tokens-1 WHERE id=?').run(userId);
-    return true;
-  }
-  return false;
-}
-
 app.post('/api/forum/posts', auth, upload.array('photos', 5), (req, res) => {
   const { title, body, categoryId } = req.body;
   if (!title || !body) return res.status(400).json({ error: 'Title and body required' });
@@ -1232,12 +1154,6 @@ app.delete('/api/forum/replies/:id', auth, (req, res) => {
   db.prepare('DELETE FROM forum_replies WHERE id=?').run(req.params.id);
   db.prepare('UPDATE forum_posts SET reply_count=reply_count-1 WHERE id=?').run(reply.post_id);
   res.json({ success: true });
-});
-
-app.get('/api/tokens/balance', auth, (req, res) => {
-  const u = db.prepare('SELECT forum_tokens,unlimited_tokens_until FROM users WHERE id=?').get(req.userId);
-  const hasUnlimited = u.unlimited_tokens_until && new Date(u.unlimited_tokens_until) > new Date();
-  res.json({ tokens: u.forum_tokens, hasUnlimited, unlimitedUntil: u.unlimited_tokens_until });
 });
 
 // ============ MERCHANT SHOP ============
@@ -1587,7 +1503,7 @@ app.get('/api/admin/members/search', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   const { q } = req.query;
   if (!q) return res.json([]);
-  const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, forum_tokens, created_at 
+  const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, created_at 
     FROM users WHERE email LIKE ? OR display_name LIKE ? ORDER BY created_at DESC LIMIT 20`).all('%'+q+'%', '%'+q+'%');
   res.json(members);
 });

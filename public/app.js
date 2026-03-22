@@ -560,7 +560,34 @@ function glazeCardView(g) {
     '<option value="in-stock"' + (g.stock_status==='in-stock'?' selected':'') + '>In Stock</option>' +
     '<option value="need-to-buy"' + (g.stock_status==='need-to-buy'?' selected':'') + '>Need to Buy</option>' +
     '<option value="low-stock"' + (g.stock_status==='low-stock'?' selected':'') + '>Low Stock</option>' +
-    '<option value="discontinued"' + (g.stock_status==='discontinued'?' selected':'') + '>Discontinued</option></select></div></div>';
+    '<option value="discontinued"' + (g.stock_status==='discontinued'?' selected':'') + '>Discontinued</option></select></div>' +
+    // Clay Bodies Tested section
+    '<div class="mt-8" style="border-top:1px solid var(--border);padding-top:12px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+    '<span class="detail-label" style="margin:0">🪨 Clay Bodies Tested</span>' +
+    '<button class="btn-ghost btn-sm" onclick="toggleClayTestForm(\'' + g.id + '\')" style="font-size:0.8rem">+ Add</button></div>' +
+    ((g.clay_tests||[]).length ? (g.clay_tests||[]).map(t =>
+      '<div style="background:var(--bg-light);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start">' +
+      (t.photo_filename ? '<img src="/uploads/' + t.photo_filename + '" style="width:48px;height:48px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in;flex-shrink:0" onclick="openLightbox(\'/uploads/' + t.photo_filename + '\')">' : '') +
+      '<div style="flex:1;min-width:0">' +
+      '<div style="font-weight:600;font-size:0.85rem;color:var(--text)">' +
+      (t.clay_body_id ? '<a href="#" onclick="event.preventDefault();navigate(\'clays\')" style="color:var(--primary);text-decoration:none">' + esc(t.clay_name) + '</a>' : esc(t.clay_name)) +
+      '</div>' +
+      (t.result_notes ? '<div class="text-sm" style="color:var(--text-light);margin-top:2px">' + esc(t.result_notes) + '</div>' : '') +
+      '</div>' +
+      '<button class="btn-ghost btn-sm" onclick="deleteClayTest(\'' + g.id + '\',\'' + t.id + '\')" style="color:var(--text-muted);font-size:0.8rem;flex-shrink:0" title="Remove">×</button>' +
+      '</div>'
+    ).join('') : '<div class="text-sm" style="color:var(--text-muted);font-style:italic">No clay bodies tested yet</div>') +
+    '<div id="clayTestForm_' + g.id + '" class="hidden" style="margin-top:8px;background:var(--bg-light);padding:12px;border-radius:var(--radius-sm)">' +
+    '<select id="clayTestSelect_' + g.id + '" class="form-select" style="margin-bottom:6px" onchange="toggleClayTestManual(\'' + g.id + '\')">' +
+    '<option value="">— Select from your clay library —</option>' +
+    '<option value="__manual__">✏️ Enter manually</option>' +
+    '</select>' +
+    '<input type="text" id="clayTestManualName_' + g.id + '" class="form-input hidden" placeholder="Clay name (e.g. Standard 266)" style="margin-bottom:6px">' +
+    '<textarea id="clayTestNotes_' + g.id + '" class="form-input" placeholder="Results / Notes (e.g. Beautiful amber, no crawling)" rows="2" style="margin-bottom:6px"></textarea>' +
+    '<input type="file" id="clayTestPhoto_' + g.id + '" accept="image/*" style="margin-bottom:6px;font-size:0.85rem">' +
+    '<button class="btn btn-primary btn-sm" onclick="saveClayTest(\'' + g.id + '\')">Save Clay Test</button>' +
+    '</div></div></div>';
 }
 function glazeListView(g) {
   const stock = g.stock_status === 'need-to-buy' ? '🛒' : (g.stock_status === 'low-stock' ? '⚠️' : (g.stock_status === 'discontinued' ? '❌' : '✅'));
@@ -1463,8 +1490,7 @@ async function redeemPromo() {
 
 function togglePromoType() {
   const type = document.getElementById('newPromoType').value;
-  document.getElementById('promoTierGroup').classList.toggle('hidden', type === 'tokens');
-  document.getElementById('promoTokenGroup').classList.toggle('hidden', type === 'tier');
+  document.getElementById('promoTierGroup').classList.toggle('hidden', type !== 'tier');
 }
 
 // Admin: create promo codes
@@ -1472,12 +1498,11 @@ async function createPromoCode() {
   const code = document.getElementById('newPromoCode').value.trim();
   const promoType = document.getElementById('newPromoType').value;
   const tier = document.getElementById('newPromoTier').value;
-  const tokenAmount = parseInt(document.getElementById('newPromoTokens')?.value) || 20;
   const days = parseInt(document.getElementById('newPromoDays').value) || 30;
   const uses = parseInt(document.getElementById('newPromoUses').value) || 0;
   if (!code) { toast('Enter a code','error'); return; }
   try {
-    const d = await api('/api/promo/create', { method:'POST', body: { code, promoType, tier, tokenAmount, durationDays: days, maxUses: uses } });
+    const d = await api('/api/promo/create', { method:'POST', body: { code, promoType, tier, durationDays: days, maxUses: uses } });
     toast('Promo code ' + d.code + ' created!', 'success');
     document.getElementById('newPromoCode').value = '';
     loadPromoCodes();
@@ -1491,7 +1516,7 @@ async function loadPromoCodes() {
     if (!el) return;
     if (!codes.length) { el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">No promo codes yet</div>'; return; }
     el.innerHTML = codes.map(c => {
-      const desc = c.promo_type === 'tokens' ? '🪙 ' + (c.token_amount||0) + ' tokens' : c.tier.toUpperCase() + ' for ' + c.duration_days + ' days';
+      const desc = c.promo_type === 'tokens' ? 'Promo gift' : c.tier.toUpperCase() + ' for ' + c.duration_days + ' days';
       return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">' +
       '<div><strong>' + esc(c.code) + '</strong> — ' + desc + '</div>' +
       '<div class="text-sm" style="color:var(--text-muted)">Used: ' + c.times_used + (c.max_uses > 0 ? '/' + c.max_uses : '/∞') + '</div></div>';
@@ -1510,20 +1535,6 @@ function setBilling(mode) {
 async function subscribePlan(plan) {
   try {
     const d = await api('/api/billing/checkout', { method:'POST', body: { plan } });
-    if (d.url) window.location.href = d.url;
-  } catch(e) { toast(e.message,'error'); }
-}
-
-async function buyTokens(packId) {
-  try {
-    const d = await api('/api/billing/tokens', { method:'POST', body: { packId } });
-    if (d.url) window.location.href = d.url;
-  } catch(e) { toast(e.message,'error'); }
-}
-
-async function buyUnlimitedPass() {
-  try {
-    const d = await api('/api/billing/unlimited-pass', { method:'POST' });
     if (d.url) window.location.href = d.url;
   } catch(e) { toast(e.message,'error'); }
 }
@@ -1655,14 +1666,13 @@ async function loadAdmin() {
       '</div><button class="btn btn-primary btn-sm" onclick="createDiscountCode()">Create Discount Code</button>' +
       '<div id="discountCodesList" class="mt-16"></div></div>';
 
-    // Promo codes section (gift tokens or tier upgrades to friends)
+    // Promo codes section (gift tier upgrades to friends)
     html += '<div class="card mb-16"><h3 style="margin-bottom:12px">🎟️ Promo Codes</h3>' +
-      '<p class="text-sm mb-16" style="color:var(--text-light)">Create promo codes to gift free tokens or tier upgrades to friends. Users redeem these on the Plans page.</p>' +
+      '<p class="text-sm mb-16" style="color:var(--text-light)">Create promo codes to gift tier upgrades to friends. Users redeem these on the Plans page.</p>' +
       '<div class="form-group"><label>Type</label><select class="form-select" id="newPromoType" onchange="togglePromoType()">' +
-      '<option value="tier">Tier Upgrade</option><option value="tokens">Token Gift</option></select></div>' +
+      '<option value="tier">Tier Upgrade</option></select></div>' +
       '<div class="form-row" style="gap:8px"><div class="form-group"><label>Code</label><input type="text" class="form-input" id="newPromoCode" placeholder="e.g., FRIENDS2026" style="text-transform:uppercase"></div>' +
-      '<div class="form-group" id="promoTierGroup"><label>Tier</label><select class="form-select" id="newPromoTier"><option value="basic">Basic</option><option value="mid">Mid</option><option value="top">Top</option></select></div>' +
-      '<div class="form-group hidden" id="promoTokenGroup"><label>Tokens to Gift</label><input type="number" class="form-input" id="newPromoTokens" value="20" min="1"></div></div>' +
+      '<div class="form-group" id="promoTierGroup"><label>Tier</label><select class="form-select" id="newPromoTier"><option value="basic">Basic</option><option value="mid">Mid</option><option value="top">Top</option></select></div></div>' +
       '<div class="form-row" style="gap:8px"><div class="form-group"><label>Days (tier duration)</label><input type="number" class="form-input" id="newPromoDays" value="30"></div>' +
       '<div class="form-group"><label>Max Uses (0=unlimited)</label><input type="number" class="form-input" id="newPromoUses" value="0"></div></div>' +
       '<button class="btn btn-primary btn-sm" onclick="createPromoCode()">Create Code</button>' +
@@ -2294,6 +2304,81 @@ async function deleteChemical(id) {
 // Glaze stock quick toggle
 async function toggleGlazeStock(id, status) {
   try { await api('/api/glazes/'+id+'/stock', {method:'PUT', body:{stockStatus:status}}); loadGlazes(); } catch(e) { toast(e.message,'error'); }
+}
+
+// ============ GLAZE CLAY BODY TESTS ============
+function toggleClayTestForm(glazeId) {
+  const form = document.getElementById('clayTestForm_' + glazeId);
+  if (!form) return;
+  form.classList.toggle('hidden');
+  // Populate the clay body dropdown when opening
+  if (!form.classList.contains('hidden')) {
+    populateClayTestDropdown(glazeId);
+  }
+}
+
+async function populateClayTestDropdown(glazeId) {
+  try {
+    const clays = await api('/api/clay-bodies');
+    const sel = document.getElementById('clayTestSelect_' + glazeId);
+    if (!sel) return;
+    // Keep first two options (placeholder + manual), remove rest
+    while (sel.options.length > 2) sel.remove(2);
+    clays.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name + (c.brand ? ' (' + c.brand + ')' : '') + (c.clay_type ? ' — ' + c.clay_type : '');
+      sel.appendChild(opt);
+    });
+  } catch(e) { /* silent */ }
+}
+
+function toggleClayTestManual(glazeId) {
+  const sel = document.getElementById('clayTestSelect_' + glazeId);
+  const manual = document.getElementById('clayTestManualName_' + glazeId);
+  if (!sel || !manual) return;
+  if (sel.value === '__manual__') {
+    manual.classList.remove('hidden');
+    manual.focus();
+  } else {
+    manual.classList.add('hidden');
+    manual.value = '';
+  }
+}
+
+async function saveClayTest(glazeId) {
+  const sel = document.getElementById('clayTestSelect_' + glazeId);
+  const manualInput = document.getElementById('clayTestManualName_' + glazeId);
+  const notesEl = document.getElementById('clayTestNotes_' + glazeId);
+  const photoEl = document.getElementById('clayTestPhoto_' + glazeId);
+  if (!sel) return;
+
+  const formData = new FormData();
+  if (sel.value === '__manual__') {
+    if (!manualInput.value.trim()) return toast('Enter a clay name', 'error');
+    formData.append('clay_name', manualInput.value.trim());
+  } else if (sel.value) {
+    formData.append('clay_body_id', sel.value);
+  } else {
+    return toast('Select a clay body or enter manually', 'error');
+  }
+  if (notesEl.value.trim()) formData.append('result_notes', notesEl.value.trim());
+  if (photoEl.files.length) formData.append('photo', photoEl.files[0]);
+
+  try {
+    await api('/api/glazes/' + glazeId + '/clay-tests', { method: 'POST', body: formData });
+    toast('Clay test added!', 'success');
+    loadGlazes();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function deleteClayTest(glazeId, testId) {
+  if (!confirm('Remove this clay body test?')) return;
+  try {
+    await api('/api/glazes/' + glazeId + '/clay-tests/' + testId, { method: 'DELETE' });
+    toast('Removed', 'success');
+    loadGlazes();
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 // Clay stock quick toggle
