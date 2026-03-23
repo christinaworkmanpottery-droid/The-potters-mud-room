@@ -1951,7 +1951,9 @@ async function loadAdminBlogPosts() {
       '<div><strong>' + esc(p.title) + '</strong> <span class="text-sm" style="color:' + (p.is_published ? 'var(--success)' : 'var(--text-muted)') + '">' + (p.is_published ? '✅ Published' : '📝 Draft') + '</span>' +
       '<div class="text-sm" style="color:var(--text-muted)">' + fmtDate(p.published_at) + ' · /' + esc(p.slug) + '</div></div>' +
       '<div style="display:flex;gap:4px">' +
+      '<button class="btn btn-sm btn-secondary" onclick="previewBlogPost(\'' + p.id + '\')" title="Preview">👁️</button>' +
       '<button class="btn btn-sm btn-secondary" onclick="editBlogPost(\'' + p.id + '\')">✏️</button>' +
+      (p.is_published ? '' : '<button class="btn btn-sm btn-primary" onclick="publishBlogPost(\'' + p.id + '\')">📢 Publish</button>') +
       '<button class="btn btn-sm btn-danger" onclick="deleteBlogPost(\'' + p.id + '\')">🗑️</button></div></div>'
     ).join('');
   } catch(e) {}
@@ -1980,6 +1982,36 @@ async function editBlogPost(id) {
     const posts = await api('/api/admin/blog/posts');
     const post = posts.find(p => p.id === id);
     if (post) openBlogPostEditor(post);
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function previewBlogPost(id) {
+  try {
+    const posts = await api('/api/admin/blog/posts');
+    const post = posts.find(p => p.id === id);
+    if (!post) return;
+    const html = '<div class="modal-overlay open" id="blogPreviewOverlay" onclick="if(event.target===this){this.remove()}">' +
+      '<div class="modal" style="max-width:700px;max-height:85vh;overflow-y:auto">' +
+      '<div class="modal-header"><h2>' + esc(post.title) + '</h2><button class="modal-close" onclick="document.getElementById(\'blogPreviewOverlay\').remove()">&times;</button></div>' +
+      '<div style="padding:20px;line-height:1.7;font-size:1rem">' + post.content + '</div>' +
+      '<div class="modal-footer">' +
+      '<button class="btn btn-secondary" onclick="document.getElementById(\'blogPreviewOverlay\').remove()">Close</button>' +
+      '<button class="btn btn-secondary" onclick="document.getElementById(\'blogPreviewOverlay\').remove();editBlogPost(\'' + post.id + '\')">✏️ Edit</button>' +
+      (post.is_published ? '' : '<button class="btn btn-primary" onclick="publishBlogPost(\'' + post.id + '\')">📢 Publish</button>') +
+      '</div></div></div>';
+    document.body.insertAdjacentHTML('beforeend', html);
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function publishBlogPost(id) {
+  if (!confirm('Publish this post? It will be visible to all users on the blog.')) return;
+  try {
+    await api('/api/admin/blog/' + id + '/publish', 'PUT');
+    toast('Post published!', 'success');
+    // Close any preview overlay
+    const overlay = document.getElementById('blogPreviewOverlay');
+    if (overlay) overlay.remove();
+    loadAdminBlogPosts();
   } catch(e) { toast(e.message, 'error'); }
 }
 
