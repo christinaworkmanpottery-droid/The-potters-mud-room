@@ -3260,8 +3260,10 @@ async function viewBlogPost(slug) {
     const post = await api('/api/blog/posts/' + slug);
     navigate('blogPost');
     const el = document.getElementById('blogPostContent');
-    // Simple markdown-ish rendering
-    const rendered = renderMarkdown(post.content || '');
+    // Render content - if it contains HTML tags, use as-is; otherwise run through markdown renderer
+    const content = post.content || '';
+    const isHtml = /<[a-z][\s\S]*>/i.test(content);
+    const rendered = isHtml ? content : renderMarkdown(content);
     const postUrl = 'https://thepottersmudroom.com/#blog/' + slug;
     const postTitle = post.title;
     const postExcerpt = post.excerpt || post.title;
