@@ -1393,9 +1393,27 @@ async function loadProfile() {
       (freeMonths > 0 ? '<div class="text-sm" style="color:var(--accent)"><strong>' + freeMonths + '</strong> free month' + (freeMonths > 1 ? 's' : '') + ' earned 🎉</div>' : '') +
       '</div></div>';
 
+    // Newsletter subscription toggle
+    const isSubscribed = d.user.newsletter_subscribed ? 'checked' : '';
+    document.getElementById('profileNewsletterInfo').innerHTML =
+      '<div style="display:flex;align-items:center;gap:12px;padding:12px;background:rgba(139,115,85,0.05);border-radius:var(--radius)">' +
+      '<input type="checkbox" id="profileNewsletter" ' + isSubscribed + ' onchange="toggleNewsletterSubscription()">' +
+      '<div>' +
+      '<label for="profileNewsletter" style="cursor:pointer;font-weight:500">📬 Subscribe to newsletter</label>' +
+      '<p class="text-sm" style="margin:4px 0 0 0;color:var(--text-light)">Get pottery tips, glazing advice, and studio news</p>' +
+      '</div></div>';
+
     // Review section
     loadMyReview();
   } catch(e) { toast(e.message,'error'); }
+}
+
+async function toggleNewsletterSubscription() {
+  try {
+    const subscribed = document.getElementById('profileNewsletter').checked;
+    await api('/api/profile/newsletter', { method: 'PUT', body: { subscribed } });
+    toast(subscribed ? '✓ Newsletter subscription saved!' : '✓ Unsubscribed from newsletter', 'success');
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 async function saveProfile() {
@@ -1712,10 +1730,8 @@ async function loadAdmin() {
       '<div id="featuredPotterHistory" class="mt-16"></div></div>';
 
     // Newsletter section
-    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">📬 Newsletter Subscribers</h3>' +
-      '<div id="adminNewsletterStats">Loading...</div>' +
-      '<button class="btn btn-secondary btn-sm mt-8" onclick="exportNewsletterCSV()">📥 Export CSV</button>' +
-      '<div id="adminNewsletterList" class="mt-16"></div></div>';
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">📬 Newsletter</h3>' +
+      '<div id="adminNewsletterContent">Loading...</div></div>';
 
     try {
       el.innerHTML = html;
@@ -2036,18 +2052,101 @@ async function loadAdminFeaturedPotter() {
 // ---- Admin: Newsletter ----
 async function loadAdminNewsletter() {
   try {
-    const d = await api('/api/admin/newsletter');
-    const stats = document.getElementById('adminNewsletterStats');
-    if (stats) stats.innerHTML = '<div class="stat-box" style="display:inline-block"><div class="stat-number">' + d.total + '</div><div class="stat-label">Active Subscribers</div></div>';
-    const el = document.getElementById('adminNewsletterList');
-    if (!el) return;
-    if (!d.subscribers.length) { el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">No subscribers yet</div>'; return; }
-    el.innerHTML = d.subscribers.slice(0, 50).map(s =>
-      '<div style="padding:4px 0;border-bottom:1px solid var(--border);font-size:0.85rem;display:flex;justify-content:space-between">' +
-      '<span>' + esc(s.email) + '</span><span class="text-sm" style="color:var(--text-muted)">' + fmtDate(s.subscribed_at) + '</span></div>'
-    ).join('');
-    if (d.subscribers.length > 50) el.innerHTML += '<div class="text-sm" style="color:var(--text-muted);margin-top:8px">... and ' + (d.subscribers.length - 50) + ' more. Export CSV for full list.</div>';
-  } catch(e) {}
+    // Get subscriber count
+    const subCount = await api('/api/admin/newsletter/subscribers');
+    
+    // Get newsletter history
+    const history = await api('/api/admin/newsletter/history');
+    
+    // Get all blog posts for dropdown
+    const posts = await api('/api/admin/blog/posts');
+    
+    let html = '<div class="mb-16">' +
+      '<div class="stat-box" style="display:inline-block">' +
+      '<div class="stat-number">' + subCount.count + '</div>' +
+      '<div class="stat-label">Subscribed Users</div></div></div>';
+    
+    // Send Newsletter section
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">📨 Send Newsletter</h3>' +
+      '<p class="text-sm mb-12" style="color:var(--text-light)">Select a published blog post to send as a newsletter to all subscribers.</p>' +
+      '<div class="form-group"><label>Blog Post</label>' +
+      '<select class="form-select" id="newsletterBlogSelect">' +
+      '<option value="">— Select a post —</option>';
+    
+    posts.filter(p => p.is_published).forEach(p => {
+      html += '<option value="' + p.id + '">' + esc(p.title) + ' (' + fmtDate(p.published_at) + ')</option>';
+    });
+    
+    html += '</select></div>' +
+      '<button class="btn btn-primary btn-sm" onclick="sendNewsletter()">Send to All Subscribers</button>' +
+      '</div>';
+    
+    // Draft Posts section
+    const draftPosts = posts.filter(p => !p.is_published);
+    if (draftPosts.length > 0) {
+      html += '<div class="card mb-16"><h3 style="margin-bottom:12px">📝 Draft Posts</h3>' +
+        '<div style="display:flex;flex-direction:column;gap:8px">';
+      
+      draftPosts.forEach(p => {
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px;border:1px solid var(--border);border-radius:var(--radius)">' +
+          '<div><strong>' + esc(p.title) + '</strong><div class="text-sm" style="color:var(--text-light)">Created ' + fmtDate(p.created_at) + '</div></div>' +
+          '<button class="btn btn-success btn-sm" onclick="publishBlogPost(\'' + p.id + '\',\'' + esc(p.title).replace(/'/g,"\\'") + '\')">Publish</button>' +
+          '</div>';
+      });
+      
+      html += '</div></div>';
+    }
+    
+    // Past Sends section
+    html += '<div class="card"><h3 style="margin-bottom:12px">📤 Past Sends</h3>';
+    if (history.length === 0) {
+      html += '<p class="text-sm" style="color:var(--text-muted)">No newsletters sent yet.</p>';
+    } else {
+      html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">' +
+        '<tr style="border-bottom:2px solid var(--border);text-align:left">' +
+        '<th style="padding:8px">Date</th>' +
+        '<th style="padding:8px">Post Title</th>' +
+        '<th style="padding:8px">Recipients</th>' +
+        '</tr>';
+      
+      history.forEach(send => {
+        html += '<tr style="border-bottom:1px solid var(--border)">' +
+          '<td style="padding:8px">' + fmtDate(send.sent_at) + '</td>' +
+          '<td style="padding:8px"><a href="/blog/' + send.slug + '" style="color:var(--primary);text-decoration:none">' + esc(send.title) + '</a></td>' +
+          '<td style="padding:8px">' + send.recipients_count + '</td>' +
+          '</tr>';
+      });
+      
+      html += '</table></div>';
+    }
+    html += '</div>';
+    
+    document.getElementById('adminNewsletterContent').innerHTML = html;
+  } catch(e) { console.error(e); }
+}
+
+async function sendNewsletter() {
+  const postId = document.getElementById('newsletterBlogSelect').value;
+  if (!postId) { toast('Select a blog post', 'error'); return; }
+  
+  try {
+    const count = (await api('/api/admin/newsletter/subscribers')).count;
+    if (!confirm('Send this newsletter to ' + count + ' subscribers?')) return;
+    
+    const result = await api('/api/admin/newsletter/send', { method: 'POST', body: { blogPostId: postId } });
+    toast('Newsletter sent to ' + result.recipientCount + ' subscribers!', 'success');
+    document.getElementById('newsletterBlogSelect').value = '';
+    loadAdminNewsletter();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function publishBlogPost(postId, title) {
+  if (!confirm('Publish "' + title + '"?')) return;
+  try {
+    await api('/api/admin/blog/' + postId + '/publish', { method: 'PUT' });
+    toast('Post published!', 'success');
+    loadAdminNewsletter();
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 function exportNewsletterCSV() {

@@ -6,12 +6,27 @@ const multer = require('multer');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
+const nodemailer = require('nodemailer');
 const { initDB } = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'pottery-app-dev-secret-change-in-prod';
 const db = initDB();
+
+// Nodemailer setup for newsletter emails
+let transporter = null;
+if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+  transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS
+    }
+  });
+} else {
+  console.warn('⚠️  SMTP not configured — newsletter emails will be skipped');
+}
 
 // Stripe setup (optional — works without keys, just disables payments)
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY || '';
@@ -204,7 +219,7 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.get('/api/auth/me', auth, (req, res) => {
-  const u = db.prepare('SELECT id,email,display_name,username,bio,location,website,avatar_filename,is_private,tier,unit_system,temp_unit,referral_code,created_at FROM users WHERE id=?').get(req.userId);
+  const u = db.prepare('SELECT id,email,display_name,username,bio,location,website,avatar_filename,is_private,tier,unit_system,temp_unit,referral_code,newsletter_subscribed,created_at FROM users WHERE id=?').get(req.userId);
   if (!u) return res.status(404).json({ error: 'Not found' });
   // Ensure referral code exists
   if (!u.referral_code) {
@@ -214,7 +229,7 @@ app.get('/api/auth/me', auth, (req, res) => {
   }
   // Get referral stats
   const referralStats = db.prepare('SELECT COUNT(*) as count FROM referral_rewards WHERE referrer_id=?').get(req.userId);
-  res.json({ user: { ...u, displayName: u.display_name, pieceCount: getPieceCount(req.userId), referralCount: referralStats?.count || 0, freeMonthsRemaining: u.free_months_remaining || 0 } });
+  res.json({ user: { ...u, displayName: u.display_name, pieceCount: getPieceCount(req.userId), referralCount: referralStats?.count || 0, freeMonthsRemaining: u.free_months_remaining || 0, newsletterSubscribed: u.newsletter_subscribed } });
 });
 
 // Change password
@@ -276,6 +291,16 @@ app.put('/api/profile', auth, (req, res) => {
   db.prepare(`UPDATE users SET display_name=?,username=?,bio=?,location=?,website=?,is_private=?,unit_system=?,temp_unit=?,updated_at=datetime('now') WHERE id=?`)
     .run(displayName, username || null, bio, location, website, isPrivate ? 1 : 0, unitSystem || 'imperial', tempUnit || 'fahrenheit', req.userId);
   res.json({ success: true });
+});
+
+// Newsletter subscription toggle
+app.put('/api/profile/newsletter', auth, (req, res) => {
+  try {
+    const { subscribed } = req.body;
+    db.prepare('UPDATE users SET newsletter_subscribed=?, updated_at=datetime(\'now\') WHERE id=?')
+      .run(subscribed ? 1 : 0, req.userId);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 app.post('/api/profile/avatar', auth, upload.single('avatar'), (req, res) => {
@@ -1868,6 +1893,16 @@ app.delete('/api/admin/blog/posts/:id', auth, (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Admin: publish blog post (set is_published=1)
+app.put('/api/admin/blog/:id/publish', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    db.prepare(`UPDATE blog_posts SET is_published=1, updated_at=datetime('now') WHERE id=?`)
+      .run(req.params.id);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ============ FEATURED POTTER ============
 // Public: get current featured potter
 app.get('/api/featured-potter', (req, res) => {
@@ -1947,6 +1982,95 @@ app.get('/api/admin/newsletter/export', auth, (req, res) => {
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename=newsletter-subscribers.csv');
     res.send(csv);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Admin: get subscriber count
+app.get('/api/admin/newsletter/subscribers', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const result = db.prepare('SELECT COUNT(*) as count FROM users WHERE newsletter_subscribed=1').get();
+    res.json({ count: result.count || 0 });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Admin: get newsletter send history
+app.get('/api/admin/newsletter/history', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const sends = db.prepare(`
+      SELECT ns.id, ns.blog_post_id, ns.sent_at, ns.recipients_count, bp.title, bp.slug
+      FROM newsletter_sends ns
+      JOIN blog_posts bp ON ns.blog_post_id = bp.id
+      ORDER BY ns.sent_at DESC
+    `).all();
+    res.json(sends);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Admin: send newsletter to all subscribers
+app.post('/api/admin/newsletter/send', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const { blogPostId } = req.body;
+    if (!blogPostId) return res.status(400).json({ error: 'blogPostId required' });
+
+    // Get blog post
+    const post = db.prepare('SELECT id, title, slug, excerpt, content FROM blog_posts WHERE id=?').get(blogPostId);
+    if (!post) return res.status(404).json({ error: 'Blog post not found' });
+
+    // Get all subscribed users
+    const subscribers = db.prepare('SELECT id, email FROM users WHERE newsletter_subscribed=1').all();
+    if (subscribers.length === 0) return res.json({ success: true, recipientCount: 0 });
+
+    const notificationId = uuidv4();
+    const sendId = uuidv4();
+    
+    // Send email to each subscriber (if email configured) and create notification
+    subscribers.forEach(subscriber => {
+      // Create in-app notification
+      db.prepare(`
+        INSERT INTO notifications (id, user_id, type, message, link, created_at)
+        VALUES (?,?,?,?,?,datetime('now'))
+      `).run(uuidv4(), subscriber.id, 'newsletter', post.title, '/blog/' + post.slug);
+
+      // Send email if configured
+      if (transporter) {
+        const mailOptions = {
+          from: process.env.SMTP_USER || 'pottery@example.com',
+          to: subscriber.email,
+          subject: 'New from The Potter\'s Mud Room: ' + post.title,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background: linear-gradient(135deg, #8B7355 0%, #A0826D 100%); padding: 20px; text-align: center; color: white;">
+                <h2 style="margin: 0;">New from The Potter's Mud Room</h2>
+              </div>
+              <div style="padding: 20px; border: 1px solid #ddd; border-top: none;">
+                <h3 style="color: #333; margin-top: 0;">${post.title}</h3>
+                <p style="color: #666; line-height: 1.6;">${post.excerpt || post.content.substring(0, 300)}</p>
+                <div style="text-align: center; margin: 20px 0;">
+                  <a href="https://thepottersmudroom.com/blog/${post.slug}" style="background: #8B7355; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Read Now</a>
+                </div>
+              </div>
+              <div style="padding: 10px 20px; background: #f5f5f5; font-size: 12px; color: #999; text-align: center;">
+                <p>The Potter's Mud Room © 2026. <a href="https://thepottersmudroom.com" style="color: #8B7355; text-decoration: none;">Visit our site</a></p>
+              </div>
+            </div>
+          `
+        };
+        transporter.sendMail(mailOptions).catch(err => {
+          console.error('Newsletter email error:', err.message);
+        });
+      }
+    });
+
+    // Record the send
+    db.prepare(`
+      INSERT INTO newsletter_sends (id, blog_post_id, sent_by, recipients_count)
+      VALUES (?,?,?,?)
+    `).run(sendId, blogPostId, req.userId, subscribers.length);
+
+    res.json({ success: true, recipientCount: subscribers.length });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 

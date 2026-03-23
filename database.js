@@ -35,6 +35,7 @@ function initDB() {
       referred_by TEXT,
       unit_system TEXT DEFAULT 'imperial' CHECK(unit_system IN ('imperial', 'metric')),
       temp_unit TEXT DEFAULT 'fahrenheit' CHECK(temp_unit IN ('fahrenheit', 'celsius')),
+      newsletter_subscribed INTEGER DEFAULT 1,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );
@@ -691,6 +692,21 @@ function initDB() {
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_blog_slug ON blog_posts(slug)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_blog_published ON blog_posts(is_published, published_at)`);
+
+  // Newsletter sends table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS newsletter_sends (
+      id TEXT PRIMARY KEY,
+      blog_post_id TEXT NOT NULL,
+      sent_at TEXT DEFAULT (datetime('now')),
+      sent_by TEXT NOT NULL,
+      recipients_count INTEGER DEFAULT 0,
+      FOREIGN KEY (blog_post_id) REFERENCES blog_posts(id),
+      FOREIGN KEY (sent_by) REFERENCES users(id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_newsletter_sends_post ON newsletter_sends(blog_post_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_newsletter_sends_date ON newsletter_sends(sent_at DESC)`);
 
   // Featured potter table
   db.exec(`
