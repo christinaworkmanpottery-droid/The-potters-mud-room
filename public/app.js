@@ -2698,12 +2698,16 @@ async function loadNotifications() {
     const c = document.getElementById('notificationList'), em = document.getElementById('notificationsEmpty');
     if (!d.notifications.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
-    c.innerHTML = d.notifications.map(n =>
-      '<div class="notif-item' + (n.is_read ? '' : ' unread') + '" onclick="handleNotifClick(\'' + esc(n.id) + '\',\'' + esc(n.link||'') + '\')">' +
-      '<div style="display:flex;justify-content:space-between"><div>' +
-      (n.type==='combo_like' ? '❤️ ' : n.type==='combo_comment' ? '💬 ' : n.type==='forum_like' ? '❤️ ' : n.type==='forum_reply' ? '💬 ' : n.type==='message' ? '✉️ ' : '🔔 ') +
-      esc(n.message) + '</div><span class="text-sm" style="color:var(--text-muted);white-space:nowrap;margin-left:12px">' + timeAgo(n.created_at) + '</span></div></div>'
-    ).join('');
+    c.innerHTML = d.notifications.map(n => {
+      const link = (n.link||'').replace(/'/g, "\\'");
+      const isBlog = n.type === 'newsletter' || (n.link && n.link.startsWith('/blog/'));
+      return '<div class="notif-item' + (n.is_read ? '' : ' unread') + '" onclick="handleNotifClick(\'' + esc(n.id) + '\',\'' + link + '\')" style="cursor:pointer">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center"><div>' +
+      (n.type==='combo_like' ? '❤️ ' : n.type==='combo_comment' ? '💬 ' : n.type==='forum_like' ? '❤️ ' : n.type==='forum_reply' ? '💬 ' : n.type==='message' ? '✉️ ' : n.type==='newsletter' ? '📰 ' : '🔔 ') +
+      esc(n.message) + '</div><div style="display:flex;align-items:center;gap:8px"><span class="text-sm" style="color:var(--text-muted);white-space:nowrap">' + timeAgo(n.created_at) + '</span>' +
+      (isBlog ? '<span style="color:var(--primary);font-size:0.85rem;font-weight:600;white-space:nowrap">Read →</span>' : '') +
+      '</div></div></div>';
+    }).join('');
     // Mark all as read
     api('/api/notifications/read', {method:'POST'}).then(() => {
       const badge = document.getElementById('notifBadge'); badge.classList.add('hidden');
