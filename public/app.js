@@ -117,7 +117,15 @@ function showApp() {
     el.style.display = tierLv[tier] >= tierLv[min] ? '' : 'none';
   });
   checkUrlParams();
-  loadDashboard(); loadClayBodies(); loadGlazes();
+  // Restore page from URL hash, or default to dashboard
+  const hashPage = window.location.hash.replace('#', '');
+  const validPages = ['dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','projects','events','contacts','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog'];
+  if (hashPage && validPages.includes(hashPage)) {
+    navigate(hashPage);
+  } else {
+    loadDashboard();
+  }
+  loadClayBodies(); loadGlazes();
   pollNotificationBadges();
   // Show admin nav for Christina
   const adminNav = document.getElementById('navAdmin');
@@ -131,6 +139,12 @@ let currentPage = 'dashboard';
 function navigate(page) {
   try {
     currentPage = page;
+    // Update URL hash so refresh stays on same page
+    if (page !== 'dashboard') {
+      window.location.hash = page;
+    } else {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
     const map = {
@@ -3451,11 +3465,19 @@ async function loadPublicCombo(shareId) {
       loadPublicCombo(shareId);
     }
   }
-  // Detect #blog hash
-  if (window.location.hash === '#blog') {
+  // Detect #blog hash (from landing page)
+  if (window.location.hash === '#blog' && !token) {
     showBlogFromLanding();
   }
 })();
+
+// Handle browser back/forward
+window.addEventListener('hashchange', () => {
+  const hashPage = window.location.hash.replace('#', '');
+  if (hashPage && hashPage !== currentPage && token) {
+    navigate(hashPage);
+  }
+});
 
 // Load landing page features
 loadLandingBlogPosts();
