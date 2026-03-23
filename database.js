@@ -753,6 +753,7 @@ function initDB() {
   safeAdd('users', 'referral_code', 'TEXT');
   safeAdd('users', 'referred_by', 'TEXT');
   safeAdd('users', 'free_months_remaining', 'INTEGER DEFAULT 0');
+  safeAdd('users', 'newsletter_subscribed', 'INTEGER DEFAULT 1');
   safeAdd('referral_rewards', 'reward_type', "TEXT DEFAULT 'free_month'");
 
   // Glaze clay body tests — track how glazes perform on different clay bodies
