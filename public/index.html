@@ -1081,6 +1081,11 @@
           <h3 style="margin-bottom:16px">Change Password</h3>
           <button class="btn btn-secondary" onclick="openModal('changePasswordModal')">Update Password</button>
         </div>
+        <div class="card" style="border:1px solid var(--danger);margin-top:16px">
+          <h3 style="margin-bottom:8px;color:var(--danger)">Delete Account</h3>
+          <p class="text-sm" style="color:var(--text-light);margin-bottom:12px">Permanently delete your account and all your data. This cannot be undone.</p>
+          <button class="btn btn-danger" onclick="openModal('deleteAccountModal')">Delete My Account</button>
+        </div>
       </div>
     </div>
 
@@ -2269,6 +2274,34 @@
   </div>
 </div>
 
-<script src="app.js?v=20260319a"></script>
+<div id="deleteAccountModal" class="modal-overlay" onclick="if(event.target===this)closeModal('deleteAccountModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 style="color:var(--danger)">Delete Account</h2>
+      <button class="modal-close" onclick="closeModal('deleteAccountModal')">&times;</button>
+    </div>
+    <div style="padding:0 24px">
+      <p style="margin-bottom:12px"><strong>This will permanently delete:</strong></p>
+      <ul style="margin-bottom:16px;padding-left:20px;color:var(--text-light)">
+        <li>All your pieces and photos</li>
+        <li>Your clay bodies and glazes</li>
+        <li>Firing logs, sales, and notes</li>
+        <li>Forum posts and replies</li>
+        <li>Your entire account</li>
+      </ul>
+      <p style="margin-bottom:16px;color:var(--danger);font-weight:600">This cannot be undone.</p>
+      <div class="form-group">
+        <label>Type <strong>DELETE</strong> to confirm</label>
+        <input type="text" class="form-input" id="deleteAccountConfirm" placeholder="Type DELETE here" autocomplete="off">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeModal('deleteAccountModal')">Cancel</button>
+      <button type="button" class="btn btn-danger" onclick="deleteAccount()">Permanently Delete</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js?v=20260323a"></script>
 </body>
 </html>

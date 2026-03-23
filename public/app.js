@@ -3040,6 +3040,17 @@ async function changePassword(e) {
   } catch(e) { toast(e.message, 'error'); }
 }
 
+async function deleteAccount() {
+  const confirm = document.getElementById('deleteAccountConfirm').value.trim();
+  if (confirm !== 'DELETE') { toast('Please type DELETE to confirm', 'error'); return; }
+  try {
+    await api('/api/account', { method: 'DELETE' });
+    closeModal('deleteAccountModal');
+    toast('Account deleted. Goodbye! 🏺', 'success');
+    logout();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
 // ============ REFERRAL LINK COPY ============
 function copyReferralLink() {
   const input = document.getElementById('refLinkInput');

@@ -230,6 +230,46 @@ app.put('/api/auth/password', auth, (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Delete account — permanently removes user and all their data
+app.delete('/api/account', auth, (req, res) => {
+  try {
+    const uid = req.userId;
+    // Prevent admin from accidentally deleting their own account
+    const u = db.prepare('SELECT email FROM users WHERE id=?').get(uid);
+    if (u?.email === ADMIN_EMAIL) return res.status(403).json({ error: 'Admin account cannot be deleted from here' });
+    // Delete all user data in order (respecting foreign keys)
+    db.prepare('DELETE FROM promo_redemptions WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM referral_rewards WHERE referrer_id=? OR referred_id=?').run(uid, uid);
+    db.prepare('DELETE FROM combo_comments WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM combo_likes WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM forum_replies WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM forum_posts WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM reviews WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM messages WHERE from_user_id=? OR to_user_id=?').run(uid, uid);
+    db.prepare('DELETE FROM notifications WHERE user_id=? OR from_user_id=?').run(uid, uid);
+    db.prepare('DELETE FROM piece_photos WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
+    db.prepare('DELETE FROM piece_glazes WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
+    db.prepare('DELETE FROM sales WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM pieces WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM glaze_combos WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM glaze_clay_tests WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM firing_logs WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM glazes WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM glaze_chemicals WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM clay_bodies WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM goals WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM projects WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM events WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM contacts WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM blocked_users WHERE user_id=? OR blocked_user_id=?').run(uid, uid);
+    db.prepare('DELETE FROM merchant_orders WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM featured_potter WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM page_views WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM users WHERE id=?').run(uid);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ============ USER PROFILE ============
 app.put('/api/profile', auth, (req, res) => {
   const { displayName, username, bio, location, website, isPrivate, unitSystem, tempUnit } = req.body;
