@@ -2717,6 +2717,7 @@ function handleNotifClick(notifId, link) {
   else if (link === 'forum') navigate('forum');
   else if (link.startsWith('forumPost_')) viewForumPost(link.replace('forumPost_',''));
   else if (link.startsWith('messages_')) { navigate('messageThread'); loadMessageThread(link.replace('messages_','')); }
+  else if (link.startsWith('/blog/')) { viewBlogPost(link.replace('/blog/','')); }
 }
 
 async function markAllNotificationsRead() {
