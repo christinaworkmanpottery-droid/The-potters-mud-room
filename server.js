@@ -18,11 +18,14 @@ const db = initDB();
 let transporter = null;
 if (process.env.SMTP_USER && process.env.SMTP_PASS) {
   transporter = nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.office365.com',
+    port: 587,
+    secure: false,
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS
-    }
+    },
+    tls: { ciphers: 'SSLv3' }
   });
 } else {
   console.warn('⚠️  SMTP not configured — newsletter emails will be skipped');
