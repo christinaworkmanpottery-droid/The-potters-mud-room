@@ -18,14 +18,11 @@ const db = initDB();
 let transporter = null;
 if (process.env.SMTP_USER && process.env.SMTP_PASS) {
   transporter = nodemailer.createTransport({
-    host: 'smtp.office365.com',
-    port: 587,
-    secure: false,
+    service: 'gmail',
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS
-    },
-    tls: { ciphers: 'SSLv3' }
+    }
   });
 } else {
   console.warn('⚠️  SMTP not configured — newsletter emails will be skipped');
@@ -2040,7 +2037,7 @@ app.post('/api/admin/newsletter/send', auth, (req, res) => {
       // Send email if configured
       if (transporter) {
         const mailOptions = {
-          from: process.env.SMTP_USER || 'pottery@example.com',
+          from: process.env.SMTP_USER || 'thepottersmudroom@gmail.com',
           to: subscriber.email,
           subject: 'New from The Potter\'s Mud Room: ' + post.title,
           html: `

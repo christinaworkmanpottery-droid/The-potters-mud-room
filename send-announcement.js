@@ -83,7 +83,7 @@ async function api(method, path, token, body) {
 </ul>
 
 <h2>New contact email</h2>
-<p>You can now reach us at <strong>info@thepottersmudroom.com</strong> for any questions, feedback, or support.</p>
+<p>You can now reach us at <strong>thepottersmudroom@gmail.com</strong> for any questions, feedback, or support.</p>
 
 <h2>Thank you for your patience</h2>
 <p>We know how frustrating it is when something doesn't work, especially when you're excited to try a new tool. We appreciate every single one of you who signed up and we're committed to making this the best pottery tracking app out there.</p>
