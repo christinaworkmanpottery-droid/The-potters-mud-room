@@ -2044,6 +2044,9 @@ app.post('/api/admin/newsletter/send', auth, (req, res) => {
 
       // Send email if configured
       if (transporter) {
+        const emailB64 = Buffer.from(subscriber.email).toString('base64');
+        const trackOpen = `https://thepottersmudroom.com/api/newsletter/open/${sendId}/${emailB64}`;
+        const trackClick = `https://thepottersmudroom.com/api/newsletter/click/${sendId}/${emailB64}?url=${encodeURIComponent('https://thepottersmudroom.com/blog/' + post.slug)}`;
         const mailOptions = {
           from: process.env.SMTP_USER || 'thepottersmudroom@gmail.com',
           to: subscriber.email,
@@ -2057,12 +2060,13 @@ app.post('/api/admin/newsletter/send', auth, (req, res) => {
                 <h3 style="color: #333; margin-top: 0;">${post.title}</h3>
                 <p style="color: #666; line-height: 1.6;">${post.excerpt || post.content.substring(0, 300)}</p>
                 <div style="text-align: center; margin: 20px 0;">
-                  <a href="https://thepottersmudroom.com/blog/${post.slug}" style="background: #8B7355; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Read Now</a>
+                  <a href="${trackClick}" style="background: #8B7355; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Read Now</a>
                 </div>
               </div>
               <div style="padding: 10px 20px; background: #f5f5f5; font-size: 12px; color: #999; text-align: center;">
                 <p>The Potter's Mud Room © 2026. <a href="https://thepottersmudroom.com" style="color: #8B7355; text-decoration: none;">Visit our site</a></p>
               </div>
+              <img src="${trackOpen}" width="1" height="1" style="display:none" alt="">
             </div>
           `
         };
@@ -2126,6 +2130,64 @@ app.post('/api/admin/email-settings/test', auth, async (req, res) => {
   } catch(e) {
     res.json({ success: false, error: e.message });
   }
+});
+
+// Newsletter tracking: open pixel (1x1 transparent gif)
+app.get('/api/newsletter/open/:sendId/:email', (req, res) => {
+  try {
+    const { sendId, email } = req.params;
+    const decoded = Buffer.from(email, 'base64').toString();
+    // Only record first open per recipient per send
+    const existing = db.prepare('SELECT id FROM newsletter_tracking WHERE send_id=? AND recipient_email=? AND event_type=?').get(sendId, decoded, 'open');
+    if (!existing) {
+      db.prepare('INSERT INTO newsletter_tracking (send_id, recipient_email, event_type) VALUES (?,?,?)').run(sendId, decoded, 'open');
+    }
+  } catch(e) { /* silent */ }
+  // Return 1x1 transparent GIF
+  const pixel = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
+  res.set({ 'Content-Type': 'image/gif', 'Cache-Control': 'no-store' });
+  res.send(pixel);
+});
+
+// Newsletter tracking: click-through
+app.get('/api/newsletter/click/:sendId/:email', (req, res) => {
+  try {
+    const { sendId, email } = req.params;
+    const decoded = Buffer.from(email, 'base64').toString();
+    const existing = db.prepare('SELECT id FROM newsletter_tracking WHERE send_id=? AND recipient_email=? AND event_type=?').get(sendId, decoded, 'click');
+    if (!existing) {
+      db.prepare('INSERT INTO newsletter_tracking (send_id, recipient_email, event_type) VALUES (?,?,?)').run(sendId, decoded, 'click');
+    }
+  } catch(e) { /* silent */ }
+  // Redirect to the blog post
+  const url = req.query.url || 'https://thepottersmudroom.com';
+  res.redirect(302, url);
+});
+
+// Admin: newsletter tracking stats
+app.get('/api/admin/newsletter/stats/:sendId', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const { sendId } = req.params;
+    const send = db.prepare('SELECT ns.*, bp.title FROM newsletter_sends ns LEFT JOIN blog_posts bp ON ns.blog_post_id=bp.id WHERE ns.id=?').get(sendId);
+    if (!send) return res.status(404).json({ error: 'Send not found' });
+    
+    const opens = db.prepare('SELECT COUNT(DISTINCT recipient_email) as count FROM newsletter_tracking WHERE send_id=? AND event_type=?').get(sendId, 'open');
+    const clicks = db.prepare('SELECT COUNT(DISTINCT recipient_email) as count FROM newsletter_tracking WHERE send_id=? AND event_type=?').get(sendId, 'click');
+    const openList = db.prepare('SELECT recipient_email, created_at FROM newsletter_tracking WHERE send_id=? AND event_type=? ORDER BY created_at').all(sendId, 'open');
+    const clickList = db.prepare('SELECT recipient_email, created_at FROM newsletter_tracking WHERE send_id=? AND event_type=? ORDER BY created_at').all(sendId, 'click');
+    
+    res.json({
+      send,
+      opens: opens.count,
+      clicks: clicks.count,
+      recipients: send.recipients_count,
+      openRate: send.recipients_count > 0 ? Math.round((opens.count / send.recipients_count) * 100) : 0,
+      clickRate: send.recipients_count > 0 ? Math.round((clicks.count / send.recipients_count) * 100) : 0,
+      openList,
+      clickList
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // Public blog post page — standalone, no login required

@@ -708,6 +708,20 @@ function initDB() {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_newsletter_sends_post ON newsletter_sends(blog_post_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_newsletter_sends_date ON newsletter_sends(sent_at DESC)`);
 
+  // Newsletter tracking (opens and clicks)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS newsletter_tracking (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      send_id TEXT NOT NULL,
+      recipient_email TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (send_id) REFERENCES newsletter_sends(id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_newsletter_tracking_send ON newsletter_tracking(send_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_newsletter_tracking_type ON newsletter_tracking(event_type)`);
+
   // Featured potter table
   db.exec(`
     CREATE TABLE IF NOT EXISTS featured_potter (
