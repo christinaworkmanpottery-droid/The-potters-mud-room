@@ -2057,7 +2057,7 @@ app.post('/api/admin/newsletter/send', auth, (req, res) => {
                 <h3 style="color: #333; margin-top: 0;">${post.title}</h3>
                 <p style="color: #666; line-height: 1.6;">${post.excerpt || post.content.substring(0, 300)}</p>
                 <div style="text-align: center; margin: 20px 0;">
-                  <a href="https://thepottersmudroom.com/blog/${post.slug}" style="background: #8B7355; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Read Now</a>
+                  <a href="https://thepottersmudroom.com/#blog/${post.slug}" style="background: #8B7355; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Read Now</a>
                 </div>
               </div>
               <div style="padding: 10px 20px; background: #f5f5f5; font-size: 12px; color: #999; text-align: center;">
@@ -2126,6 +2126,11 @@ app.post('/api/admin/email-settings/test', auth, async (req, res) => {
   } catch(e) {
     res.json({ success: false, error: e.message });
   }
+});
+
+// Redirect /blog/:slug to hash-based SPA route
+app.get('/blog/:slug', (req, res) => {
+  res.redirect(302, '/#blog/' + req.params.slug);
 });
 
 // SPA fallback — must be AFTER all API routes
