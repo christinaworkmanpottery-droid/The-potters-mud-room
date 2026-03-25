@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { width: 1080px; height: 1080px; overflow: hidden; }
+.container {
+  width: 1080px; height: 1080px;
+  background: linear-gradient(135deg, #5C4033 0%, #8B7355 40%, #A0826D 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+  padding: 55px 65px 35px;
+  position: relative;
+}
+.container::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at 30% 20%, rgba(255,248,240,0.05) 0%, transparent 60%);
+  pointer-events: none;
+}
+.header { text-align: center; z-index: 1; }
+.label {
+  font-family: Arial, sans-serif; font-size: 20px; font-weight: bold;
+  color: #5C4033; background: #FFF8F0; display: inline-block;
+  padding: 7px 24px; border-radius: 20px; letter-spacing: 3px;
+  text-transform: uppercase; margin-bottom: 14px;
+}
+h1 {
+  font-family: Georgia, serif; font-size: 46px; color: #FFF8F0;
+  text-shadow: 2px 2px 8px rgba(0,0,0,0.3); line-height: 1.15;
+  max-width: 900px;
+}
+.subtitle {
+  font-family: Arial, sans-serif; font-size: 22px; color: rgba(255,248,240,0.7);
+  margin-top: 10px; font-style: italic;
+}
+.tips { z-index: 1; width: 100%; }
+.tip {
+  display: flex; align-items: flex-start; gap: 16px;
+  margin-bottom: 20px; padding: 0 8px;
+}
+.tip-num {
+  font-family: Georgia, serif; font-size: 36px; font-weight: bold;
+  color: #FFF8F0; opacity: 0.35; min-width: 38px; text-align: right;
+  line-height: 1.1;
+}
+.tip-text {
+  font-family: Arial, sans-serif; font-size: 27px; color: #FFF8F0;
+  line-height: 1.35;
+}
+.tip-text strong { color: #FFD9B3; }
+.footer {
+  text-align: center; z-index: 1;
+  border-top: 2px solid rgba(255,248,240,0.2); padding-top: 16px; width: 100%;
+}
+.brand {
+  font-family: Georgia, serif; font-size: 22px; color: #FFF8F0;
+  letter-spacing: 4px; font-weight: bold;
+}
+.handle {
+  font-family: Arial, sans-serif; font-size: 16px; color: rgba(255,248,240,0.6);
+  margin-top: 4px;
+}
+</style>
+</head><body>
+<div class="container">
+  <div class="header">
+    <div class="label">Stop the Cracks</div>
+    <h1>Why Your Pots Keep Cracking</h1>
+    <div class="subtitle">6 fixes every potter needs to know</div>
+  </div>
+  <div class="tips">
+    <div class="tip"><span class="tip-num">1</span><span class="tip-text"><strong>Dry slowly & evenly.</strong> Cover loosely with plastic. No fans, no heaters, no rush.</span></div>
+    <div class="tip"><span class="tip-num">2</span><span class="tip-text"><strong>Keep walls even.</strong> Thick bottoms + thin walls = cracks every time.</span></div>
+    <div class="tip"><span class="tip-num">3</span><span class="tip-text"><strong>Wedge out air.</strong> Trapped bubbles expand in the kiln and blow out chunks.</span></div>
+    <div class="tip"><span class="tip-num">4</span><span class="tip-text"><strong>Compress the bottom.</strong> Use a rib after every throw — S-cracks hate this.</span></div>
+    <div class="tip"><span class="tip-num">5</span><span class="tip-text"><strong>Score & slip joins.</strong> Don't just smoosh — push the clay together properly.</span></div>
+    <div class="tip"><span class="tip-num">6</span><span class="tip-text"><strong>Track your pieces.</strong> Patterns emerge when you log what works (and what cracks).</span></div>
+  </div>
+  <div class="footer">
+    <div class="brand">THE POTTER'S MUD ROOM</div>
+    <div class="handle">thepottersmudroom.com</div>
+  </div>
+</div>
+</body></html>
