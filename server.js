@@ -2057,7 +2057,7 @@ app.post('/api/admin/newsletter/send', auth, (req, res) => {
                 <h3 style="color: #333; margin-top: 0;">${post.title}</h3>
                 <p style="color: #666; line-height: 1.6;">${post.excerpt || post.content.substring(0, 300)}</p>
                 <div style="text-align: center; margin: 20px 0;">
-                  <a href="https://thepottersmudroom.com/#blog/${post.slug}" style="background: #8B7355; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Read Now</a>
+                  <a href="https://thepottersmudroom.com/blog/${post.slug}" style="background: #8B7355; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; display: inline-block;">Read Now</a>
                 </div>
               </div>
               <div style="padding: 10px 20px; background: #f5f5f5; font-size: 12px; color: #999; text-align: center;">
@@ -2128,9 +2128,60 @@ app.post('/api/admin/email-settings/test', auth, async (req, res) => {
   }
 });
 
-// Redirect /blog/:slug to hash-based SPA route
+// Public blog post page — standalone, no login required
 app.get('/blog/:slug', (req, res) => {
-  res.redirect(302, '/#blog/' + req.params.slug);
+  try {
+    const post = db.prepare('SELECT * FROM blog_posts WHERE slug=? AND is_published=1').get(req.params.slug);
+    if (!post) return res.status(404).send('Post not found');
+    
+    res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${post.title} — The Potter's Mud Room</title>
+  <meta name="description" content="${(post.excerpt || '').replace(/"/g, '&quot;')}">
+  <meta property="og:title" content="${post.title}">
+  <meta property="og:description" content="${(post.excerpt || '').replace(/"/g, '&quot;')}">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://thepottersmudroom.com/blog/${post.slug}">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #FAF8F5; color: #333; line-height: 1.7; }
+    .header { background: linear-gradient(135deg, #8B7355 0%, #A0826D 100%); padding: 20px 0; text-align: center; }
+    .header a { color: white; text-decoration: none; font-size: 1.5rem; font-weight: bold; }
+    .header span { color: #D4A574; }
+    .container { max-width: 720px; margin: 0 auto; padding: 40px 20px; }
+    h1 { font-size: 2rem; color: #5C4033; margin-bottom: 8px; }
+    .meta { color: #999; font-size: 0.9rem; margin-bottom: 32px; }
+    .content { font-size: 1.05rem; color: #444; }
+    .content h2 { color: #5C4033; margin: 28px 0 12px; font-size: 1.4rem; }
+    .content h3 { color: #6B5244; margin: 24px 0 8px; font-size: 1.2rem; }
+    .content p { margin-bottom: 16px; }
+    .content ul, .content ol { margin: 0 0 16px 24px; }
+    .content li { margin-bottom: 6px; }
+    .content a { color: #8B7355; }
+    .content strong { color: #333; }
+    .footer { text-align: center; padding: 40px 20px; border-top: 1px solid #E8E0D8; margin-top: 40px; }
+    .footer a { color: #8B7355; text-decoration: none; font-weight: 600; padding: 12px 24px; border: 2px solid #8B7355; border-radius: 6px; }
+    .footer a:hover { background: #8B7355; color: white; }
+    .footer p { margin-top: 16px; color: #999; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <div class="header"><a href="https://thepottersmudroom.com">🏺 The Potter's <span>Mud Room</span></a></div>
+  <div class="container">
+    <h1>${post.title}</h1>
+    <div class="meta">By ${post.author || 'Christina Workman'} · ${new Date(post.published_at || post.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
+    <div class="content">${post.content}</div>
+  </div>
+  <div class="footer">
+    <a href="https://thepottersmudroom.com">Visit The Potter's Mud Room</a>
+    <p>© 2026 The Potter's Mud Room. Track your pottery journey.</p>
+  </div>
+</body>
+</html>`);
+  } catch(e) { res.status(500).send('Error loading post'); }
 });
 
 // SPA fallback — must be AFTER all API routes
