@@ -2190,6 +2190,22 @@ app.get('/api/admin/newsletter/stats/:sendId', auth, (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Dynamic sitemap with blog posts
+app.get('/sitemap.xml', (req, res) => {
+  try {
+    const posts = db.prepare("SELECT slug, updated_at, published_at FROM blog_posts WHERE is_published=1 ORDER BY published_at DESC").all();
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
+    xml += '  <url><loc>https://thepottersmudroom.com/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>\n';
+    posts.forEach(p => {
+      const date = (p.updated_at || p.published_at || '').split(' ')[0];
+      xml += `  <url><loc>https://thepottersmudroom.com/blog/${p.slug}</loc>${date ? '<lastmod>' + date + '</lastmod>' : ''}<changefreq>weekly</changefreq><priority>0.8</priority></url>\n`;
+    });
+    xml += '</urlset>';
+    res.set('Content-Type', 'application/xml');
+    res.send(xml);
+  } catch(e) { res.status(500).send('Error generating sitemap'); }
+});
+
 // Public blog post page — standalone, no login required
 app.get('/blog/:slug', (req, res) => {
   try {

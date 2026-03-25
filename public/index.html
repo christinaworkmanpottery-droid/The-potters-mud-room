@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>The Potter's Mud Room — Free Pottery Tracking App for Potters | Potters Mudroom</title>
-  <meta name="description" content="The Potter's Mud Room (Potters Mudroom) is the free pottery tracking app built by a potter, for potters. Log clay bodies, glazes, firings, sales & more. Join the potters mudroom community today.">
+  <title>The Potter's Mud Room — Free Pottery Tracking App</title>
+  <meta name="description" content="Free pottery tracking app built by a potter. Log clay bodies, glazes, firings, and sales. Track every piece from wet clay to finished work.">
   <meta name="keywords" content="potters mudroom, potters mud room, the potters mud room, mudroom pottery, pottery mudroom, mudroom for potters, pottery tracker, ceramics app, pottery journal, glaze log, clay body tracker, kiln firing log, pottery community, ceramic artists, pottery tools, handmade pottery, pottery studio, pottery organizer, pottery app, mud room for potters, pottery casualty tracker, glaze combo tracker, pottery piece tracker">
   <meta name="author" content="Christina Workman — The Potter's Mud Room">
   <meta name="robots" content="index, follow">
@@ -421,7 +421,7 @@
 <div id="authScreen" class="auth-screen" style="display:none">
   <div class="auth-card">
     <div class="auth-logo">🏺</div>
-    <h1 class="auth-title">The Potter's Mud Room</h1>
+    <h2 class="auth-title">The Potter's Mud Room</h1>
     <p class="auth-subtitle">Your pottery journal — clay, glazes &amp; community</p>
     <form id="authForm">
       <div id="nameField" class="form-group hidden">
@@ -500,7 +500,7 @@
     <!-- DASHBOARD -->
     <div id="pageDashboard" class="page active">
       <div class="page-header">
-        <h1>🏺 Dashboard</h1>
+        <h2>🏺 Dashboard</h2>
         <button class="btn btn-primary" onclick="openPieceModal()">+ New Piece</button>
       </div>
       <div id="upgradeBanner" class="upgrade-banner hidden">
@@ -525,7 +525,7 @@
     <!-- PIECES LIST -->
     <div id="pagePieces" class="page">
       <div class="page-header">
-        <h1>My Pieces</h1>
+        <h2>My Pieces</h2>
         <div style="display:flex;gap:8px;align-items:center">
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('pieces','card')" title="Card view">▦</button>
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('pieces','list')" title="List view">☰</button>
@@ -566,7 +566,7 @@
     <!-- CLAY BODIES -->
     <div id="pageClayBodies" class="page">
       <div class="page-header">
-        <h1>Clay Bodies</h1>
+        <h2>Clay Bodies</h2>
         <div style="display:flex;gap:8px;align-items:center">
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('clay','card')" title="Card view">▦</button>
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('clay','list')" title="List view">☰</button>
@@ -585,7 +585,7 @@
     <!-- GLAZES -->
     <div id="pageGlazes" class="page">
       <div class="page-header">
-        <h1>Glazes</h1>
+        <h2>Glazes</h2>
         <div style="display:flex;gap:8px;align-items:center">
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('glazes','card')" title="Card view">▦</button>
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('glazes','list')" title="List view">☰</button>
@@ -605,7 +605,7 @@
     <!-- FIRINGS -->
     <div id="pageFirings" class="page">
       <div class="page-header">
-        <h1>Firing Logs</h1>
+        <h2>Firing Logs</h2>
         <div style="display:flex;gap:8px;align-items:center">
           <select class="form-select" id="firingSort" style="width:200px" onchange="loadFirings()">
             <option value="firing_date">Sort by Firing Date</option>
@@ -631,7 +631,7 @@
     <!-- CASUALTIES -->
     <div id="pageCasualties" class="page">
       <div class="page-header">
-        <h1>Pottery Casualties</h1>
+        <h2>Pottery Casualties</h2>
       </div>
       <p style="color:var(--text-light);margin-bottom:16px">RIP to the pieces that didn't make it. Track what went wrong and what you learned — so you don't make the same mistake twice.</p>
       <div id="casualtyStats" class="stats-row" style="margin-bottom:20px"></div>
@@ -646,7 +646,7 @@
     <!-- SALES -->
     <div id="pageSales" class="page">
       <div class="page-header">
-        <h1>Sales</h1>
+        <h2>Sales</h2>
         <div style="display:flex;gap:8px;align-items:center">
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('sales','card')" title="Card view">▦</button>
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('sales','list')" title="List view">☰</button>
@@ -671,7 +671,7 @@
     <!-- COMMUNITY -->
     <div id="pageCommunity" class="page">
       <div class="page-header">
-        <h1>Community Glaze Library</h1>
+        <h2>Community Glaze Library</h2>
         <div style="display:flex;gap:8px;align-items:center">
           <button class="btn btn-sm btn-secondary" onclick="navigate('shoppingList')">🛒 Shopping List</button>
           <button class="btn btn-primary" onclick="openComboModal()">+ Share Combo</button>
@@ -702,7 +702,7 @@
     <!-- FORUM -->
     <div id="pageForum" class="page">
       <div class="page-header">
-        <h1>The Mud Room Forum</h1>
+        <h2>The Mud Room Forum</h2>
         <div style="display:flex;gap:8px;align-items:center">
           <button class="btn btn-primary" onclick="openForumPostModal()">+ New Post</button>
         </div>
@@ -734,7 +734,7 @@
     <!-- HELP / TUTORIAL -->
     <div id="pageHelp" class="page">
       <div class="page-header">
-        <h1>📖 How to Use The Potter's Mud Room</h1>
+        <h2>📖 How to Use The Potter's Mud Room</h2>
       </div>
       <div style="max-width:700px">
 
@@ -833,6 +833,10 @@
           </p>
           <p style="margin-top:12px">Questions? Post in the <strong>Mud Room Help</strong> forum category or email:</p>
           <p style="margin-top:8px"><strong>📧 <a href="mailto:thepottersmudroom@gmail.com" style="color:var(--primary)">thepottersmudroom@gmail.com</a></strong></p>
+          <p style="margin-top:12px">
+            🏺 <a href="https://christinaworkmanpottery.com" target="_blank" rel="noopener" style="color:var(--primary)"><strong>Christina Workman Pottery</strong></a> · 
+            ✨ <a href="https://lucehealing.com" target="_blank" rel="noopener" style="color:var(--primary)"><strong>Luce Healing</strong></a>
+          </p>
         </div>
 
         <div class="card mb-16" style="margin-top:16px">
@@ -903,7 +907,7 @@
     <!-- SHOP -->
     <div id="pageShop" class="page">
       <div class="page-header">
-        <h1>🛍️ The Mud Room Shop</h1>
+        <h2>🛍️ The Mud Room Shop</h2>
       </div>
       <div id="shopProducts" class="card-grid"></div>
     </div>
@@ -911,7 +915,7 @@
     <!-- UPGRADE / PLANS -->
     <div id="pageUpgrade" class="page">
       <div class="page-header">
-        <h1>Choose Your Plan</h1>
+        <h2>Choose Your Plan</h2>
       </div>
       <div id="upgradeContent"></div>
     </div>
@@ -919,7 +923,7 @@
     <!-- GOALS -->
     <div id="pageGoals" class="page">
       <div class="page-header">
-        <h1>Goals</h1>
+        <h2>Goals</h2>
         <button class="btn btn-primary" onclick="openGoalModal()">+ Add Goal</button>
       </div>
       <div id="goalsList" class="card-grid"></div>
@@ -933,7 +937,7 @@
     <!-- PROJECTS -->
     <div id="pageProjects" class="page">
       <div class="page-header">
-        <h1>Projects</h1>
+        <h2>Projects</h2>
         <button class="btn btn-primary" onclick="openProjectModal()">+ New Project</button>
       </div>
       <div id="projectsList" class="card-grid"></div>
@@ -947,7 +951,7 @@
     <!-- EVENTS -->
     <div id="pageEvents" class="page">
       <div class="page-header">
-        <h1>📅 Events</h1>
+        <h2>📅 Events</h2>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <button class="btn btn-sm btn-secondary" onclick="downloadEventsiCal()">📥 Download Calendar (.ics)</button>
           <span style="font-size:0.8rem;color:var(--text-light)">Works with Google Calendar, Outlook, Apple Calendar & more</span>
@@ -966,7 +970,7 @@
     <!-- CONTACTS -->
     <div id="pageContacts" class="page">
       <div class="page-header">
-        <h1>Contacts</h1>
+        <h2>Contacts</h2>
         <button class="btn btn-primary" onclick="openContactModal()">+ Add Contact</button>
       </div>
       <div id="contactsList" class="card-grid"></div>
@@ -980,7 +984,7 @@
     <!-- COMMUNITY MEMBERS DIRECTORY -->
     <div id="pageCommunityMembers" class="page">
       <div class="page-header">
-        <h1>👥 Community Members</h1>
+        <h2>👥 Community Members</h2>
       </div>
       <div class="filter-bar">
         <input type="text" class="form-input" placeholder="Search members..." id="memberSearch" oninput="filterMembers()">
@@ -995,7 +999,7 @@
     <!-- MEMBER PROFILE VIEW -->
     <div id="pageMemberProfile" class="page">
       <div class="page-header">
-        <h1>👤 Member Profile</h1>
+        <h2>👤 Member Profile</h2>
         <button class="btn btn-secondary" onclick="navigate('communityMembers')">← Back to Members</button>
       </div>
       <div id="memberProfileContent"></div>
@@ -1004,7 +1008,7 @@
     <!-- PROFILE -->
     <div id="pageProfile" class="page">
       <div class="page-header">
-        <h1>My Profile</h1>
+        <h2>My Profile</h2>
       </div>
       <div class="detail-grid">
         <div class="card">
@@ -1094,7 +1098,7 @@
     <!-- ADMIN (Christina only) -->
     <div id="pageAdmin" class="page">
       <div class="page-header">
-        <h1>🔧 Admin Dashboard</h1>
+        <h2>🔧 Admin Dashboard</h2>
       </div>
       <div id="adminContent"></div>
     </div>
@@ -1102,7 +1106,7 @@
     <!-- BLOG -->
     <div id="pageBlog" class="page">
       <div class="page-header">
-        <h1>📝 From the Studio</h1>
+        <h2>📝 From the Studio</h2>
       </div>
       <p style="color:var(--text-light);margin-bottom:24px">Pottery tips, glazing advice, and studio wisdom.</p>
       <div id="blogPostsList" class="card-grid"></div>
@@ -1127,7 +1131,7 @@
     <!-- NOTIFICATIONS -->
     <div id="pageNotifications" class="page">
       <div class="page-header">
-        <h1>🔔 Notifications</h1>
+        <h2>🔔 Notifications</h2>
         <button class="btn btn-secondary btn-sm" onclick="markAllNotificationsRead()">Mark All Read</button>
       </div>
       <div id="notificationList"></div>
@@ -1141,7 +1145,7 @@
     <!-- MESSAGES -->
     <div id="pageMessages" class="page">
       <div class="page-header">
-        <h1>✉️ Messages</h1>
+        <h2>✉️ Messages</h2>
       </div>
       <div id="messageList"></div>
       <div id="messagesEmpty" class="empty-state hidden">
@@ -1160,7 +1164,7 @@
     <!-- SHOPPING LIST -->
     <div id="pageShoppingList" class="page">
       <div class="page-header">
-        <h1>🛒 Shopping List</h1>
+        <h2>🛒 Shopping List</h2>
         <button class="btn btn-secondary" onclick="copyShoppingList()">📋 Copy to Clipboard</button>
         <button class="btn btn-secondary" onclick="printShoppingList()">🖨️ Print</button>
       </div>
@@ -1171,7 +1175,7 @@
     <!-- GLAZE CHEMICALS -->
     <div id="pageChemicals" class="page">
       <div class="page-header">
-        <h1>🧪 Glaze Chemicals Inventory</h1>
+        <h2>🧪 Glaze Chemicals Inventory</h2>
         <button class="btn btn-primary" onclick="openChemicalModal()">+ Add Chemical</button>
       </div>
       <p style="color:var(--text-light);margin-bottom:16px">Track your glaze-mixing materials. When viewing recipes, you'll see which ingredients you have on hand.</p>
