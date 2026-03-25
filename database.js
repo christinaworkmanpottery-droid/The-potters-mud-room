@@ -772,6 +772,14 @@ function initDB() {
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_glaze_clay_tests_glaze ON glaze_clay_tests(glaze_id)`);
 
+  // Site settings (for SMTP credentials etc.)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS site_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT
+    )
+  `);
+
   // Seed starter blog posts (INSERT OR IGNORE by slug)
   const blogInsert = db.prepare(`INSERT OR IGNORE INTO blog_posts (id, title, slug, content, excerpt, author, is_published, published_at) VALUES (?,?,?,?,?,?,1,datetime('now'))`);
 

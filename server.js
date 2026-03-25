@@ -16,16 +16,24 @@ const db = initDB();
 
 // Nodemailer setup for newsletter emails
 let transporter = null;
+function setupTransporter(user, pass) {
+  if (user && pass) {
+    transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user, pass }
+    });
+    transporter.verify((err) => {
+      if (err) console.error('⚠️  SMTP verification failed:', err.message);
+      else console.log('✅ SMTP connected as', user);
+    });
+  }
+}
+
+// Try env vars first
 if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-  transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS
-    }
-  });
+  setupTransporter(process.env.SMTP_USER, process.env.SMTP_PASS);
 } else {
-  console.warn('⚠️  SMTP not configured — newsletter emails will be skipped');
+  console.warn('⚠️  SMTP not configured via env — will check database on startup');
 }
 
 // Stripe setup (optional — works without keys, just disables payments)
@@ -2089,6 +2097,54 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
   }
 });
+
+// ---- Admin: Email Settings (save SMTP creds to DB so env vars aren't needed) ----
+app.get('/api/admin/email-settings', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const user = db.prepare("SELECT value FROM site_settings WHERE key='smtp_user'").get();
+    const configured = !!(user && user.value);
+    res.json({ configured, email: user ? user.value : null });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/email-settings', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const { smtp_user, smtp_pass } = req.body;
+    if (!smtp_user || !smtp_pass) return res.status(400).json({ error: 'Email and app password are required' });
+    
+    db.prepare("INSERT OR REPLACE INTO site_settings (key, value) VALUES ('smtp_user', ?)").run(smtp_user);
+    db.prepare("INSERT OR REPLACE INTO site_settings (key, value) VALUES ('smtp_pass', ?)").run(smtp_pass);
+    
+    // Reconnect transporter
+    setupTransporter(smtp_user, smtp_pass);
+    
+    res.json({ success: true, message: 'Email settings saved. Testing connection...' });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/email-settings/test', auth, async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  if (!transporter) return res.json({ success: false, error: 'No email configured' });
+  try {
+    await transporter.verify();
+    res.json({ success: true, message: 'Email connection working!' });
+  } catch(e) {
+    res.json({ success: false, error: e.message });
+  }
+});
+
+// Load SMTP from database on startup (if not in env vars)
+if (!transporter) {
+  try {
+    const smtpUser = db.prepare("SELECT value FROM site_settings WHERE key='smtp_user'").get();
+    const smtpPass = db.prepare("SELECT value FROM site_settings WHERE key='smtp_pass'").get();
+    if (smtpUser && smtpPass) {
+      setupTransporter(smtpUser.value, smtpPass.value);
+    }
+  } catch(e) { /* site_settings table might not exist yet */ }
+}
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🏺 The Potter's Mud Room running on http://localhost:${PORT}`);

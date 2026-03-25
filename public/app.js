@@ -1747,6 +1747,11 @@ async function loadAdmin() {
     html += '<div class="card mb-16"><h3 style="margin-bottom:12px">📬 Newsletter</h3>' +
       '<div id="adminNewsletterContent">Loading...</div></div>';
 
+    // Email settings section
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">📧 Email Settings</h3>' +
+      '<p class="text-sm mb-12" style="color:var(--text-light)">Configure Gmail for sending newsletters. You need a <a href="https://myaccount.google.com/apppasswords" target="_blank">Gmail App Password</a> (requires 2-Step Verification).</p>' +
+      '<div id="adminEmailSettingsContent">Loading...</div></div>';
+
     try {
       el.innerHTML = html;
     } catch(renderErr) {
@@ -1761,6 +1766,7 @@ async function loadAdmin() {
     loadAdminBlogPosts();
     loadAdminFeaturedPotter();
     loadAdminNewsletter();
+    loadAdminEmailSettings();
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -2197,6 +2203,77 @@ async function publishBlogPost(postId, title) {
 
 function exportNewsletterCSV() {
   exportData('/api/admin/newsletter/export');
+}
+
+// ---- Admin: Email Settings ----
+async function loadAdminEmailSettings() {
+  try {
+    const settings = await api('/api/admin/email-settings');
+    const el = document.getElementById('adminEmailSettingsContent');
+    if (!el) return;
+    
+    let html = '';
+    if (settings.configured) {
+      html += '<div style="padding:12px;background:var(--success-bg,#e8f5e9);border-radius:var(--radius);margin-bottom:12px">' +
+        '<strong>✅ Email configured:</strong> ' + esc(settings.email) + '</div>';
+      html += '<button class="btn btn-sm" onclick="testEmailSettings()" id="testEmailBtn">Test Connection</button> ';
+      html += '<button class="btn btn-sm btn-ghost" onclick="showEmailForm()">Change Settings</button>';
+      html += '<div id="emailTestResult" style="margin-top:8px"></div>';
+    } else {
+      html += '<div style="padding:12px;background:var(--warning-bg,#fff3e0);border-radius:var(--radius);margin-bottom:12px">' +
+        '<strong>⚠️ Email not configured</strong> — newsletters won\'t be sent until you add your Gmail credentials below.</div>';
+    }
+    
+    html += '<div id="emailSettingsForm" style="' + (settings.configured ? 'display:none;' : '') + 'margin-top:12px">' +
+      '<div class="form-group"><label>Gmail Address</label>' +
+      '<input type="email" class="form-input" id="smtpUserInput" placeholder="yourname@gmail.com" value="' + esc(settings.email || '') + '"></div>' +
+      '<div class="form-group"><label>Gmail App Password</label>' +
+      '<input type="password" class="form-input" id="smtpPassInput" placeholder="16-character app password">' +
+      '<div class="text-sm mt-4" style="color:var(--text-light)">Go to <a href="https://myaccount.google.com/apppasswords" target="_blank">Google App Passwords</a> to create one (2-Step Verification must be on first)</div></div>' +
+      '<button class="btn btn-primary btn-sm" onclick="saveEmailSettings()">Save Email Settings</button></div>';
+    
+    el.innerHTML = html;
+  } catch(e) { console.error('Email settings error:', e); }
+}
+
+function showEmailForm() {
+  const form = document.getElementById('emailSettingsForm');
+  if (form) form.style.display = '';
+}
+
+async function saveEmailSettings() {
+  const user = document.getElementById('smtpUserInput').value.trim();
+  const pass = document.getElementById('smtpPassInput').value;
+  if (!user || !pass) return toast('Please enter both email and app password', 'error');
+  try {
+    await api('/api/admin/email-settings', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ smtp_user: user, smtp_pass: pass })
+    });
+    toast('Email settings saved!', 'success');
+    loadAdminEmailSettings();
+    // Test immediately
+    setTimeout(testEmailSettings, 1000);
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function testEmailSettings() {
+  const btn = document.getElementById('testEmailBtn');
+  const result = document.getElementById('emailTestResult');
+  if (btn) btn.disabled = true;
+  if (result) result.innerHTML = '<span style="color:var(--text-light)">Testing...</span>';
+  try {
+    const r = await api('/api/admin/email-settings/test', { method: 'POST' });
+    if (r.success) {
+      if (result) result.innerHTML = '<span style="color:var(--success,green)">✅ ' + esc(r.message) + '</span>';
+    } else {
+      if (result) result.innerHTML = '<span style="color:var(--error,red)">❌ ' + esc(r.error) + '</span>';
+    }
+  } catch(e) {
+    if (result) result.innerHTML = '<span style="color:var(--error,red)">❌ ' + esc(e.message) + '</span>';
+  }
+  if (btn) btn.disabled = false;
 }
 
 // Landing page reviews
