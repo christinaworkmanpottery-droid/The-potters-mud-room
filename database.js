@@ -383,6 +383,20 @@ function initDB() {
     CREATE INDEX IF NOT EXISTS idx_page_views_date ON page_views(created_at);
     CREATE INDEX IF NOT EXISTS idx_page_views_path ON page_views(path);
 
+    -- User activity tracking (feature usage)
+    CREATE TABLE IF NOT EXISTS user_activity (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      action TEXT NOT NULL,
+      page TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_user_activity_user ON user_activity(user_id);
+    CREATE INDEX IF NOT EXISTS idx_user_activity_action ON user_activity(action);
+    CREATE INDEX IF NOT EXISTS idx_user_activity_date ON user_activity(created_at);
+
     -- Insert default forum categories
     INSERT OR IGNORE INTO forum_categories (id, name, description, sort_order, icon) VALUES
       ('cat-general', 'General Chat', 'Talk about anything pottery related', 1, '💬'),

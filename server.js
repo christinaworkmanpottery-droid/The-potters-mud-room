@@ -2262,6 +2262,66 @@ app.get('/blog/:slug', (req, res) => {
   } catch(e) { res.status(500).send('Error loading post'); }
 });
 
+// ============ USER ACTIVITY TRACKING ============
+// POST /api/activity — log user feature usage
+app.post('/api/activity', auth, (req, res) => {
+  try {
+    const { action, page } = req.body;
+    if (!action) return res.status(400).json({ error: 'action required' });
+    db.prepare('INSERT INTO user_activity (user_id, action, page) VALUES (?,?,?)').run(req.userId, action, page || null);
+    res.json({ ok: true });
+  } catch(e) { res.json({ ok: true }); /* don't fail on tracking */ }
+});
+
+// GET /api/admin/activity-summary — admin usage analytics
+app.get('/api/admin/activity-summary', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    // Feature usage counts (ranked most to least)
+    const featureUsage = db.prepare(`SELECT action, COUNT(*) as count FROM user_activity GROUP BY action ORDER BY count DESC`).all();
+
+    // Daily active users (last 30 days)
+    const dailyActiveUsers = db.prepare(`SELECT date(created_at) as day, COUNT(DISTINCT user_id) as users FROM user_activity WHERE created_at >= datetime('now', '-30 day') GROUP BY day ORDER BY day`).all();
+
+    // Per-user activity summary
+    const perUser = db.prepare(`
+      SELECT u.email, u.display_name, 
+        COUNT(ua.id) as total_actions,
+        MAX(ua.created_at) as last_active,
+        (SELECT ua2.action FROM user_activity ua2 WHERE ua2.user_id = u.id GROUP BY ua2.action ORDER BY COUNT(*) DESC LIMIT 1) as top_feature
+      FROM users u
+      JOIN user_activity ua ON ua.user_id = u.id
+      GROUP BY u.id
+      ORDER BY total_actions DESC
+    `).all();
+
+    // Activity over time (daily counts last 30 days)
+    const activityOverTime = db.prepare(`SELECT date(created_at) as day, COUNT(*) as count FROM user_activity WHERE created_at >= datetime('now', '-30 day') GROUP BY day ORDER BY day`).all();
+
+    // Total count for percentage calc
+    const totalActions = featureUsage.reduce((s, f) => s + f.count, 0);
+
+    // Active users: today / this week / this month
+    const activeToday = db.prepare("SELECT COUNT(DISTINCT user_id) as c FROM user_activity WHERE created_at >= datetime('now', '-1 day')").get().c;
+    const activeWeek = db.prepare("SELECT COUNT(DISTINCT user_id) as c FROM user_activity WHERE created_at >= datetime('now', '-7 day')").get().c;
+    const activeMonth = db.prepare("SELECT COUNT(DISTINCT user_id) as c FROM user_activity WHERE created_at >= datetime('now', '-30 day')").get().c;
+
+    res.json({
+      featureUsage,
+      dailyActiveUsers,
+      perUser,
+      activityOverTime,
+      totalActions,
+      activeToday,
+      activeWeek,
+      activeMonth
+    });
+  } catch(e) {
+    console.error('Activity summary error:', e.message);
+    res.status(500).json({ error: 'Failed to load activity summary' });
+  }
+});
+
 // SPA fallback — must be AFTER all API routes
 app.get('*', (req, res) => {
   if (!req.path.startsWith('/api/') && !req.path.startsWith('/uploads/')) {

@@ -176,6 +176,18 @@ function navigate(page) {
   };
   if (loaders[page]) loaders[page]();
     trackPageView('/' + page);
+    // Track feature usage for navigation
+    const activityMap = {
+      dashboard:'view_dashboard', pieces:'view_pieces', clayBodies:'view_clays',
+      glazes:'view_glazes', firings:'view_firings', casualties:'view_casualties',
+      sales:'view_sales', goals:'view_goals', projects:'view_projects',
+      events:'view_calendar', contacts:'view_contacts', community:'view_combos',
+      forum:'view_forum', profile:'view_profile', shoppingList:'view_shopping_list',
+      chemicals:'view_chemicals', communityMembers:'view_community_members',
+      notifications:'view_notifications', messages:'view_messages', blog:'view_blog',
+      help:'view_help', admin:'view_admin', shop:'view_shop', upgrade:'view_upgrade'
+    };
+    if (activityMap[page]) trackActivity(activityMap[page], page);
   } catch(navErr) { console.error('Navigation error:', navErr); }
 }
 function closeNav() {
@@ -385,8 +397,8 @@ async function savePiece(e) {
     casualtyLesson: document.getElementById('pieceCasualtyLesson').value||null
   };
   try {
-    if (id) { await api('/api/pieces/'+id, {method:'PUT',body}); toast('Piece updated!','success'); }
-    else { await api('/api/pieces', {method:'POST',body}); toast('Piece added!','success'); }
+    if (id) { await api('/api/pieces/'+id, {method:'PUT',body}); toast('Piece updated!','success'); trackActivity('edit_piece', 'pieces'); }
+    else { await api('/api/pieces', {method:'POST',body}); toast('Piece added!','success'); trackActivity('create_piece', 'pieces'); }
     closeModal('pieceModal');
     if (currentPage==='dashboard') loadDashboard(); else if (currentPage==='pieces') loadPieces(); else if (currentPage==='pieceDetail'&&id) viewPiece(id);
   } catch(err) { toast(err.message,'error'); }
@@ -431,7 +443,7 @@ async function uploadPhoto(e) {
   try {
     const r = await fetch('/api/pieces/' + pid + '/photos', { method:'POST', headers:{Authorization:'Bearer '+token}, body:fd });
     const d = await r.json(); if (!r.ok) throw new Error(d.error);
-    toast('Photo uploaded!','success'); closeModal('photoModal'); viewPiece(pid);
+    toast('Photo uploaded!','success'); trackActivity('upload_photo', 'pieces'); closeModal('photoModal'); viewPiece(pid);
   } catch(err) { toast(err.message,'error'); }
 }
 
@@ -518,8 +530,8 @@ async function saveClay(e) {
   const id = document.getElementById('clayId').value;
   const body = { name:document.getElementById('clayName').value, brand:document.getElementById('clayBrand').value||null, clayType:document.getElementById('clayType').value||null, colorWet:document.getElementById('clayColorWet').value||null, colorFired:document.getElementById('clayColorFired').value||null, coneRange:document.getElementById('clayConeRange').value||null, shrinkagePct:parseFloat(document.getElementById('clayShrinkage').value)||null, absorptionPct:parseFloat(document.getElementById('clayAbsorption').value)||null, costPerBag:parseFloat(document.getElementById('clayCost').value)||null, bagWeight:document.getElementById('clayWeight').value||null, source:document.getElementById('claySource').value||null, sourceUrl:document.getElementById('claySourceUrl').value||null, buyUrl:document.getElementById('clayBuyUrl').value||null, inStock:document.getElementById('clayInStock').checked, notes:document.getElementById('clayNotes').value||null };
   try {
-    if (id) { await api('/api/clay-bodies/'+id, {method:'PUT',body}); toast('Clay updated!','success'); }
-    else { await api('/api/clay-bodies', {method:'POST',body}); toast('Clay added!','success'); }
+    if (id) { await api('/api/clay-bodies/'+id, {method:'PUT',body}); toast('Clay updated!','success'); trackActivity('edit_clay', 'clayBodies'); }
+    else { await api('/api/clay-bodies', {method:'POST',body}); toast('Clay added!','success'); trackActivity('create_clay', 'clayBodies'); }
     closeModal('clayModal'); loadClayBodies();
   } catch(e) { toast(e.message,'error'); }
 }
@@ -688,8 +700,8 @@ async function saveGlaze(e) {
   });
   const body = { name:document.getElementById('glazeName').value, glazeType:document.getElementById('glazeType').value, brand:document.getElementById('glazeBrand').value||null, sku:document.getElementById('glazeSku').value||null, colorDescription:document.getElementById('glazeColor').value||null, coneRange:document.getElementById('glazeCone').value||null, atmosphere:document.getElementById('glazeAtmosphere').value||null, surface:document.getElementById('glazeSurface').value||null, opacity:document.getElementById('glazeOpacity').value||null, recipeStatus:document.getElementById('glazeRecipeStatus')?.value||null, recipeNotes:document.getElementById('glazeRecipeNotes')?.value||null, stockStatus:document.getElementById('glazeStockStatus').value||null, source:document.getElementById('glazeSource').value||null, sourceUrl:document.getElementById('glazeSourceUrl').value||null, buyUrl:document.getElementById('glazeBuyUrl').value||null, inStock:document.getElementById('glazeInStock').checked, notes:document.getElementById('glazeNotes').value||null, ingredients:ings };
   try {
-    if (id) { await api('/api/glazes/'+id, {method:'PUT',body}); toast('Glaze updated!','success'); }
-    else { await api('/api/glazes', {method:'POST',body}); toast('Glaze added!','success'); }
+    if (id) { await api('/api/glazes/'+id, {method:'PUT',body}); toast('Glaze updated!','success'); trackActivity('edit_glaze', 'glazes'); }
+    else { await api('/api/glazes', {method:'POST',body}); toast('Glaze added!','success'); trackActivity('create_glaze', 'glazes'); }
     closeModal('glazeModal'); loadGlazes();
   } catch(e) { toast(e.message,'error'); }
 }
@@ -872,6 +884,7 @@ async function saveFiring(e) {
     const url = firingId ? '/api/firing-logs/' + firingId : '/api/firing-logs';
     await api(url, { method, body });
     toast(firingId ? 'Firing updated!' : 'Firing logged!', 'success');
+    trackActivity(firingId ? 'edit_firing' : 'log_firing', 'firings');
     closeModal('firingModal');
     document.getElementById('firingId').value = '';
     loadFirings();
@@ -1006,6 +1019,7 @@ async function saveBulkSale(e) {
   try {
     await api('/api/sales/bulk', { method: 'POST', body: { eventName, date, venueType, lineItems } });
     toast('Bulk sale recorded!', 'success');
+    trackActivity('create_bulk_sale', 'sales');
     closeModal('bulkSaleModal');
     loadSales();
   } catch(e) { toast(e.message, 'error'); }
@@ -1029,6 +1043,7 @@ async function saveSale(e) {
     const url = saleId ? '/api/sales/' + saleId : '/api/sales';
     await api(url, { method, body });
     toast(saleId ? 'Sale updated!' : 'Sale logged!', 'success');
+    trackActivity(saleId ? 'edit_sale' : 'create_sale', 'sales');
     closeModal('saleModal');
     document.getElementById('saleId').value = '';
     loadSales();
@@ -1162,6 +1177,7 @@ async function saveCombo(e) {
     const r = await fetch(url, { method, headers:{Authorization:'Bearer '+token}, body:fd });
     const d = await r.json(); if (!r.ok) throw new Error(d.error);
     toast(comboId ? 'Combo updated!' : 'Combo saved!','success');
+    trackActivity(comboId ? 'edit_combo' : 'create_combo', 'community');
     closeModal('comboModal');
     document.getElementById('comboId').value = '';
     loadCombos();
@@ -1290,7 +1306,7 @@ async function submitReply(postId) {
   try {
     const r = await fetch('/api/forum/posts/' + postId + '/reply', { method:'POST', headers:{Authorization:'Bearer '+token}, body:fd });
     const d = await r.json(); if (!r.ok) throw new Error(d.error);
-    toast('Reply posted!','success'); viewForumPost(postId);
+    toast('Reply posted!','success'); trackActivity('create_reply', 'forum'); viewForumPost(postId);
   } catch(e) { toast(e.message,'error'); }
 }
 // ---- app3.js: final section ----
@@ -1314,7 +1330,7 @@ async function saveForumPost(e) {
   try {
     const r = await fetch('/api/forum/posts', { method:'POST', headers:{Authorization:'Bearer '+token}, body:fd });
     const d = await r.json(); if (!r.ok) throw new Error(d.error);
-    toast('Post published!','success'); closeModal('forumPostModal'); loadForumPosts();
+    toast('Post published!','success'); trackActivity('create_post', 'forum'); closeModal('forumPostModal'); loadForumPosts();
   } catch(e) { toast(e.message,'error'); }
 }
 
@@ -1443,6 +1459,7 @@ async function saveProfile() {
       tempUnit: document.getElementById('profileTemp').value
     }});
     toast('Profile saved!', 'success');
+    trackActivity('edit_profile', 'profile');
   } catch(e) { toast(e.message,'error'); }
 }
 
@@ -1606,6 +1623,29 @@ function trackPageView(pagePath) {
 // Track landing page view immediately
 trackPageView('/');
 
+// ---- User Activity Tracking ----
+let _activityThrottle = {};
+function trackActivity(action, page) {
+  if (!token || !action) return;
+  // Throttle: same action+page max once per 5 seconds
+  const key = action + ':' + (page || '');
+  const now = Date.now();
+  if (_activityThrottle[key] && now - _activityThrottle[key] < 5000) return;
+  _activityThrottle[key] = now;
+  // Clean old throttle entries every 100 calls
+  if (Object.keys(_activityThrottle).length > 100) {
+    const cutoff = now - 10000;
+    for (const k in _activityThrottle) { if (_activityThrottle[k] < cutoff) delete _activityThrottle[k]; }
+  }
+  try {
+    fetch('/api/activity', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, page })
+    }).catch(() => {});
+  } catch(e) {}
+}
+
 function loadProfilePhoto() {
   const preview = document.getElementById('profilePhotoPreview');
   if (preview && currentUser?.avatar_filename) {
@@ -1645,6 +1685,7 @@ async function exportData(endpoint) {
     a.remove();
     URL.revokeObjectURL(url);
     toast('Downloaded!', 'success');
+    trackActivity('export_data', endpoint);
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -1752,6 +1793,11 @@ async function loadAdmin() {
       '<p class="text-sm mb-12" style="color:var(--text-light)">Configure Gmail for sending newsletters. You need a <a href="https://myaccount.google.com/apppasswords" target="_blank">Gmail App Password</a> (requires 2-Step Verification).</p>' +
       '<div id="adminEmailSettingsContent">Loading...</div></div>';
 
+    // Usage analytics section
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">📊 Feature Usage</h3>' +
+      '<p class="text-sm mb-12" style="color:var(--text-light)">See which features members are actually using — and which ones they\'re ignoring.</p>' +
+      '<div id="adminUsageContent">Loading...</div></div>';
+
     try {
       el.innerHTML = html;
     } catch(renderErr) {
@@ -1767,6 +1813,7 @@ async function loadAdmin() {
     loadAdminFeaturedPotter();
     loadAdminNewsletter();
     loadAdminEmailSettings();
+    loadAdminUsage();
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -2291,6 +2338,107 @@ async function testEmailSettings() {
     if (result) result.innerHTML = '<span style="color:var(--error,red)">❌ ' + esc(e.message) + '</span>';
   }
   if (btn) btn.disabled = false;
+}
+
+// ---- Admin Usage Analytics ----
+async function loadAdminUsage() {
+  const el = document.getElementById('adminUsageContent');
+  if (!el) return;
+  try {
+    const d = await api('/api/admin/activity-summary');
+    let html = '';
+
+    // Active users: today / week / month
+    html += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">' +
+      '<div class="stat-box"><div class="stat-number">' + (d.activeToday || 0) + '</div><div class="stat-label">Active Today</div></div>' +
+      '<div class="stat-box"><div class="stat-number">' + (d.activeWeek || 0) + '</div><div class="stat-label">This Week</div></div>' +
+      '<div class="stat-box"><div class="stat-number">' + (d.activeMonth || 0) + '</div><div class="stat-label">This Month</div></div>' +
+      '<div class="stat-box"><div class="stat-number">' + (d.totalActions || 0) + '</div><div class="stat-label">Total Actions</div></div>' +
+      '</div>';
+
+    // Feature usage ranked bar chart
+    if (d.featureUsage && d.featureUsage.length) {
+      const maxCount = d.featureUsage[0].count;
+      const threshold = d.totalActions * 0.05;
+      html += '<h4 style="margin:16px 0 8px">Feature Usage (ranked)</h4>';
+      html += '<div style="display:flex;flex-direction:column;gap:4px">';
+      d.featureUsage.forEach(f => {
+        const pct = maxCount > 0 ? Math.round(f.count / maxCount * 100) : 0;
+        const totalPct = d.totalActions > 0 ? (f.count / d.totalActions * 100).toFixed(1) : '0';
+        const color = f.count < threshold ? 'var(--error, #e74c3c)' : 'var(--primary, #6366f1)';
+        html += '<div style="display:flex;align-items:center;gap:8px;font-size:0.82rem">' +
+          '<div style="width:140px;text-overflow:ellipsis;overflow:hidden;white-space:nowrap;flex-shrink:0" title="' + esc(f.action) + '">' + esc(f.action.replace(/_/g, ' ')) + '</div>' +
+          '<div style="flex:1;background:var(--bg-alt, #f0f0f0);border-radius:4px;height:18px;overflow:hidden">' +
+          '<div style="width:' + pct + '%;height:100%;background:' + color + ';border-radius:4px;min-width:2px"></div></div>' +
+          '<div style="width:70px;text-align:right;flex-shrink:0;color:var(--text-light)">' + f.count + ' (' + totalPct + '%)</div></div>';
+      });
+      html += '</div>';
+
+      // Ignored features callout
+      const ignored = d.featureUsage.filter(f => f.count < threshold);
+      if (ignored.length) {
+        html += '<div style="margin-top:12px;padding:10px;background:var(--bg-alt, #fff3cd);border-radius:8px;border-left:3px solid var(--error, #e74c3c)">' +
+          '<strong style="font-size:0.85rem">⚠️ Low Usage Features (&lt;5% of total):</strong>' +
+          '<div style="font-size:0.82rem;color:var(--text-light);margin-top:4px">' +
+          ignored.map(f => esc(f.action.replace(/_/g, ' ')) + ' (' + f.count + ')').join(', ') +
+          '</div></div>';
+      }
+    } else {
+      html += '<div class="text-sm" style="color:var(--text-muted)">No activity data yet. Usage will appear as members use the app.</div>';
+    }
+
+    // Daily activity chart (last 30 days)
+    if (d.activityOverTime && d.activityOverTime.length) {
+      const maxDay = Math.max(...d.activityOverTime.map(x => x.count));
+      html += '<h4 style="margin:20px 0 8px">Daily Activity (last 30 days)</h4>';
+      html += '<div style="display:flex;align-items:flex-end;gap:2px;height:80px;border-bottom:1px solid var(--border, #ddd)">';
+      d.activityOverTime.forEach(day => {
+        const h = maxDay > 0 ? Math.max(2, Math.round(day.count / maxDay * 76)) : 2;
+        const lbl = day.day.slice(5); // MM-DD
+        html += '<div title="' + day.day + ': ' + day.count + ' actions" style="flex:1;min-width:6px;background:var(--primary, #6366f1);height:' + h + 'px;border-radius:2px 2px 0 0"></div>';
+      });
+      html += '</div>';
+      html += '<div style="display:flex;justify-content:space-between;font-size:0.7rem;color:var(--text-light);margin-top:2px">' +
+        '<span>' + (d.activityOverTime[0]?.day?.slice(5) || '') + '</span>' +
+        '<span>' + (d.activityOverTime[d.activityOverTime.length-1]?.day?.slice(5) || '') + '</span></div>';
+    }
+
+    // Daily active users chart
+    if (d.dailyActiveUsers && d.dailyActiveUsers.length) {
+      const maxU = Math.max(...d.dailyActiveUsers.map(x => x.users));
+      html += '<h4 style="margin:20px 0 8px">Daily Active Users (last 30 days)</h4>';
+      html += '<div style="display:flex;align-items:flex-end;gap:2px;height:60px;border-bottom:1px solid var(--border, #ddd)">';
+      d.dailyActiveUsers.forEach(day => {
+        const h = maxU > 0 ? Math.max(2, Math.round(day.users / maxU * 56)) : 2;
+        html += '<div title="' + day.day + ': ' + day.users + ' users" style="flex:1;min-width:6px;background:var(--success, #22c55e);height:' + h + 'px;border-radius:2px 2px 0 0"></div>';
+      });
+      html += '</div>';
+      html += '<div style="display:flex;justify-content:space-between;font-size:0.7rem;color:var(--text-light);margin-top:2px">' +
+        '<span>' + (d.dailyActiveUsers[0]?.day?.slice(5) || '') + '</span>' +
+        '<span>' + (d.dailyActiveUsers[d.dailyActiveUsers.length-1]?.day?.slice(5) || '') + '</span></div>';
+    }
+
+    // Per-user activity table
+    if (d.perUser && d.perUser.length) {
+      html += '<h4 style="margin:20px 0 8px">User Activity</h4>';
+      html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
+      html += '<tr style="border-bottom:2px solid var(--border);text-align:left">' +
+        '<th style="padding:6px">User</th><th style="padding:6px">Actions</th>' +
+        '<th style="padding:6px">Last Active</th><th style="padding:6px">Top Feature</th></tr>';
+      d.perUser.forEach(u => {
+        html += '<tr style="border-bottom:1px solid var(--border)">' +
+          '<td style="padding:6px">' + esc(u.display_name || u.email) + '<div style="font-size:0.75rem;color:var(--text-light)">' + esc(u.email) + '</div></td>' +
+          '<td style="padding:6px">' + u.total_actions + '</td>' +
+          '<td style="padding:6px">' + timeAgo(u.last_active) + '</td>' +
+          '<td style="padding:6px"><span class="piece-meta-tag">' + esc((u.top_feature || '').replace(/_/g, ' ')) + '</span></td></tr>';
+      });
+      html += '</table></div>';
+    }
+
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">Could not load usage data: ' + esc(e.message) + '</div>';
+  }
 }
 
 // Landing page reviews
@@ -2960,8 +3108,8 @@ async function saveGoal(e) {
     priority: document.getElementById('goalPriority').value
   };
   try {
-    if (id) { await api('/api/goals/' + id, {method:'PUT',body}); toast('Goal updated!','success'); }
-    else { await api('/api/goals', {method:'POST',body}); toast('Goal added!','success'); }
+    if (id) { await api('/api/goals/' + id, {method:'PUT',body}); toast('Goal updated!','success'); trackActivity('edit_goal', 'goals'); }
+    else { await api('/api/goals', {method:'POST',body}); toast('Goal added!','success'); trackActivity('create_goal', 'goals'); }
     closeModal('goalModal');
     document.getElementById('goalId').value = '';
     loadGoals();
@@ -3019,8 +3167,8 @@ async function saveProject(e) {
     dueDate: document.getElementById('projectDueDate').value || null
   };
   try {
-    if (id) { await api('/api/projects/' + id, {method:'PUT',body}); toast('Project updated!','success'); }
-    else { await api('/api/projects', {method:'POST',body}); toast('Project added!','success'); }
+    if (id) { await api('/api/projects/' + id, {method:'PUT',body}); toast('Project updated!','success'); trackActivity('edit_project', 'projects'); }
+    else { await api('/api/projects', {method:'POST',body}); toast('Project added!','success'); trackActivity('create_project', 'projects'); }
     closeModal('projectModal');
     document.getElementById('projectId').value = '';
     loadProjects();
@@ -3112,8 +3260,8 @@ async function saveEvent(e) {
     location: document.getElementById('eventLocation').value || null
   };
   try {
-    if (id) { await api('/api/events/' + id, {method:'PUT',body}); toast('Event updated!','success'); }
-    else { await api('/api/events', {method:'POST',body}); toast('Event added!','success'); }
+    if (id) { await api('/api/events/' + id, {method:'PUT',body}); toast('Event updated!','success'); trackActivity('edit_event', 'events'); }
+    else { await api('/api/events', {method:'POST',body}); toast('Event added!','success'); trackActivity('create_event', 'events'); }
     closeModal('eventModal');
     document.getElementById('eventId').value = '';
     loadEvents();
@@ -3191,8 +3339,8 @@ async function saveContact(e) {
     notes: document.getElementById('contactNotes').value || null
   };
   try {
-    if (id) { await api('/api/contacts/' + id, {method:'PUT',body}); toast('Contact updated!','success'); }
-    else { await api('/api/contacts', {method:'POST',body}); toast('Contact added!','success'); }
+    if (id) { await api('/api/contacts/' + id, {method:'PUT',body}); toast('Contact updated!','success'); trackActivity('edit_contact', 'contacts'); }
+    else { await api('/api/contacts', {method:'POST',body}); toast('Contact added!','success'); trackActivity('create_contact', 'contacts'); }
     closeModal('contactModal');
     document.getElementById('contactId').value = '';
     loadContacts();
