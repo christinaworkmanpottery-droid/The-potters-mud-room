@@ -1599,10 +1599,10 @@ async function subscribePlan(plan) {
 }
 
 async function cancelSubscription() {
-  if (!confirm('Are you sure you want to cancel your subscription? You\'ll keep access until the end of your billing period.')) return;
+  if (!confirm('Are you sure you want to cancel your subscription? This will cancel all active subscriptions on your Stripe account immediately.')) return;
   try {
-    await api('/api/billing/cancel', { method:'POST' });
-    toast('Subscription cancelled. You\'ll keep access until the end of your billing period.', 'success');
+    const result = await api('/api/billing/cancel', { method:'POST' });
+    toast(result.message || 'Subscription cancelled successfully.', 'success');
     const me = await api('/api/auth/me'); currentUser = me.user; loadProfile();
   } catch(e) { toast(e.message,'error'); }
 }

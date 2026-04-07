@@ -91,15 +91,17 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req,
     }
     case 'customer.subscription.updated': {
       const sub = event.data.object;
-      const user = db.prepare('SELECT id FROM users WHERE stripe_subscription_id=?').get(sub.id);
+      let user = db.prepare('SELECT id FROM users WHERE stripe_subscription_id=?').get(sub.id);
+      if (!user && sub.customer) user = db.prepare('SELECT id FROM users WHERE stripe_customer_id=?').get(sub.customer);
       if (user && sub.status !== 'active' && sub.status !== 'trialing') {
-        db.prepare('UPDATE users SET tier=? WHERE id=?').run('free', user.id);
+        db.prepare('UPDATE users SET tier=?, stripe_subscription_id=NULL WHERE id=?').run('free', user.id);
       }
       break;
     }
     case 'customer.subscription.deleted': {
       const sub = event.data.object;
-      const user = db.prepare('SELECT id FROM users WHERE stripe_subscription_id=?').get(sub.id);
+      let user = db.prepare('SELECT id FROM users WHERE stripe_subscription_id=?').get(sub.id);
+      if (!user && sub.customer) user = db.prepare('SELECT id FROM users WHERE stripe_customer_id=?').get(sub.customer);
       if (user) {
         db.prepare('UPDATE users SET tier=?, stripe_subscription_id=NULL WHERE id=?').run('free', user.id);
       }
@@ -395,13 +397,72 @@ app.post('/api/billing/checkout', auth, async (req, res) => {
 
 app.post('/api/billing/cancel', auth, async (req, res) => {
   if (!stripe) return res.status(400).json({ error: 'Stripe not configured' });
-  const u = db.prepare('SELECT stripe_subscription_id FROM users WHERE id=?').get(req.userId);
-  if (!u?.stripe_subscription_id) return res.status(400).json({ error: 'No active subscription' });
-  try {
-    await stripe.subscriptions.cancel(u.stripe_subscription_id);
-    db.prepare('UPDATE users SET tier=?, stripe_subscription_id=NULL WHERE id=?').run('free', req.userId);
-    res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  const u = db.prepare('SELECT stripe_subscription_id, stripe_customer_id FROM users WHERE id=?').get(req.userId);
+
+  let cancelledCount = 0;
+
+  // 1) Try cancelling by stored subscription ID
+  if (u?.stripe_subscription_id) {
+    try {
+      await stripe.subscriptions.cancel(u.stripe_subscription_id);
+      cancelledCount++;
+    } catch (err) {
+      // If subscription already cancelled or not found, that's fine — continue
+      if (!err.message.includes('No such subscription') && !err.message.includes('already been canceled')) {
+        console.error('Cancel by sub ID error:', err.message);
+      }
+    }
+  }
+
+  // 2) Also check Stripe directly by customer ID for any remaining active subs
+  //    This catches orphaned subscriptions the local DB lost track of
+  if (u?.stripe_customer_id) {
+    try {
+      const activeSubs = await stripe.subscriptions.list({
+        customer: u.stripe_customer_id,
+        status: 'active',
+        limit: 10,
+      });
+      for (const sub of activeSubs.data) {
+        try {
+          await stripe.subscriptions.cancel(sub.id);
+          cancelledCount++;
+        } catch (err) {
+          console.error('Cancel active sub error:', err.message);
+        }
+      }
+      // Also cancel any 'past_due' or 'trialing' subs
+      for (const status of ['past_due', 'trialing']) {
+        const subs = await stripe.subscriptions.list({
+          customer: u.stripe_customer_id,
+          status,
+          limit: 10,
+        });
+        for (const sub of subs.data) {
+          try {
+            await stripe.subscriptions.cancel(sub.id);
+            cancelledCount++;
+          } catch (err) {
+            console.error(`Cancel ${status} sub error:`, err.message);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Stripe customer lookup error:', err.message);
+    }
+  }
+
+  // 3) Always clean up local DB regardless
+  db.prepare('UPDATE users SET tier=?, stripe_subscription_id=NULL WHERE id=?').run('free', req.userId);
+
+  if (cancelledCount > 0) {
+    res.json({ success: true, message: `Cancelled ${cancelledCount} subscription(s). You're back on the free tier.` });
+  } else if (u?.stripe_subscription_id || u?.stripe_customer_id) {
+    // Had Stripe info but nothing to cancel — already done
+    res.json({ success: true, message: 'No active subscriptions found on Stripe. Local account reset to free tier.' });
+  } else {
+    res.json({ success: true, message: 'Account reset to free tier.' });
+  }
 });
 
 // ============ ADMIN ============
