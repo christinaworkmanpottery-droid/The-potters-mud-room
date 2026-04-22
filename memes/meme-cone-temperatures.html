@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { width: 1080px; height: 1080px; overflow: hidden; }
+.container {
+  width: 1080px; height: 1080px;
+  background: linear-gradient(135deg, #4A1F0A 0%, #B8480E 55%, #8B3A10 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+  padding: 60px 70px 45px;
+  position: relative;
+}
+.container::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at 50% 5%, rgba(255,220,170,0.12) 0%, transparent 55%);
+  pointer-events: none;
+}
+.header { text-align: center; z-index: 1; }
+.label {
+  font-family: Arial, sans-serif; font-size: 22px; font-weight: bold;
+  color: #3E2723; background: #FFF8F0; display: inline-block;
+  padding: 8px 28px; border-radius: 20px; letter-spacing: 3px;
+  text-transform: uppercase; margin-bottom: 20px;
+}
+h1 {
+  font-family: Georgia, serif; font-size: 54px; color: #FFF8F0;
+  text-shadow: 2px 2px 8px rgba(0,0,0,0.35); line-height: 1.12;
+}
+.sub {
+  font-family: Georgia, serif; font-style: italic; font-size: 26px;
+  color: rgba(255,248,240,0.85); margin-top: 10px;
+}
+.cones { z-index: 1; width: 100%; display: flex; flex-direction: column; gap: 18px; }
+.cone-row {
+  background: rgba(255,248,240,0.10);
+  border-left: 6px solid #FFD8A8;
+  border-radius: 8px;
+  padding: 18px 24px;
+  display: flex; align-items: center; gap: 22px;
+}
+.cone-label {
+  font-family: Georgia, serif; font-size: 38px; font-weight: bold;
+  color: #FFD8A8; min-width: 140px;
+}
+.cone-desc {
+  font-family: Arial, sans-serif; font-size: 24px; color: #FFF8F0;
+  line-height: 1.35;
+}
+.cone-temp {
+  display: block; font-size: 18px; color: rgba(255,248,240,0.65); margin-top: 4px;
+}
+.footer {
+  text-align: center; z-index: 1;
+  border-top: 2px solid rgba(255,248,240,0.2); padding-top: 18px; width: 100%;
+}
+.brand {
+  font-family: Georgia, serif; font-size: 24px; color: #FFF8F0;
+  letter-spacing: 4px; font-weight: bold;
+}
+.handle {
+  font-family: Arial, sans-serif; font-size: 18px; color: rgba(255,248,240,0.6);
+  margin-top: 4px;
+}
+</style>
+</head><body>
+<div class="container">
+  <div class="header">
+    <div class="label">Cone Cheat Sheet</div>
+    <h1>Know Your Cones</h1>
+    <div class="sub">A potter's quick guide to firing ranges</div>
+  </div>
+  <div class="cones">
+    <div class="cone-row">
+      <div class="cone-label">Cone 06</div>
+      <div class="cone-desc">Low-fire bisque — porous, perfect for bright glazes &amp; underglazes.
+        <span class="cone-temp">~1828°F / 998°C</span>
+      </div>
+    </div>
+    <div class="cone-row">
+      <div class="cone-label">Cone 04</div>
+      <div class="cone-desc">Earthenware glaze firing — vivid color, softer body.
+        <span class="cone-temp">~1940°F / 1060°C</span>
+      </div>
+    </div>
+    <div class="cone-row">
+      <div class="cone-label">Cone 6</div>
+      <div class="cone-desc">Mid-range stoneware — the sweet spot: durable &amp; food-safe.
+        <span class="cone-temp">~2232°F / 1222°C</span>
+      </div>
+    </div>
+    <div class="cone-row">
+      <div class="cone-label">Cone 10</div>
+      <div class="cone-desc">High-fire stoneware &amp; porcelain — vitrified, rich surfaces.
+        <span class="cone-temp">~2345°F / 1285°C</span>
+      </div>
+    </div>
+  </div>
+  <div class="footer">
+    <div class="brand">THE POTTER'S MUD ROOM</div>
+    <div class="handle">thepottersmudroom.com · @thepottersmudroom</div>
+  </div>
+</div>
+</body></html>
