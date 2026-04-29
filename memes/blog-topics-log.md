@@ -10,6 +10,7 @@ Tracks published/drafted blog posts to avoid repeating topics.
 | 2026-03-23 | We're Back & Better Than Ever! | were-back-and-better-march-2026 | Published |
 | 2026-03-25 | Why Your Pots Are Cracking (And How to Stop It) | why-your-pots-are-cracking-and-how-to-stop-it | Draft |
 | 2026-04-22 | Understanding Cone Temperatures: A Potter's Guide to Firing Ranges | understanding-cone-temperatures-a-potters-guide-to-firing-ranges | Draft |
+| 2026-04-29 | Glaze Defects Decoded: Fixing the 5 Disasters Every Potter Hits | glaze-defects-decoded-fixing-the-5-disasters-every-potter-hits | Draft |
 
 ## Future Topic Ideas
 - Choosing the right clay body for your project
