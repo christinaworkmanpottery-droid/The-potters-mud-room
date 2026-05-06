@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { width: 1080px; height: 1080px; overflow: hidden; }
+.container {
+  width: 1080px; height: 1080px;
+  background: linear-gradient(135deg, #5C4033 0%, #8B7355 40%, #A0826D 100%);
+  display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+  padding: 55px 65px 35px;
+  position: relative;
+}
+.container::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(ellipse at 30% 20%, rgba(255,248,240,0.05) 0%, transparent 60%);
+  pointer-events: none;
+}
+.header { text-align: center; z-index: 1; }
+.label {
+  font-family: Arial, sans-serif; font-size: 20px; font-weight: bold;
+  color: #5C4033; background: #FFF8F0; display: inline-block;
+  padding: 7px 24px; border-radius: 20px; letter-spacing: 3px;
+  text-transform: uppercase; margin-bottom: 14px;
+}
+h1 {
+  font-family: Georgia, serif; font-size: 44px; color: #FFF8F0;
+  text-shadow: 2px 2px 8px rgba(0,0,0,0.3); line-height: 1.15;
+  max-width: 900px;
+}
+.subtitle {
+  font-family: Arial, sans-serif; font-size: 22px; color: rgba(255,248,240,0.7);
+  margin-top: 10px; font-style: italic;
+}
+.tips { z-index: 1; width: 100%; }
+.tip {
+  display: flex; align-items: flex-start; gap: 16px;
+  margin-bottom: 18px; padding: 0 8px;
+}
+.tip-num {
+  font-family: Georgia, serif; font-size: 36px; font-weight: bold;
+  color: #FFF8F0; opacity: 0.35; min-width: 38px; text-align: right;
+  line-height: 1.1;
+}
+.tip-text {
+  font-family: Arial, sans-serif; font-size: 26px; color: #FFF8F0;
+  line-height: 1.35;
+}
+.tip-text strong { color: #FFD9B3; }
+.footer {
+  text-align: center; z-index: 1;
+  border-top: 2px solid rgba(255,248,240,0.2); padding-top: 16px; width: 100%;
+}
+.brand {
+  font-family: Georgia, serif; font-size: 22px; color: #FFF8F0;
+  letter-spacing: 4px; font-weight: bold;
+}
+.handle {
+  font-family: Arial, sans-serif; font-size: 16px; color: rgba(255,248,240,0.6);
+  margin-top: 4px;
+}
+</style>
+</head><body>
+<div class="container">
+  <div class="header">
+    <div class="label">Save Your Scraps</div>
+    <h1>Recycling Clay Like a Pro</h1>
+    <div class="subtitle">Stop throwing away money — reclaim it</div>
+  </div>
+  <div class="tips">
+    <div class="tip"><span class="tip-num">1</span><span class="tip-text"><strong>Dry it out first.</strong> Let scraps go bone dry — mixing wet and dry clay makes lumps.</span></div>
+    <div class="tip"><span class="tip-num">2</span><span class="tip-text"><strong>Slake in a bucket.</strong> Cover dry clay with water and walk away. Let it dissolve on its own.</span></div>
+    <div class="tip"><span class="tip-num">3</span><span class="tip-text"><strong>Use plaster bats.</strong> Pour your slip onto plaster and let it absorb the excess water evenly.</span></div>
+    <div class="tip"><span class="tip-num">4</span><span class="tip-text"><strong>Don't mix clay bodies.</strong> Keep stoneware and porcelain separate or you'll get surprises.</span></div>
+    <div class="tip"><span class="tip-num">5</span><span class="tip-text"><strong>Wedge thoroughly.</strong> Reclaimed clay needs extra wedging — air pockets love hiding in there.</span></div>
+    <div class="tip"><span class="tip-num">6</span><span class="tip-text"><strong>Track your batches.</strong> Label what went in so you know what comes out. Future you will be grateful.</span></div>
+  </div>
+  <div class="footer">
+    <div class="brand">THE POTTER'S MUD ROOM</div>
+    <div class="handle">thepottersmudroom.com</div>
+  </div>
+</div>
+</body></html>

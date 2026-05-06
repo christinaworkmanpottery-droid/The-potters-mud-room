@@ -1633,6 +1633,20 @@ app.post('/api/admin/members/:id/cancel', auth, (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Manually upgrade/fix a member (e.g. when Stripe webhook missed). Admin only.
+// Body: { tier, billingPeriod, stripeCustomerId, stripeSubscriptionId }
+app.post('/api/admin/members/:id/upgrade', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const { tier, billingPeriod, stripeCustomerId, stripeSubscriptionId } = req.body || {};
+    if (!tier) return res.status(400).json({ error: 'tier required' });
+    db.prepare(`UPDATE users SET tier=?, billing_period=?, stripe_customer_id=?, stripe_subscription_id=? WHERE id=?`)
+      .run(tier, billingPeriod || 'monthly', stripeCustomerId || null, stripeSubscriptionId || null, req.params.id);
+    const u = db.prepare('SELECT id,email,tier,billing_period,stripe_customer_id,stripe_subscription_id FROM users WHERE id=?').get(req.params.id);
+    res.json({ success: true, user: u });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/api/admin/members/search', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   const { q } = req.query;
