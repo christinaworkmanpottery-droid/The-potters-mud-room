@@ -1633,6 +1633,29 @@ app.post('/api/admin/members/:id/cancel', auth, (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Admin: send a plain announcement email to all members.
+// Body: { subject, html, text? }
+app.post('/api/admin/announce', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const { subject, html, text } = req.body || {};
+    if (!subject || !html) return res.status(400).json({ error: 'subject and html required' });
+    const recipients = db.prepare('SELECT id, email FROM users WHERE email IS NOT NULL AND email != \"\"').all();
+    if (!transporter) return res.status(500).json({ error: 'SMTP not configured' });
+    let sent = 0, failed = 0;
+    recipients.forEach(r => {
+      transporter.sendMail({
+        from: process.env.SMTP_USER || 'thepottersmudroom@gmail.com',
+        to: r.email,
+        subject,
+        html,
+        text: text || html.replace(/<[^>]+>/g,'')
+      }).then(() => { sent++; }).catch(err => { failed++; console.error('Announce email error:', r.email, err.message); });
+    });
+    res.json({ success: true, queued: recipients.length, note: 'Emails sent in background. Check server logs for failures.' });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // Manually upgrade/fix a member (e.g. when Stripe webhook missed). Admin only.
 // Body: { tier, billingPeriod, stripeCustomerId, stripeSubscriptionId }
 app.post('/api/admin/members/:id/upgrade', auth, (req, res) => {
