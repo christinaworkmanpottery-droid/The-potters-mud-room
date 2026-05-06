@@ -1640,7 +1640,7 @@ app.post('/api/admin/announce', auth, (req, res) => {
   try {
     const { subject, html, text } = req.body || {};
     if (!subject || !html) return res.status(400).json({ error: 'subject and html required' });
-    const recipients = db.prepare('SELECT id, email FROM users WHERE email IS NOT NULL AND email != \"\"').all();
+    const recipients = db.prepare("SELECT id, email FROM users WHERE email IS NOT NULL AND email != ''").all();
     if (!transporter) return res.status(500).json({ error: 'SMTP not configured' });
     let sent = 0, failed = 0;
     recipients.forEach(r => {
