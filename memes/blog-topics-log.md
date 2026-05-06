@@ -11,10 +11,10 @@ Tracks published/drafted blog posts to avoid repeating topics.
 | 2026-03-25 | Why Your Pots Are Cracking (And How to Stop It) | why-your-pots-are-cracking-and-how-to-stop-it | Draft |
 | 2026-04-22 | Understanding Cone Temperatures: A Potter's Guide to Firing Ranges | understanding-cone-temperatures-a-potters-guide-to-firing-ranges | Draft |
 | 2026-04-29 | Glaze Defects Decoded: Fixing the 5 Disasters Every Potter Hits | glaze-defects-decoded-fixing-the-5-disasters-every-potter-hits | Draft |
+| 2026-05-06 | Kiln Loading Like a Pro: Fit More In Without the Disasters | kiln-loading-like-a-pro-fit-more-in-without-the-disasters | Draft |
 
 ## Future Topic Ideas
 - Choosing the right clay body for your project
-- Kiln loading tips: maximize space without disasters (draft exists in blog-post-draft.md — not yet published)
 - Hand-building techniques for beginners
 - Studio organization on a budget
 - How to price your pottery for markets
