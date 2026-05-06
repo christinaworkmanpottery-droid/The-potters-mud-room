@@ -16,22 +16,22 @@ const db = initDB();
 
 // Nodemailer setup for newsletter emails
 let transporter = null;
-function setupTransporter(user, pass) {
+function setupTransporter(user, pass, host, port) {
   if (user && pass) {
-    transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user, pass }
-    });
+    const config = host
+      ? { host, port: port || 587, secure: false, auth: { user, pass } }
+      : { service: 'gmail', auth: { user, pass } };
+    transporter = nodemailer.createTransport(config);
     transporter.verify((err) => {
       if (err) console.error('⚠️  SMTP verification failed:', err.message);
-      else console.log('✅ SMTP connected as', user);
+      else console.log('✅ SMTP connected as', user, host ? '(via '+host+')' : '(via gmail)');
     });
   }
 }
 
 // Try env vars first
 if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-  setupTransporter(process.env.SMTP_USER, process.env.SMTP_PASS);
+  setupTransporter(process.env.SMTP_USER, process.env.SMTP_PASS, process.env.SMTP_HOST, parseInt(process.env.SMTP_PORT) || undefined);
 } else {
   console.warn('⚠️  SMTP not configured via env — will check database on startup');
 }
@@ -2206,14 +2206,15 @@ app.get('/api/admin/email-settings', auth, (req, res) => {
 app.post('/api/admin/email-settings', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
-    const { smtp_user, smtp_pass } = req.body;
+    const { smtp_user, smtp_pass, smtp_host, smtp_port } = req.body;
     if (!smtp_user || !smtp_pass) return res.status(400).json({ error: 'Email and app password are required' });
     
     db.prepare("INSERT OR REPLACE INTO site_settings (key, value) VALUES ('smtp_user', ?)").run(smtp_user);
     db.prepare("INSERT OR REPLACE INTO site_settings (key, value) VALUES ('smtp_pass', ?)").run(smtp_pass);
+    if (smtp_host) db.prepare("INSERT OR REPLACE INTO site_settings (key, value) VALUES ('smtp_host', ?)").run(smtp_host);
+    if (smtp_port) db.prepare("INSERT OR REPLACE INTO site_settings (key, value) VALUES ('smtp_port', ?)").run(String(smtp_port));
     
-    // Reconnect transporter
-    setupTransporter(smtp_user, smtp_pass);
+    setupTransporter(smtp_user, smtp_pass, smtp_host || null, smtp_port ? parseInt(smtp_port) : undefined);
     
     res.json({ success: true, message: 'Email settings saved. Testing connection...' });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -2434,8 +2435,10 @@ if (!transporter) {
   try {
     const smtpUser = db.prepare("SELECT value FROM site_settings WHERE key='smtp_user'").get();
     const smtpPass = db.prepare("SELECT value FROM site_settings WHERE key='smtp_pass'").get();
+    const smtpHost = db.prepare("SELECT value FROM site_settings WHERE key='smtp_host'").get();
+    const smtpPort = db.prepare("SELECT value FROM site_settings WHERE key='smtp_port'").get();
     if (smtpUser && smtpPass) {
-      setupTransporter(smtpUser.value, smtpPass.value);
+      setupTransporter(smtpUser.value, smtpPass.value, smtpHost ? smtpHost.value : null, smtpPort ? parseInt(smtpPort.value) : undefined);
     }
   } catch(e) { /* site_settings table might not exist yet */ }
 }
