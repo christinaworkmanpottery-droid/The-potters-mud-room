@@ -808,6 +808,41 @@ function initDB() {
     )
   `);
 
+  // Unified email sends history (newsletters + announcements)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS email_sends (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL DEFAULT 'newsletter',
+      subject TEXT,
+      sent_at TEXT DEFAULT (datetime('now')),
+      sent_by TEXT,
+      recipients_count INTEGER DEFAULT 0,
+      blog_post_id TEXT,
+      FOREIGN KEY (sent_by) REFERENCES users(id),
+      FOREIGN KEY (blog_post_id) REFERENCES blog_posts(id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_email_sends_date ON email_sends(sent_at DESC)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_email_sends_type ON email_sends(type)`);
+
+  // Backfill: migrate existing newsletter_sends into email_sends
+  try {
+    const existing = db.prepare('SELECT COUNT(*) as c FROM email_sends WHERE type="newsletter"').get();
+    if (existing.c === 0) {
+      const nsSends = db.prepare('SELECT ns.id, ns.sent_at, ns.sent_by, ns.recipients_count, ns.blog_post_id, bp.title FROM newsletter_sends ns LEFT JOIN blog_posts bp ON ns.blog_post_id=bp.id').all();
+      const ins = db.prepare('INSERT OR IGNORE INTO email_sends (id, type, subject, sent_at, sent_by, recipients_count, blog_post_id) VALUES (?,?,?,?,?,?,?)');
+      nsSends.forEach(s => {
+        ins.run(s.id, 'newsletter', s.title || 'Newsletter', s.sent_at, s.sent_by, s.recipients_count, s.blog_post_id);
+      });
+    }
+  } catch(e) { /* newsletter_sends might not have data yet */ }
+
+  // Backfill: retroactive announcement from 2026-05-08
+  try {
+    db.prepare(`INSERT OR IGNORE INTO email_sends (id, type, subject, sent_at, sent_by, recipients_count, blog_post_id)
+      VALUES ('announce-2026-05-08-updates', 'announcement', 'Quick Heads Up - Updates Coming to The Potters Mud Room', '2026-05-08 22:00:00', NULL, 28, NULL)`).run();
+  } catch(e) { /* ignore if already exists */ }
+
   // Seed starter blog posts (INSERT OR IGNORE by slug)
   const blogInsert = db.prepare(`INSERT OR IGNORE INTO blog_posts (id, title, slug, content, excerpt, author, is_published, published_at) VALUES (?,?,?,?,?,?,1,datetime('now'))`);
 

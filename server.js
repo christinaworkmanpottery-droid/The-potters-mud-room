@@ -1652,6 +1652,11 @@ app.post('/api/admin/announce', auth, (req, res) => {
         text: text || html.replace(/<[^>]+>/g,'')
       }).then(() => { sent++; }).catch(err => { failed++; console.error('Announce email error:', r.email, err.message); });
     });
+    // Log announcement to unified email_sends history
+    const announceId = uuidv4();
+    try {
+      db.prepare('INSERT INTO email_sends (id, type, subject, sent_by, recipients_count, blog_post_id) VALUES (?,?,?,?,?,?)').run(announceId, 'announcement', subject, req.userId, recipients.length, null);
+    } catch(e) { console.error('Failed to log announcement send:', e.message); }
     res.json({ success: true, queued: recipients.length, note: 'Emails sent in background. Check server logs for failures.' });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -2104,11 +2109,12 @@ app.get('/api/admin/newsletter/subscribers', auth, (req, res) => {
 app.get('/api/admin/newsletter/history', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
+    // Unified history: pull from email_sends table (includes both newsletters and announcements)
     const sends = db.prepare(`
-      SELECT ns.id, ns.blog_post_id, ns.sent_at, ns.recipients_count, bp.title, bp.slug
-      FROM newsletter_sends ns
-      JOIN blog_posts bp ON ns.blog_post_id = bp.id
-      ORDER BY ns.sent_at DESC
+      SELECT es.id, es.type, es.subject, es.sent_at, es.recipients_count, es.blog_post_id, bp.title, bp.slug
+      FROM email_sends es
+      LEFT JOIN blog_posts bp ON es.blog_post_id = bp.id
+      ORDER BY es.sent_at DESC
     `).all();
     res.json(sends);
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -2174,11 +2180,16 @@ app.post('/api/admin/newsletter/send', auth, (req, res) => {
       }
     });
 
-    // Record the send
+    // Record the send in legacy table
     db.prepare(`
       INSERT INTO newsletter_sends (id, blog_post_id, sent_by, recipients_count)
       VALUES (?,?,?,?)
     `).run(sendId, blogPostId, req.userId, subscribers.length);
+
+    // Also record in unified email_sends history
+    try {
+      db.prepare('INSERT INTO email_sends (id, type, subject, sent_by, recipients_count, blog_post_id) VALUES (?,?,?,?,?,?)').run(sendId, 'newsletter', post.title, req.userId, subscribers.length, blogPostId);
+    } catch(e) { console.error('Failed to log newsletter to email_sends:', e.message); }
 
     res.json({ success: true, recipientCount: subscribers.length });
   } catch(e) { res.status(500).json({ error: e.message }); }
