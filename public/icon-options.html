@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>App Icon Options - The Potter's Mud Room</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a1a; color: white; font-family: -apple-system, sans-serif; padding: 20px; text-align: center; }
+h1 { color: #d4a373; margin-bottom: 8px; font-size: 1.5rem; }
+.subtitle { color: #aaa; margin-bottom: 30px; }
+h2 { color: #fefae0; margin-top: 40px; margin-bottom: 8px; font-size: 1.2rem; }
+.desc { color: #999; font-size: 0.9rem; margin-bottom: 16px; max-width: 350px; margin-left: auto; margin-right: auto; }
+.icon { width: 250px; height: 250px; margin: 0 auto 40px; border-radius: 56px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.5); position: relative; }
+
+/* Option 1: Bowl/Vessel */
+.icon1 { background: linear-gradient(145deg, #5c4033 0%, #3d2b1f 50%, #2a1a10 100%); display: flex; align-items: center; justify-content: center; }
+.bowl { width: 140px; height: 100px; position: relative; }
+.bowl-body { width: 140px; height: 80px; background: linear-gradient(180deg, #d4a373 0%, #8B4513 100%); border-radius: 0 0 70px 70px; position: absolute; bottom: 0; overflow: hidden; }
+.bowl-line1 { position: absolute; top: 20px; left: 10px; right: 10px; height: 2px; background: rgba(254,250,224,0.3); border-radius: 50%; }
+.bowl-line2 { position: absolute; top: 35px; left: 15px; right: 15px; height: 1.5px; background: rgba(254,250,224,0.2); border-radius: 50%; }
+.bowl-line3 { position: absolute; top: 50px; left: 20px; right: 20px; height: 1.5px; background: rgba(254,250,224,0.15); border-radius: 50%; }
+.bowl-rim { width: 150px; height: 16px; background: linear-gradient(180deg, #fefae0 0%, #d4a373 100%); border-radius: 8px; position: absolute; top: 0; left: -5px; }
+
+/* Option 2: Hands on wheel */
+.icon2 { background: linear-gradient(145deg, #fefae0 0%, #f5e6c8 100%); display: flex; align-items: center; justify-content: center; }
+.wheel { width: 180px; height: 180px; position: relative; display: flex; align-items: center; justify-content: center; }
+.wheel-disc { width: 120px; height: 30px; background: #8B4513; border-radius: 50%; position: absolute; bottom: 60px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+.clay-form { width: 50px; height: 60px; background: linear-gradient(180deg, #d4a373 0%, #a0522d 100%); border-radius: 25px 25px 20px 20px; position: absolute; bottom: 75px; }
+.hand-l { width: 25px; height: 50px; background: #5c4033; border-radius: 12px; position: absolute; bottom: 70px; left: 55px; transform: rotate(15deg); }
+.hand-r { width: 25px; height: 50px; background: #5c4033; border-radius: 12px; position: absolute; bottom: 70px; right: 55px; transform: rotate(-15deg); }
+
+/* Option 3: Door concept */
+.icon3 { background: linear-gradient(145deg, #606c38 0%, #4a5428 100%); display: flex; align-items: center; justify-content: center; }
+.door-frame { width: 130px; height: 180px; background: #3d2b1f; border-radius: 8px; position: relative; overflow: hidden; box-shadow: inset 0 0 20px rgba(0,0,0,0.5); }
+.door-inside { width: 100%; height: 100%; background: linear-gradient(180deg, #fefae0 0%, #d4a373 100%); opacity: 0.9; }
+.shelf1 { position: absolute; top: 30px; left: 10px; right: 10px; height: 3px; background: #5c4033; }
+.shelf2 { position: absolute; top: 80px; left: 10px; right: 10px; height: 3px; background: #5c4033; }
+.shelf3 { position: absolute; top: 130px; left: 10px; right: 10px; height: 3px; background: #5c4033; }
+.pot1 { position: absolute; top: 12px; left: 20px; width: 20px; height: 18px; background: #8B4513; border-radius: 0 0 10px 10px; }
+.pot2 { position: absolute; top: 10px; left: 55px; width: 25px; height: 20px; background: #a0522d; border-radius: 5px 5px 12px 12px; }
+.pot3 { position: absolute; top: 60px; left: 30px; width: 30px; height: 20px; background: #d4a373; border-radius: 0 0 15px 15px; }
+.pot4 { position: absolute; top: 58px; left: 75px; width: 18px; height: 22px; background: #606c38; border-radius: 4px 4px 9px 9px; }
+.pot5 { position: absolute; top: 110px; left: 20px; width: 22px; height: 20px; background: #5c4033; border-radius: 0 0 11px 11px; }
+.pot6 { position: absolute; top: 108px; left: 60px; width: 28px; height: 22px; background: #8B4513; border-radius: 6px 6px 14px 14px; }
+.door-edge { position: absolute; top: 0; right: 0; width: 15px; height: 100%; background: linear-gradient(90deg, transparent, rgba(61,43,31,0.8)); }
+.door-knob { position: absolute; top: 50%; right: 20px; width: 8px; height: 8px; background: #d4a373; border-radius: 50%; }
+
+/* Option 4: Spiral */
+.icon4 { background: radial-gradient(circle at center, #fefae0 0%, #d4a373 25%, #8B4513 50%, #5c4033 75%, #2a1a10 100%); display: flex; align-items: center; justify-content: center; }
+.spiral { width: 200px; height: 200px; position: relative; border-radius: 50%; }
+.ring1 { position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px; border: 3px solid rgba(254,250,224,0.4); border-radius: 50%; }
+.ring2 { position: absolute; top: 30px; left: 30px; right: 30px; bottom: 30px; border: 3px solid rgba(212,163,115,0.5); border-radius: 50%; }
+.ring3 { position: absolute; top: 50px; left: 50px; right: 50px; bottom: 50px; border: 3px solid rgba(254,250,224,0.3); border-radius: 50%; }
+.ring4 { position: absolute; top: 70px; left: 70px; right: 70px; bottom: 70px; border: 2px solid rgba(212,163,115,0.4); border-radius: 50%; }
+.center-dot { position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; background: #fefae0; border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 20px rgba(254,250,224,0.6); }
+</style>
+</head>
+<body>
+<h1>🏺 App Icon Options</h1>
+<p class="subtitle">Pick your favorite or tell me what to change</p>
+
+<h2>Option 1 — The Bowl</h2>
+<p class="desc">Classic pottery vessel silhouette. Simple, iconic, instantly says "pottery."</p>
+<div class="icon icon1">
+  <div class="bowl">
+    <div class="bowl-rim"></div>
+    <div class="bowl-body">
+      <div class="bowl-line1"></div>
+      <div class="bowl-line2"></div>
+      <div class="bowl-line3"></div>
+    </div>
+  </div>
+</div>
+
+<h2>Option 2 — Hands on the Wheel</h2>
+<p class="desc">Potter's hands shaping clay. Artisan, human, craft-focused.</p>
+<div class="icon icon2">
+  <div class="wheel">
+    <div class="clay-form"></div>
+    <div class="hand-l"></div>
+    <div class="hand-r"></div>
+    <div class="wheel-disc"></div>
+  </div>
+</div>
+
+<h2>Option 3 — The Mud Room Door</h2>
+<p class="desc">A door opening to reveal shelves of pottery. Plays on the app name.</p>
+<div class="icon icon3">
+  <div class="door-frame">
+    <div class="door-inside"></div>
+    <div class="shelf1"></div>
+    <div class="shelf2"></div>
+    <div class="shelf3"></div>
+    <div class="pot1"></div>
+    <div class="pot2"></div>
+    <div class="pot3"></div>
+    <div class="pot4"></div>
+    <div class="pot5"></div>
+    <div class="pot6"></div>
+    <div class="door-edge"></div>
+    <div class="door-knob"></div>
+  </div>
+</div>
+
+<h2>Option 4 — The Spiral</h2>
+<p class="desc">Abstract wheel rings. Modern, earthy, eye-catching. Like looking down at a spinning wheel.</p>
+<div class="icon icon4">
+  <div class="spiral">
+    <div class="ring1"></div>
+    <div class="ring2"></div>
+    <div class="ring3"></div>
+    <div class="ring4"></div>
+    <div class="center-dot"></div>
+  </div>
+</div>
+
+</body>
+</html>
