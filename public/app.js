@@ -2204,19 +2204,18 @@ async function loadAdminNewsletter() {
       html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">' +
         '<tr style="border-bottom:2px solid var(--border);text-align:left">' +
         '<th style="padding:8px">Date</th>' +
-        '<th style="padding:8px">Post Title</th>' +
-        '<th style="padding:8px">Sent</th>' +
-        '<th style="padding:8px">Opens</th>' +
-        '<th style="padding:8px">Clicks</th>' +
+        '<th style="padding:8px">Subject</th>' +
+        '<th style="padding:8px">Recipients</th>' +
+        '<th style="padding:8px">Status</th>' +
         '</tr>';
       
       history.forEach(send => {
+        const title = send.title || send.subject || 'Announcement';
         html += '<tr style="border-bottom:1px solid var(--border)">' +
           '<td style="padding:8px">' + fmtDate(send.sent_at) + '</td>' +
-          '<td style="padding:8px"><a href="/blog/' + send.slug + '" style="color:var(--primary);text-decoration:none">' + esc(send.title) + '</a></td>' +
+          '<td style="padding:8px">' + esc(title) + '</td>' +
           '<td style="padding:8px">' + send.recipients_count + '</td>' +
-          '<td style="padding:8px"><span id="opens-' + send.id + '">...</span></td>' +
-          '<td style="padding:8px"><span id="clicks-' + send.id + '">...</span></td>' +
+          '<td style="padding:8px"><span style="color:#8B9E6B;font-weight:500">✓ Delivered</span></td>' +
           '</tr>';
       });
       
@@ -2225,19 +2224,6 @@ async function loadAdminNewsletter() {
     html += '</div>';
     
     document.getElementById('adminNewsletterContent').innerHTML = html;
-    
-    // Load tracking stats for each send
-    if (history && history.length) {
-      history.forEach(async send => {
-        try {
-          const stats = await api('/api/admin/newsletter/stats/' + send.id);
-          const opensEl = document.getElementById('opens-' + send.id);
-          const clicksEl = document.getElementById('clicks-' + send.id);
-          if (opensEl) opensEl.innerHTML = stats.opens + ' <span style="color:var(--text-muted);font-size:0.8em">(' + stats.openRate + '%)</span>';
-          if (clicksEl) clicksEl.innerHTML = stats.clicks + ' <span style="color:var(--text-muted);font-size:0.8em">(' + stats.clickRate + '%)</span>';
-        } catch(e) { /* silent */ }
-      });
-    }
   } catch(e) { console.error(e); }
 }
 
