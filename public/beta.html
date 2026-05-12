@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Join the Beta — The Potter's Mud Room</title>
+  <meta name="description" content="Be one of the first to test The Potter's Mud Room app. Help shape the future of pottery tracking.">
+  <link rel="canonical" href="https://thepottersmudroom.com/beta">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #FAF7F2; --text: #2C2420; --text-light: #7A6F66;
+      --primary: #C67B4E; --primary-hover: #B56A3E; --primary-light: #F5E6D8;
+      --bg-dark: #3E2E24; --border: #E8E0D6;
+      --radius: 10px; --shadow: 0 4px 16px rgba(44,36,32,0.12);
+      --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      --font-display: Georgia, 'Times New Roman', serif;
+    }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh; }
+    .nav { background: var(--bg-dark); color: #fff; padding: 16px 20px; text-align: center; }
+    .nav h1 { font-family: var(--font-display); font-size: 1.4rem; }
+    .nav .mud { color: var(--primary); }
+    .container { max-width: 600px; margin: 0 auto; padding: 40px 20px; }
+    .hero { text-align: center; margin-bottom: 40px; }
+    .hero h2 { font-family: var(--font-display); font-size: 2rem; margin-bottom: 12px; }
+    .hero p { font-size: 1.1rem; color: var(--text-light); max-width: 500px; margin: 0 auto; }
+    .card { background: #fff; border-radius: var(--radius); padding: 32px; box-shadow: var(--shadow); margin-bottom: 32px; }
+    .card h3 { font-family: var(--font-display); margin-bottom: 16px; font-size: 1.3rem; }
+    .steps { list-style: none; counter-reset: step; }
+    .steps li { counter-increment: step; padding: 12px 0; padding-left: 40px; position: relative; border-bottom: 1px solid var(--border); }
+    .steps li:last-child { border-bottom: none; }
+    .steps li::before { content: counter(step); position: absolute; left: 0; top: 12px; width: 28px; height: 28px; background: var(--primary); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 600; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; margin-bottom: 6px; font-size: 0.9rem; font-weight: 500; color: var(--text-light); }
+    .form-input { width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: 6px; font-size: 1rem; font-family: var(--font); }
+    .form-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+    .btn { display: inline-block; padding: 14px 28px; background: var(--primary); color: #fff; border: none; border-radius: 6px; font-size: 1rem; font-weight: 500; cursor: pointer; width: 100%; text-align: center; transition: background 0.2s; }
+    .btn:hover { background: var(--primary-hover); }
+    .perks { list-style: none; }
+    .perks li { padding: 8px 0; padding-left: 28px; position: relative; }
+    .perks li::before { content: "✓"; position: absolute; left: 0; color: var(--primary); font-weight: bold; }
+    .note { text-align: center; color: var(--text-light); font-size: 0.9rem; margin-top: 24px; }
+    .success { display: none; text-align: center; padding: 24px; }
+    .success h3 { color: var(--primary); margin-bottom: 8px; }
+    .footer { text-align: center; padding: 32px 20px; color: var(--text-light); font-size: 0.85rem; }
+    .footer a { color: var(--primary); text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <h1>The Potter's <span class="mud">Mud</span> Room</h1>
+  </div>
+
+  <div class="container">
+    <div class="hero">
+      <h2>🏺 Join the Beta</h2>
+      <p>Be one of the first potters to try The Potter's Mud Room. Help us shape the app before it goes public.</p>
+    </div>
+
+    <div class="card">
+      <h3>What You Get</h3>
+      <ul class="perks">
+        <li>Early access to the app before anyone else</li>
+        <li>Track your pieces, clay bodies, glazes & firings</li>
+        <li>Direct input on features — tell us what potters actually need</li>
+        <li>Free forever for beta testers</li>
+        <li>Help a fellow potter build something real</li>
+      </ul>
+    </div>
+
+    <div class="card" id="signup-card">
+      <h3>Sign Up for Beta Access</h3>
+      <form id="beta-form">
+        <div class="form-group">
+          <label for="email">Gmail Address (required for Android beta)</label>
+          <input type="email" id="email" name="email" class="form-input" placeholder="yourname@gmail.com" required>
+        </div>
+        <div class="form-group">
+          <label for="name">Name (optional)</label>
+          <input type="text" id="name" name="name" class="form-input" placeholder="Your name">
+        </div>
+        <button type="submit" class="btn">Join the Beta 🎉</button>
+      </form>
+      <div class="success" id="success-msg">
+        <h3>You're in! 🎉</h3>
+        <p>We'll send you a link to install the app soon. Keep an eye on your email.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>How It Works</h3>
+      <ol class="steps">
+        <li>Sign up with your Gmail address above</li>
+        <li>We'll add you to the beta tester list</li>
+        <li>You'll get an email with a link to install the app from Google Play</li>
+        <li>Try it out, break things, tell us what you think!</li>
+      </ol>
+    </div>
+
+    <p class="note">Built by a potter, for potters. 🤎</p>
+  </div>
+
+  <div class="footer">
+    <a href="/">← Back to The Potter's Mud Room</a>
+  </div>
+
+  <script>
+    document.getElementById('beta-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const name = document.getElementById('name').value;
+      const subject = encodeURIComponent('Beta Tester Sign-up: The Potters Mud Room');
+      const body = encodeURIComponent('Email: ' + email + '\nName: ' + (name || 'Not provided'));
+      window.open('mailto:christinaworkmanpottery@gmail.com?subject=' + subject + '&body=' + body, '_blank');
+      document.getElementById('beta-form').style.display = 'none';
+      document.getElementById('success-msg').style.display = 'block';
+    });
+  </script>
+</body>
+</html>
