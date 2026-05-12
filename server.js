@@ -2199,6 +2199,42 @@ app.post('/api/admin/newsletter/send', auth, (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Admin: send a plain announcement email to all members.
+// Body: { subject, html, text? }
+app.post('/api/admin/announce', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const { subject, html, text } = req.body || {};
+    if (!subject || !html) return res.status(400).json({ error: 'subject and html required' });
+    const recipients = db.prepare("SELECT id, email FROM users WHERE email IS NOT NULL AND email != ''").all();
+    if (!transporter) return res.status(500).json({ error: 'SMTP not configured' });
+    const announceId = uuidv4();
+    let sent = 0, failed = 0;
+    recipients.forEach(r => {
+      // Add open-tracking pixel to each email
+      const emailB64 = Buffer.from(r.email).toString('base64');
+      const trackOpen = `https://thepottersmudroom.com/api/newsletter/open/${announceId}/${emailB64}`;
+      const htmlWithTracking = html + `<img src="${trackOpen}" width="1" height="1" style="display:none" alt="">`;
+      transporter.sendMail({
+        from: process.env.SMTP_USER || 'thepottersmudroom@gmail.com',
+        to: r.email,
+        subject,
+        html: htmlWithTracking,
+        text: text || html.replace(/<[^>]+>/g,'')
+      }).then(() => { sent++; }).catch(err => { failed++; console.error('Announce email error:', r.email, err.message); });
+    });
+    // Log announcement to unified email_sends history
+    try {
+      db.prepare('INSERT INTO email_sends (id, type, subject, sent_by, recipients_count, blog_post_id) VALUES (?,?,?,?,?,?)').run(announceId, 'announcement', subject, req.userId, recipients.length, null);
+    } catch(e) { console.error('Failed to log announcement send:', e.message); }
+    // Also record in newsletter_sends so stats endpoint can find it
+    try {
+      db.prepare('INSERT INTO newsletter_sends (id, blog_post_id, sent_by, recipients_count) VALUES (?,?,?,?)').run(announceId, null, req.userId, recipients.length);
+    } catch(e) { /* silent */ }
+    res.json({ success: true, queued: recipients.length, id: announceId });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ============ BACKFILL REFERRAL CODES ============
 // Ensure all existing users have referral codes at startup
 try {
@@ -2283,8 +2319,14 @@ app.get('/api/admin/newsletter/stats/:sendId', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
     const { sendId } = req.params;
-    const send = db.prepare('SELECT ns.*, bp.title FROM newsletter_sends ns LEFT JOIN blog_posts bp ON ns.blog_post_id=bp.id WHERE ns.id=?').get(sendId);
-    if (!send) return res.status(404).json({ error: 'Send not found' });
+    // Try newsletter_sends first, fall back to email_sends for announcements
+    let send = db.prepare('SELECT ns.*, bp.title FROM newsletter_sends ns LEFT JOIN blog_posts bp ON ns.blog_post_id=bp.id WHERE ns.id=?').get(sendId);
+    if (!send) {
+      // Check email_sends table for announcements
+      const es = db.prepare('SELECT * FROM email_sends WHERE id=?').get(sendId);
+      if (!es) return res.status(404).json({ error: 'Send not found' });
+      send = { id: es.id, recipients_count: es.recipients_count, title: es.subject };
+    }
     
     const opens = db.prepare('SELECT COUNT(DISTINCT recipient_email) as count FROM newsletter_tracking WHERE send_id=? AND event_type=?').get(sendId, 'open');
     const clicks = db.prepare('SELECT COUNT(DISTINCT recipient_email) as count FROM newsletter_tracking WHERE send_id=? AND event_type=?').get(sendId, 'click');
