@@ -1642,18 +1642,22 @@ app.post('/api/admin/announce', auth, (req, res) => {
     if (!subject || !html) return res.status(400).json({ error: 'subject and html required' });
     const recipients = db.prepare("SELECT id, email FROM users WHERE email IS NOT NULL AND email != ''").all();
     if (!transporter) return res.status(500).json({ error: 'SMTP not configured' });
+    const announceId = uuidv4();
     let sent = 0, failed = 0;
     recipients.forEach(r => {
+      // Add open-tracking pixel to each email
+      const emailB64 = Buffer.from(r.email).toString('base64');
+      const trackOpen = `https://thepottersmudroom.com/api/newsletter/open/${announceId}/${emailB64}`;
+      const htmlWithTracking = html + `<img src="${trackOpen}" width="1" height="1" style="display:none" alt="">`;
       transporter.sendMail({
         from: process.env.SMTP_USER || 'thepottersmudroom@gmail.com',
         to: r.email,
         subject,
-        html,
+        html: htmlWithTracking,
         text: text || html.replace(/<[^>]+>/g,'')
       }).then(() => { sent++; }).catch(err => { failed++; console.error('Announce email error:', r.email, err.message); });
     });
     // Log announcement to unified email_sends history
-    const announceId = uuidv4();
     try {
       db.prepare('INSERT INTO email_sends (id, type, subject, sent_by, recipients_count, blog_post_id) VALUES (?,?,?,?,?,?)').run(announceId, 'announcement', subject, req.userId, recipients.length, null);
     } catch(e) { console.error('Failed to log announcement send:', e.message); }

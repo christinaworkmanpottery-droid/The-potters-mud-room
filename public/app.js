@@ -2205,7 +2205,8 @@ async function loadAdminNewsletter() {
         '<tr style="border-bottom:2px solid var(--border);text-align:left">' +
         '<th style="padding:8px">Date</th>' +
         '<th style="padding:8px">Subject</th>' +
-        '<th style="padding:8px">Recipients</th>' +
+        '<th style="padding:8px">Sent To</th>' +
+        '<th style="padding:8px">Confirmed Opens</th>' +
         '<th style="padding:8px">Status</th>' +
         '</tr>';
       
@@ -2215,15 +2216,37 @@ async function loadAdminNewsletter() {
           '<td style="padding:8px">' + fmtDate(send.sent_at) + '</td>' +
           '<td style="padding:8px">' + esc(title) + '</td>' +
           '<td style="padding:8px">' + send.recipients_count + '</td>' +
+          '<td style="padding:8px"><span id="opens-' + send.id + '">...</span></td>' +
           '<td style="padding:8px"><span style="color:#8B9E6B;font-weight:500">✓ Delivered</span></td>' +
           '</tr>';
       });
       
       html += '</table></div>';
+      html += '<p style="font-size:0.8rem;color:var(--text-muted);margin-top:8px">💡 Most email apps (Gmail, Apple Mail) block open tracking by default. Actual readership is likely much higher than confirmed opens.</p>';
     }
     html += '</div>';
     
     document.getElementById('adminNewsletterContent').innerHTML = html;
+
+    // Load tracking stats for each send
+    if (history && history.length) {
+      history.forEach(async send => {
+        try {
+          const stats = await api('/api/admin/newsletter/stats/' + send.id);
+          const opensEl = document.getElementById('opens-' + send.id);
+          if (opensEl) {
+            if (stats.opens > 0) {
+              opensEl.innerHTML = stats.opens + '+ <span style="color:var(--text-muted);font-size:0.8em">of ' + send.recipients_count + '</span>';
+            } else {
+              opensEl.innerHTML = '<span style="color:var(--text-muted)">—</span>';
+            }
+          }
+        } catch(e) {
+          const opensEl = document.getElementById('opens-' + send.id);
+          if (opensEl) opensEl.innerHTML = '<span style="color:var(--text-muted)">—</span>';
+        }
+      });
+    }
   } catch(e) { console.error(e); }
 }
 
