@@ -2506,7 +2506,10 @@ app.post('/api/admin/beta-signups/notify', auth, (req, res) => {
   if (!unsent.length) return res.json({ success: true, sent: 0, message: 'Everyone has already been notified!' });
   // Mark as notified immediately, send in background
   const ids = unsent.map(s => s.id);
-  db.prepare('UPDATE beta_signups SET notified_at=datetime(\'now\') WHERE id IN (' + ids.join(',') + ')').run();
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  for (const id of ids) {
+    db.prepare('UPDATE beta_signups SET notified_at=? WHERE id=?').run(now, id);
+  }
   res.json({ success: true, sent: unsent.length, total: unsent.length });
   // Send emails in background (don't block response)
   (async () => {
