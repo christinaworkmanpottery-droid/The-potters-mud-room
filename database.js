@@ -674,6 +674,7 @@ function initDB() {
   const catInsert = db.prepare('INSERT OR IGNORE INTO forum_categories (id, name, description, sort_order, icon) VALUES (?,?,?,?,?)');
   catInsert.run('cat-events', 'Events', 'Post pottery events, workshops, shows, and meetups near you!', 11, '📅');
   catInsert.run('cat-jobs', 'Job Board', 'Pottery jobs, studio assistant positions, teaching gigs, and opportunities', 12, '💼');
+  catInsert.run('cat-gear', 'Gear & Materials', 'Recommend your favorite tools, brushes, wheels, kilns, and pottery supplies!', 13, '🛠️');
 
   // Reviews table
   db.exec(`

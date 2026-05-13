@@ -1128,8 +1128,8 @@ app.get('/api/export/pieces', auth, requireTier('starter'), (req, res) => {
 
 // ============ COMMUNITY GLAZE COMBOS ============
 app.get('/api/community/combos', auth, requireTier('starter'), (req, res) => {
-  const { search, cone, atmosphere, filter } = req.query;
-  let sql = 'SELECT gc.*,u.display_name as author FROM glaze_combos gc JOIN users u ON gc.user_id=u.id WHERE ';
+  const { search, cone, atmosphere, filter, clay, sort, type } = req.query;
+  let sql = 'SELECT gc.*,u.display_name as author,(SELECT COUNT(*) FROM combo_comments cc WHERE cc.combo_id=gc.id) as comment_count FROM glaze_combos gc JOIN users u ON gc.user_id=u.id WHERE ';
   const params = [];
   
   // Handle filter: "Community Shared", "My Private Combos", "All My Combos"
@@ -1144,10 +1144,15 @@ app.get('/api/community/combos', auth, requireTier('starter'), (req, res) => {
     sql += 'gc.is_shared=1';
   }
   
-  if (search) { sql += ' AND (gc.name LIKE ? OR gc.description LIKE ?)'; params.push(`%${search}%`, `%${search}%`); }
+  if (search) { sql += ' AND (gc.name LIKE ? OR gc.description LIKE ? OR gc.clay_body_name LIKE ? OR gc.id IN (SELECT combo_id FROM glaze_combo_layers WHERE glaze_name LIKE ?))'; params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`); }
   if (cone) { sql += ' AND gc.cone=?'; params.push(cone); }
   if (atmosphere) { sql += ' AND gc.atmosphere=?'; params.push(atmosphere); }
-  sql += ' ORDER BY gc.likes DESC, gc.created_at DESC';
+  if (clay) { sql += ' AND gc.clay_body_name LIKE ?'; params.push(`%${clay}%`); }
+  if (type === 'single') { sql += ' AND gc.id IN (SELECT combo_id FROM glaze_combo_layers GROUP BY combo_id HAVING COUNT(*)=1)'; }
+  else if (type === 'combo') { sql += ' AND gc.id IN (SELECT combo_id FROM glaze_combo_layers GROUP BY combo_id HAVING COUNT(*)>1)'; }
+  if (sort === 'newest') { sql += ' ORDER BY gc.created_at DESC'; }
+  else if (sort === 'comments') { sql += ' ORDER BY comment_count DESC'; }
+  else { sql += ' ORDER BY gc.likes DESC, gc.created_at DESC'; }
   const combos = db.prepare(sql).all(...params);
   const getL = db.prepare('SELECT * FROM glaze_combo_layers WHERE combo_id=? ORDER BY layer_order');
   const getLike = db.prepare('SELECT id FROM combo_likes WHERE combo_id=? AND user_id=?');
@@ -1155,7 +1160,7 @@ app.get('/api/community/combos', auth, requireTier('starter'), (req, res) => {
   combos.forEach(c => {
     c.layers = getL.all(c.id);
     c.user_liked = !!getLike.get(c.id, req.userId);
-    c.comment_count = getCommentCount.get(c.id).c;
+    if (!c.comment_count && c.comment_count !== 0) c.comment_count = getCommentCount.get(c.id).c;
   });
   res.json(combos);
 });
