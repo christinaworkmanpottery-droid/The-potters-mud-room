@@ -905,6 +905,8 @@ app.get('/api/pieces/:id', auth, (req, res) => {
 });
 
 app.post('/api/pieces', auth, (req, res) => {
+  console.log('[DEBUG] POST /api/pieces body:', JSON.stringify(req.body));
+  console.log('[DEBUG] POST /api/pieces content-type:', req.headers['content-type']);
   const u = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
   if ((u?.tier || 'free') === 'free' && getPieceCount(req.userId) >= 20) return res.status(403).json({ error: 'Free tier limited to 20 pieces. Upgrade to add more!' });
   const { title, description, clayBodyId, studio, status, form, technique, dimensions, weight, materialCost, firingCost, dateStarted, notes, glazeIds, casualtyType, casualtyNotes, casualtyLesson } = req.body;
