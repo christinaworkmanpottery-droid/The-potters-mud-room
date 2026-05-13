@@ -853,6 +853,12 @@ function initDB() {
   try { db.exec('ALTER TABLE beta_signups ADD COLUMN notified_at TEXT'); } catch(e) { /* already exists */ }
   safeAdd('users', 'is_beta_tester', 'INTEGER DEFAULT 0');
 
+  // One-time cleanup: remove ghost "Untitled" pieces with no real data (from iOS FormData bug)
+  try {
+    const deleted = db.prepare("DELETE FROM pieces WHERE (title IS NULL OR title = '' OR title = 'Untitled Piece') AND (description IS NULL OR description = '') AND (notes IS NULL OR notes = '')").run();
+    if (deleted.changes > 0) console.log(`[cleanup] Removed ${deleted.changes} ghost untitled pieces`);
+  } catch(e) { /* ignore */ }
+
   // Backfill: retroactive announcement from 2026-05-08
   try {
     db.prepare(`INSERT OR IGNORE INTO email_sends (id, type, subject, sent_at, sent_by, recipients_count, blog_post_id)
