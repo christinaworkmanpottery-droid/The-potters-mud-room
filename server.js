@@ -2478,6 +2478,22 @@ app.get('/api/admin/activity-summary', auth, (req, res) => {
   }
 });
 
+// ============ BETA SIGNUPS ============
+app.post('/api/beta-signup', (req, res) => {
+  const { email, name } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+  try {
+    db.prepare('INSERT OR IGNORE INTO beta_signups (email, name) VALUES (?, ?)').run(email.trim().toLowerCase(), name || null);
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: 'Something went wrong' }); }
+});
+
+app.get('/api/admin/beta-signups', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  const signups = db.prepare('SELECT * FROM beta_signups ORDER BY created_at DESC').all();
+  res.json(signups);
+});
+
 // SPA fallback — must be AFTER all API routes
 app.get('*', (req, res) => {
   if (!req.path.startsWith('/api/') && !req.path.startsWith('/uploads/')) {

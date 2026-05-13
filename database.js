@@ -837,6 +837,17 @@ function initDB() {
     }
   } catch(e) { /* newsletter_sends might not have data yet */ }
 
+  // Beta signups table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS beta_signups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL,
+      name TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_beta_email ON beta_signups(email);
+  `);
+
   // Backfill: retroactive announcement from 2026-05-08
   try {
     db.prepare(`INSERT OR IGNORE INTO email_sends (id, type, subject, sent_at, sent_by, recipients_count, blog_post_id)

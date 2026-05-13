@@ -105,15 +105,32 @@
   </div>
 
   <script>
-    document.getElementById('beta-form').addEventListener('submit', function(e) {
+    document.getElementById('beta-form').addEventListener('submit', async function(e) {
       e.preventDefault();
-      const email = document.getElementById('email').value;
-      const name = document.getElementById('name').value;
-      const subject = encodeURIComponent('Beta Tester Sign-up: The Potters Mud Room');
-      const body = encodeURIComponent('Email: ' + email + '\nName: ' + (name || 'Not provided'));
-      window.open('mailto:christinaworkmanpottery@gmail.com?subject=' + subject + '&body=' + body, '_blank');
-      document.getElementById('beta-form').style.display = 'none';
-      document.getElementById('success-msg').style.display = 'block';
+      const email = document.getElementById('email').value.trim();
+      const name = document.getElementById('name').value.trim();
+      const btn = this.querySelector('button');
+      btn.disabled = true;
+      btn.textContent = 'Signing up...';
+      try {
+        const res = await fetch('/api/beta-signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, name })
+        });
+        if (res.ok) {
+          document.getElementById('beta-form').style.display = 'none';
+          document.getElementById('success-msg').style.display = 'block';
+        } else {
+          btn.disabled = false;
+          btn.textContent = 'Join the Beta 🎉';
+          alert('Something went wrong. Please try again.');
+        }
+      } catch(err) {
+        btn.disabled = false;
+        btn.textContent = 'Join the Beta 🎉';
+        alert('Connection error. Please try again.');
+      }
     });
   </script>
 </body>
