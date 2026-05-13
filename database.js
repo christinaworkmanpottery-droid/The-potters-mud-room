@@ -848,6 +848,8 @@ function initDB() {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_beta_email ON beta_signups(email);
   `);
+  // Add notified_at column if missing (table may already exist without it)
+  try { db.exec('ALTER TABLE beta_signups ADD COLUMN notified_at TEXT'); } catch(e) { /* already exists */ }
 
   // Backfill: retroactive announcement from 2026-05-08
   try {
