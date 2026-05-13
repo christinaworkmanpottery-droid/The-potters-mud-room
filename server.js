@@ -2499,6 +2499,11 @@ app.get('/api/admin/beta-signups', auth, (req, res) => {
   res.json(signups);
 });
 
+// Static pages
+app.get('/beta', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'beta.html'));
+});
+
 // SPA fallback — must be AFTER all API routes
 app.get('*', (req, res) => {
   if (!req.path.startsWith('/api/') && !req.path.startsWith('/uploads/')) {
