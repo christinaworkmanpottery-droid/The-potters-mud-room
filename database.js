@@ -850,6 +850,7 @@ function initDB() {
   `);
   // Add notified_at column if missing (table may already exist without it)
   try { db.exec('ALTER TABLE beta_signups ADD COLUMN notified_at TEXT'); } catch(e) { /* already exists */ }
+  safeAdd('users', 'is_beta_tester', 'INTEGER DEFAULT 0');
 
   // Backfill: retroactive announcement from 2026-05-08
   try {

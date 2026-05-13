@@ -94,7 +94,11 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req,
       let user = db.prepare('SELECT id FROM users WHERE stripe_subscription_id=?').get(sub.id);
       if (!user && sub.customer) user = db.prepare('SELECT id FROM users WHERE stripe_customer_id=?').get(sub.customer);
       if (user && sub.status !== 'active' && sub.status !== 'trialing') {
-        db.prepare('UPDATE users SET tier=?, stripe_subscription_id=NULL WHERE id=?').run('free', user.id);
+        // Never downgrade lifetime beta testers
+        const isBeta = db.prepare('SELECT is_beta_tester FROM users WHERE id=?').get(user.id);
+        if (!isBeta?.is_beta_tester) {
+          db.prepare('UPDATE users SET tier=?, stripe_subscription_id=NULL WHERE id=?').run('free', user.id);
+        }
       }
       break;
     }
@@ -103,7 +107,11 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req,
       let user = db.prepare('SELECT id FROM users WHERE stripe_subscription_id=?').get(sub.id);
       if (!user && sub.customer) user = db.prepare('SELECT id FROM users WHERE stripe_customer_id=?').get(sub.customer);
       if (user) {
-        db.prepare('UPDATE users SET tier=?, stripe_subscription_id=NULL WHERE id=?').run('free', user.id);
+        // Never downgrade lifetime beta testers
+        const isBeta = db.prepare('SELECT is_beta_tester FROM users WHERE id=?').get(user.id);
+        if (!isBeta?.is_beta_tester) {
+          db.prepare('UPDATE users SET tier=?, stripe_subscription_id=NULL WHERE id=?').run('free', user.id);
+        }
       }
       break;
     }
@@ -2484,13 +2492,29 @@ app.post('/api/beta-signup', (req, res) => {
   if (!email) return res.status(400).json({ error: 'Email is required' });
   try {
     db.prepare('INSERT OR IGNORE INTO beta_signups (email, name) VALUES (?, ?)').run(email.trim().toLowerCase(), name || null);
-    // If this email matches an existing user, upgrade them to top tier (lifetime beta reward)
+    // If this email matches an existing user, upgrade them to lifetime unlimited (beta reward)
     const user = db.prepare('SELECT id FROM users WHERE LOWER(email)=?').get(email.trim().toLowerCase());
     if (user) {
-      db.prepare("UPDATE users SET tier='top', billing_period='promo', plan_expires_at=NULL WHERE id=?").run(user.id);
+      db.prepare("UPDATE users SET tier='top', billing_period='promo', plan_expires_at=NULL, is_beta_tester=1 WHERE id=?").run(user.id);
     }
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: 'Something went wrong' }); }
+});
+
+// Admin: bulk upgrade all beta signups to lifetime unlimited
+app.post('/api/admin/beta-signups/upgrade-all', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  const signups = db.prepare('SELECT email FROM beta_signups').all();
+  let upgraded = 0;
+  for (const s of signups) {
+    const result = db.prepare("UPDATE users SET tier='top', billing_period='promo', plan_expires_at=NULL, is_beta_tester=1 WHERE LOWER(email)=? AND is_beta_tester=0").run(s.email);
+    if (result.changes > 0) upgraded++;
+  }
+  // Also mark any already-top users who are beta signups
+  for (const s of signups) {
+    db.prepare("UPDATE users SET is_beta_tester=1 WHERE LOWER(email)=?").run(s.email);
+  }
+  res.json({ success: true, upgraded, total: signups.length });
 });
 
 app.get('/api/admin/beta-signups', auth, (req, res) => {
