@@ -1784,6 +1784,11 @@ async function loadAdmin() {
       '<button class="btn btn-primary btn-sm" onclick="setFeaturedPotter()">Set Featured Potter</button>' +
       '<div id="featuredPotterHistory" class="mt-16"></div></div>';
 
+    // Beta testers section
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">🧪 Beta Testers</h3>' +
+      '<p class="text-sm mb-12" style="color:var(--text-light)">People who signed up to beta test the app. Copy their Gmail addresses into Google Play\'s closed testing list.</p>' +
+      '<div id="adminBetaContent">Loading...</div></div>';
+
     // Newsletter section
     html += '<div class="card mb-16"><h3 style="margin-bottom:12px">📬 Newsletter</h3>' +
       '<div id="adminNewsletterContent">Loading...</div></div>';
@@ -1814,6 +1819,7 @@ async function loadAdmin() {
     loadAdminNewsletter();
     loadAdminEmailSettings();
     loadAdminUsage();
+    loadAdminBeta();
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -2146,6 +2152,57 @@ async function loadAdminFeaturedPotter() {
         ' · ' + fmtDate(fp.featured_date) + '</div>'
       ).join('');
   } catch(e) {}
+}
+
+// ---- Admin: Beta Testers ----
+async function loadAdminBeta() {
+  const el = document.getElementById('adminBetaContent');
+  if (!el) return;
+  try {
+    const signups = await api('/api/admin/beta-signups');
+    if (!signups.length) {
+      el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">No beta signups yet</div>';
+      return;
+    }
+    let html = '<div style="margin-bottom:12px"><strong>' + signups.length + ' signup' + (signups.length !== 1 ? 's' : '') + '</strong></div>';
+    html += '<div style="background:var(--bg-alt);padding:12px;border-radius:8px;margin-bottom:12px">';
+    html += '<label class="text-sm" style="color:var(--text-light);display:block;margin-bottom:4px">Gmail addresses (copy these into Google Play):</label>';
+    html += '<textarea id="betaEmailList" readonly style="width:100%;min-height:80px;font-size:0.85rem;padding:8px;border:1px solid var(--border);border-radius:4px;resize:vertical">' + signups.map(s => s.email).join('\n') + '</textarea>';
+    html += '<button class="btn btn-sm" style="margin-top:8px;font-size:0.8rem" onclick="copyBetaEmails()">📋 Copy All Emails</button>';
+    html += ' <button class="btn btn-primary btn-sm" style="margin-top:8px;font-size:0.8rem" onclick="sendBetaInvites()">📨 Send Welcome Email to New Signups</button>';
+    html += '</div>';
+    html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
+    html += '<tr style="border-bottom:2px solid var(--border);text-align:left"><th style="padding:6px">Email</th><th style="padding:6px">Name</th><th style="padding:6px">Signed Up</th></tr>';
+    signups.forEach(s => {
+      html += '<tr style="border-bottom:1px solid var(--border)">' +
+        '<td style="padding:6px">' + esc(s.email) + '</td>' +
+        '<td style="padding:6px">' + esc(s.name || '—') + '</td>' +
+        '<td style="padding:6px">' + fmtDate(s.created_at) + '</td></tr>';
+    });
+    html += '</table></div>';
+    el.innerHTML = html;
+  } catch(e) { el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">Error loading beta signups</div>'; }
+}
+
+function copyBetaEmails() {
+  const ta = document.getElementById('betaEmailList');
+  if (ta) {
+    ta.select();
+    navigator.clipboard.writeText(ta.value).then(() => toast('Copied!', 'success')).catch(() => toast('Long-press to copy manually', ''));
+  }
+}
+
+async function sendBetaInvites() {
+  if (!confirm('Send welcome email to new signups who haven\'t been emailed yet?')) return;
+  try {
+    const result = await api('/api/admin/beta-signups/notify', { method: 'POST' });
+    if (result.sent === 0) {
+      toast('Everyone has already been notified!', '');
+    } else {
+      toast('Sent welcome email to ' + result.sent + ' new tester' + (result.sent !== 1 ? 's' : '') + '!', 'success');
+    }
+    loadAdminBeta();
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 // ---- Admin: Newsletter ----

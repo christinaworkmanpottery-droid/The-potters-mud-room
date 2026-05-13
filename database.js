@@ -843,6 +843,7 @@ function initDB() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT NOT NULL,
       name TEXT,
+      notified_at TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_beta_email ON beta_signups(email);

@@ -2499,6 +2499,40 @@ app.get('/api/admin/beta-signups', auth, (req, res) => {
   res.json(signups);
 });
 
+app.post('/api/admin/beta-signups/notify', auth, async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  if (!transporter) return res.status(500).json({ error: 'SMTP not configured' });
+  const unsent = db.prepare('SELECT * FROM beta_signups WHERE notified_at IS NULL').all();
+  if (!unsent.length) return res.json({ success: true, sent: 0, message: 'Everyone has already been notified!' });
+  let sent = 0;
+  for (const s of unsent) {
+    try {
+      await transporter.sendMail({
+        from: process.env.SMTP_USER || 'thepottersmudroom@gmail.com',
+        to: s.email,
+        subject: '\uD83C\uDFFA You\'re In! Install The Potter\'s Mud Room Beta',
+        html: `<div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;padding:20px">
+<h2 style="color:#8B4513">Welcome to the Beta! \uD83C\uDF89</h2>
+<p>Hey${s.name ? ' ' + s.name : ''}!</p>
+<p>Thanks for signing up to beta test <strong>The Potter's Mud Room</strong>. Your <strong>lifetime unlimited membership</strong> is active!</p>
+<p>Here's how to install the app:</p>
+<ol>
+<li>You'll receive a separate email from Google Play with an invite link</li>
+<li>Tap the link to join the beta on Google Play</li>
+<li>Install the app and sign in with your email</li>
+</ol>
+<p>If you don't see the Google Play invite within 24 hours, check your spam folder or reply to this email.</p>
+<p>Happy potting! \uD83E\uDED6</p>
+<p style="color:#666;font-style:italic">— Christina & The Potter's Mud Room</p>
+</div>`
+      });
+      db.prepare('UPDATE beta_signups SET notified_at=datetime(\'now\') WHERE id=?').run(s.id);
+      sent++;
+    } catch(e) { console.error('Beta notify error:', s.email, e.message); }
+  }
+  res.json({ success: true, sent, total: unsent.length });
+});
+
 // Static pages
 app.get('/beta', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'beta.html'));
