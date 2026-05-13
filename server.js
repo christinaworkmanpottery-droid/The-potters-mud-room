@@ -2484,6 +2484,11 @@ app.post('/api/beta-signup', (req, res) => {
   if (!email) return res.status(400).json({ error: 'Email is required' });
   try {
     db.prepare('INSERT OR IGNORE INTO beta_signups (email, name) VALUES (?, ?)').run(email.trim().toLowerCase(), name || null);
+    // If this email matches an existing user, upgrade them to top tier (lifetime beta reward)
+    const user = db.prepare('SELECT id FROM users WHERE LOWER(email)=?').get(email.trim().toLowerCase());
+    if (user) {
+      db.prepare("UPDATE users SET tier='top', billing_period='promo', plan_expires_at=NULL WHERE id=?").run(user.id);
+    }
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: 'Something went wrong' }); }
 });
