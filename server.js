@@ -904,25 +904,74 @@ app.get('/api/pieces/:id', auth, (req, res) => {
   res.json(p);
 });
 
-app.post('/api/pieces', auth, (req, res) => {
-  console.log('[DEBUG] POST /api/pieces body:', JSON.stringify(req.body));
-  console.log('[DEBUG] POST /api/pieces content-type:', req.headers['content-type']);
+app.post('/api/pieces', auth, upload.single('photo'), (req, res) => {
+  // Handle both JSON and FormData (iOS may send either)
+  const body = req.body || {};
+  const title = String(body.title || body.name || '').trim() || null;
+  const description = String(body.description || '').trim() || null;
+  const clayBodyId = body.clayBodyId || body.clay_body_id || null;
+  const studio = String(body.studio || body.clay || '').trim() || null;
+  const status = String(body.status || 'in-progress').trim();
+  const form = body.form || null;
+  const technique = body.technique || null;
+  const dimensions = body.dimensions || null;
+  const weight = body.weight || null;
+  const materialCost = body.materialCost || body.material_cost || null;
+  const firingCost = body.firingCost || body.firing_cost || null;
+  const dateStarted = body.dateStarted || body.date_started || null;
+  const notes = body.firingTemp ? `Firing temp: ${body.firingTemp}` : (body.notes || null);
+  const casualtyType = body.casualtyType || body.casualty_type || null;
+  const casualtyNotes = body.casualtyNotes || body.casualty_notes || null;
+  const casualtyLesson = body.casualtyLesson || body.casualty_lesson || null;
+  let glazeIds = body.glazeIds || body.glaze_ids || null;
+  if (typeof glazeIds === 'string') { try { glazeIds = JSON.parse(glazeIds); } catch(e) { glazeIds = null; } }
+
+  console.log('[DEBUG] POST /api/pieces content-type:', req.headers['content-type'], 'title:', title);
+
   const u = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
   if ((u?.tier || 'free') === 'free' && getPieceCount(req.userId) >= 20) return res.status(403).json({ error: 'Free tier limited to 20 pieces. Upgrade to add more!' });
-  const { title, description, clayBodyId, studio, status, form, technique, dimensions, weight, materialCost, firingCost, dateStarted, notes, glazeIds, casualtyType, casualtyNotes, casualtyLesson } = req.body;
+
   const id = uuidv4();
   const isCasualty = (status === 'broken' || status === 'recycled');
   db.prepare('INSERT INTO pieces (id,user_id,title,description,clay_body_id,studio,status,form,technique,dimensions,weight,material_cost,firing_cost,date_started,notes,casualty_type,casualty_notes,casualty_lesson) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
     .run(id, req.userId, title, description, clayBodyId, studio, status || 'in-progress', form, technique, dimensions, weight, materialCost, firingCost, dateStarted, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null);
+
+  // If photo was uploaded via FormData, save it automatically
+  if (req.file) {
+    const photoId = uuidv4();
+    db.prepare('INSERT INTO piece_photos (id, piece_id, filename, original_name, sort_order) VALUES (?,?,?,?,0)').run(photoId, id, req.file.filename, req.file.originalname);
+  }
+
   if (glazeIds?.length) {
     const ins = db.prepare('INSERT INTO piece_glazes (id,piece_id,glaze_id,coats,application_method,layer_order) VALUES (?,?,?,?,?,?)');
-    glazeIds.forEach((g, i) => ins.run(uuidv4(), id, g.glazeId, g.coats || 1, g.method, i));
+    glazeIds.forEach((g, i) => ins.run(uuidv4(), id, g.glazeId || g, g.coats || 1, g.method || null, i));
   }
   res.json({ id });
 });
 
-app.put('/api/pieces/:id', auth, (req, res) => {
-  const { title, description, clayBodyId, studio, status, form, technique, dimensions, weight, materialCost, firingCost, salePrice, dateStarted, dateCompleted, dateSold, notes, glazeIds, casualtyType, casualtyNotes, casualtyLesson } = req.body;
+app.put('/api/pieces/:id', auth, upload.single('photo'), (req, res) => {
+  const body = req.body || {};
+  const title = body.title || body.name || null;
+  const description = body.description || null;
+  const clayBodyId = body.clayBodyId || body.clay_body_id || null;
+  const studio = body.studio || body.clay || null;
+  const status = body.status || null;
+  const form = body.form || null;
+  const technique = body.technique || null;
+  const dimensions = body.dimensions || null;
+  const weight = body.weight || null;
+  const materialCost = body.materialCost || body.material_cost || null;
+  const firingCost = body.firingCost || body.firing_cost || null;
+  const salePrice = body.salePrice || body.sale_price || null;
+  const dateStarted = body.dateStarted || body.date_started || null;
+  const dateCompleted = body.dateCompleted || body.date_completed || null;
+  const dateSold = body.dateSold || body.date_sold || null;
+  const notes = body.firingTemp ? `Firing temp: ${body.firingTemp}` : (body.notes || null);
+  const casualtyType = body.casualtyType || body.casualty_type || null;
+  const casualtyNotes = body.casualtyNotes || body.casualty_notes || null;
+  const casualtyLesson = body.casualtyLesson || body.casualty_lesson || null;
+  let glazeIds = body.glazeIds || body.glaze_ids;
+  if (typeof glazeIds === 'string') { try { glazeIds = JSON.parse(glazeIds); } catch(e) { glazeIds = undefined; } }
   const isCasualty = (status === 'broken' || status === 'recycled');
   const r = db.prepare(`UPDATE pieces SET title=?,description=?,clay_body_id=?,studio=?,status=?,form=?,technique=?,dimensions=?,weight=?,material_cost=?,firing_cost=?,sale_price=?,date_started=?,date_completed=?,date_sold=?,notes=?,casualty_type=?,casualty_notes=?,casualty_lesson=?,updated_at=datetime('now') WHERE id=? AND user_id=?`)
     .run(title, description, clayBodyId, studio, status, form, technique, dimensions, weight, materialCost, firingCost, salePrice, dateStarted, dateCompleted, dateSold, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null, req.params.id, req.userId);
