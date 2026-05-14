@@ -64,10 +64,14 @@ const safeUpload = (fieldName) => (req, res, next) => {
   const ct = (req.headers['content-type'] || '');
   // If not multipart, skip multer entirely
   if (!ct.includes('multipart/form-data')) return next();
-  upload.single(fieldName)(req, res, (err) => {
+  // Try the primary field name, then fallbacks
+  upload.any()(req, res, (err) => {
     if (err) {
       console.warn('[MULTER] Parse error, continuing without file:', err.message);
-      // Continue anyway — body might still be parseable by express.json
+    }
+    // Map any uploaded file to req.file for consistency
+    if (req.files && req.files.length > 0) {
+      req.file = req.files[0];
     }
     next();
   });
@@ -923,9 +927,9 @@ app.post('/api/pieces', auth, safeUpload('photo'), (req, res) => {
   // Handle both JSON and FormData (iOS may send either)
   const body = req.body || {};
   const title = String(body.title || body.name || '').trim() || null;
-  const description = String(body.description || '').trim() || null;
+  const clayText = String(body.clay || body.studio || '').trim() || null;
   const clayBodyId = body.clayBodyId || body.clay_body_id || null;
-  const studio = String(body.studio || body.clay || '').trim() || null;
+  const glazeText = String(body.glaze || '').trim() || null;
   const statusMap = {'In Progress':'in-progress','Bisque Fired':'bisque-fired','Glazed':'glazed','Final Fired':'glaze-fired','Glaze Fired':'glaze-fired','Complete':'done','Done':'done','Sold':'sold','Broken':'broken','Recycled':'recycled'};
   const rawStatus = String(body.status || 'in-progress').trim();
   const status = statusMap[rawStatus] || rawStatus.toLowerCase().replace(/\s+/g,'-');
@@ -936,14 +940,22 @@ app.post('/api/pieces', auth, safeUpload('photo'), (req, res) => {
   const materialCost = body.materialCost || body.material_cost || null;
   const firingCost = body.firingCost || body.firing_cost || null;
   const dateStarted = body.dateStarted || body.date_started || null;
-  const notes = body.firingTemp ? `Firing temp: ${body.firingTemp}` : (body.notes || null);
+  // Combine all text info into notes
+  const firingTemp = String(body.firingTemp || body.firing_temp || '').trim();
+  const userNotes = String(body.notes || body.description || '').trim();
+  const noteParts = [];
+  if (userNotes) noteParts.push(userNotes);
+  if (glazeText) noteParts.push(`Glaze: ${glazeText}`);
+  if (firingTemp) noteParts.push(`Firing temp: ${firingTemp}`);
+  const notes = noteParts.length ? noteParts.join(' | ') : null;
+  const description = String(body.description || '').trim() || null;
   const casualtyType = body.casualtyType || body.casualty_type || null;
   const casualtyNotes = body.casualtyNotes || body.casualty_notes || null;
   const casualtyLesson = body.casualtyLesson || body.casualty_lesson || null;
   let glazeIds = body.glazeIds || body.glaze_ids || null;
   if (typeof glazeIds === 'string') { try { glazeIds = JSON.parse(glazeIds); } catch(e) { glazeIds = null; } }
 
-  console.log('[DEBUG] POST /api/pieces content-type:', req.headers['content-type'], 'title:', title, 'status:', status);
+  console.log('[DEBUG] POST /api/pieces content-type:', req.headers['content-type'], 'body:', JSON.stringify(body), 'file:', req.file ? req.file.originalname : 'none', 'title:', title, 'status:', status, 'clay:', clayText, 'glaze:', glazeText, 'notes:', notes);
 
   const u = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
   if ((u?.tier || 'free') === 'free' && getPieceCount(req.userId) >= 20) return res.status(403).json({ error: 'Free tier limited to 20 pieces. Upgrade to add more!' });
@@ -952,7 +964,7 @@ app.post('/api/pieces', auth, safeUpload('photo'), (req, res) => {
   const isCasualty = (status === 'broken' || status === 'recycled');
   try {
     db.prepare('INSERT INTO pieces (id,user_id,title,description,clay_body_id,studio,status,form,technique,dimensions,weight,material_cost,firing_cost,date_started,notes,casualty_type,casualty_notes,casualty_lesson) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-      .run(id, req.userId, title, description, clayBodyId, studio, status || 'in-progress', form, technique, dimensions, weight, materialCost, firingCost, dateStarted, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null);
+      .run(id, req.userId, title, description, clayBodyId, clayText, status || 'in-progress', form, technique, dimensions, weight, materialCost, firingCost, dateStarted, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null);
   } catch (dbErr) {
     console.error('[DB ERROR] Insert piece failed:', dbErr.message, { title, status, body });
     return res.status(400).json({ error: 'Could not save piece: ' + dbErr.message });
