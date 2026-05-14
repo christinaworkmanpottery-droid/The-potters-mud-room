@@ -910,7 +910,25 @@ app.get('/api/pieces', auth, (req, res) => {
   const pieces = db.prepare(sql).all(...params);
   const getGl = db.prepare('SELECT pg.*,g.name as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order');
   const getPh = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order');
-  pieces.forEach(p => { p.glazes = getGl.all(p.id); p.photos = getPh.all(p.id); });
+  pieces.forEach(p => {
+    p.glazes = getGl.all(p.id);
+    p.photos = getPh.all(p.id);
+    // Legacy field aliases so older app builds can read piece data
+    p.name = p.title;
+    p.clay = p.clay_body_name || p.studio || null;
+    // Extract glaze from notes if stored there, or from glazes array
+    if (p.glazes && p.glazes.length > 0) {
+      p.glaze = p.glazes.map(g => g.glaze_name || g.name).join(', ');
+    } else if (p.notes) {
+      const gm = p.notes.match(/Glaze:\s*([^|]+)/);
+      if (gm) p.glaze = gm[1].trim();
+    }
+    // Extract firing temp from notes
+    if (p.notes) {
+      const fm = p.notes.match(/Firing temp:\s*([^|]+)/);
+      if (fm) p.firingTemp = fm[1].trim();
+    }
+  });
   res.json(pieces);
 });
 
@@ -920,6 +938,26 @@ app.get('/api/pieces/:id', auth, (req, res) => {
   p.glazes = db.prepare('SELECT pg.*,g.name as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order').all(p.id);
   p.photos = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order').all(p.id);
   p.firings = db.prepare('SELECT * FROM firing_logs WHERE piece_id=? ORDER BY date DESC').all(p.id);
+  // Legacy field aliases so older app builds can read piece data
+  p.name = p.title;
+  p.clay = p.clay_body_name || p.studio || null;
+  if (p.glazes && p.glazes.length > 0) {
+    p.glaze = p.glazes.map(g => g.glaze_name || g.name).join(', ');
+  } else if (p.notes) {
+    const gm = p.notes.match(/Glaze:\s*([^|]+)/);
+    if (gm) p.glaze = gm[1].trim();
+  }
+  if (p.notes) {
+    const fm = p.notes.match(/Firing temp:\s*([^|]+)/);
+    if (fm) p.firingTemp = fm[1].trim();
+    // Clean notes — strip embedded glaze/firing temp for display
+    p.cleanNotes = p.notes
+      .replace(/\s*\|\s*Glaze:[^|]+/g, '')
+      .replace(/\s*\|\s*Firing temp:[^|]+/g, '')
+      .replace(/^Glaze:[^|]+\s*\|?\s*/g, '')
+      .replace(/^Firing temp:[^|]+\s*\|?\s*/g, '')
+      .trim() || null;
+  }
   res.json(p);
 });
 
