@@ -926,7 +926,9 @@ app.post('/api/pieces', auth, safeUpload('photo'), (req, res) => {
   const description = String(body.description || '').trim() || null;
   const clayBodyId = body.clayBodyId || body.clay_body_id || null;
   const studio = String(body.studio || body.clay || '').trim() || null;
-  const status = String(body.status || 'in-progress').trim();
+  const statusMap = {'In Progress':'in-progress','Bisque Fired':'bisque-fired','Glazed':'glazed','Final Fired':'glaze-fired','Glaze Fired':'glaze-fired','Complete':'done','Done':'done','Sold':'sold','Broken':'broken','Recycled':'recycled'};
+  const rawStatus = String(body.status || 'in-progress').trim();
+  const status = statusMap[rawStatus] || rawStatus.toLowerCase().replace(/\s+/g,'-');
   const form = body.form || null;
   const technique = body.technique || null;
   const dimensions = body.dimensions || null;
@@ -941,15 +943,20 @@ app.post('/api/pieces', auth, safeUpload('photo'), (req, res) => {
   let glazeIds = body.glazeIds || body.glaze_ids || null;
   if (typeof glazeIds === 'string') { try { glazeIds = JSON.parse(glazeIds); } catch(e) { glazeIds = null; } }
 
-  console.log('[DEBUG] POST /api/pieces content-type:', req.headers['content-type'], 'title:', title);
+  console.log('[DEBUG] POST /api/pieces content-type:', req.headers['content-type'], 'title:', title, 'status:', status);
 
   const u = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
   if ((u?.tier || 'free') === 'free' && getPieceCount(req.userId) >= 20) return res.status(403).json({ error: 'Free tier limited to 20 pieces. Upgrade to add more!' });
 
   const id = uuidv4();
   const isCasualty = (status === 'broken' || status === 'recycled');
-  db.prepare('INSERT INTO pieces (id,user_id,title,description,clay_body_id,studio,status,form,technique,dimensions,weight,material_cost,firing_cost,date_started,notes,casualty_type,casualty_notes,casualty_lesson) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-    .run(id, req.userId, title, description, clayBodyId, studio, status || 'in-progress', form, technique, dimensions, weight, materialCost, firingCost, dateStarted, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null);
+  try {
+    db.prepare('INSERT INTO pieces (id,user_id,title,description,clay_body_id,studio,status,form,technique,dimensions,weight,material_cost,firing_cost,date_started,notes,casualty_type,casualty_notes,casualty_lesson) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(id, req.userId, title, description, clayBodyId, studio, status || 'in-progress', form, technique, dimensions, weight, materialCost, firingCost, dateStarted, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null);
+  } catch (dbErr) {
+    console.error('[DB ERROR] Insert piece failed:', dbErr.message, { title, status, body });
+    return res.status(400).json({ error: 'Could not save piece: ' + dbErr.message });
+  }
 
   // If photo was uploaded via FormData, save it automatically
   if (req.file) {
@@ -970,7 +977,9 @@ app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
   const description = body.description || null;
   const clayBodyId = body.clayBodyId || body.clay_body_id || null;
   const studio = body.studio || body.clay || null;
-  const status = body.status || null;
+  const statusMap2 = {'In Progress':'in-progress','Bisque Fired':'bisque-fired','Glazed':'glazed','Final Fired':'glaze-fired','Glaze Fired':'glaze-fired','Complete':'done','Done':'done','Sold':'sold','Broken':'broken','Recycled':'recycled'};
+  const rawSt = body.status ? String(body.status).trim() : null;
+  const status = rawSt ? (statusMap2[rawSt] || rawSt.toLowerCase().replace(/\s+/g,'-')) : null;
   const form = body.form || null;
   const technique = body.technique || null;
   const dimensions = body.dimensions || null;
