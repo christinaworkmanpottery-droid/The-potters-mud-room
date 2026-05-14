@@ -1310,6 +1310,15 @@ app.get('/api/community/combos', auth, requireTier('starter'), (req, res) => {
   res.json(combos);
 });
 
+app.get('/api/community/combos/:id', auth, (req, res) => {
+  const combo = db.prepare('SELECT gc.*,u.display_name as author FROM glaze_combos gc JOIN users u ON gc.user_id=u.id WHERE gc.id=?').get(req.params.id);
+  if (!combo) return res.status(404).json({ error: 'Not found' });
+  combo.layers = db.prepare('SELECT * FROM glaze_combo_layers WHERE combo_id=? ORDER BY layer_order').all(combo.id);
+  combo.user_liked = !!db.prepare('SELECT id FROM combo_likes WHERE combo_id=? AND user_id=?').get(combo.id, req.userId);
+  combo.comment_count = db.prepare('SELECT COUNT(*) as c FROM combo_comments WHERE combo_id=?').get(combo.id).c;
+  res.json({ combo });
+});
+
 app.post('/api/community/combos', auth, requireTier('starter'), upload.array('photos', 2), (req, res) => {
   const { name, clayBodyName, cone, atmosphere, description, notes, isShared, layers } = req.body;
   const parsedLayers = typeof layers === 'string' ? JSON.parse(layers) : layers;
