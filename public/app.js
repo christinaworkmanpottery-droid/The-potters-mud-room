@@ -219,8 +219,8 @@ function pieceCard(p) {
   const gl = (p.glazes||[]).map(g => '<span class="glaze-tag">' + esc(g.glaze_name) + '</span>').join('');
   return '<div class="card piece-card" onclick="viewPiece(\'' + p.id + '\')">' + img +
     '<div class="card-header"><div><div class="card-title">' + esc(p.title||'Untitled') + '</div>' +
-    '<div class="text-sm" style="color:var(--text-light)">' + esc(p.clay_body_name||'No clay specified') + '</div></div>' +
-    fmtStatus(p.status) + '</div>' +
+    '<div class="text-sm" style="color:var(--text-light)">' + esc(p.clay_body_name||p.clay||p.studio||'No clay specified') + '</div></div>' +
+    fmtStatus(p.statusSlug||p.status) + '</div>' +
     (gl ? '<div class="piece-meta">' + gl + '</div>' : '') +
     '<div class="piece-meta">' +
     (p.studio ? '<span class="piece-meta-tag">📍 ' + esc(p.studio) + '</span>' : '') +
@@ -255,8 +255,8 @@ async function loadPieces() {
 function pieceListRow(p) {
   return '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="viewPiece(\'' + p.id + '\')">' +
     '<strong style="min-width:150px">' + esc(p.title||'Untitled') + '</strong>' +
-    '<span class="text-sm" style="color:var(--text-light);min-width:100px">' + esc(p.clay_body_name||'') + '</span>' +
-    fmtStatus(p.status) +
+    '<span class="text-sm" style="color:var(--text-light);min-width:100px">' + esc(p.clay_body_name||p.clay||p.studio||'') + '</span>' +
+    fmtStatus(p.statusSlug||p.status) +
     '<span class="text-sm" style="min-width:80px">' + esc(p.technique||'') + '</span>' +
     '<span class="text-sm" style="min-width:80px;color:var(--text-muted)">' + fmtDate(p.date_started) + '</span>' +
     '<span style="margin-left:auto;display:flex;gap:4px">' +
@@ -300,7 +300,7 @@ async function viewPiece(id) {
     document.getElementById('pieceDetailContent').innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:20px"><div>' +
       '<h1>' + esc(p.title||'Untitled') + '</h1>' +
-      '<div class="text-sm" style="color:var(--text-light);margin-top:4px">' + esc(p.clay_body_name||'') + ' ' + fmtStatus(p.status) + '</div></div>' +
+      '<div class="text-sm" style="color:var(--text-light);margin-top:4px">' + esc(p.clay_body_name||p.clay||p.studio||'') + ' ' + fmtStatus(p.statusSlug||p.status) + '</div></div>' +
       '<div style="display:flex;gap:8px">' +
       (canAddPhoto ? '<button class="btn btn-secondary btn-sm" onclick="openPhotoUpload(\'' + p.id + '\')">📸 Photo</button>' : '') +
       '<button class="btn btn-secondary btn-sm" onclick="duplicatePiece(\'' + p.id + '\')">📋 Duplicate</button>' +
@@ -308,14 +308,14 @@ async function viewPiece(id) {
       '<button class="btn btn-danger btn-sm" onclick="deletePiece(\'' + p.id + '\')">🗑️</button></div></div>' +
       (photos ? '<div class="detail-photos mb-16">' + photos + '</div>' : '') +
       '<div class="detail-grid"><div class="card"><h3 style="margin-bottom:16px">Details</h3>' +
-      df('Clay Body', p.clay_body_name) + df('Technique', p.technique) + df('Form', p.form) +
-      df('Studio', p.studio) + df('Dimensions', p.dimensions) + df('Weight', p.weight) +
+      df('Clay Body', p.clay_body_name||p.clay||p.studio) + df('Glaze', p.glaze||((p.glazes&&p.glazes.length)?null:null)) + df('Firing Temp', p.firingTemp) + df('Technique', p.technique) + df('Form', p.form) +
+      df('Dimensions', p.dimensions) + df('Weight', p.weight) +
       df('Started', fmtDate(p.date_started)) +
       (p.date_completed ? df('Completed', fmtDate(p.date_completed)) : '') +
       (p.material_cost ? df('Material Cost', '$' + p.material_cost) : '') +
       (p.firing_cost ? df('Firing Cost', '$' + p.firing_cost) : '') +
       (p.sale_price ? df('Sale Price', '$' + p.sale_price) : '') +
-      (p.notes ? df('Notes', p.notes) : '') + '</div>' +
+      (p.cleanNotes ? df('Notes', p.cleanNotes) : (p.description ? df('Notes', p.description) : '')) + '</div>' +
       '<div><div class="card mb-16"><h3 style="margin-bottom:12px">Glazes</h3>' + glist + '</div>' +
       (firings ? '<div class="card mb-16"><h3 style="margin-bottom:12px">Firings</h3>' + firings + '</div>' : '') +
       ((p.status === 'broken' || p.status === 'recycled') ? '<div class="card" style="border:2px solid var(--danger);background:rgba(220,53,69,0.05)"><h3 style="margin-bottom:12px;color:var(--danger)">' + (p.status === 'recycled' ? 'Recycle Report' : 'Casualty Report') + '</h3>' +
@@ -918,8 +918,8 @@ async function loadCasualties() {
       const typeLabel = p.casualty_type ? '<span class="piece-meta-tag" style="background:rgba(220,53,69,0.1);color:var(--danger)">⚠️ ' + esc(CASUALTY_LABELS[p.casualty_type]||p.casualty_type) + '</span>' : '';
       return '<div class="card piece-card" onclick="viewPiece(\'' + p.id + '\')">' + img +
         '<div class="card-header"><div><div class="card-title">' + esc(p.title||'Untitled') + '</div>' +
-        '<div class="text-sm" style="color:var(--text-light)">' + esc(p.clay_body_name||'No clay specified') + '</div></div>' +
-        fmtStatus(p.status) + '</div>' +
+        '<div class="text-sm" style="color:var(--text-light)">' + esc(p.clay_body_name||p.clay||p.studio||'No clay specified') + '</div></div>' +
+        fmtStatus(p.statusSlug||p.status) + '</div>' +
         (typeLabel ? '<div class="piece-meta">' + typeLabel + '</div>' : '') +
         (gl ? '<div class="piece-meta">' + gl + '</div>' : '') +
         (p.casualty_lesson ? '<div class="text-sm" style="color:var(--success);padding:8px 0;border-top:1px solid var(--border);margin-top:8px"><strong>🎓 Lesson:</strong> ' + esc(p.casualty_lesson.substring(0,120)) + (p.casualty_lesson.length > 120 ? '...' : '') + '</div>' : '') +
