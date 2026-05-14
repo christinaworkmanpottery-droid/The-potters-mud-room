@@ -910,6 +910,7 @@ app.get('/api/pieces', auth, (req, res) => {
   const pieces = db.prepare(sql).all(...params);
   const getGl = db.prepare('SELECT pg.*,g.name as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order');
   const getPh = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order');
+  const statusLabels = {'in-progress':'In Progress','bisque-fired':'Bisque Fired','glazed':'Glazed','glaze-fired':'Final Fired','done':'Complete','sold':'Sold','broken':'Broken','recycled':'Recycled'};
   pieces.forEach(p => {
     p.glazes = getGl.all(p.id);
     p.photos = getPh.all(p.id);
@@ -928,6 +929,9 @@ app.get('/api/pieces', auth, (req, res) => {
       const fm = p.notes.match(/Firing temp:\s*([^|]+)/);
       if (fm) p.firingTemp = fm[1].trim();
     }
+    // Pretty status label for display (preserve slug as statusSlug)
+    p.statusSlug = p.status;
+    p.status = statusLabels[p.status] || p.status;
   });
   res.json(pieces);
 });
@@ -958,6 +962,10 @@ app.get('/api/pieces/:id', auth, (req, res) => {
       .replace(/^Firing temp:[^|]+\s*\|?\s*/g, '')
       .trim() || null;
   }
+  // Pretty status label for display (preserve slug as statusSlug)
+  const statusLabels2 = {'in-progress':'In Progress','bisque-fired':'Bisque Fired','glazed':'Glazed','glaze-fired':'Final Fired','done':'Complete','sold':'Sold','broken':'Broken','recycled':'Recycled'};
+  p.statusSlug = p.status;
+  p.status = statusLabels2[p.status] || p.status;
   res.json(p);
 });
 
