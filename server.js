@@ -931,7 +931,7 @@ app.get('/api/pieces', auth, (req, res) => {
     }
     // Pretty status label for display (preserve slug as statusSlug)
     p.statusSlug = p.status;
-    p.status = statusLabels[p.status] || p.status;
+    p.status = p.status === 'in-progress' ? null : (statusLabels[p.status] || p.status);
   });
   res.json(pieces);
 });
@@ -965,7 +965,7 @@ app.get('/api/pieces/:id', auth, (req, res) => {
   // Pretty status label for display (preserve slug as statusSlug)
   const statusLabels2 = {'in-progress':'In Progress','bisque-fired':'Bisque Fired','glazed':'Glazed','glaze-fired':'Final Fired','done':'Complete','sold':'Sold','broken':'Broken','recycled':'Recycled'};
   p.statusSlug = p.status;
-  p.status = statusLabels2[p.status] || p.status;
+  p.status = p.status === 'in-progress' ? null : (statusLabels2[p.status] || p.status);
   res.json(p);
 });
 
