@@ -59,6 +59,20 @@ const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 },
   }
 });
 
+// Safe multer wrapper — if multipart parsing fails, continue with JSON body
+const safeUpload = (fieldName) => (req, res, next) => {
+  const ct = (req.headers['content-type'] || '');
+  // If not multipart, skip multer entirely
+  if (!ct.includes('multipart/form-data')) return next();
+  upload.single(fieldName)(req, res, (err) => {
+    if (err) {
+      console.warn('[MULTER] Parse error, continuing without file:', err.message);
+      // Continue anyway — body might still be parseable by express.json
+    }
+    next();
+  });
+};
+
 // Stripe webhook needs raw body — must be BEFORE express.json()
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req, res) => {
   if (!stripe || !STRIPE_WEBHOOK_SECRET) return res.status(400).send('Stripe not configured');
@@ -121,6 +135,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req,
 
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(UPLOADS_DIR));
 // Prevent browser caching of HTML/JS/CSS so updates show immediately
 app.use(express.static(path.join(__dirname, 'public'), {
@@ -904,7 +919,7 @@ app.get('/api/pieces/:id', auth, (req, res) => {
   res.json(p);
 });
 
-app.post('/api/pieces', auth, upload.single('photo'), (req, res) => {
+app.post('/api/pieces', auth, safeUpload('photo'), (req, res) => {
   // Handle both JSON and FormData (iOS may send either)
   const body = req.body || {};
   const title = String(body.title || body.name || '').trim() || null;
@@ -949,7 +964,7 @@ app.post('/api/pieces', auth, upload.single('photo'), (req, res) => {
   res.json({ id });
 });
 
-app.put('/api/pieces/:id', auth, upload.single('photo'), (req, res) => {
+app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
   const body = req.body || {};
   const title = body.title || body.name || null;
   const description = body.description || null;
@@ -2647,6 +2662,12 @@ if (!transporter) {
     }
   } catch(e) { /* site_settings table might not exist yet */ }
 }
+
+// Global error handler — always return JSON, never HTML
+app.use((err, req, res, next) => {
+  console.error('[ERROR]', err.message);
+  res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
+});
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🏺 The Potter's Mud Room running on http://localhost:${PORT}`);
