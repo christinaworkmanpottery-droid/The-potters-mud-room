@@ -1002,7 +1002,15 @@ app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
   const dateStarted = body.dateStarted || body.date_started || null;
   const dateCompleted = body.dateCompleted || body.date_completed || null;
   const dateSold = body.dateSold || body.date_sold || null;
-  const notes = body.firingTemp ? `Firing temp: ${body.firingTemp}` : (body.notes || null);
+  const glazeText = String(body.glaze || '').trim() || null;
+  const firingTemp = String(body.firingTemp || body.firing_temp || '').trim();
+  const userNotes = String(body.notes || '').trim();
+  const noteParts = [];
+  if (userNotes) noteParts.push(userNotes);
+  if (glazeText) noteParts.push(`Glaze: ${glazeText}`);
+  if (firingTemp) noteParts.push(`Firing temp: ${firingTemp}`);
+  const notes = noteParts.length ? noteParts.join(' | ') : null;
+  const description = String(body.description || '').trim() || null;
   const casualtyType = body.casualtyType || body.casualty_type || null;
   const casualtyNotes = body.casualtyNotes || body.casualty_notes || null;
   const casualtyLesson = body.casualtyLesson || body.casualty_lesson || null;
