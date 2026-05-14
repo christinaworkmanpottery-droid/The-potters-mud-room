@@ -1048,7 +1048,6 @@ app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
   if (glazeText) noteParts.push(`Glaze: ${glazeText}`);
   if (firingTemp) noteParts.push(`Firing temp: ${firingTemp}`);
   const notes = noteParts.length ? noteParts.join(' | ') : null;
-  const description = String(body.description || '').trim() || null;
   const casualtyType = body.casualtyType || body.casualty_type || null;
   const casualtyNotes = body.casualtyNotes || body.casualty_notes || null;
   const casualtyLesson = body.casualtyLesson || body.casualty_lesson || null;
