@@ -693,6 +693,13 @@ app.get('/api/clay-bodies', auth, (req, res) => {
   res.json(clays);
 });
 
+app.get('/api/clay-bodies/:id', auth, (req, res) => {
+  const clay = db.prepare('SELECT * FROM clay_bodies WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!clay) return res.status(404).json({ error: 'Not found' });
+  clay.photos = db.prepare('SELECT * FROM clay_photos WHERE clay_id=? ORDER BY sort_order').all(clay.id);
+  res.json({ clay });
+});
+
 app.post('/api/clay-bodies', auth, (req, res) => {
   const { name, brand, colorWet, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, costPerBag, bagWeight, source, sourceUrl, inStock, buyUrl, notes } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });
