@@ -492,6 +492,9 @@ function initDB() {
   safeAdd('sales', 'quantity', 'INTEGER DEFAULT 1');
   safeAdd('sales', 'item_description', 'TEXT');
   safeAdd('sales', 'event_name', 'TEXT');
+  safeAdd('sales', 'buyer_email', 'TEXT');
+  safeAdd('sales', 'buyer_phone', 'TEXT');
+  safeAdd('sales', 'image_filename', 'TEXT');
 
   // Goals table (item 36)
   db.exec(`

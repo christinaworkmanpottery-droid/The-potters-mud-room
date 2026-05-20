@@ -1238,12 +1238,24 @@ app.get('/api/sales', auth, requireTier('starter'), (req, res) => {
 });
 
 app.post('/api/sales', auth, requireTier('starter'), (req, res) => {
-  const { pieceId, date, price, venue, venueType, buyerName, notes, quantity, itemDescription, eventName } = req.body;
+  const { pieceId, date, price, venue, venueType, buyerName, buyerEmail, buyerPhone, notes, quantity, itemDescription, eventName } = req.body;
   const id = uuidv4();
-  db.prepare('INSERT INTO sales (id,user_id,piece_id,date,price,venue,venue_type,buyer_name,notes,quantity,item_description,event_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
-    .run(id, req.userId, pieceId || null, date, price, venue, venueType, buyerName, notes, quantity || 1, itemDescription || null, eventName || null);
+  db.prepare('INSERT INTO sales (id,user_id,piece_id,date,price,venue,venue_type,buyer_name,buyer_email,buyer_phone,notes,quantity,item_description,event_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .run(id, req.userId, pieceId || null, date, price, venue, venueType, buyerName, buyerEmail || null, buyerPhone || null, notes, quantity || 1, itemDescription || null, eventName || null);
   if (pieceId) db.prepare(`UPDATE pieces SET status='sold',sale_price=?,date_sold=?,updated_at=datetime('now') WHERE id=? AND user_id=?`).run(price, date, pieceId, req.userId);
   res.json({ id });
+});
+
+app.post('/api/sales/:id/photo', auth, upload.single('photo'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
+  const sale = db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!sale) return res.status(404).json({ error: 'Sale not found' });
+  if (sale.image_filename) {
+    const old = path.join(UPLOADS_DIR, sale.image_filename);
+    if (fs.existsSync(old)) fs.unlinkSync(old);
+  }
+  db.prepare('UPDATE sales SET image_filename=? WHERE id=?').run(req.file.filename, req.params.id);
+  res.json({ filename: req.file.filename });
 });
 
 // Bulk sale creation
