@@ -496,6 +496,14 @@ function initDB() {
   safeAdd('sales', 'buyer_phone', 'TEXT');
   safeAdd('sales', 'image_filename', 'TEXT');
 
+  // Contact linking (items 29-31)
+  safeAdd('contacts', 'role', 'TEXT'); // buyer, gallery, potter, venue, supplier, other
+  safeAdd('contacts', 'address', 'TEXT');
+  safeAdd('contacts', 'instagram', 'TEXT');
+  safeAdd('contacts', 'website', 'TEXT');
+  safeAdd('sales', 'contact_id', 'TEXT');
+  safeAdd('events', 'contact_id', 'TEXT');
+
   // Remove venue_type CHECK constraint (allow 'website' and future values)
   try {
     const hasOldCheck = db.prepare("SELECT sql FROM sqlite_master WHERE name='sales'").get();

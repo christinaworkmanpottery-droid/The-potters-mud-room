@@ -1238,20 +1238,20 @@ app.get('/api/sales', auth, requireTier('starter'), (req, res) => {
 });
 
 app.post('/api/sales', auth, requireTier('starter'), (req, res) => {
-  const { pieceId, date, price, venue, venueType, buyerName, buyerEmail, buyerPhone, notes, quantity, itemDescription, eventName } = req.body;
+  const { pieceId, date, price, venue, venueType, buyerName, buyerEmail, buyerPhone, notes, quantity, itemDescription, eventName, contactId } = req.body;
   const id = uuidv4();
-  db.prepare('INSERT INTO sales (id,user_id,piece_id,date,price,venue,venue_type,buyer_name,buyer_email,buyer_phone,notes,quantity,item_description,event_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-    .run(id, req.userId, pieceId || null, date, price, venue, venueType, buyerName, buyerEmail || null, buyerPhone || null, notes, quantity || 1, itemDescription || null, eventName || null);
+  db.prepare('INSERT INTO sales (id,user_id,piece_id,date,price,venue,venue_type,buyer_name,buyer_email,buyer_phone,notes,quantity,item_description,event_name,contact_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .run(id, req.userId, pieceId || null, date, price, venue, venueType, buyerName, buyerEmail || null, buyerPhone || null, notes, quantity || 1, itemDescription || null, eventName || null, contactId || null);
   if (pieceId) db.prepare(`UPDATE pieces SET status='sold',sale_price=?,date_sold=?,updated_at=datetime('now') WHERE id=? AND user_id=?`).run(price, date, pieceId, req.userId);
   res.json({ id });
 });
 
 app.put('/api/sales/:id', auth, requireTier('starter'), (req, res) => {
-  const { pieceId, date, price, venue, venueType, buyerName, buyerEmail, buyerPhone, notes, quantity, itemDescription, eventName } = req.body;
+  const { pieceId, date, price, venue, venueType, buyerName, buyerEmail, buyerPhone, notes, quantity, itemDescription, eventName, contactId } = req.body;
   const existing = db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!existing) return res.status(404).json({ error: 'Sale not found' });
-  db.prepare('UPDATE sales SET piece_id=?,date=?,price=?,venue=?,venue_type=?,buyer_name=?,buyer_email=?,buyer_phone=?,notes=?,quantity=?,item_description=?,event_name=? WHERE id=? AND user_id=?')
-    .run(pieceId || null, date, price, venue, venueType, buyerName || null, buyerEmail || null, buyerPhone || null, notes || null, quantity || 1, itemDescription || null, eventName || null, req.params.id, req.userId);
+  db.prepare('UPDATE sales SET piece_id=?,date=?,price=?,venue=?,venue_type=?,buyer_name=?,buyer_email=?,buyer_phone=?,notes=?,quantity=?,item_description=?,event_name=?,contact_id=? WHERE id=? AND user_id=?')
+    .run(pieceId || null, date, price, venue, venueType, buyerName || null, buyerEmail || null, buyerPhone || null, notes || null, quantity || 1, itemDescription || null, eventName || null, contactId || null, req.params.id, req.userId);
   if (pieceId) db.prepare(`UPDATE pieces SET status='sold',sale_price=?,date_sold=?,updated_at=datetime('now') WHERE id=? AND user_id=?`).run(price, date, pieceId, req.userId);
   res.json({ ok: true });
 });
@@ -2101,21 +2101,39 @@ END:VEVENT
 // ============ CONTACTS ============
 app.get('/api/contacts', auth, (req, res) => {
   const contacts = db.prepare('SELECT * FROM contacts WHERE user_id=? ORDER BY name ASC').all(req.userId);
+  // Attach sale/event counts
+  const saleCounts = db.prepare('SELECT contact_id, COUNT(*) as count, SUM(price*quantity) as total FROM sales WHERE user_id=? AND contact_id IS NOT NULL GROUP BY contact_id').all(req.userId);
+  const eventCounts = db.prepare('SELECT contact_id, COUNT(*) as count FROM events WHERE user_id=? AND contact_id IS NOT NULL GROUP BY contact_id').all(req.userId);
+  const saleMap = Object.fromEntries(saleCounts.map(s => [s.contact_id, { count: s.count, total: s.total }]));
+  const eventMap = Object.fromEntries(eventCounts.map(e => [e.contact_id, e.count]));
+  contacts.forEach(c => {
+    c.salesCount = saleMap[c.id]?.count || 0;
+    c.salesTotal = saleMap[c.id]?.total || 0;
+    c.eventsCount = eventMap[c.id] || 0;
+  });
   res.json(contacts);
 });
 
+app.get('/api/contacts/:id', auth, (req, res) => {
+  const contact = db.prepare('SELECT * FROM contacts WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!contact) return res.status(404).json({ error: 'Contact not found' });
+  contact.sales = db.prepare('SELECT id,date,price,item_description,venue,venue_type,quantity FROM sales WHERE contact_id=? AND user_id=? ORDER BY date DESC').all(contact.id, req.userId);
+  contact.events = db.prepare('SELECT id,title,event_date,location FROM events WHERE contact_id=? AND user_id=? ORDER BY event_date DESC').all(contact.id, req.userId);
+  res.json(contact);
+});
+
 app.post('/api/contacts', auth, requireTier('starter'), (req, res) => {
-  const { name, email, phone, notes } = req.body;
+  const { name, email, phone, notes, role, address, instagram, website } = req.body;
   const id = uuidv4();
-  db.prepare('INSERT INTO contacts (id,user_id,name,email,phone,notes) VALUES (?,?,?,?,?,?)')
-    .run(id, req.userId, name, email || null, phone || null, notes || null);
+  db.prepare('INSERT INTO contacts (id,user_id,name,email,phone,notes,role,address,instagram,website) VALUES (?,?,?,?,?,?,?,?,?,?)')
+    .run(id, req.userId, name, email || null, phone || null, notes || null, role || null, address || null, instagram || null, website || null);
   res.json({ id });
 });
 
 app.put('/api/contacts/:id', auth, (req, res) => {
-  const { name, email, phone, notes } = req.body;
-  db.prepare('UPDATE contacts SET name=?,email=?,phone=?,notes=?,updated_at=datetime(\'now\') WHERE id=? AND user_id=?')
-    .run(name, email, phone, notes, req.params.id, req.userId);
+  const { name, email, phone, notes, role, address, instagram, website } = req.body;
+  db.prepare('UPDATE contacts SET name=?,email=?,phone=?,notes=?,role=?,address=?,instagram=?,website=?,updated_at=datetime(\'now\') WHERE id=? AND user_id=?')
+    .run(name, email || null, phone || null, notes || null, role || null, address || null, instagram || null, website || null, req.params.id, req.userId);
   res.json({ success: true });
 });
 
