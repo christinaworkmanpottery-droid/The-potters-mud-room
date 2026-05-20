@@ -995,13 +995,26 @@ app.post('/api/pieces', auth, safeUpload('photo'), (req, res) => {
   const dateStarted = body.dateStarted || body.date_started || null;
   // Combine all text info into notes
   const firingTemp = String(body.firingTemp || body.firing_temp || '').trim();
-  const userNotes = String(body.notes || body.description || '').trim();
-  const noteParts = [];
-  if (userNotes) noteParts.push(userNotes);
-  if (glazeText) noteParts.push(`Glaze: ${glazeText}`);
-  if (firingTemp) noteParts.push(`Firing temp: ${firingTemp}`);
-  const notes = noteParts.length ? noteParts.join(' | ') : null;
-  const description = String(body.description || '').trim() || null;
+  // notes may already contain user notes + firing temp from app; description is the pure user notes
+  const userNotes = String(body.description || '').trim();
+  // If body.notes already has content (from app), use it as base; otherwise build from parts
+  let existingNotes = String(body.notes || '').trim();
+  let notes;
+  if (existingNotes) {
+    // App already combined notes — just ensure glaze is included
+    const noteParts = [existingNotes];
+    if (glazeText && !existingNotes.includes('Glaze:')) noteParts.push(`Glaze: ${glazeText}`);
+    if (firingTemp && !existingNotes.includes('Firing temp:')) noteParts.push(`Firing temp: ${firingTemp}`);
+    notes = noteParts.join(' | ');
+  } else {
+    // Legacy/web creation — build notes from scratch
+    const noteParts = [];
+    if (userNotes) noteParts.push(userNotes);
+    if (glazeText) noteParts.push(`Glaze: ${glazeText}`);
+    if (firingTemp) noteParts.push(`Firing temp: ${firingTemp}`);
+    notes = noteParts.length ? noteParts.join(' | ') : null;
+  }
+  const description = userNotes || null;
   const casualtyType = body.casualtyType || body.casualty_type || null;
   const casualtyNotes = body.casualtyNotes || body.casualty_notes || null;
   const casualtyLesson = body.casualtyLesson || body.casualty_lesson || null;
@@ -1057,12 +1070,22 @@ app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
   const dateSold = body.dateSold || body.date_sold || null;
   const glazeText = String(body.glaze || '').trim() || null;
   const firingTemp = String(body.firingTemp || body.firing_temp || '').trim();
-  const userNotes = String(body.notes || '').trim();
-  const noteParts = [];
-  if (userNotes) noteParts.push(userNotes);
-  if (glazeText) noteParts.push(`Glaze: ${glazeText}`);
-  if (firingTemp) noteParts.push(`Firing temp: ${firingTemp}`);
-  const notes = noteParts.length ? noteParts.join(' | ') : null;
+  // Same logic as POST — app may send pre-combined notes
+  const userNotes = String(body.description || '').trim();
+  let existingNotes = String(body.notes || '').trim();
+  let notes;
+  if (existingNotes) {
+    const noteParts = [existingNotes];
+    if (glazeText && !existingNotes.includes('Glaze:')) noteParts.push(`Glaze: ${glazeText}`);
+    if (firingTemp && !existingNotes.includes('Firing temp:')) noteParts.push(`Firing temp: ${firingTemp}`);
+    notes = noteParts.join(' | ');
+  } else {
+    const noteParts = [];
+    if (userNotes) noteParts.push(userNotes);
+    if (glazeText) noteParts.push(`Glaze: ${glazeText}`);
+    if (firingTemp) noteParts.push(`Firing temp: ${firingTemp}`);
+    notes = noteParts.length ? noteParts.join(' | ') : null;
+  }
   const casualtyType = body.casualtyType || body.casualty_type || null;
   const casualtyNotes = body.casualtyNotes || body.casualty_notes || null;
   const casualtyLesson = body.casualtyLesson || body.casualty_lesson || null;
