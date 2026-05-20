@@ -1246,6 +1246,30 @@ app.post('/api/sales', auth, requireTier('starter'), (req, res) => {
   res.json({ id });
 });
 
+app.put('/api/sales/:id', auth, requireTier('starter'), (req, res) => {
+  const { pieceId, date, price, venue, venueType, buyerName, buyerEmail, buyerPhone, notes, quantity, itemDescription, eventName } = req.body;
+  const existing = db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!existing) return res.status(404).json({ error: 'Sale not found' });
+  db.prepare('UPDATE sales SET piece_id=?,date=?,price=?,venue=?,venue_type=?,buyer_name=?,buyer_email=?,buyer_phone=?,notes=?,quantity=?,item_description=?,event_name=? WHERE id=? AND user_id=?')
+    .run(pieceId || null, date, price, venue, venueType, buyerName || null, buyerEmail || null, buyerPhone || null, notes || null, quantity || 1, itemDescription || null, eventName || null, req.params.id, req.userId);
+  if (pieceId) db.prepare(`UPDATE pieces SET status='sold',sale_price=?,date_sold=?,updated_at=datetime('now') WHERE id=? AND user_id=?`).run(price, date, pieceId, req.userId);
+  res.json({ ok: true });
+});
+
+app.delete('/api/sales/:id', auth, requireTier('starter'), (req, res) => {
+  const existing = db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!existing) return res.status(404).json({ error: 'Sale not found' });
+  // If the sale was linked to a piece, revert piece status from 'sold' back to 'done'
+  if (existing.piece_id) {
+    const piece = db.prepare('SELECT * FROM pieces WHERE id=? AND user_id=?').get(existing.piece_id, req.userId);
+    if (piece && piece.status === 'sold') {
+      db.prepare(`UPDATE pieces SET status='done',sale_price=NULL,date_sold=NULL,updated_at=datetime('now') WHERE id=? AND user_id=?`).run(existing.piece_id, req.userId);
+    }
+  }
+  db.prepare('DELETE FROM sales WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  res.json({ ok: true });
+});
+
 app.post('/api/sales/:id/photo', auth, upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
   const sale = db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId);

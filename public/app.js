@@ -27,7 +27,14 @@ function toast(msg, type = '') {
   document.getElementById('toastContainer').appendChild(el);
   setTimeout(() => el.remove(), 4000);
 }
-function fmtDate(d) { return d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'; }
+function fmtDate(d) {
+  if (!d) return '—';
+  // Handle YYYY-MM-DD strings by appending T12:00 to avoid timezone offset issues
+  const str = String(d);
+  const dt = /^\d{4}-\d{2}-\d{2}$/.test(str) ? new Date(str + 'T12:00:00') : new Date(str);
+  if (isNaN(dt.getTime())) return '—';
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 function timeAgo(d) {
   if (!d) return '';
   const s = Math.floor((Date.now() - new Date(d).getTime()) / 1000);
@@ -954,14 +961,21 @@ async function loadSales() {
         '<span style="font-weight:700;color:var(--accent);min-width:60px">$' + ((s.price||0) * (s.quantity||1)).toFixed(0) + '</span>' +
         '<span class="text-sm" style="min-width:80px">' + fmtDate(s.date) + '</span>' +
         '<span class="text-sm" style="color:var(--text-light)">' + esc(s.venue_type||'') + '</span>' +
-        '<span class="text-sm" style="color:var(--text-muted)">' + esc(s.venue||'') + '</span></div>'
+        '<span class="text-sm" style="color:var(--text-muted)">' + esc(s.venue||'') + '</span>' +
+        '<span style="margin-left:auto;display:flex;gap:6px">' +
+        '<button onclick="editSale(\'' + s.id + '\')" class="btn-small" title="Edit">✏️</button>' +
+        '<button onclick="deleteSale(\'' + s.id + '\')" class="btn-small" title="Delete" style="color:var(--danger)">🗑️</button></span></div>'
       ).join('');
     } else {
       c.innerHTML = sales.map(s =>
         '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(s.item_description || s.piece_title || 'Unknown piece') + '</div>' +
-        '<div class="text-sm" style="color:var(--text-light)">' + fmtDate(s.date) + (s.venue ? ' · ' + esc(s.venue) : '') + (s.event_name ? ' · ' + esc(s.event_name) : '') + '</div></div>' +
+        '<div class="text-sm" style="color:var(--text-light)">' + fmtDate(s.date) + (s.venue ? ' \u00b7 ' + esc(s.venue) : '') + (s.event_name ? ' \u00b7 ' + esc(s.event_name) : '') + '</div></div>' +
         '<div style="font-family:var(--font-display);font-size:1.2rem;font-weight:700;color:var(--accent)">$' + ((s.price||0) * (s.quantity||1)).toFixed(0) + (s.quantity && s.quantity > 1 ? ' (Qty: ' + s.quantity + ')' : '') + '</div></div>' +
-        (s.venue_type ? '<span class="piece-meta-tag">' + esc(s.venue_type) + '</span>' : '') + '</div>'
+        (s.venue_type ? '<span class="piece-meta-tag">' + esc(s.venue_type) + '</span>' : '') +
+        (s.buyer_name ? '<span class="piece-meta-tag">\uD83D\uDC64 ' + esc(s.buyer_name) + '</span>' : '') +
+        '<div style="margin-top:8px;display:flex;gap:6px">' +
+        '<button onclick="editSale(\'' + s.id + '\')" class="btn-small">✏️ Edit</button>' +
+        '<button onclick="deleteSale(\'' + s.id + '\')" class="btn-small" style="color:var(--danger)">🗑️ Delete</button></div></div>'
       ).join('');
     }
   } catch(e) { toast(e.message,'error'); }
@@ -975,6 +989,8 @@ function openSaleModal() {
   document.getElementById('saleQuantity').value = '1';
   document.getElementById('saleItemDescription').value = '';
   document.getElementById('saleEventName').value = '';
+  const buyerEl = document.getElementById('saleBuyerName');
+  if (buyerEl) buyerEl.value = '';
   api('/api/pieces').then(pieces => {
     const s = document.getElementById('salePiece');
     s.innerHTML = '<option value="">Select piece...</option>' + pieces.map(p => '<option value="' + p.id + '">' + esc(p.title||'Untitled') + '</option>').join('');
@@ -1036,7 +1052,8 @@ async function saveSale(e) {
     venue: document.getElementById('saleVenue').value || null,
     quantity: parseInt(document.getElementById('saleQuantity').value) || 1,
     itemDescription: document.getElementById('saleItemDescription').value || null,
-    eventName: document.getElementById('saleEventName').value || null
+    eventName: document.getElementById('saleEventName').value || null,
+    buyerName: (document.getElementById('saleBuyerName') || {}).value || null
   };
   try {
     const method = saleId ? 'PUT' : 'POST';
@@ -1046,6 +1063,38 @@ async function saveSale(e) {
     trackActivity(saleId ? 'edit_sale' : 'create_sale', 'sales');
     closeModal('saleModal');
     document.getElementById('saleId').value = '';
+    loadSales();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function editSale(id) {
+  try {
+    const sales = await api('/api/sales');
+    const s = sales.find(x => x.id === id);
+    if (!s) return toast('Sale not found', 'error');
+    const pieces = await api('/api/pieces');
+    const sel = document.getElementById('salePiece');
+    sel.innerHTML = '<option value="">No linked piece</option>' + pieces.map(p => '<option value="' + p.id + '">' + esc(p.title||'Untitled') + '</option>').join('');
+    document.getElementById('saleId').value = s.id;
+    document.getElementById('salePiece').value = s.piece_id || '';
+    document.getElementById('salePrice').value = s.price || '';
+    document.getElementById('saleDate').value = s.date || '';
+    document.getElementById('saleVenueType').value = s.venue_type || '';
+    document.getElementById('saleVenue').value = s.venue || '';
+    document.getElementById('saleQuantity').value = s.quantity || 1;
+    document.getElementById('saleItemDescription').value = s.item_description || '';
+    document.getElementById('saleEventName').value = s.event_name || '';
+    const buyerNameEl = document.getElementById('saleBuyerName');
+    if (buyerNameEl) buyerNameEl.value = s.buyer_name || '';
+    openModal('saleModal');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function deleteSale(id) {
+  if (!confirm('Delete this sale? This cannot be undone.')) return;
+  try {
+    await api('/api/sales/' + id, { method: 'DELETE' });
+    toast('Sale deleted', 'success');
     loadSales();
   } catch(e) { toast(e.message, 'error'); }
 }

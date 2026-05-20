@@ -193,7 +193,7 @@ function initDB() {
       date TEXT,
       price REAL,
       venue TEXT,
-      venue_type TEXT CHECK(venue_type IN ('online', 'art-fair', 'gallery', 'studio', 'commission', 'gift', 'other', NULL)),
+      venue_type TEXT CHECK(venue_type IN ('online', 'art-fair', 'gallery', 'studio', 'commission', 'gift', 'website', 'other', NULL)),
       buyer_name TEXT,
       notes TEXT,
       created_at TEXT DEFAULT (datetime('now')),
@@ -495,6 +495,39 @@ function initDB() {
   safeAdd('sales', 'buyer_email', 'TEXT');
   safeAdd('sales', 'buyer_phone', 'TEXT');
   safeAdd('sales', 'image_filename', 'TEXT');
+
+  // Remove venue_type CHECK constraint (allow 'website' and future values)
+  try {
+    const hasOldCheck = db.prepare("SELECT sql FROM sqlite_master WHERE name='sales'").get();
+    if (hasOldCheck && hasOldCheck.sql && hasOldCheck.sql.includes("CHECK(venue_type IN")) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS sales_new (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          piece_id TEXT,
+          date TEXT,
+          price REAL,
+          venue TEXT,
+          venue_type TEXT,
+          buyer_name TEXT,
+          notes TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          quantity INTEGER DEFAULT 1,
+          item_description TEXT,
+          event_name TEXT,
+          buyer_email TEXT,
+          buyer_phone TEXT,
+          image_filename TEXT,
+          FOREIGN KEY (user_id) REFERENCES users(id),
+          FOREIGN KEY (piece_id) REFERENCES pieces(id) ON DELETE SET NULL
+        );
+        INSERT INTO sales_new SELECT id,user_id,piece_id,date,price,venue,venue_type,buyer_name,notes,created_at,quantity,item_description,event_name,buyer_email,buyer_phone,image_filename FROM sales;
+        DROP TABLE sales;
+        ALTER TABLE sales_new RENAME TO sales;
+        CREATE INDEX IF NOT EXISTS idx_sales_user ON sales(user_id);
+      `);
+    }
+  } catch(e) { /* migration already done or no data */ }
 
   // Goals table (item 36)
   db.exec(`
