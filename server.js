@@ -867,11 +867,53 @@ app.delete('/api/glazes/:id/clay-tests/:testId', auth, (req, res) => {
   res.json({ success: true });
 });
 
-// Shopping list — all out-of-stock clays and glazes
+// Shopping list — all out-of-stock clays and glazes + custom items
 app.get('/api/shopping-list', auth, (req, res) => {
   const clays = db.prepare('SELECT id,name,brand,source,source_url,buy_url FROM clay_bodies WHERE user_id=? AND in_stock=0').all(req.userId);
   const glazes = db.prepare('SELECT id,name,brand,source,source_url,buy_url,stock_status FROM glazes WHERE user_id=? AND (stock_status=? OR in_stock=0)').all(req.userId, 'need-to-buy');
-  res.json({ clays, glazes });
+  const custom = db.prepare('SELECT * FROM shopping_list_items WHERE user_id=? ORDER BY is_checked ASC, created_at DESC').all(req.userId);
+  res.json({ clays, glazes, custom });
+});
+
+// Add custom shopping list item
+app.post('/api/shopping-list', auth, (req, res) => {
+  const { name, category, quantity, source, sourceUrl, notes } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'Item name required' });
+  const id = uuidv4();
+  db.prepare('INSERT INTO shopping_list_items (id,user_id,name,category,quantity,source,source_url,notes) VALUES (?,?,?,?,?,?,?,?)')
+    .run(id, req.userId, name.trim(), category||'general', quantity||null, source||null, sourceUrl||null, notes||null);
+  res.json({ id, name: name.trim() });
+});
+
+// Update custom shopping list item
+app.put('/api/shopping-list/:id', auth, (req, res) => {
+  const { name, category, quantity, source, sourceUrl, notes, isChecked } = req.body;
+  const item = db.prepare('SELECT id FROM shopping_list_items WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!item) return res.status(404).json({ error: 'Not found' });
+  db.prepare(`UPDATE shopping_list_items SET name=COALESCE(?,name), category=COALESCE(?,category), quantity=?, source=?, source_url=?, notes=?, is_checked=COALESCE(?,is_checked), updated_at=datetime('now') WHERE id=?`)
+    .run(name||null, category||null, quantity||null, source||null, sourceUrl||null, notes||null, isChecked!==undefined?(isChecked?1:0):null, req.params.id);
+  res.json({ success: true });
+});
+
+// Toggle checked status
+app.patch('/api/shopping-list/:id/toggle', auth, (req, res) => {
+  const item = db.prepare('SELECT id, is_checked FROM shopping_list_items WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!item) return res.status(404).json({ error: 'Not found' });
+  db.prepare('UPDATE shopping_list_items SET is_checked=?, updated_at=datetime(\'now\') WHERE id=?').run(item.is_checked ? 0 : 1, req.params.id);
+  res.json({ isChecked: !item.is_checked });
+});
+
+// Delete custom shopping list item
+app.delete('/api/shopping-list/:id', auth, (req, res) => {
+  const r = db.prepare('DELETE FROM shopping_list_items WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  if (r.changes === 0) return res.status(404).json({ error: 'Not found' });
+  res.json({ success: true });
+});
+
+// Clear all checked items
+app.delete('/api/shopping-list/checked/clear', auth, (req, res) => {
+  const r = db.prepare('DELETE FROM shopping_list_items WHERE user_id=? AND is_checked=1').run(req.userId);
+  res.json({ deleted: r.changes });
 });
 
 // ============ GLAZE CHEMICALS INVENTORY ============

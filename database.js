@@ -893,6 +893,20 @@ function initDB() {
       created_at TEXT DEFAULT (datetime('now'))
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_beta_email ON beta_signups(email);
+
+    CREATE TABLE IF NOT EXISTS shopping_list_items (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      category TEXT DEFAULT 'general',
+      quantity TEXT,
+      source TEXT,
+      source_url TEXT,
+      notes TEXT,
+      is_checked INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
   `);
   // Add notified_at column if missing (table may already exist without it)
   try { db.exec('ALTER TABLE beta_signups ADD COLUMN notified_at TEXT'); } catch(e) { /* already exists */ }
