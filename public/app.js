@@ -127,7 +127,11 @@ function showApp() {
   // Restore page from URL hash, or default to dashboard
   const hashPage = window.location.hash.replace('#', '');
   const validPages = ['dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','projects','events','contacts','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog'];
-  if (hashPage && validPages.includes(hashPage)) {
+  if (hashPage && hashPage.startsWith('blog/')) {
+    const slug = hashPage.replace('blog/', '');
+    if (slug) viewBlogPost(slug);
+    else navigate('blog');
+  } else if (hashPage && validPages.includes(hashPage)) {
     navigate(hashPage);
   } else {
     loadDashboard();
@@ -3630,6 +3634,7 @@ async function viewBlogPost(slug) {
   try {
     const post = await api('/api/blog/posts/' + slug);
     navigate('blogPost');
+    window.history.replaceState(null, '', '#blog/' + slug);
     const el = document.getElementById('blogPostContent');
     // Render content - if it contains HTML tags, use as-is; otherwise run through markdown renderer
     const content = post.content || '';
@@ -3823,7 +3828,11 @@ async function loadPublicCombo(shareId) {
     }
   }
   // Detect #blog hash (from landing page)
-  if (window.location.hash === '#blog' && !token) {
+  const blogHash = window.location.hash;
+  if (blogHash && blogHash.startsWith('#blog/') && !token) {
+    const slug = blogHash.replace('#blog/', '');
+    if (slug) showBlogPostFromLanding(slug);
+  } else if (blogHash === '#blog' && !token) {
     showBlogFromLanding();
   }
 })();
@@ -3831,7 +3840,13 @@ async function loadPublicCombo(shareId) {
 // Handle browser back/forward
 window.addEventListener('hashchange', () => {
   const hashPage = window.location.hash.replace('#', '');
-  if (hashPage && hashPage !== currentPage && token) {
+  if (hashPage && hashPage.startsWith('blog/')) {
+    const slug = hashPage.replace('blog/', '');
+    if (slug) {
+      if (token) viewBlogPost(slug);
+      else showBlogPostFromLanding(slug);
+    }
+  } else if (hashPage && hashPage !== currentPage && token) {
     navigate(hashPage);
   }
 });
