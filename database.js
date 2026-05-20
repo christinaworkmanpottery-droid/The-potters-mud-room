@@ -544,6 +544,7 @@ function initDB() {
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_events_user ON events(user_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date)`);
+  safeAdd('events', 'image_filename', 'TEXT');
 
   // Contacts table (item 40)
   db.exec(`

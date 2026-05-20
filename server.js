@@ -2001,10 +2001,24 @@ app.get('/api/events', auth, (req, res) => {
 
 app.post('/api/events', auth, requireTier('starter'), (req, res) => {
   const { title, description, eventDate, startTime, endTime, location } = req.body;
+  if (!eventDate) return res.status(400).json({ error: 'Event date is required' });
   const id = uuidv4();
   db.prepare('INSERT INTO events (id,user_id,title,description,event_date,start_time,end_time,location) VALUES (?,?,?,?,?,?,?,?)')
     .run(id, req.userId, title, description, eventDate, startTime || null, endTime || null, location || null);
   res.json({ id });
+});
+
+app.post('/api/events/:id/photo', auth, upload.single('photo'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
+  const ev = db.prepare('SELECT * FROM events WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!ev) return res.status(404).json({ error: 'Event not found' });
+  // Remove old image if exists
+  if (ev.image_filename) {
+    const old = path.join(UPLOADS_DIR, ev.image_filename);
+    if (fs.existsSync(old)) fs.unlinkSync(old);
+  }
+  db.prepare('UPDATE events SET image_filename=? WHERE id=?').run(req.file.filename, req.params.id);
+  res.json({ filename: req.file.filename });
 });
 
 app.put('/api/events/:id', auth, (req, res) => {
