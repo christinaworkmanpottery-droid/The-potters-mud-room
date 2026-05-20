@@ -1493,6 +1493,30 @@ app.post('/api/forum/posts/:id/reply', auth, upload.array('photos', 3), (req, re
   res.json({ id });
 });
 
+// Edit own forum post
+app.put('/api/forum/posts/:id', auth, (req, res) => {
+  const post = db.prepare('SELECT user_id FROM forum_posts WHERE id=?').get(req.params.id);
+  if (!post) return res.status(404).json({ error: 'Not found' });
+  if (post.user_id !== req.userId) return res.status(403).json({ error: 'You can only edit your own posts' });
+  const { title, content, body, categoryId } = req.body;
+  const postBody = content || body || '';
+  db.prepare('UPDATE forum_posts SET title=?,body=?,category_id=COALESCE(?,category_id),updated_at=datetime(\'now\') WHERE id=?')
+    .run(title, postBody, categoryId || null, req.params.id);
+  res.json({ id: req.params.id, title, body: postBody, content: postBody });
+});
+
+// Edit own forum reply
+app.put('/api/forum/replies/:id', auth, (req, res) => {
+  const reply = db.prepare('SELECT user_id FROM forum_replies WHERE id=?').get(req.params.id);
+  if (!reply) return res.status(404).json({ error: 'Not found' });
+  if (reply.user_id !== req.userId) return res.status(403).json({ error: 'You can only edit your own replies' });
+  const { content, body } = req.body;
+  const replyBody = content || body || '';
+  db.prepare('UPDATE forum_replies SET body=?,updated_at=datetime(\'now\') WHERE id=?')
+    .run(replyBody, req.params.id);
+  res.json({ id: req.params.id, body: replyBody, content: replyBody });
+});
+
 // Delete own forum post
 app.delete('/api/forum/posts/:id', auth, (req, res) => {
   const post = db.prepare('SELECT user_id FROM forum_posts WHERE id=?').get(req.params.id);
