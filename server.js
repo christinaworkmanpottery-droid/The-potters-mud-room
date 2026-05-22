@@ -2906,12 +2906,13 @@ app.post('/api/admin/members/:id/reset-password', auth, (req, res) => {
 });
 
 // One-time emergency reset (remove after use)
-app.post('/api/admin/one-time-reset', (req, res) => {
+// Admin password reset (authenticated)
+app.post('/api/admin/members/:id/reset-password', auth, (req, res) => {
   try {
-    const { email, newPassword, secret } = req.body;
-    if (secret !== 'esme-reset-2026') return res.status(403).json({ error: 'Invalid secret' });
-    if (!email || !newPassword) return res.status(400).json({ error: 'Email and newPassword required' });
-    const user = db.prepare('SELECT id FROM users WHERE email=?').get(email.trim().toLowerCase());
+    if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    const user = db.prepare('SELECT id FROM users WHERE id=?').get(req.params.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
     const hash = bcrypt.hashSync(newPassword, 10);
     db.prepare(`UPDATE users SET password_hash=?, updated_at=datetime('now') WHERE id=?`).run(hash, user.id);
