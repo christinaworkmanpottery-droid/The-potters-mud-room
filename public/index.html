@@ -436,8 +436,37 @@
       </div>
       <button type="submit" class="btn btn-primary btn-lg" style="width:100%" id="authSubmit">Sign In</button>
       <div id="authError" class="auth-error hidden"></div>
+      <p id="forgotPasswordLink" class="auth-toggle" style="margin-top:8px;margin-bottom:0">
+        <a onclick="showForgotPassword()" style="cursor:pointer;font-size:0.85rem;color:#6b4c3b">Forgot Password?</a>
+      </p>
     </form>
-    <p class="auth-toggle">
+    <!-- Forgot Password Form -->
+    <form id="forgotPasswordForm" style="display:none">
+      <p style="margin-bottom:12px;font-size:0.9rem;color:#666">Enter your email and we'll send you a reset link.</p>
+      <div class="form-group">
+        <input type="email" id="forgotEmail" class="form-input" placeholder="Email" required autocomplete="email">
+      </div>
+      <button type="submit" class="btn btn-primary btn-lg" style="width:100%">Send Reset Link</button>
+      <div id="forgotError" class="auth-error hidden"></div>
+      <div id="forgotSuccess" class="auth-error hidden" style="color:#2e7d32"></div>
+      <p class="auth-toggle" style="margin-top:12px">
+        <a onclick="hideForgotPassword()" style="cursor:pointer">← Back to Sign In</a>
+      </p>
+    </form>
+    <!-- Reset Password Form (shown via hash) -->
+    <form id="resetPasswordForm" style="display:none">
+      <p style="margin-bottom:12px;font-size:0.9rem;color:#666">Enter your new password.</p>
+      <div class="form-group">
+        <input type="password" id="resetNewPassword" class="form-input" placeholder="New password" required minlength="6">
+      </div>
+      <div class="form-group">
+        <input type="password" id="resetConfirmPassword" class="form-input" placeholder="Confirm password" required minlength="6">
+      </div>
+      <button type="submit" class="btn btn-primary btn-lg" style="width:100%">Set New Password</button>
+      <div id="resetError" class="auth-error hidden"></div>
+      <div id="resetSuccess" class="auth-error hidden" style="color:#2e7d32"></div>
+    </form>
+    <p class="auth-toggle" id="authToggleParagraph">
       <span id="authToggleText">Don't have an account?</span>
       <a id="authToggleLink" onclick="toggleAuth()">Create one — it's free!</a>
     </p>

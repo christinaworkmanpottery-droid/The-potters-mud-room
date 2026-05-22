@@ -7,6 +7,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 const { initDB } = require('./database');
 
 const app = express();
@@ -2886,6 +2887,88 @@ app.post('/api/admin/beta-signups/notify', auth, (req, res) => {
 // Static pages
 app.get('/beta', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'beta.html'));
+});
+
+// === PASSWORD RESET ENDPOINTS ===
+
+// Admin: reset a member's password
+app.post('/api/admin/members/:id/reset-password', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    const user = db.prepare('SELECT id FROM users WHERE id=?').get(req.params.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const hash = bcrypt.hashSync(newPassword, 10);
+    db.prepare('UPDATE users SET password_hash=?, updated_at=datetime("now") WHERE id=?').run(hash, req.params.id);
+    res.json({ success: true, message: 'Password reset successfully' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// One-time emergency reset (remove after use)
+app.post('/api/admin/one-time-reset', (req, res) => {
+  try {
+    const { email, newPassword, secret } = req.body;
+    if (secret !== 'esme-reset-2026') return res.status(403).json({ error: 'Invalid secret' });
+    if (!email || !newPassword) return res.status(400).json({ error: 'Email and newPassword required' });
+    const user = db.prepare('SELECT id FROM users WHERE email=?').get(email.trim().toLowerCase());
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    const hash = bcrypt.hashSync(newPassword, 10);
+    db.prepare('UPDATE users SET password_hash=?, updated_at=datetime("now") WHERE id=?').run(hash, user.id);
+    res.json({ success: true, message: 'Password reset successfully' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Forgot password — generate token and send email
+app.post('/api/auth/forgot-password', async (req, res) => {
+  try {
+    const email = (req.body.email || '').trim().toLowerCase();
+    if (!email) return res.status(400).json({ error: 'Email is required' });
+    const user = db.prepare('SELECT id, email FROM users WHERE email=?').get(email);
+    // Always return success (don't reveal if email exists)
+    if (!user) return res.json({ success: true, message: 'If that email exists, a reset link has been sent.' });
+    // Generate token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
+    db.prepare('INSERT INTO password_reset_tokens (id, user_id, token, expires_at) VALUES (?,?,?,?)')
+      .run(uuidv4(), user.id, resetToken, expiresAt);
+    // Send email
+    const resetLink = `https://thepottersmudroom.com/#reset-password?token=${resetToken}`;
+    if (transporter) {
+      await transporter.sendMail({
+        from: '"The Potter\'s Mud Room" <thepottersmudroom@gmail.com>',
+        to: user.email,
+        subject: 'Reset Your Password — The Potter\'s Mud Room',
+        html: `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:24px">
+          <h2 style="color:#6b4c3b">🏺 Password Reset</h2>
+          <p>Hi! You requested a password reset for your Potter's Mud Room account.</p>
+          <p><a href="${resetLink}" style="display:inline-block;background:#6b4c3b;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Reset My Password</a></p>
+          <p style="color:#888;font-size:0.85rem">This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>
+        </div>`
+      });
+    }
+    res.json({ success: true, message: 'If that email exists, a reset link has been sent.' });
+  } catch (err) {
+    console.error('Forgot password error:', err);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
+  }
+});
+
+// Reset password with token
+app.post('/api/auth/reset-password', (req, res) => {
+  try {
+    const { token: resetToken, newPassword } = req.body;
+    if (!resetToken || !newPassword) return res.status(400).json({ error: 'Token and new password are required' });
+    if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    const record = db.prepare('SELECT * FROM password_reset_tokens WHERE token=?').get(resetToken);
+    if (!record) return res.status(400).json({ error: 'Invalid or expired reset link' });
+    if (record.used) return res.status(400).json({ error: 'This reset link has already been used' });
+    if (new Date(record.expires_at) < new Date()) return res.status(400).json({ error: 'This reset link has expired' });
+    const hash = bcrypt.hashSync(newPassword, 10);
+    db.prepare('UPDATE users SET password_hash=?, updated_at=datetime("now") WHERE id=?').run(hash, record.user_id);
+    db.prepare('UPDATE password_reset_tokens SET used=1 WHERE id=?').run(record.id);
+    res.json({ success: true, message: 'Password updated successfully! You can now sign in.' });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // SPA fallback — must be AFTER all API routes

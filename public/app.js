@@ -78,6 +78,94 @@ function toggleAuth() {
   document.getElementById('authToggleLink').textContent = isSignUp ? 'Sign in' : "Create one — it's free!";
   document.getElementById('authError').classList.add('hidden');
 }
+
+// Forgot Password UI
+function showForgotPassword() {
+  document.getElementById('authForm').style.display = 'none';
+  document.getElementById('forgotPasswordLink').style.display = 'none';
+  document.getElementById('forgotPasswordForm').style.display = '';
+  document.getElementById('resetPasswordForm').style.display = 'none';
+  document.getElementById('authToggleParagraph').style.display = 'none';
+}
+function hideForgotPassword() {
+  document.getElementById('authForm').style.display = '';
+  document.getElementById('forgotPasswordLink').style.display = '';
+  document.getElementById('forgotPasswordForm').style.display = 'none';
+  document.getElementById('authToggleParagraph').style.display = '';
+  document.getElementById('forgotError').classList.add('hidden');
+  document.getElementById('forgotSuccess').classList.add('hidden');
+}
+document.getElementById('forgotPasswordForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = document.getElementById('forgotEmail').value.trim().toLowerCase();
+  const errEl = document.getElementById('forgotError');
+  const successEl = document.getElementById('forgotSuccess');
+  errEl.classList.add('hidden');
+  successEl.classList.add('hidden');
+  try {
+    const res = await fetch('/api/auth/forgot-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Something went wrong');
+    successEl.textContent = 'If that email is registered, a reset link has been sent. Check your inbox!';
+    successEl.classList.remove('hidden');
+  } catch (err) { errEl.textContent = err.message; errEl.classList.remove('hidden'); }
+});
+
+// Reset Password Form (token-based)
+document.getElementById('resetPasswordForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const newPassword = document.getElementById('resetNewPassword').value;
+  const confirmPassword = document.getElementById('resetConfirmPassword').value;
+  const errEl = document.getElementById('resetError');
+  const successEl = document.getElementById('resetSuccess');
+  errEl.classList.add('hidden');
+  successEl.classList.add('hidden');
+  if (newPassword !== confirmPassword) {
+    errEl.textContent = 'Passwords do not match';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  // Get token from URL hash
+  const hashPart = window.location.hash;
+  const tokenMatch = hashPart.match(/[?&]token=([^&]+)/);
+  const resetToken = tokenMatch ? tokenMatch[1] : null;
+  if (!resetToken) {
+    errEl.textContent = 'Invalid reset link. Please request a new one.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  try {
+    const res = await fetch('/api/auth/reset-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: resetToken, newPassword })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Something went wrong');
+    successEl.textContent = 'Password updated! You can now sign in with your new password.';
+    successEl.classList.remove('hidden');
+    e.target.querySelector('button[type=submit]').disabled = true;
+    setTimeout(() => { window.location.hash = ''; hideForgotPassword(); location.reload(); }, 3000);
+  } catch (err) { errEl.textContent = err.message; errEl.classList.remove('hidden'); }
+});
+
+// Detect reset-password hash on page load
+function checkResetPasswordHash() {
+  const hash = window.location.hash;
+  if (hash.startsWith('#reset-password')) {
+    // Show auth screen with reset form
+    document.getElementById('landingPage').style.display = 'none';
+    document.getElementById('authScreen').style.display = '';
+    document.getElementById('authForm').style.display = 'none';
+    document.getElementById('forgotPasswordLink').style.display = 'none';
+    document.getElementById('forgotPasswordForm').style.display = 'none';
+    document.getElementById('resetPasswordForm').style.display = '';
+    document.getElementById('authToggleParagraph').style.display = 'none';
+  }
+}
+
 document.getElementById('authForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const email = document.getElementById('authEmail').value.trim().toLowerCase();
@@ -106,6 +194,8 @@ function logout() {
   document.getElementById('mainApp').classList.add('hidden');
 }
 async function checkAuth() {
+  // Don't override reset-password view
+  if (window.location.hash.startsWith('#reset-password')) return;
   if (!token) { document.getElementById('landingPage').style.display = ''; return; }
   try { document.getElementById('landingPage').style.display = 'none'; const d = await api('/api/auth/me'); currentUser = d.user; showApp(); } catch { logout(); }
 }
@@ -3840,7 +3930,9 @@ async function loadPublicCombo(shareId) {
 // Handle browser back/forward
 window.addEventListener('hashchange', () => {
   const hashPage = window.location.hash.replace('#', '');
-  if (hashPage && hashPage.startsWith('blog/')) {
+  if (hashPage && hashPage.startsWith('reset-password')) {
+    checkResetPasswordHash();
+  } else if (hashPage && hashPage.startsWith('blog/')) {
     const slug = hashPage.replace('blog/', '');
     if (slug) {
       if (token) viewBlogPost(slug);
@@ -3855,4 +3947,5 @@ window.addEventListener('hashchange', () => {
 loadLandingBlogPosts();
 loadFeaturedPotter();
 
+checkResetPasswordHash();
 checkAuth();
