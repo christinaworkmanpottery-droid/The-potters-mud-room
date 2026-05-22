@@ -2900,7 +2900,7 @@ app.post('/api/admin/members/:id/reset-password', auth, (req, res) => {
     const user = db.prepare('SELECT id FROM users WHERE id=?').get(req.params.id);
     if (!user) return res.status(404).json({ error: 'User not found' });
     const hash = bcrypt.hashSync(newPassword, 10);
-    db.prepare('UPDATE users SET password_hash=?, updated_at=datetime("now") WHERE id=?').run(hash, req.params.id);
+    db.prepare(`UPDATE users SET password_hash=?, updated_at=datetime('now') WHERE id=?`).run(hash, req.params.id);
     res.json({ success: true, message: 'Password reset successfully' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2914,7 +2914,7 @@ app.post('/api/admin/one-time-reset', (req, res) => {
     const user = db.prepare('SELECT id FROM users WHERE email=?').get(email.trim().toLowerCase());
     if (!user) return res.status(404).json({ error: 'User not found' });
     const hash = bcrypt.hashSync(newPassword, 10);
-    db.prepare('UPDATE users SET password_hash=?, updated_at=datetime("now") WHERE id=?').run(hash, user.id);
+    db.prepare(`UPDATE users SET password_hash=?, updated_at=datetime('now') WHERE id=?`).run(hash, user.id);
     res.json({ success: true, message: 'Password reset successfully' });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -2965,7 +2965,7 @@ app.post('/api/auth/reset-password', (req, res) => {
     if (record.used) return res.status(400).json({ error: 'This reset link has already been used' });
     if (new Date(record.expires_at) < new Date()) return res.status(400).json({ error: 'This reset link has expired' });
     const hash = bcrypt.hashSync(newPassword, 10);
-    db.prepare('UPDATE users SET password_hash=?, updated_at=datetime("now") WHERE id=?').run(hash, record.user_id);
+    db.prepare(`UPDATE users SET password_hash=?, updated_at=datetime('now') WHERE id=?`).run(hash, record.user_id);
     db.prepare('UPDATE password_reset_tokens SET used=1 WHERE id=?').run(record.id);
     res.json({ success: true, message: 'Password updated successfully! You can now sign in.' });
   } catch (err) { res.status(500).json({ error: err.message }); }
