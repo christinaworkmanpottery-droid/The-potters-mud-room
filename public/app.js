@@ -1946,6 +1946,11 @@ async function loadAdmin() {
       '<p class="text-sm mb-12" style="color:var(--text-light)">See which features members are actually using — and which ones they\'re ignoring.</p>' +
       '<div id="adminUsageContent">Loading...</div></div>';
 
+    // Docs & Templates section
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">📋 Docs & Templates</h3>' +
+      '<p class="text-sm mb-12" style="color:var(--text-light)">Quick-access documents, templates, and guides for managing the app.</p>' +
+      '<div id="adminDocsContent">Loading...</div></div>';
+
     try {
       el.innerHTML = html;
     } catch(renderErr) {
@@ -1963,6 +1968,7 @@ async function loadAdmin() {
     loadAdminEmailSettings();
     loadAdminUsage();
     loadAdminBeta();
+    loadAdminDocs();
   } catch(e) { toast(e.message, 'error'); }
 }
 
@@ -2648,6 +2654,128 @@ async function loadAdminUsage() {
   } catch(e) {
     el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">Could not load usage data: ' + esc(e.message) + '</div>';
   }
+}
+
+// ========== ADMIN DOCS ==========
+async function loadAdminDocs() {
+  const el = document.getElementById('adminDocsContent');
+  if (!el) return;
+  try {
+    const data = await api('/api/admin/docs');
+    const docs = data.docs || [];
+    if (!docs.length) {
+      el.innerHTML = '<p class="text-sm" style="color:var(--text-muted)">No docs yet. Click "+ New Doc" to create one.</p>';
+    } else {
+      let html = '<div style="display:flex;flex-direction:column;gap:8px">';
+      docs.forEach(d => {
+        const badge = d.pinned ? ' 📌' : '';
+        const cat = d.category && d.category !== 'general' ? '<span style="font-size:0.7rem;background:var(--primary);color:#fff;padding:2px 6px;border-radius:4px;margin-left:6px">' + esc(d.category) + '</span>' : '';
+        html += '<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px;cursor:pointer" onclick="viewAdminDoc(\'' + esc(d.slug) + '\')">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center">' +
+          '<div><strong>' + esc(d.title) + '</strong>' + badge + cat + '</div>' +
+          '<span class="text-sm" style="color:var(--text-muted)">' + fmtDate(d.updated_at) + '</span></div></div>';
+      });
+      html += '</div>';
+      el.innerHTML = html;
+    }
+    el.innerHTML += '<button class="btn btn-primary btn-sm mt-16" onclick="openDocEditor()">+ New Doc</button>';
+  } catch(e) {
+    el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">Could not load docs: ' + esc(e.message) + '</div>';
+  }
+}
+
+async function viewAdminDoc(slug) {
+  try {
+    const doc = await api('/api/admin/docs/' + slug);
+    const content = (doc.content || '').replace(/\\n/g, '\n').replace(/\n/g, '<br>');
+    const modal = document.createElement('div');
+    modal.id = 'docViewerModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+    modal.innerHTML = '<div style="background:var(--bg);border-radius:12px;max-width:700px;width:100%;max-height:85vh;overflow-y:auto;padding:24px;position:relative">' +
+      '<div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:16px">' +
+      '<h3 style="margin:0">' + esc(doc.title) + '</h3>' +
+      '<div style="display:flex;gap:8px">' +
+      '<button class="btn btn-sm" onclick="editAdminDoc(\'' + esc(doc.slug) + '\')">✏️ Edit</button>' +
+      '<button class="btn btn-sm" onclick="copyDocContent(\'' + esc(doc.slug) + '\')">📋 Copy</button>' +
+      '<button class="btn btn-sm" onclick="deleteAdminDoc(\'' + esc(doc.slug) + '\')">🗑️</button>' +
+      '<button class="btn btn-sm" onclick="closeDocViewer()">✕</button></div></div>' +
+      '<div id="docViewerBody" style="line-height:1.6;white-space:pre-wrap;font-size:0.95rem">' + content + '</div></div>';
+    document.body.appendChild(modal);
+    modal.addEventListener('click', function(e) { if (e.target === modal) closeDocViewer(); });
+  } catch(e) { toast('Could not load doc: ' + e.message, 'error'); }
+}
+
+function closeDocViewer() {
+  const m = document.getElementById('docViewerModal');
+  if (m) m.remove();
+}
+
+async function copyDocContent(slug) {
+  try {
+    const doc = await api('/api/admin/docs/' + slug);
+    const text = (doc.content || '').replace(/\\n/g, '\n').replace(/\*\*/g, '').replace(/\n/g, '\n');
+    await navigator.clipboard.writeText(text);
+    toast('Copied to clipboard!', 'success');
+  } catch(e) { toast('Could not copy: ' + e.message, 'error'); }
+}
+
+function openDocEditor(slug, existingDoc) {
+  closeDocViewer();
+  const modal = document.createElement('div');
+  modal.id = 'docEditorModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.innerHTML = '<div style="background:var(--bg);border-radius:12px;max-width:700px;width:100%;max-height:85vh;overflow-y:auto;padding:24px">' +
+    '<h3 style="margin-bottom:16px">' + (slug ? 'Edit Doc' : 'New Doc') + '</h3>' +
+    '<div class="form-group"><label>Title</label><input type="text" class="form-input" id="docEditorTitle" value="' + esc(existingDoc?.title || '') + '"></div>' +
+    '<div class="form-group"><label>Category</label><input type="text" class="form-input" id="docEditorCategory" value="' + esc(existingDoc?.category || 'general') + '" placeholder="e.g. testers, general"></div>' +
+    '<div class="form-group"><label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="docEditorPinned"' + (existingDoc?.pinned ? ' checked' : '') + '> Pinned</label></div>' +
+    '<div class="form-group"><label>Content</label><textarea class="form-input" id="docEditorContent" style="min-height:200px;font-family:inherit" placeholder="Write your doc here...">' + esc(existingDoc?.content || '').replace(/\\n/g, '\n') + '</textarea></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+    '<button class="btn btn-sm" onclick="closeDocEditor()">Cancel</button>' +
+    '<button class="btn btn-primary btn-sm" onclick="saveAdminDoc(\'' + esc(slug || '') + '\')">Save</button></div></div>';
+  document.body.appendChild(modal);
+}
+
+function closeDocEditor() {
+  const m = document.getElementById('docEditorModal');
+  if (m) m.remove();
+}
+
+async function editAdminDoc(slug) {
+  try {
+    const doc = await api('/api/admin/docs/' + slug);
+    openDocEditor(slug, doc);
+  } catch(e) { toast('Could not load doc: ' + e.message, 'error'); }
+}
+
+async function saveAdminDoc(slug) {
+  const title = document.getElementById('docEditorTitle').value.trim();
+  const content = document.getElementById('docEditorContent').value;
+  const category = document.getElementById('docEditorCategory').value.trim() || 'general';
+  const pinned = document.getElementById('docEditorPinned').checked;
+  if (!title) return toast('Title is required', 'error');
+  if (!content) return toast('Content is required', 'error');
+  try {
+    if (slug) {
+      await api('/api/admin/docs/' + slug, { method: 'PUT', body: { title, content, category, pinned } });
+      toast('Doc updated!', 'success');
+    } else {
+      await api('/api/admin/docs', { method: 'POST', body: { title, content, category, pinned } });
+      toast('Doc created!', 'success');
+    }
+    closeDocEditor();
+    loadAdminDocs();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function deleteAdminDoc(slug) {
+  if (!confirm('Delete this doc?')) return;
+  try {
+    await api('/api/admin/docs/' + slug, { method: 'DELETE' });
+    toast('Doc deleted', 'success');
+    closeDocViewer();
+    loadAdminDocs();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
 // Landing page reviews

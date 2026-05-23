@@ -2975,6 +2975,85 @@ app.post('/api/auth/reset-password', (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ========== ADMIN DOCS ==========
+
+// GET /api/admin/docs — list all docs
+app.get('/api/admin/docs', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  const docs = db.prepare('SELECT id,slug,title,category,pinned,created_at,updated_at FROM admin_docs ORDER BY pinned DESC, updated_at DESC').all();
+  res.json({ docs });
+});
+
+// GET /api/admin/docs/:slug — get single doc
+app.get('/api/admin/docs/:slug', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  const doc = db.prepare('SELECT * FROM admin_docs WHERE slug=?').get(req.params.slug);
+  if (!doc) return res.status(404).json({ error: 'Doc not found' });
+  res.json(doc);
+});
+
+// POST /api/admin/docs — create doc
+app.post('/api/admin/docs', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  const { title, content, category, pinned } = req.body;
+  const slug = (title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const id = require('crypto').randomUUID();
+  db.prepare('INSERT INTO admin_docs (id,slug,title,content,category,pinned) VALUES (?,?,?,?,?,?)')
+    .run(id, slug, title, content, category || 'general', pinned ? 1 : 0);
+  res.json({ id, slug });
+});
+
+// PUT /api/admin/docs/:slug — update doc
+app.put('/api/admin/docs/:slug', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  const { title, content, category, pinned } = req.body;
+  db.prepare(`UPDATE admin_docs SET title=?,content=?,category=?,pinned=?,updated_at=datetime('now') WHERE slug=?`)
+    .run(title, content, category || 'general', pinned ? 1 : 0, req.params.slug);
+  res.json({ success: true });
+});
+
+// DELETE /api/admin/docs/:slug — delete doc
+app.delete('/api/admin/docs/:slug', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  db.prepare('DELETE FROM admin_docs WHERE slug=?').run(req.params.slug);
+  res.json({ success: true });
+});
+
+// Seed default docs if empty
+(function seedAdminDocs() {
+  const count = db.prepare('SELECT COUNT(*) as c FROM admin_docs').get().c;
+  if (count === 0) {
+    const crypto = require('crypto');
+    const docs = [
+      {
+        slug: 'beta-tester-troubleshooting',
+        title: '🧪 Beta Tester Troubleshooting Guide',
+        category: 'testers',
+        pinned: 1,
+        content: `Hey! Thanks for helping test the app. If you're seeing "App not available" or can't find the download, try these steps in order:\n\n**Step 1: Open the testing link in Chrome**\n👉 https://play.google.com/apps/testing/com.mudroom4.pottersmudroom\n\n⚠️ IMPORTANT: Do NOT open this link inside Facebook Messenger, Instagram, or any other app — it won't work. Copy/paste it into Chrome (or your default browser).\n\n**Step 2: Make sure you're signed into the right Google account**\n- The email you gave Christina must match the Google account you're signed into in Chrome\n- To check: tap your profile picture in the top-right of Chrome and verify the email\n- If you have multiple Google accounts, switch to the correct one\n\n**Step 3: Click "Become a Tester"**\n- On the testing page, you should see a button that says "Become a tester" or "Accept"\n- You MUST click this first — don't skip it!\n- After accepting, a download/install link will appear on the same page\n\n**Step 4: Install the app**\n- After accepting, click the "Download it on Google Play" link on that same page\n- This should open the Play Store listing where you can install\n\n**Still not working? Try these:**\n✅ Clear the Play Store cache — Settings → Apps → Google Play Store → Clear Cache\n✅ Make sure your Play Store app is signed into the same email\n✅ Wait 1-2 hours (Google sometimes takes time to process)\n✅ Restart your phone\n✅ Try accepting the invite on a computer first, then install from your phone\n\n**If nothing works, send Christina:**\n1. A screenshot of what you see\n2. The exact Gmail address you're using`
+      },
+      {
+        slug: 'beta-tester-invite-template',
+        title: '✉️ Beta Tester Invite Message Template',
+        category: 'testers',
+        pinned: 1,
+        content: `Hey [NAME]! 👋\n\nThanks so much for being willing to test Potter's Mud Room! Here's how to get set up:\n\n1. Open this link in Chrome (NOT inside Messenger/Facebook/Instagram):\n👉 https://play.google.com/apps/testing/com.mudroom4.pottersmudroom\n\n2. Make sure you're signed into Chrome with: [THEIR GMAIL]\n\n3. Click "Become a Tester" / "Accept"\n\n4. After accepting, click "Download it on Google Play"\n\nAs a thank you for testing, you'll get lifetime free premium access! 🎉\n\nIf you run into any issues, let me know and I'll help you through it. 🙏`
+      },
+      {
+        slug: 'todo-list',
+        title: '📋 To-Do List',
+        category: 'general',
+        pinned: 1,
+        content: `**🔥 HIGH PRIORITY — App & Testers**\n\n**Testing & QA:**\n☐ Test all updates from the movies session (Firing Logs, Materials, Goals, Events, Casualties, Contacts, Forum, Sales, Blog share links, Glaze Library, Home stat tiles, Notifications)\n☐ Test the project save fix (Nancy's bug — fixed May 23)\n\n**Beta Tester Recruitment:**\n☐ Post on Facebook\n☐ Post on TikTok\n☐ Post on Instagram\n☐ Send Esme the Facebook URLs\n\n**Tester Follow-ups:**\n☐ Carrie (Johnsoncarrie572@gmail.com) — still can't access\n☐ Jessica (jrintoul528@gmail.com) — same access issue\n☐ Veronika (Denmark) — sent troubleshooting guide\n☐ Nancy — confirm project save works now\n\n**🎨 NEW — Pottery Classes & Booking**\n\n☐ Figure out class details (types, pricing, group sizes, party packages, location, schedule)\n☐ Build booking system on christinaworkmanpottery.com\n☐ Create flyers for private hand building instruction/classes\n☐ Create flyers for pottery parties\n\n**📋 OTHER**\n☐ Send Esme FB URLs\n☐ Android build resets June 1 — plan next build`
+      }
+    ];
+    const stmt = db.prepare('INSERT INTO admin_docs (id,slug,title,content,category,pinned) VALUES (?,?,?,?,?,?)');
+    for (const d of docs) {
+      stmt.run(crypto.randomUUID(), d.slug, d.title, d.content, d.category, d.pinned ? 1 : 0);
+    }
+  }
+})();
+
 // SPA fallback — must be AFTER all API routes
 app.get('*', (req, res) => {
   if (!req.path.startsWith('/api/') && !req.path.startsWith('/uploads/')) {

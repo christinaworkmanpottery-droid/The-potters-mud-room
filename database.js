@@ -570,6 +570,20 @@ function initDB() {
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_projects_user ON projects(user_id)`);
 
+  // Admin docs table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS admin_docs (
+      id TEXT PRIMARY KEY,
+      slug TEXT UNIQUE NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      category TEXT DEFAULT 'general',
+      pinned INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
   // Events table (item 39)
   db.exec(`
     CREATE TABLE IF NOT EXISTS events (
