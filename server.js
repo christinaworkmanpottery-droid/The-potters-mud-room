@@ -2046,17 +2046,20 @@ app.get('/api/projects', auth, (req, res) => {
 });
 
 app.post('/api/projects', auth, requireTier('starter'), (req, res) => {
-  const { title, description, status, dueDate } = req.body;
+  const { title, name, description, status, dueDate, deadline, notes } = req.body;
+  const projectTitle = title || name;
+  if (!projectTitle) return res.status(400).json({ error: 'Project name is required' });
   const id = uuidv4();
   db.prepare('INSERT INTO projects (id,user_id,title,description,status,due_date) VALUES (?,?,?,?,?,?)')
-    .run(id, req.userId, title, description, status || 'active', dueDate || null);
+    .run(id, req.userId, projectTitle, description || notes || null, status || 'active', dueDate || deadline || null);
   res.json({ id });
 });
 
 app.put('/api/projects/:id', auth, (req, res) => {
-  const { title, description, status, dueDate } = req.body;
+  const { title, name, description, status, dueDate, deadline, notes } = req.body;
+  const projectTitle = title || name;
   db.prepare('UPDATE projects SET title=?,description=?,status=?,due_date=?,updated_at=datetime(\'now\') WHERE id=? AND user_id=?')
-    .run(title, description, status, dueDate, req.params.id, req.userId);
+    .run(projectTitle, description || notes || null, status, dueDate || deadline || null, req.params.id, req.userId);
   res.json({ success: true });
 });
 
