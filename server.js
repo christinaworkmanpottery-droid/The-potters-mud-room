@@ -964,9 +964,16 @@ app.get('/api/pieces', auth, (req, res) => {
   pieces.forEach(p => {
     p.glazes = getGl.all(p.id);
     p.photos = getPh.all(p.id);
+    // Clean up legacy data: if studio was used to store clay body text, suppress it
+    if (p.studio && p.clay_body_name && p.studio.toLowerCase() === p.clay_body_name.toLowerCase()) {
+      p.studio = null;
+    } else if (p.studio && !p.clay_body_name) {
+      p.clay_body_name = p.studio;
+      p.studio = null;
+    }
     // Legacy field aliases so older app builds can read piece data
     p.name = p.title;
-    p.clay = p.clay_body_name || p.studio || null;
+    p.clay = p.clay_body_name || null;
     // Extract glaze from notes if stored there, or from glazes array
     if (p.glazes && p.glazes.length > 0) {
       p.glaze = p.glazes.map(g => g.glaze_name || g.name).join(', ');
@@ -992,9 +999,17 @@ app.get('/api/pieces/:id', auth, (req, res) => {
   p.glazes = db.prepare('SELECT pg.*,g.name as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order').all(p.id);
   p.photos = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order').all(p.id);
   p.firings = db.prepare('SELECT * FROM firing_logs WHERE piece_id=? ORDER BY date DESC').all(p.id);
+  // Clean up legacy data: if studio was used to store clay body text, suppress it
+  if (p.studio && p.clay_body_name && p.studio.toLowerCase() === p.clay_body_name.toLowerCase()) {
+    p.studio = null;
+  } else if (p.studio && !p.clay_body_name) {
+    // studio field was misused for clay - move it to clay display and clear studio
+    p.clay_body_name = p.studio;
+    p.studio = null;
+  }
   // Legacy field aliases so older app builds can read piece data
   p.name = p.title;
-  p.clay = p.clay_body_name || p.studio || null;
+  p.clay = p.clay_body_name || null;
   if (p.glazes && p.glazes.length > 0) {
     p.glaze = p.glazes.map(g => g.glaze_name || g.name).join(', ');
   } else if (p.notes) {
