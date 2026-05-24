@@ -1533,7 +1533,9 @@ app.post('/api/forum/posts/:id/reply', auth, upload.array('photos', 3), (req, re
     const ins = db.prepare('INSERT INTO forum_photos (id,reply_id,filename,original_name) VALUES (?,?,?,?)');
     req.files.forEach(f => ins.run(uuidv4(), id, f.filename, f.originalname));
   }
-  res.json({ id });
+  const fullReply = db.prepare(`SELECT fr.*, u.display_name as author_name, u.avatar_filename as author_avatar FROM forum_replies fr JOIN users u ON fr.user_id=u.id WHERE fr.id=?`).get(id);
+  fullReply.photos = db.prepare('SELECT * FROM forum_photos WHERE reply_id=?').all(id);
+  res.json({ reply: fullReply });
 });
 
 // Edit own forum post
