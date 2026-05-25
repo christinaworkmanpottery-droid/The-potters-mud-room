@@ -3206,6 +3206,9 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
 });
 
+// One-time cleanup: remove test blog post
+try { db.prepare("DELETE FROM blog_posts WHERE slug='test-ping-delete'").run(); } catch(e) {}
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🏺 The Potter's Mud Room running on http://localhost:${PORT}`);
 });
