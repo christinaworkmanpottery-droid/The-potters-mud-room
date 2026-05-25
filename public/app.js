@@ -3791,10 +3791,10 @@ function copyReferralLink() {
 }
 
 function copyBlogLink(url, title) {
-  const text = title + '\n\nCheck it out: ' + url + '\n\n#pottery #ceramics #potterymudroom #handmade #pottersofinstagram';
-  navigator.clipboard.writeText(text).then(() => toast('Link + hashtags copied! Paste into your Instagram/TikTok post or bio 📋', 'success')).catch(() => {
+  const text = title + '\n\n✨ New on the blog → link in bio 👆\n\nthepottersmudroom.com\n\n#potterylife #ceramicsartist #potterystudio #handmadeceramics #pottertools';
+  navigator.clipboard.writeText(text).then(() => toast('Instagram caption + hashtags copied! Paste into your post 📸', 'success')).catch(() => {
     const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-    toast('Link + hashtags copied! Paste into your Instagram/TikTok post or bio 📋', 'success');
+    toast('Instagram caption + hashtags copied! Paste into your post 📸', 'success');
   });
 }
 
@@ -3867,9 +3867,9 @@ async function viewBlogPost(slug) {
       '<button class="btn btn-sm" onclick="window.open(\'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(postUrl) + '\',\'_blank\',\'width=600,height=400\')" style="background:#1877F2;color:#fff;border:none">📘 Facebook</button>' +
       '<button class="btn btn-sm" onclick="window.open(\'https://pinterest.com/pin/create/button/?url=' + encodeURIComponent(postUrl) + '&description=' + encodeURIComponent(postTitle + ' — ' + postExcerpt) + '&media=' + encodeURIComponent('https://thepottersmudroom.com/og-image.png') + '\',\'_blank\',\'width=600,height=400\')" style="background:#E60023;color:#fff;border:none">📌 Pinterest</button>' +
       '<button class="btn btn-sm" onclick="window.open(\'https://twitter.com/intent/tweet?url=' + encodeURIComponent(postUrl) + '&text=' + encodeURIComponent(postTitle) + '\',\'_blank\',\'width=600,height=400\')" style="background:#000;color:#fff;border:none">𝕏 Post</button>' +
-      '<button class="btn btn-sm" onclick="copyBlogLink(\'' + esc(postUrl) + '\',\'' + esc(postTitle) + '\')" style="background:#E1306C;color:#fff;border:none">📋 Copy for Instagram / TikTok</button>' +
+      '<button class="btn btn-sm" onclick="copyBlogLink(\'' + esc(postUrl) + '\',\'' + esc(postTitle) + '\')" style="background:#E1306C;color:#fff;border:none">📸 Instagram Caption</button>' +
       '</div>' +
-      '<p class="text-sm" style="color:var(--text-muted);margin-top:8px">Tip: For Instagram & TikTok, copy the link and paste it in your bio or story!</p></div>';
+      '<p class="text-sm" style="color:var(--text-muted);margin-top:8px">Tap "📸 Instagram Caption" to copy a ready-to-paste caption with hashtags!</p></div>';
     el.innerHTML = '<article class="card" style="max-width:700px">' +
       '<h1 style="font-size:1.8rem;font-family:Georgia,serif;margin-bottom:12px;color:var(--text)">' + esc(post.title) + '</h1>' +
       '<div class="text-sm" style="color:var(--text-muted);margin-bottom:24px">By ' + esc(post.author || 'Christina Workman') + ' · ' + fmtDate(post.published_at) + '</div>' +
@@ -4020,7 +4020,7 @@ async function loadPublicCombo(shareId) {
       '<button class="btn btn-sm" onclick="window.open(\'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(comboUrl) + '\',\'_blank\',\'width=600,height=400\')" style="background:#1877F2;color:#fff;border:none">📘 Facebook</button>' +
       '<button class="btn btn-sm" onclick="window.open(\'https://pinterest.com/pin/create/button/?url=' + encodeURIComponent(comboUrl) + '&description=' + encodeURIComponent(comboTitle) + (combo.photo_filename ? '&media=' + encodeURIComponent('https://thepottersmudroom.com/uploads/' + combo.photo_filename) : '') + '\',\'_blank\',\'width=600,height=400\')" style="background:#E60023;color:#fff;border:none">📌 Pinterest</button>' +
       '<button class="btn btn-sm" onclick="window.open(\'https://twitter.com/intent/tweet?url=' + encodeURIComponent(comboUrl) + '&text=' + encodeURIComponent(comboTitle) + '\',\'_blank\',\'width=600,height=400\')" style="background:#000;color:#fff;border:none">𝕏 Post</button>' +
-      '<button class="btn btn-sm" onclick="copyBlogLink(\'' + esc(comboUrl) + '\',\'' + esc(combo.name) + '\')" style="background:#E1306C;color:#fff;border:none">📋 Copy for Instagram / TikTok</button>' +
+      '<button class="btn btn-sm" onclick="copyBlogLink(\'' + esc(comboUrl) + '\',\'' + esc(combo.name) + '\')" style="background:#E1306C;color:#fff;border:none">📸 Instagram Caption</button>' +
       '</div></div>';
     html += '<div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border);text-align:center">' +
       '<p style="color:var(--text-light);margin-bottom:12px">Track your own glaze combos in The Potter\'s Mud Room</p>' +
