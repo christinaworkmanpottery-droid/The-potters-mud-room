@@ -537,10 +537,10 @@
         <div><strong style="color:var(--primary)">Free tier:</strong> <span id="pieceCountText">0/20 pieces</span></div>
       </div>
       <div class="stats-row">
-        <div class="stat-box"><div class="stat-number" id="statPieces">0</div><div class="stat-label">Pieces</div></div>
-        <div class="stat-box"><div class="stat-number" id="statClays">0</div><div class="stat-label">Clay Bodies</div></div>
-        <div class="stat-box"><div class="stat-number" id="statGlazes">0</div><div class="stat-label">Glazes</div></div>
-        <div class="stat-box" id="statSalesBox"><div class="stat-number" id="statSales">$0</div><div class="stat-label">Total Sales</div></div>
+        <div class="stat-box" onclick="navigate('pieces')" style="cursor:pointer"><div class="stat-number" id="statPieces">0</div><div class="stat-label">Pieces</div></div>
+        <div class="stat-box" onclick="navigate('clayBodies')" style="cursor:pointer"><div class="stat-number" id="statClays">0</div><div class="stat-label">Clay Bodies</div></div>
+        <div class="stat-box" onclick="navigate('glazes')" style="cursor:pointer"><div class="stat-number" id="statGlazes">0</div><div class="stat-label">Glazes</div></div>
+        <div class="stat-box" id="statSalesBox" onclick="navigate('sales')" style="cursor:pointer"><div class="stat-number" id="statSales">$0</div><div class="stat-label">Total Sales</div></div>
       </div>
       <h2 class="mb-16">Recent Pieces</h2>
       <div id="recentPieces" class="card-grid"></div>
