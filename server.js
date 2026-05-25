@@ -150,6 +150,22 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req,
       }
       break;
     }
+    case 'charge.refunded': {
+      const charge = event.data.object;
+      const email = charge.billing_details?.email;
+      if (email) {
+        try {
+          const transporter = require('nodemailer').createTransport({ host: 'smtp.gmail.com', port: 587, secure: false, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } });
+          transporter.sendMail({
+            from: `"The Potter's Mud Room" <${process.env.SMTP_USER}>`,
+            to: email,
+            subject: 'Your refund has been processed — The Potter\'s Mud Room',
+            html: `<div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;padding:20px;color:#333"><h2 style="color:#8B4513">Refund Confirmation</h2><p>Hey there!</p><p>Your refund of <strong>$${(charge.amount_refunded / 100).toFixed(2)}</strong> has been processed. It should appear on your statement within 5-10 business days.</p><p>If you have any questions, just reply to this email.</p><p style="margin-top:30px">— Christina<br><em>The Potter's Mud Room</em><br><a href="https://thepottersmudroom.com" style="color:#8B4513">thepottersmudroom.com</a></p></div>`
+          }).catch(e => console.error('Refund email failed:', e.message));
+        } catch(e) { console.error('Refund email error:', e.message); }
+      }
+      break;
+    }
   }
   res.json({ received: true });
 });
