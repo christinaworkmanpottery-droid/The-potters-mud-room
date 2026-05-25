@@ -2171,7 +2171,7 @@ async function loadAdminBlogPosts() {
     el.innerHTML = posts.map(p =>
       '<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">' +
       '<div><strong>' + esc(p.title) + '</strong> <span class="text-sm" style="color:' + (p.is_published ? 'var(--success)' : 'var(--text-muted)') + '">' + (p.is_published ? '✅ Published' : '📝 Draft') + '</span>' +
-      '<div class="text-sm" style="color:var(--text-muted)">' + fmtDate(p.published_at) + ' · /' + esc(p.slug) + '</div></div>' +
+      '<div class="text-sm" style="color:var(--text-muted)">' + fmtDate(p.published_at) + ' · /' + esc(p.slug) + ' · 👁️ ' + (p.view_count || 0) + ' views</div></div>' +
       '<div style="display:flex;gap:4px">' +
       '<button class="btn btn-sm btn-secondary" onclick="previewBlogPost(\'' + p.id + '\')" title="Preview">👁️</button>' +
       '<button class="btn btn-sm btn-secondary" onclick="editBlogPost(\'' + p.id + '\')">✏️</button>' +

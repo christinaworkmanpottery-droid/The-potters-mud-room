@@ -760,6 +760,7 @@ function initDB() {
       author TEXT DEFAULT 'Christina Workman',
       published_at TEXT DEFAULT (datetime('now')),
       is_published INTEGER DEFAULT 0,
+      view_count INTEGER DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     )
@@ -935,6 +936,7 @@ function initDB() {
   // Add notified_at column if missing (table may already exist without it)
   try { db.exec('ALTER TABLE beta_signups ADD COLUMN notified_at TEXT'); } catch(e) { /* already exists */ }
   safeAdd('users', 'is_beta_tester', 'INTEGER DEFAULT 0');
+  safeAdd('blog_posts', 'view_count', 'INTEGER DEFAULT 0');
 
   // One-time cleanup: remove ghost "Untitled" pieces with no real data (from iOS FormData bug)
   try {

@@ -2397,6 +2397,8 @@ app.get('/api/blog/posts/:slug', (req, res) => {
   try {
     const post = db.prepare('SELECT * FROM blog_posts WHERE slug=? AND is_published=1').get(req.params.slug);
     if (!post) return res.status(404).json({ error: 'Post not found' });
+    // Track blog view
+    try { db.prepare("UPDATE blog_posts SET view_count=COALESCE(view_count,0)+1 WHERE id=?").run(post.id); } catch(e) {}
     res.json(post);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
