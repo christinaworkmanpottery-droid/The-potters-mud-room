@@ -155,6 +155,17 @@ function generateMudLogPDF(outputPath) {
 
     // Footer
     doc.fontSize(7).fillColor(light).text('thepottersmudroom.com', 50, 760);
+
+    // ===== NOTES PAGE after each piece =====
+    doc.addPage();
+    doc.fontSize(18).font('Helvetica-Bold').fillColor(brown).text('Notes', 50, 50);
+    doc.fontSize(9).fillColor(light).text('Piece #' + (i + 1), 520, 55);
+    let ny = 90;
+    for (let n = 0; n < 28; n++) {
+      ny += 24;
+      writeLine(ny);
+    }
+    doc.fontSize(7).fillColor(light).text('thepottersmudroom.com', 50, 760);
   }
 
   // ===== CLAY BODY LOG (5 pages) =====
