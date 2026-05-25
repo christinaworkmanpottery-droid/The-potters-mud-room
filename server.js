@@ -3163,6 +3163,22 @@ app.delete('/api/admin/docs/:slug', auth, (req, res) => {
   }
 })();
 
+// ONE-TIME notification broadcast — remove after use
+app.post('/api/_notify-925', (req, res) => {
+  if (req.headers['x-seed-key'] !== 'esme-seed-2026') return res.status(403).json({ error: 'nope' });
+  const { v4: uuidv4 } = require('uuid');
+  const { message, link } = req.body;
+  if (!message) return res.status(400).json({ error: 'message required' });
+  const users = db.prepare('SELECT id FROM users').all();
+  const ins = db.prepare('INSERT INTO notifications (id,user_id,type,message,link) VALUES (?,?,?,?,?)');
+  let count = 0;
+  users.forEach(u => {
+    ins.run(uuidv4(), u.id, 'announcement', message, link || null);
+    count++;
+  });
+  res.json({ status: 'sent', count });
+});
+
 // Global error handler — ensure API routes ALWAYS return JSON, never HTML
 app.use((err, req, res, next) => {
   if (req.path.startsWith('/api/')) {
