@@ -873,26 +873,30 @@ app.get('/api/shopping-list', auth, (req, res) => {
   const clays = db.prepare('SELECT id,name,brand,source,source_url,buy_url FROM clay_bodies WHERE user_id=? AND in_stock=0').all(req.userId);
   const glazes = db.prepare('SELECT id,name,brand,source,source_url,buy_url,stock_status FROM glazes WHERE user_id=? AND (stock_status=? OR in_stock=0)').all(req.userId, 'need-to-buy');
   const custom = db.prepare('SELECT * FROM shopping_list_items WHERE user_id=? ORDER BY is_checked ASC, created_at DESC').all(req.userId);
+  // Map source_url to buy_url for custom items so app can use consistent field
+  custom.forEach(c => { if (c.source_url && !c.buy_url) c.buy_url = c.source_url; });
   res.json({ clays, glazes, custom });
 });
 
 // Add custom shopping list item
 app.post('/api/shopping-list', auth, (req, res) => {
-  const { name, category, quantity, source, sourceUrl, notes } = req.body;
+  const { name, category, quantity, source, sourceUrl, buy_url, notes } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'Item name required' });
   const id = uuidv4();
+  const url = buy_url || sourceUrl || null;
   db.prepare('INSERT INTO shopping_list_items (id,user_id,name,category,quantity,source,source_url,notes) VALUES (?,?,?,?,?,?,?,?)')
-    .run(id, req.userId, name.trim(), category||'general', quantity||null, source||null, sourceUrl||null, notes||null);
+    .run(id, req.userId, name.trim(), category||'general', quantity||null, source||null, url, notes||null);
   res.json({ id, name: name.trim() });
 });
 
 // Update custom shopping list item
 app.put('/api/shopping-list/:id', auth, (req, res) => {
-  const { name, category, quantity, source, sourceUrl, notes, isChecked } = req.body;
+  const { name, category, quantity, source, sourceUrl, buy_url, notes, isChecked } = req.body;
   const item = db.prepare('SELECT id FROM shopping_list_items WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!item) return res.status(404).json({ error: 'Not found' });
+  const url = buy_url || sourceUrl || null;
   db.prepare(`UPDATE shopping_list_items SET name=COALESCE(?,name), category=COALESCE(?,category), quantity=?, source=?, source_url=?, notes=?, is_checked=COALESCE(?,is_checked), updated_at=datetime('now') WHERE id=?`)
-    .run(name||null, category||null, quantity||null, source||null, sourceUrl||null, notes||null, isChecked!==undefined?(isChecked?1:0):null, req.params.id);
+    .run(name||null, category||null, quantity||null, source||null, url, notes||null, isChecked!==undefined?(isChecked?1:0):null, req.params.id);
   res.json({ success: true });
 });
 
