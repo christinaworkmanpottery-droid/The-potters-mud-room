@@ -3163,9 +3163,23 @@ app.delete('/api/admin/docs/:slug', auth, (req, res) => {
   }
 })();
 
+// Global error handler — ensure API routes ALWAYS return JSON, never HTML
+app.use((err, req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    console.error('[API ERROR]', req.method, req.path, err.message);
+    res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
+  } else {
+    next(err);
+  }
+});
+
 // SPA fallback — must be AFTER all API routes
+// Catch-all for any method on /api/ that didn't match a route
+app.all('/api/*', (req, res) => {
+  res.status(404).json({ error: 'Not found' });
+});
 app.get('*', (req, res) => {
-  if (!req.path.startsWith('/api/') && !req.path.startsWith('/uploads/')) {
+  if (!req.path.startsWith('/uploads/')) {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
   } else {
     res.status(404).json({ error: 'Not found' });
