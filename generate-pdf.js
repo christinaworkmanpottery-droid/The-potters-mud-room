@@ -28,7 +28,7 @@ function generateMudLogPDF(outputPath) {
   }
 
   // ===== COVER PAGE =====
-  doc.rect(0, 0, 612, 792).fill('#FAF7F2');
+  
   doc.fontSize(60).font('Helvetica-Bold').fillColor(clay).text('*', 0, 200, { align: 'center' });
   doc.fontSize(36).font('Helvetica-Bold').fillColor(brown).text("The Potter's", 0, 290, { align: 'center' });
   doc.fontSize(36).font('Helvetica-Bold').fillColor(clay).text('Mud Log', 0, 335, { align: 'center' });
@@ -38,7 +38,7 @@ function generateMudLogPDF(outputPath) {
 
   // ===== BELONGS TO PAGE =====
   doc.addPage();
-  doc.rect(0, 0, 612, 792).fill('#FAF7F2');
+  
   doc.fontSize(20).font('Helvetica-Bold').fillColor(brown).text('This Mud Log Belongs To:', 50, 200);
   writeLine(260);
   doc.fontSize(9).fillColor(light).text('Name', 50, 265);
@@ -50,7 +50,7 @@ function generateMudLogPDF(outputPath) {
   // ===== PIECE LOG PAGES (20 pages) =====
   for (let i = 0; i < 20; i++) {
     doc.addPage();
-    doc.rect(0, 0, 612, 792).fill('#FAF7F2');
+    
     
     doc.fontSize(18).font('Helvetica-Bold').fillColor(brown).text('Piece Log', 50, 50);
     doc.fontSize(9).fillColor(light).text('#' + (i + 1), 520, 55);
@@ -160,7 +160,7 @@ function generateMudLogPDF(outputPath) {
   // ===== CLAY BODY LOG (5 pages) =====
   for (let i = 0; i < 5; i++) {
     doc.addPage();
-    doc.rect(0, 0, 612, 792).fill('#FAF7F2');
+    
     doc.fontSize(18).font('Helvetica-Bold').fillColor(brown).text('Clay Body Log', 50, 50);
     doc.fontSize(9).fillColor(light).text('#' + (i + 1), 520, 55);
 
@@ -192,7 +192,7 @@ function generateMudLogPDF(outputPath) {
   // ===== GLAZE LOG (10 pages) =====
   for (let i = 0; i < 10; i++) {
     doc.addPage();
-    doc.rect(0, 0, 612, 792).fill('#FAF7F2');
+    
     doc.fontSize(18).font('Helvetica-Bold').fillColor(brown).text('Glaze Log', 50, 50);
     doc.fontSize(9).fillColor(light).text('#' + (i + 1), 520, 55);
 
@@ -240,7 +240,7 @@ function generateMudLogPDF(outputPath) {
 
   // ===== BACK COVER =====
   doc.addPage();
-  doc.rect(0, 0, 612, 792).fill('#FAF7F2');
+  
   doc.fontSize(24).font('Helvetica-Bold').fillColor(brown).text("Keep Making.", 0, 300, { align: 'center' });
   doc.fontSize(24).fillColor(clay).text("Keep Tracking.", 0, 340, { align: 'center' });
   doc.fontSize(24).fillColor(brown).text("Keep Growing.", 0, 380, { align: 'center' });
