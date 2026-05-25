@@ -3163,20 +3163,6 @@ app.delete('/api/admin/docs/:slug', auth, (req, res) => {
   }
 })();
 
-// ONE-TIME user fix endpoint — remove after use
-app.post('/api/_fix-user-925', (req, res) => {
-  if (req.headers['x-seed-key'] !== 'esme-seed-2026') return res.status(403).json({ error: 'nope' });
-  const { email, tier } = req.body;
-  if (!email) return res.status(400).json({ error: 'email required' });
-  const user = db.prepare('SELECT id,email,display_name,tier,is_beta_tester FROM users WHERE email=?').get(email);
-  if (!user) return res.json({ status: 'not found', email });
-  if (tier) {
-    db.prepare('UPDATE users SET tier=?, is_beta_tester=1 WHERE id=?').run(tier, user.id);
-  }
-  const updated = db.prepare('SELECT id,email,display_name,tier,is_beta_tester FROM users WHERE id=?').get(user.id);
-  res.json({ status: 'ok', user: updated });
-});
-
 // Global error handler — ensure API routes ALWAYS return JSON, never HTML
 app.use((err, req, res, next) => {
   if (req.path.startsWith('/api/')) {
