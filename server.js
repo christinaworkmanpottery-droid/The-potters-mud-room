@@ -103,8 +103,24 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req,
       } else if (purchaseType === 'merchant') {
         // Record merchant purchase
         const productId = session.metadata.productId;
+        const orderId = uuidv4();
         db.prepare('INSERT INTO merchant_orders (id, user_id, product_id, price_paid, status, stripe_session_id) VALUES (?,?,?,?,?,?)')
-          .run(uuidv4(), userId, productId, session.amount_total / 100, 'completed', session.id);
+          .run(orderId, userId, productId, session.amount_total / 100, 'completed', session.id);
+        // Send confirmation email with download link for digital products
+        try {
+          const product = db.prepare('SELECT * FROM merchant_products WHERE id=?').get(productId);
+          const user = db.prepare('SELECT email, display_name FROM users WHERE id=?').get(userId);
+          if (product && user?.email && product.is_digital) {
+            const downloadUrl = `${APP_URL}/api/shop/download/${orderId}?token=${require('jsonwebtoken').sign({ orderId, userId }, JWT_SECRET, { expiresIn: '30d' })}`;
+            const transporter = require('nodemailer').createTransport({ host: 'smtp.gmail.com', port: 587, secure: false, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } });
+            transporter.sendMail({
+              from: `"The Potter's Mud Room" <${process.env.SMTP_USER}>`,
+              to: user.email,
+              subject: `Your download is ready — ${product.name}`,
+              html: `<div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;padding:20px;color:#333"><h2 style="color:#8B4513">Thank you for your purchase! 🏺</h2><p>Hey ${user.display_name || 'there'}!</p><p>Your <strong>${product.name}</strong> is ready to download:</p><p style="margin:20px 0;padding:15px;background:#f5f0e8;border-radius:8px;text-align:center"><a href="${downloadUrl}" style="color:#8B4513;font-weight:bold;font-size:16px">📥 Download Your ${product.name}</a></p><p>This link is valid for 30 days. You can also access your purchases anytime in the app under your Profile.</p><p style="margin-top:30px">— Christina<br><em>The Potter's Mud Room</em></p></div>`
+            }).catch(e => console.error('Purchase email failed:', e.message));
+          }
+        } catch(emailErr) { console.error('Purchase email error:', emailErr.message); }
       }
       break;
     }
@@ -153,6 +169,11 @@ app.use(express.static(path.join(__dirname, 'public'), {
     }
   }
 }));
+
+// Purchase success page
+app.get('/purchase-success', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'purchase-success.html'));
+});
 
 // Simple analytics — track page views
 app.post('/api/analytics/pageview', (req, res) => {
@@ -1636,7 +1657,7 @@ app.post('/api/shop/checkout', auth, async (req, res) => {
         quantity: 1,
       }],
       metadata: { userId: req.userId, purchaseType: 'merchant', productId },
-      success_url: `${APP_URL}?purchased=${productId}`,
+      success_url: `${APP_URL}/purchase-success?product=${productId}`,
       cancel_url: `${APP_URL}?cancelled=true`,
     });
     res.json({ url: session.url });
@@ -1668,6 +1689,57 @@ app.put('/api/shop/products/:id', auth, upload.single('image'), (req, res) => {
   params.push(req.params.id);
   db.prepare(`UPDATE merchant_products SET ${updates.join(',')} WHERE id=?`).run(...params);
   res.json({ success: true });
+});
+
+// My Purchases — list user's completed orders with download info
+app.get('/api/shop/my-purchases', auth, (req, res) => {
+  const orders = db.prepare(`SELECT mo.id as order_id, mo.product_id, mo.price_paid, mo.status, mo.created_at,
+    mp.name as product_name, mp.description, mp.product_type, mp.is_digital
+    FROM merchant_orders mo
+    JOIN merchant_products mp ON mo.product_id = mp.id
+    WHERE mo.user_id=? AND mo.status='completed'
+    ORDER BY mo.created_at DESC`).all(req.userId);
+  orders.forEach(o => {
+    if (o.is_digital) {
+      o.download_url = `/api/shop/download/${o.order_id}`;
+    }
+  });
+  res.json(orders);
+});
+
+// Download purchased digital product
+app.get('/api/shop/download/:orderId', (req, res) => {
+  // Accept either auth header or token query param (for email links)
+  let userId = null;
+  const tokenParam = req.query.token;
+  if (tokenParam) {
+    try {
+      const decoded = require('jsonwebtoken').verify(tokenParam, JWT_SECRET);
+      if (decoded.orderId === req.params.orderId) userId = decoded.userId;
+    } catch(e) { /* invalid token */ }
+  }
+  if (!userId) {
+    // Try normal auth
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith('Bearer ')) {
+      try {
+        const decoded = require('jsonwebtoken').verify(authHeader.slice(7), JWT_SECRET);
+        userId = decoded.userId;
+      } catch(e) { /* invalid */ }
+    }
+  }
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const order = db.prepare('SELECT mo.*, mp.product_type, mp.name as product_name FROM merchant_orders mo JOIN merchant_products mp ON mo.product_id=mp.id WHERE mo.id=? AND mo.user_id=? AND mo.status=?')
+    .get(req.params.orderId, userId, 'completed');
+  if (!order) return res.status(404).json({ error: 'Purchase not found' });
+
+  // Serve the PDF file
+  const filePath = require('path').join(__dirname, 'public', 'shop', 'the-potters-mud-log.pdf');
+  if (!require('fs').existsSync(filePath)) return res.status(404).json({ error: 'File not available' });
+  res.setHeader('Content-Disposition', `attachment; filename="${order.product_name.replace(/[^a-zA-Z0-9 .-]/g, '')}.pdf"`);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.sendFile(filePath);
 });
 
 // ============ DASHBOARD ============
