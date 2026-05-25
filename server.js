@@ -3208,3 +3208,15 @@ app.use((err, req, res, next) => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🏺 The Potter's Mud Room running on http://localhost:${PORT}`);
 });
+// ONE-TIME blog seed endpoint — remove after use
+app.post('/api/_seed-blog-925', (req, res) => {
+  if (req.headers['x-seed-key'] !== 'esme-seed-2026') return res.status(403).json({ error: 'nope' });
+  const { v4: uuidv4 } = require('uuid');
+  const { title, slug, content, excerpt } = req.body;
+  if (!title || !slug || !content) return res.status(400).json({ error: 'missing fields' });
+  const existing = db.prepare('SELECT id FROM blog_posts WHERE slug=?').get(slug);
+  if (existing) return res.json({ status: 'already exists', id: existing.id });
+  const id = uuidv4();
+  db.prepare("INSERT INTO blog_posts (id, title, slug, content, excerpt, author, is_published, published_at) VALUES (?,?,?,?,?,?,1,datetime('now'))").run(id, title, slug, content, excerpt, 'Christina Workman');
+  res.json({ status: 'created', id, slug });
+});
