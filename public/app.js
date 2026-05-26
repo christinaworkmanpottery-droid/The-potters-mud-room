@@ -833,7 +833,7 @@ async function loadFirings() {
     c.className = mode === 'list' ? '' : 'card-grid';
     if (mode === 'list') {
       c.innerHTML = firings.map(f =>
-        '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">' +
+        '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="editFiring(\'' + f.id + '\')">' +
         '<strong style="min-width:100px">' + esc(f.firing_type||'Firing') + '</strong>' +
         '<span class="text-sm" style="min-width:60px">Cone ' + esc(f.cone||'?') + '</span>' +
         '<span class="text-sm" style="min-width:80px;color:var(--text-light)">' + esc(f.atmosphere||'') + '</span>' +
@@ -841,13 +841,13 @@ async function loadFirings() {
         (f.firing_time ? '<span class="text-sm" style="color:var(--text-muted)">⏱️ ' + esc(f.firing_time) + '</span>' : '') +
         (f.piece_title ? '<span class="piece-meta-tag">' + esc(f.piece_title) + '</span>' : '') +
         (f.kiln_name ? '<span class="text-sm" style="color:var(--text-muted)">' + esc(f.kiln_name) + '</span>' : '') +
-        '<div style="margin-left:auto;display:flex;gap:6px;flex-shrink:0"><button onclick="editFiring(\'' + f.id + '\')" class="btn btn-sm btn-secondary" style="padding:2px 10px;font-size:0.8rem" title="Edit">✎ Edit</button><button onclick="deleteFiring(\'' + f.id + '\')" class="btn btn-sm btn-secondary" style="padding:2px 10px;font-size:0.8rem;color:var(--danger)" title="Delete">✕ Delete</button></div>' +
+        '<div style="margin-left:auto;display:flex;gap:6px;flex-shrink:0"><button onclick="event.stopPropagation();editFiring(\'' + f.id + '\')" class="btn btn-sm btn-secondary" style="padding:2px 10px;font-size:0.8rem" title="Edit">✎ Edit</button><button onclick="event.stopPropagation();deleteFiring(\'' + f.id + '\')" class="btn btn-sm btn-secondary" style="padding:2px 10px;font-size:0.8rem;color:var(--danger)" title="Delete">✕ Delete</button></div>' +
         '</div>'
       ).join('');
     } else {
       const photosHtml = (photos) => photos && photos.length > 0 ? '<div style="display:flex;gap:6px;margin:8px 0">' + photos.map(p => '<img src="/uploads/' + p.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')">').join('') + '</div>' : '';
       c.innerHTML = firings.map(f =>
-        '<div class="card">' +
+        '<div class="card" style="cursor:pointer" onclick="editFiring(\'' + f.id + '\')">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
         '<div><div class="card-title">' + esc(f.firing_type||'Firing') + ' — Cone ' + esc(f.cone||'?') + '</div>' +
         '<div class="text-sm" style="color:var(--text-light)">' + (f.kiln_name ? esc(f.kiln_name) + ' · ' : '') + fmtDate(f.date) +
@@ -855,7 +855,7 @@ async function loadFirings() {
         (f.firing_speed ? ' · ' + esc(f.firing_speed) : '') +
         (f.firing_time ? ' · ⏱️ ' + esc(f.firing_time) : '') +
         '</div></div>' +
-        '<div style="display:flex;gap:4px;flex-shrink:0"><button onclick="editFiring(\'' + f.id + '\')" class="btn-small" title="Edit">✎</button><button onclick="deleteFiring(\'' + f.id + '\')" class="btn-small" title="Delete">✕</button></div>' +
+        '<div style="display:flex;gap:4px;flex-shrink:0"><button onclick="event.stopPropagation();editFiring(\'' + f.id + '\')" class="btn-small" title="Edit">✎</button><button onclick="event.stopPropagation();deleteFiring(\'' + f.id + '\')" class="btn-small" title="Delete">✕</button></div>' +
         '</div>' +
         photosHtml(f.photos) +
         (f.piece_title ? '<div class="text-sm" style="margin-bottom:4px"><span class="piece-meta-tag">' + esc(f.piece_title) + '</span></div>' : '') +

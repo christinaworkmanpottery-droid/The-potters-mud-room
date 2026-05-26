@@ -238,3 +238,6 @@ body.nav-open { overflow: hidden; }
     min-width: unset;
   }
 }
+
+/* Firing cards - clickable hover */
+#firingList .card:hover { border-color: var(--primary); }
