@@ -241,3 +241,8 @@ body.nav-open { overflow: hidden; }
 
 /* Firing cards - clickable hover */
 #firingList .card:hover { border-color: var(--primary); }
+
+/* All card sections - clickable hover */
+#clayList .card:hover, #glazeList .card:hover, #salesList .card:hover,
+#goalsList .card:hover, #projectsList .card:hover, #eventsList .card:hover,
+#contactsList .card:hover { border-color: var(--primary); }

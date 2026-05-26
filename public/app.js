@@ -557,13 +557,13 @@ function clayCardView(cl) {
     (p.notes ? '<div style="font-size:0.65rem;color:var(--text-light)">' + esc(p.notes) + '</div>' : '') +
     '<button class="btn-ghost btn-sm" style="position:absolute;top:0;right:0;font-size:0.7rem" onclick="event.stopPropagation();deleteClayPhoto(\'' + p.id + '\')">×</button></div>'
   ).join('');
-  return '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(cl.name) + ' ' + stockBadge + '</div>' +
+  return '<div class="card" style="cursor:pointer" onclick="editClayById(\'' + cl.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(cl.name) + ' ' + stockBadge + '</div>' +
     '<div class="text-sm" style="color:var(--text-light)">' + esc(cl.brand||'') + (cl.clay_type ? ' · ' + esc(cl.clay_type) : '') + '</div></div>' +
     '<div style="display:flex;gap:4px">' +
-    '<button class="btn-ghost btn-sm" onclick="openClayPhotoUpload(\'' + cl.id + '\')" title="Add photo">📸</button>' +
-    '<button class="btn-ghost btn-sm" onclick="duplicateClay(\'' + cl.id + '\')" title="Duplicate">📋</button>' +
-    '<button class="btn-ghost btn-sm" onclick="editClayById(\'' + cl.id + '\')">✏️</button>' +
-    '<button class="btn-ghost btn-sm" onclick="deleteClay(\'' + cl.id + '\')">🗑️</button></div></div>' +
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();openClayPhotoUpload(\'' + cl.id + '\')" title="Add photo">📸</button>' +
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();duplicateClay(\'' + cl.id + '\')" title="Duplicate">📋</button>' +
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();editClayById(\'' + cl.id + '\')">✏️</button>' +
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deleteClay(\'' + cl.id + '\')">🗑️</button></div></div>' +
     (photos ? '<div style="display:flex;gap:6px;margin-bottom:10px">' + photos + '</div>' : '') +
     '<div style="display:flex;gap:16px;flex-wrap:wrap">' +
     (cl.color_wet ? '<div><span class="detail-label">Wet</span><div>' + esc(cl.color_wet) + '</div></div>' : '') +
@@ -581,7 +581,7 @@ function clayCardView(cl) {
 }
 function clayListView(cl) {
   const stock = cl.in_stock ? '✅' : '❌';
-  return '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">' +
+  return '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="editClayById(\'' + cl.id + '\')">' +
     '<span style="min-width:24px">' + stock + '</span>' +
     '<strong style="min-width:150px">' + esc(cl.name) + '</strong>' +
     '<span class="text-sm" style="color:var(--text-light);min-width:100px">' + esc(cl.brand||'') + '</span>' +
@@ -589,9 +589,9 @@ function clayListView(cl) {
     '<span class="text-sm" style="min-width:60px">' + (cl.cone_range ? 'Cone ' + esc(cl.cone_range) : '') + '</span>' +
     '<span class="text-sm" style="min-width:70px">' + (cl.shrinkage_pct ? cl.shrinkage_pct + '% shrink' : '') + '</span>' +
     '<span style="margin-left:auto;display:flex;gap:4px">' +
-    '<button class="btn-ghost btn-sm" onclick="duplicateClay(\'' + cl.id + '\')">📋</button>' +
-    '<button class="btn-ghost btn-sm" onclick="editClayById(\'' + cl.id + '\')">✏️</button>' +
-    '<button class="btn-ghost btn-sm" onclick="deleteClay(\'' + cl.id + '\')">🗑️</button></span></div>';
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();duplicateClay(\'' + cl.id + '\')">📋</button>' +
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();editClayById(\'' + cl.id + '\')">✏️</button>' +
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deleteClay(\'' + cl.id + '\')">🗑️</button></span></div>';
 }
 async function loadClayBodies() {
   try {
@@ -661,14 +661,14 @@ function glazeCardView(g) {
     const color = Math.abs(total-100)<0.1 ? 'var(--success)' : (Math.abs(total-100)<5 ? '#F4A623' : 'var(--danger)');
     ingredientTotal = ' <span style="color:'+color+';font-weight:600;font-size:0.8rem">('+total.toFixed(1)+'%)</span>';
   }
-  return '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(g.name) +
+  return '<div class="card" style="cursor:pointer" onclick="editGlazeById(\'' + g.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(g.name) +
     ' <span class="glaze-tag' + (g.glaze_type==='recipe'?' recipe':'') + '">' + g.glaze_type + '</span> ' + stockBadge + ' ' + recipeStatusBadge + '</div>' +
     '<div class="text-sm" style="color:var(--text-light)">' + esc(g.brand||'') + (g.sku ? ' · SKU: ' + esc(g.sku) : '') + (g.color_description ? ' · ' + esc(g.color_description) : '') + '</div></div>' +
     '<div style="display:flex;gap:4px">' +
-    '<button class="btn-ghost btn-sm" onclick="openGlazePhotoUpload(\'' + g.id + '\')" title="Add photo">📸</button>' +
-    '<button class="btn-ghost btn-sm" onclick="duplicateGlaze(\'' + g.id + '\')" title="Duplicate">📋</button>' +
-    '<button class="btn-ghost btn-sm" onclick="editGlazeById(\'' + g.id + '\')">✏️</button>' +
-    '<button class="btn-ghost btn-sm" onclick="deleteGlaze(\'' + g.id + '\')">🗑️</button></div></div>' +
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();openGlazePhotoUpload(\'' + g.id + '\')" title="Add photo">📸</button>' +
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();duplicateGlaze(\'' + g.id + '\')" title="Duplicate">📋</button>' +
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();editGlazeById(\'' + g.id + '\')">✏️</button>' +
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deleteGlaze(\'' + g.id + '\')">🗑️</button></div></div>' +
     (photos ? '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">' + photos + '</div>' : '') +
     '<div style="display:flex;gap:16px;flex-wrap:wrap">' +
     (g.cone_range ? '<div><span class="detail-label">Cone</span><div>' + esc(g.cone_range) + '</div></div>' : '') +
@@ -682,7 +682,7 @@ function glazeCardView(g) {
     (g.recipe_notes ? '<div class="text-sm mt-4" style="color:var(--text-light)">📝 ' + esc(g.recipe_notes) + '</div>' : '') +
     (g.notes ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(g.notes) + '</div>' : '') +
     '<div class="mt-8" style="display:flex;gap:4px;flex-wrap:wrap">' +
-    '<select class="form-select" style="width:auto;font-size:0.75rem;padding:2px 6px" onchange="toggleGlazeStock(\'' + g.id + '\',this.value)">' +
+    '<select class="form-select" style="width:auto;font-size:0.75rem;padding:2px 6px" onclick="event.stopPropagation()" onchange="event.stopPropagation();toggleGlazeStock(\'' + g.id + '\',this.value)">' +
     '<option value=""' + (!g.stock_status?' selected':'') + '>Stock…</option>' +
     '<option value="in-stock"' + (g.stock_status==='in-stock'?' selected':'') + '>In Stock</option>' +
     '<option value="need-to-buy"' + (g.stock_status==='need-to-buy'?' selected':'') + '>Need to Buy</option>' +
@@ -702,7 +702,7 @@ function glazeCardView(g) {
       '</div>' +
       (t.result_notes ? '<div class="text-sm" style="color:var(--text-light);margin-top:2px">' + esc(t.result_notes) + '</div>' : '') +
       '</div>' +
-      '<button class="btn-ghost btn-sm" onclick="deleteClayTest(\'' + g.id + '\',\'' + t.id + '\')" style="color:var(--text-muted);font-size:0.8rem;flex-shrink:0" title="Remove">×</button>' +
+      '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deleteClayTest(\'' + g.id + '\',\'' + t.id + '\')" style="color:var(--text-muted);font-size:0.8rem;flex-shrink:0" title="Remove">×</button>' +
       '</div>'
     ).join('') : '<div class="text-sm" style="color:var(--text-muted);font-style:italic">No clay bodies tested yet</div>') +
     '<div id="clayTestForm_' + g.id + '" class="hidden" style="margin-top:8px;background:var(--bg-light);padding:12px;border-radius:var(--radius-sm)">' +
@@ -713,12 +713,12 @@ function glazeCardView(g) {
     '<input type="text" id="clayTestManualName_' + g.id + '" class="form-input hidden" placeholder="Clay name (e.g. Standard 266)" style="margin-bottom:6px">' +
     '<textarea id="clayTestNotes_' + g.id + '" class="form-input" placeholder="Results / Notes (e.g. Beautiful amber, no crawling)" rows="2" style="margin-bottom:6px"></textarea>' +
     '<input type="file" id="clayTestPhoto_' + g.id + '" accept="image/*" style="margin-bottom:6px;font-size:0.85rem">' +
-    '<button class="btn btn-primary btn-sm" onclick="saveClayTest(\'' + g.id + '\')">Save Clay Test</button>' +
+    '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();saveClayTest(\'' + g.id + '\')">Save Clay Test</button>' +
     '</div></div></div>';
 }
 function glazeListView(g) {
   const stock = g.stock_status === 'need-to-buy' ? '🛒' : (g.stock_status === 'low-stock' ? '⚠️' : (g.stock_status === 'discontinued' ? '❌' : '✅'));
-  return '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">' +
+  return '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="editGlazeById(\'' + g.id + '\')">' +
     '<span style="min-width:24px">' + stock + '</span>' +
     '<strong style="min-width:150px">' + esc(g.name) + '</strong>' +
     '<span class="glaze-tag' + (g.glaze_type==='recipe'?' recipe':'') + '" style="font-size:0.7rem">' + g.glaze_type + '</span>' +
@@ -727,9 +727,9 @@ function glazeListView(g) {
     '<span class="text-sm" style="min-width:60px">' + esc(g.surface||'') + '</span>' +
     '<span class="text-sm" style="min-width:70px">' + esc(g.opacity||'') + '</span>' +
     '<span style="margin-left:auto;display:flex;gap:4px">' +
-    '<button class="btn-ghost btn-sm" onclick="duplicateGlaze(\'' + g.id + '\')">📋</button>' +
-    '<button class="btn-ghost btn-sm" onclick="editGlazeById(\'' + g.id + '\')">✏️</button>' +
-    '<button class="btn-ghost btn-sm" onclick="deleteGlaze(\'' + g.id + '\')">🗑️</button></span></div>';
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();duplicateGlaze(\'' + g.id + '\')">📋</button>' +
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();editGlazeById(\'' + g.id + '\')">✏️</button>' +
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deleteGlaze(\'' + g.id + '\')">🗑️</button></span></div>';
 }
 async function loadGlazes() {
   try {
@@ -1049,7 +1049,7 @@ async function loadSales() {
     c.className = mode === 'list' ? '' : 'card-grid';
     if (mode === 'list') {
       c.innerHTML = sales.map(s =>
-        '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">' +
+        '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="editSale(\'' + s.id + '\')">' +
         '<strong style="min-width:150px">' + esc(s.item_description || s.piece_title || 'Unknown piece') + '</strong>' +
         (s.quantity && s.quantity > 1 ? '<span class="text-sm">Qty: ' + s.quantity + '</span>' : '') +
         '<span style="font-weight:700;color:var(--accent);min-width:60px">$' + ((s.price||0) * (s.quantity||1)).toFixed(0) + '</span>' +
@@ -1057,19 +1057,19 @@ async function loadSales() {
         '<span class="text-sm" style="color:var(--text-light)">' + esc(s.venue_type||'') + '</span>' +
         '<span class="text-sm" style="color:var(--text-muted)">' + esc(s.venue||'') + '</span>' +
         '<span style="margin-left:auto;display:flex;gap:6px">' +
-        '<button onclick="editSale(\'' + s.id + '\')" class="btn-small" title="Edit">✏️</button>' +
-        '<button onclick="deleteSale(\'' + s.id + '\')" class="btn-small" title="Delete" style="color:var(--danger)">🗑️</button></span></div>'
+        '<button onclick="event.stopPropagation();editSale(\'' + s.id + '\')" class="btn-small" title="Edit">✏️</button>' +
+        '<button onclick="event.stopPropagation();deleteSale(\'' + s.id + '\')" class="btn-small" title="Delete" style="color:var(--danger)">🗑️</button></span></div>'
       ).join('');
     } else {
       c.innerHTML = sales.map(s =>
-        '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(s.item_description || s.piece_title || 'Unknown piece') + '</div>' +
+        '<div class="card" style="cursor:pointer" onclick="editSale(\'' + s.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(s.item_description || s.piece_title || 'Unknown piece') + '</div>' +
         '<div class="text-sm" style="color:var(--text-light)">' + fmtDate(s.date) + (s.venue ? ' \u00b7 ' + esc(s.venue) : '') + (s.event_name ? ' \u00b7 ' + esc(s.event_name) : '') + '</div></div>' +
         '<div style="font-family:var(--font-display);font-size:1.2rem;font-weight:700;color:var(--accent)">$' + ((s.price||0) * (s.quantity||1)).toFixed(0) + (s.quantity && s.quantity > 1 ? ' (Qty: ' + s.quantity + ')' : '') + '</div></div>' +
         (s.venue_type ? '<span class="piece-meta-tag">' + esc(s.venue_type) + '</span>' : '') +
         (s.buyer_name ? '<span class="piece-meta-tag">\uD83D\uDC64 ' + esc(s.buyer_name) + '</span>' : '') +
         '<div style="margin-top:8px;display:flex;gap:6px">' +
-        '<button onclick="editSale(\'' + s.id + '\')" class="btn-small">✏️ Edit</button>' +
-        '<button onclick="deleteSale(\'' + s.id + '\')" class="btn-small" style="color:var(--danger)">🗑️ Delete</button></div></div>'
+        '<button onclick="event.stopPropagation();editSale(\'' + s.id + '\')" class="btn-small">✏️ Edit</button>' +
+        '<button onclick="event.stopPropagation();deleteSale(\'' + s.id + '\')" class="btn-small" style="color:var(--danger)">🗑️ Delete</button></div></div>'
       ).join('');
     }
   } catch(e) { toast(e.message,'error'); }
@@ -3441,11 +3441,11 @@ async function loadGoals() {
     if (!goals.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
     c.innerHTML = goals.map(g =>
-      '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(g.title) + '</div>' +
+      '<div class="card" style="cursor:pointer" onclick="editGoal(\'' + g.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(g.title) + '</div>' +
       '<div class="text-sm" style="color:var(--text-light)">' + (g.due_date ? 'Due: ' + fmtDate(g.due_date) : '') + '</div></div>' +
       '<span class="piece-meta-tag">' + (g.priority||'medium') + '</span></div>' +
       (g.description ? '<div class="text-sm mt-8">' + esc(g.description) + '</div>' : '') +
-      '<div style="display:flex;gap:4px;margin-top:10px"><button onclick="editGoal(\'' + g.id + '\')" class="btn-small">✎</button><button onclick="deleteGoal(\'' + g.id + '\')" class="btn-small">✕</button></div>' +
+      '<div style="display:flex;gap:4px;margin-top:10px"><button onclick="event.stopPropagation();editGoal(\'' + g.id + '\')" class="btn-small">✎</button><button onclick="event.stopPropagation();deleteGoal(\'' + g.id + '\')" class="btn-small">✕</button></div>' +
       '</div>'
     ).join('');
   } catch(e) { toast(e.message,'error'); }
@@ -3501,12 +3501,12 @@ async function loadProjects() {
     em.classList.add('hidden');
     const photosHtml = (photos) => photos && photos.length > 0 ? '<div style="display:flex;gap:6px;margin:8px 0;flex-wrap:wrap">' + photos.map(p => '<img src="/uploads/' + p.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')">').join('') + '</div>' : '';
     c.innerHTML = projects.map(p =>
-      '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(p.title) + '</div>' +
+      '<div class="card" style="cursor:pointer" onclick="editProject(\'' + p.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(p.title) + '</div>' +
       '<div class="text-sm" style="color:var(--text-light)">' + (p.due_date ? 'Due: ' + fmtDate(p.due_date) : '') + '</div></div>' +
       '<span class="piece-meta-tag">' + (p.status||'active') + '</span></div>' +
       photosHtml(p.photos) +
       (p.description ? '<div class="text-sm mt-8">' + esc(p.description) + '</div>' : '') +
-      '<div style="display:flex;gap:4px;margin-top:10px"><button onclick="openProjectPhotoUpload(\'' + p.id + '\')" class="btn-small" title="Add photos">📸</button><button onclick="editProject(\'' + p.id + '\')" class="btn-small">✎</button><button onclick="deleteProject(\'' + p.id + '\')" class="btn-small">✕</button></div>' +
+      '<div style="display:flex;gap:4px;margin-top:10px"><button onclick="event.stopPropagation();openProjectPhotoUpload(\'' + p.id + '\')" class="btn-small" title="Add photos">📸</button><button onclick="event.stopPropagation();editProject(\'' + p.id + '\')" class="btn-small">✎</button><button onclick="event.stopPropagation();deleteProject(\'' + p.id + '\')" class="btn-small">✕</button></div>' +
       '</div>'
     ).join('');
   } catch(e) { toast(e.message,'error'); }
@@ -3591,11 +3591,11 @@ async function loadEvents() {
       const start = e.event_date + (e.start_time ? 'T' + e.start_time : 'T00:00');
       const end = e.event_date + (e.end_time ? 'T' + e.end_time : 'T23:59');
       const gCalUrl = 'https://calendar.google.com/calendar/r/eventedit?text=' + encodeURIComponent(e.title) + '&dates=' + start.replace(/[-:]/g,'') + '/' + end.replace(/[-:]/g,'') + (e.location ? '&location=' + encodeURIComponent(e.location) : '') + (e.description ? '&details=' + encodeURIComponent(e.description) : '');
-      return '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(e.title) + '</div>' +
+      return '<div class="card" style="cursor:pointer" onclick="editEvent(\'' + e.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(e.title) + '</div>' +
       '<div class="text-sm" style="color:var(--text-light)">' + fmtDate(e.event_date) + (e.start_time ? ' at ' + e.start_time : '') + '</div></div></div>' +
       (e.location ? '<div class="text-sm"><strong>Location:</strong> ' + esc(e.location) + '</div>' : '') +
       (e.description ? '<div class="text-sm mt-8">' + esc(e.description) + '</div>' : '') +
-      '<div style="display:flex;gap:4px;margin-top:10px"><a href="' + gCalUrl + '" target="_blank" class="btn btn-sm btn-secondary" style="text-decoration:none">📱 Add to Google Calendar</a><button onclick="editEvent(\'' + e.id + '\')" class="btn-small">✎</button><button onclick="deleteEvent(\'' + e.id + '\')" class="btn-small">✕</button></div>' +
+      '<div style="display:flex;gap:4px;margin-top:10px"><a href="' + gCalUrl + '" target="_blank" class="btn btn-sm btn-secondary" style="text-decoration:none" onclick="event.stopPropagation()">📱 Add to Google Calendar</a><button onclick="event.stopPropagation();editEvent(\'' + e.id + '\')" class="btn-small">✎</button><button onclick="event.stopPropagation();deleteEvent(\'' + e.id + '\')" class="btn-small">✕</button></div>' +
       '</div>';
     }).join('');
   } catch(e) { toast(e.message,'error'); }
@@ -3674,11 +3674,11 @@ async function loadContacts() {
     if (!contacts.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
     c.innerHTML = contacts.map(ct =>
-      '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(ct.name) + '</div>' +
+      '<div class="card" style="cursor:pointer" onclick="editContact(\'' + ct.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(ct.name) + '</div>' +
       (ct.email ? '<div class="text-sm" style="color:var(--text-light)">' + esc(ct.email) + '</div>' : '') +
       (ct.phone ? '<div class="text-sm" style="color:var(--text-light)">' + esc(ct.phone) + '</div>' : '') + '</div></div>' +
       (ct.notes ? '<div class="text-sm mt-8">' + esc(ct.notes) + '</div>' : '') +
-      '<div style="display:flex;gap:4px;margin-top:10px"><button onclick="editContact(\'' + ct.id + '\')" class="btn-small">✎</button><button onclick="deleteContact(\'' + ct.id + '\')" class="btn-small">✕</button></div>' +
+      '<div style="display:flex;gap:4px;margin-top:10px"><button onclick="event.stopPropagation();editContact(\'' + ct.id + '\')" class="btn-small">✎</button><button onclick="event.stopPropagation();deleteContact(\'' + ct.id + '\')" class="btn-small">✕</button></div>' +
       '</div>'
     ).join('');
   } catch(e) { toast(e.message,'error'); }
