@@ -723,6 +723,15 @@ app.get('/api/export/firing-logs', auth, (req, res) => {
   res.send(csv);
 });
 
+app.get('/api/export/contacts', auth, (req, res) => {
+  const contacts = db.prepare('SELECT * FROM contacts WHERE user_id=? ORDER BY name').all(req.userId);
+  let csv = 'Name,Email,Phone,Notes\n';
+  contacts.forEach(c => { csv += `"${(c.name||'').replace(/"/g,'""')}","${(c.email||'').replace(/"/g,'""')}","${(c.phone||'').replace(/"/g,'""')}","${(c.notes||'').replace(/"/g,'""')}"\n`; });
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=potters-mudroom-contacts.csv');
+  res.send(csv);
+});
+
 // ============ CLAY BODIES ============
 app.get('/api/clay-bodies', auth, (req, res) => {
   const clays = db.prepare('SELECT * FROM clay_bodies WHERE user_id=? ORDER BY name').all(req.userId);

@@ -3678,7 +3678,7 @@ async function loadContacts() {
       (ct.email ? '<div class="text-sm" style="color:var(--text-light)">' + esc(ct.email) + '</div>' : '') +
       (ct.phone ? '<div class="text-sm" style="color:var(--text-light)">' + esc(ct.phone) + '</div>' : '') + '</div></div>' +
       (ct.notes ? '<div class="text-sm mt-8">' + esc(ct.notes) + '</div>' : '') +
-      '<div style="display:flex;gap:4px;margin-top:10px"><button onclick="event.stopPropagation();editContact(\'' + ct.id + '\')" class="btn-small">✎</button><button onclick="event.stopPropagation();deleteContact(\'' + ct.id + '\')" class="btn-small">✕</button></div>' +
+      '<div style="display:flex;gap:8px;margin-top:12px"><button onclick="event.stopPropagation();editContact(\'' + ct.id + '\')" class="btn btn-sm btn-secondary">✏️ Edit</button><button onclick="event.stopPropagation();deleteContact(\'' + ct.id + '\')" class="btn btn-sm btn-secondary" style="color:var(--danger)">🗑️ Delete</button></div>' +
       '</div>'
     ).join('');
   } catch(e) { toast(e.message,'error'); }
@@ -3690,6 +3690,8 @@ function openContactModal(ct = null) {
   document.getElementById('contactEmail').value = ct?.email || '';
   document.getElementById('contactPhone').value = ct?.phone || '';
   document.getElementById('contactNotes').value = ct?.notes || '';
+  const delBtn = document.getElementById('contactDeleteBtn');
+  if (delBtn) { if (ct?.id) { delBtn.classList.remove('hidden'); delBtn.onclick = () => deleteContact(ct.id); } else { delBtn.classList.add('hidden'); } }
   openModal('contactModal');
 }
 

@@ -1004,7 +1004,10 @@
     <div id="pageContacts" class="page">
       <div class="page-header">
         <h2>Contacts</h2>
-        <button class="btn btn-primary" onclick="openContactModal()">+ Add Contact</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-sm btn-secondary" onclick="exportData('/api/export/contacts')">📥 Download</button>
+          <button class="btn btn-primary" onclick="openContactModal()">+ Add Contact</button>
+        </div>
       </div>
       <div id="contactsList" class="card-grid"></div>
       <div id="contactsEmpty" class="empty-state hidden">
@@ -2030,9 +2033,12 @@
         <label>Notes</label>
         <textarea class="form-textarea" id="contactNotes" placeholder="Notes..."></textarea>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" onclick="closeModal('contactModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary">Save Contact</button>
+      <div class="modal-footer" style="display:flex;justify-content:space-between;align-items:center">
+        <button type="button" id="contactDeleteBtn" class="btn btn-sm hidden" style="color:var(--danger);border:1px solid var(--danger);background:transparent">🗑️ Delete</button>
+        <div style="display:flex;gap:8px;margin-left:auto">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('contactModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Contact</button>
+        </div>
       </div>
     </form>
   </div>
