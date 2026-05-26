@@ -1329,6 +1329,17 @@ async function saveCombo(e) {
 
 // ---- Forum ----
 function debounceLoadForum() { clearTimeout(debounceTimer); debounceTimer = setTimeout(loadForumPosts, 300); }
+function selectForumCategory(catId) {
+  document.getElementById('forumCategoryFilter').value = catId;
+  // Highlight active category card
+  document.querySelectorAll('.forum-cat-card').forEach(el => el.classList.remove('forum-cat-active'));
+  if (catId) {
+    document.querySelectorAll('.forum-cat-card').forEach(el => { if (el.dataset.catId === catId) el.classList.add('forum-cat-active'); });
+  }
+  loadForumPosts();
+  // Scroll to posts area so user sees results
+  setTimeout(() => { const el = document.getElementById('forumPostsArea'); if (el) el.scrollIntoView({behavior:'smooth', block:'start'}); }, 150);
+}
 async function loadForum() {
   try {
     forumCategories = await api('/api/forum/categories');
@@ -1341,7 +1352,7 @@ async function loadForum() {
     // Category cards
     const catEl = document.getElementById('forumCategories');
     catEl.innerHTML = forumCategories.map(c =>
-      '<div class="stat-box forum-cat-card" onclick="document.getElementById(\'forumCategoryFilter\').value=\'' + c.id + '\';loadForumPosts()" style="cursor:pointer">' +
+      '<div class="stat-box forum-cat-card" data-cat-id="' + c.id + '" onclick="selectForumCategory(\'' + c.id + '\')" style="cursor:pointer">' +
       '<div style="font-size:1.5rem">' + c.icon + '</div>' +
       '<div class="stat-label" style="font-weight:600;color:var(--text)">' + esc(c.name) + '</div>' +
       '<div class="text-sm" style="color:var(--text-muted)">' + c.postCount + ' posts</div></div>'
@@ -1362,7 +1373,30 @@ async function loadForumPosts() {
     if (cat) u += 'categoryId=' + encodeURIComponent(cat) + '&';
     const posts = await api(u);
     const c = document.getElementById('forumPosts'), em = document.getElementById('forumEmpty');
-    if (!posts.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
+    // Show category header when filtered
+    const catHeader = document.getElementById('forumCatHeader');
+    if (cat && catHeader) {
+      const activeCat = forumCategories.find(fc => fc.id === cat);
+      if (activeCat) {
+        catHeader.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px"><div style="display:flex;align-items:center;gap:8px"><span style="font-size:1.5rem">' + activeCat.icon + '</span><strong style="font-size:1.1rem">' + esc(activeCat.name) + '</strong></div><button class="btn btn-secondary btn-sm" onclick="selectForumCategory(\'\')">← All Categories</button></div>';
+        catHeader.classList.remove('hidden');
+      }
+    } else if (catHeader) {
+      catHeader.innerHTML = '';
+      catHeader.classList.add('hidden');
+    }
+    if (!posts.length) {
+      c.innerHTML='';
+      // Show category-specific empty state
+      const activeCat = cat ? forumCategories.find(fc => fc.id === cat) : null;
+      if (activeCat) {
+        em.innerHTML = '<div class="empty-state-icon">' + activeCat.icon + '</div><div class="empty-state-title">No posts in ' + esc(activeCat.name) + ' yet</div><p>Be the first to start a conversation!</p><button class="btn btn-primary mt-16" onclick="openForumPostModal()">+ New Post</button>';
+      } else {
+        em.innerHTML = '<div class="empty-state-icon">💬</div><div class="empty-state-title">Welcome to The Mud Room!</div><p>Start a conversation — ask questions, share your work, help other potters.</p><button class="btn btn-primary mt-16" onclick="openForumPostModal()">+ New Post</button>';
+      }
+      em.classList.remove('hidden');
+      return;
+    }
     em.classList.add('hidden');
     c.innerHTML = posts.map(p => {
       const avatar = p.author_avatar ? '<img src="/uploads/' + p.author_avatar + '" class="forum-avatar">' : '<div class="forum-avatar-placeholder">' + (p.author_name||'?')[0].toUpperCase() + '</div>';

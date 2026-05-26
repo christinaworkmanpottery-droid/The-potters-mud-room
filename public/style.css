@@ -208,3 +208,33 @@ body.nav-open { overflow: hidden; }
 /* Small action buttons for inline edit/delete */
 .btn-small { background:none; border:1px solid var(--border); color:var(--text-light); padding:2px 8px; border-radius:var(--radius-sm); cursor:pointer; font-size:0.8rem; transition:all 0.15s; }
 .btn-small:hover { background:var(--primary-light); color:var(--primary); border-color:var(--primary); }
+
+/* Forum categories - horizontal scroll on mobile */
+.forum-categories-scroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.forum-categories-scroll .stat-box {
+  min-width: 120px;
+  flex-shrink: 0;
+}
+.forum-cat-active {
+  border-color: var(--primary) !important;
+  background: var(--primary-light) !important;
+  box-shadow: 0 0 0 2px var(--primary);
+}
+@media (min-width: 768px) {
+  .forum-categories-scroll {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    overflow-x: visible;
+    padding-bottom: 0;
+  }
+  .forum-categories-scroll .stat-box {
+    min-width: unset;
+  }
+}
