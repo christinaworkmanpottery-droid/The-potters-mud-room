@@ -1,0 +1,51 @@
+# The Potter's Mud Room
+
+> Free pottery tracking app built by a potter, for potters. Track every piece, glaze, clay body, and firing — from wet clay to finished work.
+
+## What It Does
+
+The Potter's Mud Room (also known as Potters Mudroom) solves the #1 problem for potters: "Which clay and glaze did I use on that piece?" It's a digital pottery journal and studio organizer.
+
+## Features
+
+- **Piece Tracking**: Log every piece with clay body, glazes, technique, photos at each stage, and notes
+- **Glaze Library**: Track commercial glazes and custom recipes with brand, SKU, ingredients, and result photos
+- **Clay Bodies**: Log clay types — wet/fired colors, shrinkage %, cone range, cost per bag
+- **Firing Logs**: Record every firing — type, cone, atmosphere, kiln, speed, holds. Link to pieces
+- **Potter Community**: Forum to share work, ask questions, post glaze results, connect with ceramicists
+- **Sales Tracking**: Log sales by venue, track revenue, export CSV for taxes
+- **Casualty Tracking**: Log failures (cracking, crawling, warping) and lessons learned
+
+## Pricing
+
+- **Free**: $0 forever — 20 pieces, 1 photo per piece, clay & glaze library, browse the forum
+- **Starter**: $3.48/mo (50% founding member discount) — unlimited pieces, 3 photos per piece, firing logs, glaze recipes, sales tracking, full forum access
+
+## Who It's For
+
+- Wheel throwers
+- Hand builders
+- Ceramic students
+- Studio potters
+- Anyone who wants to stop guessing and start tracking their pottery
+
+## Created By
+
+Christina Workman — a lifelong ceramicist who specializes in small plates and bowls. She built this app to solve her own problem of forgetting which clay and glaze was used on each piece.
+
+## Links
+
+- Website: https://thepottersmudroom.com
+- Creator: https://christinaworkmanpottery.com
+- Related: https://esmeandjade.com (Healing crystal jewelry)
+- Related: https://lucehealing.com (Energy healing services)
+- Instagram: https://www.instagram.com/thepottersmudroom
+
+## Blog Topics
+
+- Studio organization tips
+- Choosing clay bodies
+- Glaze defect troubleshooting
+- Kiln loading techniques
+- Cone temperature guides
+- Pottery business tracking

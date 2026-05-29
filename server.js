@@ -3185,6 +3185,12 @@ app.use((err, req, res, next) => {
 });
 
 // SPA fallback — must be AFTER all API routes
+// Serve llms.txt with correct content type for AI search engines
+app.get('/llms.txt', (req, res) => {
+  res.set('Content-Type', 'text/plain; charset=utf-8');
+  res.sendFile(path.join(__dirname, 'public', 'llms.txt'));
+});
+
 // Catch-all for any method on /api/ that didn't match a route
 app.all('/api/*', (req, res) => {
   res.status(404).json({ error: 'Not found' });
