@@ -307,6 +307,47 @@ app.get('/api/auth/me', auth, (req, res) => {
   res.json({ user: { ...u, displayName: u.display_name, pieceCount: getPieceCount(req.userId), referralCount: referralStats?.count || 0, freeMonthsRemaining: u.free_months_remaining || 0, newsletterSubscribed: u.newsletter_subscribed } });
 });
 
+// User subscription status (used by mobile app BillingScreen)
+app.get('/api/user/subscription', auth, (req, res) => {
+  const u = db.prepare('SELECT tier, billing_period, plan_expires_at, stripe_subscription_id FROM users WHERE id=?').get(req.userId);
+  if (!u) return res.status(404).json({ error: 'User not found' });
+  res.json({
+    plan: u.tier || 'free',
+    status: 'active',
+    billingPeriod: u.billing_period || null,
+    expiresAt: u.plan_expires_at || null,
+    hasStripeSubscription: !!u.stripe_subscription_id
+  });
+});
+
+// Alias for mobile app checkout (app calls /api/create-checkout-session)
+app.post('/api/create-checkout-session', auth, async (req, res) => {
+  if (!stripe) return res.status(400).json({ error: 'Stripe not configured yet — coming soon!' });
+  const { plan } = req.body;
+  const PRICE_CONFIG_LOCAL = {
+    free: null,
+    starter: { amount: 695, name: "Starter Plan — $6.95/mo", tier: 'starter' },
+    'starter-yearly': { amount: 6950, name: "Starter Plan — $69.50/year", tier: 'starter' },
+    basic: { amount: 995, name: "Basic Plan — $9.95/mo", tier: 'basic' },
+    mid: { amount: 1295, name: "Mid Plan — $12.95/mo", tier: 'mid' },
+    top: { amount: 1995, name: "Top Plan — $19.95/mo", tier: 'top' },
+    unlimited: { amount: 995, name: "Unlimited Plan — $9.95/mo", tier: 'top' },
+  };
+  const config = PRICE_CONFIG_LOCAL[plan];
+  if (!config) return res.status(400).json({ error: 'Invalid plan' });
+  try {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      mode: 'subscription',
+      line_items: [{ price_data: { currency: 'usd', recurring: { interval: 'month' }, product_data: { name: config.name }, unit_amount: config.amount }, quantity: 1 }],
+      metadata: { userId: req.userId, purchaseType: 'subscription', tier: config.tier, billing: 'monthly' },
+      success_url: `${APP_URL || 'https://thepottersmudroom.com'}?upgraded=${config.tier}`,
+      cancel_url: `${APP_URL || 'https://thepottersmudroom.com'}?cancelled=true`,
+    });
+    res.json({ url: session.url });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Change password
 app.put('/api/auth/password', auth, (req, res) => {
   try {
