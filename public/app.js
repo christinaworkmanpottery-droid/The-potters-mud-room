@@ -1900,9 +1900,9 @@ async function loadAdmin() {
       '<div class="stat-box"><div class="stat-number">' + s.byTier.free + '</div><div class="stat-label">Free</div></div>' +
       '</div>';
 
-    // Members table
-    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">All Members</h3>';
-    html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
+    // Members table — collapsed by default
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="document.getElementById(\'adminMembersTable\').style.display=document.getElementById(\'adminMembersTable\').style.display===\'none\'?\'block\':\'none\'">All Members (' + m.length + ') ▸ <span style=\'font-size:0.8rem;color:var(--text-light);font-weight:normal\'>tap to expand</span></h3>';
+    html += '<div id="adminMembersTable" style="display:none"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
     html += '<tr style="border-bottom:2px solid var(--border);text-align:left"><th style="padding:8px">Name</th><th style="padding:8px">Email</th><th style="padding:8px">Tier</th><th style="padding:8px">Billing</th><th style="padding:8px">Joined</th><th style="padding:8px">Actions</th></tr>';
     m.forEach(u => {
       const tier = u.tier || 'free';
@@ -1915,7 +1915,7 @@ async function loadAdmin() {
         '<td style="padding:8px">' + fmtDate(u.created_at) + '</td>' +
         '<td style="padding:8px">' + (tier !== 'free' ? '<button class="btn btn-danger btn-sm" style="font-size:0.7rem" onclick="adminCancelMember(\'' + u.id + '\',\'' + esc(u.email).replace(/'/g,"\\'") + '\')">Cancel</button>' : '') + '</td></tr>';
     });
-    html += '</table></div></div>';
+    html += '</table></div></div></div>';
 
     // Discount codes section
     html += '<div class="card mb-16"><h3 style="margin-bottom:12px">🏷️ Shop Discount Codes</h3>' +
