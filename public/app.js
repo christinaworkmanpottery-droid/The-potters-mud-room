@@ -4173,7 +4173,7 @@ async function sendAiMessage() {
   try {
     const res = await fetch('/api/ai/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('mudlog_token') },
       body: JSON.stringify({ message: text, history: aiChatHistory.slice(-10) })
     });
     const data = await res.json();
