@@ -2726,6 +2726,32 @@ app.post('/api/admin/announce', auth, (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Admin: send email to specific recipients (not all members)
+// Body: { to: "email" or ["email1","email2"], subject, html, text? }
+app.post('/api/admin/email-send', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const { to, subject, html, text } = req.body || {};
+    if (!to || !subject || !html) return res.status(400).json({ error: 'to, subject, and html required' });
+    if (!transporter) return res.status(500).json({ error: 'SMTP not configured' });
+    const recipients = Array.isArray(to) ? to : [to];
+    let sent = 0, failed = 0;
+    const promises = recipients.map(email =>
+      transporter.sendMail({
+        from: process.env.SMTP_USER || 'thepottersmudroom@gmail.com',
+        to: email,
+        subject,
+        html,
+        text: text || html.replace(/<[^>]+>/g, '')
+      }).then(() => { sent++; }).catch(err => { failed++; console.error('Targeted email error:', email, err.message); })
+    );
+    Promise.all(promises).then(() => {
+      console.log(`Targeted email done: ${sent} sent, ${failed} failed`);
+    });
+    res.json({ success: true, queued: recipients.length });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ============ BACKFILL REFERRAL CODES ============
 // Ensure all existing users have referral codes at startup
 try {
