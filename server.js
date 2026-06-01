@@ -3280,6 +3280,10 @@ IMPORTANT RULES:
 3. General pottery knowledge (what cone 6 means, how glazes work, troubleshooting) is fine to answer confidently.
 4. For specific commercial products, you can share general category info (e.g., "Duncan glazes are generally low-fire") but always defer to the label for exact temps.
 
+POTTERY FACTS THAT AI MODELS OFTEN GET WRONG:
+- Drying time: Pieces typically take 7-14 days to become fully bone dry before bisque firing, NOT 1-2 days. Thicker pieces and humid environments take longer. Rushing drying causes cracks.
+- Duncan Clear Brilliance is a LOW-FIRE glaze (cone 06-04), not mid-fire.
+
 POTTERY RESOURCES YOU SHOULD KNOW ABOUT:
 - kilnshare.com — a platform where potters can find and rent kiln space from other potters nearby. Great for potters who don't own a kiln.
 - glazy.org — open-source glaze chemistry database with thousands of recipes and UMF analysis
