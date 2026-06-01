@@ -260,7 +260,8 @@ function navigate(page) {
       communityMembers:'pageCommunityMembers',
       memberProfile:'pageMemberProfile',
       notifications:'pageNotifications', messages:'pageMessages', messageThread:'pageMessageThread',
-      blog:'pageBlog', blogPost:'pageBlogPost', publicCombo:'pagePublicCombo'
+      blog:'pageBlog', blogPost:'pageBlogPost', publicCombo:'pagePublicCombo',
+      aiChat:'pageAiChat'
     };
     const el = document.getElementById(map[page]); if (el) el.classList.add('active');
     try { const nb = document.querySelector('.nav-link[data-page="' + page + '"]'); if (nb) nb.classList.add('active'); } catch(e) {}
@@ -273,7 +274,7 @@ function navigate(page) {
     shoppingList:loadShoppingList, chemicals:loadChemicals,
     communityMembers:loadCommunityMembers,
     notifications:loadNotifications, messages:loadMessages,
-    blog:loadBlog
+    blog:loadBlog, aiChat:loadAiChatHistory
   };
   if (loaders[page]) loaders[page]();
     trackPageView('/' + page);
@@ -4116,3 +4117,81 @@ loadFeaturedPotter();
 
 checkResetPasswordHash();
 checkAuth();
+
+// ─── AI Pottery Assistant ───────────────────────────────────────────────────
+let aiChatHistory = JSON.parse(localStorage.getItem('aiChatHistory') || '[]');
+
+function loadAiChatHistory() {
+  const container = document.getElementById('aiChatMessages');
+  if (!container) return;
+  // Keep welcome message, add saved history
+  if (aiChatHistory.length > 0) {
+    container.innerHTML = '';
+    // Re-add welcome
+    container.innerHTML += `<div class="ai-msg" style="margin-bottom:12px;padding:10px 14px;background:#f5f0eb;border-radius:12px;max-width:85%">
+      <div style="font-size:0.75rem;color:var(--primary);font-weight:600;margin-bottom:4px">✨ Pottery AI</div>
+      <div>Hi! I'm your pottery assistant. Ask me anything about clay, glazes, firing, hand building, troubleshooting — whatever's on your mind. 🏺</div>
+    </div>`;
+    aiChatHistory.forEach(msg => {
+      appendAiMessage(msg.role, msg.content, false);
+    });
+    container.scrollTop = container.scrollHeight;
+  }
+}
+
+function appendAiMessage(role, content, save = true) {
+  const container = document.getElementById('aiChatMessages');
+  if (!container) return;
+  const isUser = role === 'user';
+  const html = isUser
+    ? `<div style="margin-bottom:12px;padding:10px 14px;background:var(--primary);color:white;border-radius:12px;max-width:85%;margin-left:auto;border-bottom-right-radius:4px">${escapeHtml(content)}</div>`
+    : `<div style="margin-bottom:12px;padding:10px 14px;background:#f5f0eb;border-radius:12px;max-width:85%;border-bottom-left-radius:4px">
+        <div style="font-size:0.75rem;color:var(--primary);font-weight:600;margin-bottom:4px">✨ Pottery AI</div>
+        <div>${escapeHtml(content).replace(/\n/g, '<br>')}</div>
+      </div>`;
+  container.insertAdjacentHTML('beforeend', html);
+  container.scrollTop = container.scrollHeight;
+  if (save) {
+    aiChatHistory.push({ role, content });
+    // Keep last 50 messages
+    if (aiChatHistory.length > 50) aiChatHistory = aiChatHistory.slice(-50);
+    localStorage.setItem('aiChatHistory', JSON.stringify(aiChatHistory));
+  }
+}
+
+async function sendAiMessage() {
+  const input = document.getElementById('aiChatInput');
+  const btn = document.getElementById('aiSendBtn');
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  btn.disabled = true;
+  btn.textContent = '...';
+  appendAiMessage('user', text);
+
+  try {
+    const res = await fetch('/api/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+      body: JSON.stringify({ message: text, history: aiChatHistory.slice(-10) })
+    });
+    const data = await res.json();
+    if (data.reply) {
+      appendAiMessage('assistant', data.reply);
+    } else {
+      appendAiMessage('assistant', data.error || 'Sorry, something went wrong. Try again!');
+    }
+  } catch (e) {
+    appendAiMessage('assistant', 'Connection error. Please try again in a moment.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Send';
+  }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
