@@ -173,7 +173,6 @@
       <div style="font-size:4rem;margin-bottom:16px">🏺</div>
       <h1 style="font-family:Georgia,serif;font-size:2.4rem;margin-bottom:12px;line-height:1.2">The Pottery Tracker<br><span style="color:#C67B4E">Built for Potters</span></h1>
       <p style="font-size:1.15rem;color:rgba(255,255,255,0.85);margin-bottom:16px;line-height:1.6;max-width:600px;margin-left:auto;margin-right:auto">Track every piece, glaze, clay body, and firing — from wet clay to finished work. Built by a real potter who got tired of forgetting which glaze she used.</p>
-      <p style="font-size:1.05rem;color:#C67B4E;margin-bottom:8px;font-weight:600">✨ Now with a built-in AI Pottery Assistant — free for everyone</p>
       <p style="font-size:0.95rem;color:rgba(255,255,255,0.6);margin-bottom:32px">For wheel throwers, hand builders, ceramic students, and studio potters who want to stop guessing and start tracking.</p>
       <button class="btn btn-primary btn-lg" onclick="document.getElementById('landingPage').style.display='none';document.getElementById('authScreen').style.display='flex'" style="font-size:1.1rem;padding:16px 40px">Get Started — It's Free</button>
       <p style="margin-top:12px;color:rgba(255,255,255,0.5);font-size:0.9rem">No credit card required. 20 pieces free forever.</p>
@@ -181,16 +180,6 @@
         <a href="https://www.instagram.com/thepottersmudroom" target="_blank" rel="noopener" style="color:#fff;background:rgba(255,255,255,0.15);padding:10px 20px;border-radius:8px;text-decoration:none;font-size:1rem;display:inline-flex;align-items:center;gap:8px">📷 @thepottersmudroom</a>
         <a href="#blog" onclick="showBlogFromLanding()" style="color:#fff;background:rgba(255,255,255,0.15);padding:10px 20px;border-radius:8px;text-decoration:none;font-size:1rem;display:inline-flex;align-items:center;gap:8px">📝 From the Studio</a>
       </div>
-    </div>
-  </div>
-
-  <!-- AI POTTERY ASSISTANT — Hero Feature -->
-  <div style="background:linear-gradient(135deg, #5C4033 0%, #8B6914 100%);padding:48px 20px;text-align:center;color:white">
-    <div style="max-width:700px;margin:0 auto">
-      <div style="font-size:2.5rem;margin-bottom:12px">✨</div>
-      <h2 style="font-family:Georgia,serif;font-size:1.8rem;margin-bottom:16px;color:white">The First Pottery App with a Built-In AI Assistant</h2>
-      <p style="font-size:1.1rem;line-height:1.7;opacity:0.95;margin-bottom:12px">Stuck on a glaze issue? Not sure what cone to fire at? AI can't throw a pot or feel when clay is ready — but it CAN remember every firing schedule, glaze recipe, and troubleshooting tip so you don't have to. Ask it anything, anytime. It's like texting that friend who's been potting for 30 years — except they're available 24/7, even when you've got clay on your hands.</p>
-      <p style="font-size:1rem;opacity:0.8;margin-top:16px">Free for everyone — no upgrade required.</p>
     </div>
   </div>
 
@@ -523,7 +512,7 @@
       </div>
       <div class="nav-section">
         <div class="nav-section-title">Community</div>
-        <button class="nav-link" data-page="aiChat" onclick="navigate('aiChat'); closeNav()">✨ Pottery AI</button>
+        <button class="nav-link" data-page="aiChat" onclick="navigate('aiChat'); closeNav()">Ask a Potter</button>
         <button class="nav-link" data-page="community" onclick="navigate('community'); closeNav()">Community Library</button>
         <button class="nav-link" data-page="communityMembers" onclick="navigate('communityMembers'); closeNav()">👥 Members</button>
         <button class="nav-link" data-page="forum" onclick="navigate('forum'); closeNav()">Forum</button>
@@ -550,15 +539,6 @@
       <div class="page-header">
         <h2>🏺 Dashboard</h2>
         <button class="btn btn-primary" onclick="openPieceModal()">+ New Piece</button>
-      </div>
-      <!-- AI Assistant Quick Access -->
-      <div onclick="navigate('aiChat')" style="background:linear-gradient(135deg, #5C4033 0%, #8B6914 100%);border-radius:12px;padding:16px 20px;margin-bottom:20px;cursor:pointer;display:flex;align-items:center;gap:12px">
-        <span style="font-size:1.5rem">✨</span>
-        <div style="flex:1">
-          <div style="color:white;font-weight:600;font-size:1rem">Pottery AI Assistant</div>
-          <div style="color:rgba(255,255,255,0.8);font-size:0.85rem">Ask anything about clay, glazes, firing, or troubleshooting</div>
-        </div>
-        <span style="color:rgba(255,255,255,0.6);font-size:1.2rem">›</span>
       </div>
       <div id="upgradeBanner" class="upgrade-banner hidden">
         <div><strong style="color:var(--primary)">Free tier:</strong> <span id="pieceCountText">0/20 pieces</span></div>
@@ -728,7 +708,7 @@
     <!-- AI CHAT -->
     <div id="pageAiChat" class="page">
       <div class="page-header">
-        <h2>✨ Pottery AI Assistant</h2>
+        <h2>Ask a Potter</h2>
       </div>
       <p style="color:var(--text-light);margin-bottom:16px">Ask anything about clay, glazes, firing, hand building, troubleshooting — whatever's on your mind.</p>
       <div id="aiChatMessages" style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;min-height:300px;max-height:500px;overflow-y:auto;margin-bottom:16px">
