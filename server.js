@@ -46,6 +46,8 @@ if (STRIPE_SECRET) {
   stripe = require('stripe')(STRIPE_SECRET);
 }
 
+// OpenAI for Pottery AI assistant
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const UPLOADS_DIR = path.join(__dirname, 'data', 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 const storage = multer.diskStorage({
@@ -3248,6 +3250,74 @@ app.use((err, req, res, next) => {
     res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
   } else {
     next(err);
+  }
+});
+
+// ─── Pottery AI Assistant ─────────────────────────────────────────────────────
+app.post('/api/ai/chat', auth, async (req, res) => {
+  try {
+    if (!OPENAI_API_KEY) return res.status(503).json({ error: 'AI assistant not configured' });
+    const { message, history } = req.body;
+    if (!message || typeof message !== 'string') return res.status(400).json({ error: 'message required' });
+
+    // Build conversation with system prompt
+    const systemPrompt = `You are a friendly, knowledgeable pottery assistant inside The Potter's Mud Room app. You help potters of all skill levels with questions about:
+- Clay bodies (earthenware, stoneware, porcelain, properties, shrinkage, firing temps)
+- Hand building techniques (pinch, coil, slab, sculpting, joining, drying)
+- Wheel throwing tips and troubleshooting
+- Glazing (application, layering, food safety, common issues like crawling/pinholing/crazing)
+- Glaze chemistry basics (unity molecular formula, flux/glass-former/stabilizer ratios)
+- Firing (bisque temps, glaze firing, kiln loading, oxidation vs reduction, ramp schedules)
+- Kiln maintenance and safety
+- Troubleshooting (cracks, warping, bloating, glaze defects, S-cracks)
+- Tools and equipment recommendations
+- Studio setup and organization
+- Selling pottery, pricing, and business tips
+
+Keep answers concise but helpful. Use plain language. If you're not sure about something, say so rather than guessing. When relevant, mention safety considerations (ventilation, food-safe glazes, kiln safety). You can use bullet points for lists. Don't use markdown headers. Be warm and encouraging — pottery is supposed to be fun!`;
+
+    const messages = [{ role: 'system', content: systemPrompt }];
+
+    // Add conversation history (last 10 messages max)
+    if (Array.isArray(history)) {
+      const recent = history.slice(-10);
+      recent.forEach(h => {
+        if (h.role === 'user' || h.role === 'assistant') {
+          messages.push({ role: h.role, content: h.content });
+        }
+      });
+    }
+
+    messages.push({ role: 'user', content: message });
+
+    // Call OpenAI
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages,
+        max_tokens: 1000,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error('OpenAI error:', response.status, err);
+      return res.status(502).json({ error: 'AI service temporarily unavailable' });
+    }
+
+    const data = await response.json();
+    const reply = data.choices?.[0]?.message?.content || 'Sorry, I couldn\'t generate a response. Try again!';
+
+    res.json({ reply });
+  } catch (e) {
+    console.error('AI chat error:', e.message);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
