@@ -1331,7 +1331,7 @@ app.post('/api/firing-logs', auth, requireTier('starter'), (req, res) => {
   const { pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail, holdUsed, holdDuration, date, results, notes, firingTime, firingMode, loadDescription, firingModeNotes } = req.body;
   const id = uuidv4();
   db.prepare('INSERT INTO firing_logs (id,user_id,piece_id,firing_type,cone,temperature,atmosphere,kiln_name,schedule,duration,firing_speed,custom_speed_detail,hold_used,hold_duration,date,results,notes,firing_time,firing_mode,load_description,firing_mode_notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-    .run(id, req.userId, pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null, firingModeNotes || null);
+    .run(id, req.userId, pieceId, firingType || null, cone, temperature, atmosphere || null, kilnName, schedule, duration, firingSpeed || null, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null, firingModeNotes || null);
   res.json({ id });
 });
 
@@ -1339,7 +1339,7 @@ app.post('/api/firing-logs', auth, requireTier('starter'), (req, res) => {
 app.put('/api/firing-logs/:id', auth, (req, res) => {
   const { pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail, holdUsed, holdDuration, date, results, notes, firingTime, firingMode, loadDescription, firingModeNotes } = req.body;
   db.prepare('UPDATE firing_logs SET piece_id=?,firing_type=?,cone=?,temperature=?,atmosphere=?,kiln_name=?,schedule=?,duration=?,firing_speed=?,custom_speed_detail=?,hold_used=?,hold_duration=?,date=?,results=?,notes=?,firing_time=?,firing_mode=?,load_description=?,firing_mode_notes=? WHERE id=? AND user_id=?')
-    .run(pieceId || null, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null, firingModeNotes || null, req.params.id, req.userId);
+    .run(pieceId || null, firingType || null, cone, temperature, atmosphere || null, kilnName, schedule, duration, firingSpeed || null, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null, firingModeNotes || null, req.params.id, req.userId);
   res.json({ success: true });
 });
 

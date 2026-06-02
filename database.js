@@ -167,7 +167,7 @@ function initDB() {
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
       piece_id TEXT,
-      firing_type TEXT CHECK(firing_type IN ('bisque', 'glaze', 'raku', 'pit', 'wood', 'soda', 'salt', 'maintenance', 'element-change', 'thermocouple', 'preheat', 'soak', 'other')),
+      firing_type TEXT CHECK(firing_type IN ('bisque', 'glaze', 'lustre', 'raku', 'pit', 'wood', 'soda', 'salt', 'maintenance', 'element-change', 'thermocouple', 'preheat', 'soak', 'other')),
       cone TEXT,
       temperature TEXT,
       atmosphere TEXT CHECK(atmosphere IN ('oxidation', 'reduction', 'neutral', NULL)),
@@ -937,6 +937,46 @@ function initDB() {
   try { db.exec('ALTER TABLE beta_signups ADD COLUMN notified_at TEXT'); } catch(e) { /* already exists */ }
   safeAdd('users', 'is_beta_tester', 'INTEGER DEFAULT 0');
   safeAdd('blog_posts', 'view_count', 'INTEGER DEFAULT 0');
+
+  // Migration: update firing_logs CHECK constraint to include 'lustre'
+  try {
+    const flSchema = db.prepare("SELECT sql FROM sqlite_master WHERE name='firing_logs'").get();
+    if (flSchema && flSchema.sql && flSchema.sql.includes("firing_type") && !flSchema.sql.includes("'lustre'")) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS firing_logs_new (
+          id TEXT PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          piece_id TEXT,
+          firing_type TEXT CHECK(firing_type IN ('bisque', 'glaze', 'lustre', 'raku', 'pit', 'wood', 'soda', 'salt', 'maintenance', 'element-change', 'thermocouple', 'preheat', 'soak', 'other')),
+          cone TEXT,
+          temperature TEXT,
+          atmosphere TEXT CHECK(atmosphere IN ('oxidation', 'reduction', 'neutral', NULL)),
+          kiln_name TEXT,
+          schedule TEXT,
+          duration TEXT,
+          firing_speed TEXT CHECK(firing_speed IN ('slow', 'medium', 'fast', 'custom', NULL)),
+          custom_speed_detail TEXT,
+          hold_used INTEGER DEFAULT 0,
+          hold_duration TEXT,
+          date TEXT,
+          results TEXT,
+          notes TEXT,
+          firing_time TEXT,
+          firing_mode TEXT DEFAULT 'kiln-load',
+          load_description TEXT,
+          firing_mode_notes TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          FOREIGN KEY (user_id) REFERENCES users(id),
+          FOREIGN KEY (piece_id) REFERENCES pieces(id) ON DELETE SET NULL
+        );
+        INSERT INTO firing_logs_new SELECT id, user_id, piece_id, firing_type, cone, temperature, atmosphere, kiln_name, schedule, duration, firing_speed, custom_speed_detail, hold_used, hold_duration, date, results, notes, firing_time, firing_mode, load_description, firing_mode_notes, created_at FROM firing_logs;
+        DROP TABLE firing_logs;
+        ALTER TABLE firing_logs_new RENAME TO firing_logs;
+        CREATE INDEX IF NOT EXISTS idx_firing_user ON firing_logs(user_id);
+      `);
+      console.log('[migration] Updated firing_logs CHECK constraint to include lustre');
+    }
+  } catch(e) { console.warn('[migration] firing_logs lustre migration:', e.message); }
 
   // One-time cleanup: remove ghost "Untitled" pieces with no real data (from iOS FormData bug)
   try {
