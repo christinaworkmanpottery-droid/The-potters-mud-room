@@ -4263,7 +4263,7 @@ function openTokenShop() {
   const html = `<div class="modal-overlay" id="tokenShopModal" onclick="if(event.target===this)closeModal('tokenShopModal')" style="display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999">
     <div class="modal" style="max-width:400px;width:90%;padding:24px;border-radius:16px;background:white">
       <h2 style="margin-bottom:8px">Buy More Questions</h2>
-      <p style="color:var(--text-light);margin-bottom:20px;font-size:0.9rem">Purchased questions never expire. Use them anytime!</p>
+      <p style="color:var(--text-light);margin-bottom:20px;font-size:0.9rem">Everyone gets 5 free questions per month. These packs are extra — they never expire and stack on top of your monthly free questions. Unlimited members get unlimited questions included.</p>
       <div style="display:flex;flex-direction:column;gap:12px">
         <button onclick="buyTokenPack('starter')" style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#f5f0eb;border:2px solid var(--border);border-radius:12px;cursor:pointer;transition:border-color 0.2s" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
           <div style="text-align:left"><div style="font-weight:600">10 Questions</div><div style="font-size:0.8rem;color:var(--text-light)">$0.20 each</div></div>
