@@ -234,7 +234,7 @@ function refreshTier(req, res, next) {
 function requireTier(min) {
   // New simplified tiers: free=0, starter=1
   // Backward compat: basic/mid/top all treated as >= starter
-  const lv = { free: 0, starter: 1, basic: 1, mid: 2, top: 3 };
+  const lv = { free: 0, starter: 1, basic: 1, mid: 1, top: 1 };
   const minLv = min === 'starter' ? 1 : (lv[min] || 0);
   return (req, res, next) => {
     const u = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
@@ -337,12 +337,8 @@ app.post('/api/create-checkout-session', auth, async (req, res) => {
   const { plan } = req.body;
   const PRICE_CONFIG_LOCAL = {
     free: null,
-    starter: { amount: 695, name: "Starter Plan — $6.95/mo", tier: 'starter' },
-    'starter-yearly': { amount: 6950, name: "Starter Plan — $69.50/year", tier: 'starter' },
-    basic: { amount: 995, name: "Basic Plan — $9.95/mo", tier: 'basic' },
-    mid: { amount: 1295, name: "Mid Plan — $12.95/mo", tier: 'mid' },
-    top: { amount: 1995, name: "Top Plan — $19.95/mo", tier: 'top' },
-    unlimited: { amount: 995, name: "Unlimited Plan — $9.95/mo", tier: 'top' },
+    starter: { amount: 695, name: "Unlimited Plan — $6.95/mo", tier: 'starter' },
+    'starter-yearly': { amount: 6950, name: "Unlimited Plan — $69.50/year", tier: 'starter' },
   };
   const config = PRICE_CONFIG_LOCAL[plan];
   if (!config) return res.status(400).json({ error: 'Invalid plan' });
@@ -462,14 +458,7 @@ const PRICE_CONFIG = {
   starter: { amount: 695, name: "Starter Plan — $6.95/mo" },
   'starter-yearly': { amount: 6950, name: "Starter Plan — $69.50/year (save $14!)", tier: 'starter' },
   'starter-founding': { amount: 348, name: "Starter Plan — Founding Rate $3.48/mo", tier: 'starter' },
-  'starter-founding-yearly': { amount: 3475, name: "Starter Plan — Founding Rate $34.75/year", tier: 'starter' },
-  // Legacy plans (kept for backward compat with existing Stripe subscriptions)
-  basic: { amount: 995, name: "Basic Plan — $9.95/mo" },
-  mid: { amount: 1295, name: "Mid Plan — $12.95/mo" },
-  top: { amount: 1995, name: "Top Plan — $19.95/mo" },
-  'basic-yearly': { amount: 9500, name: "Basic Plan — $95/year (save $24.40!)", tier: 'basic' },
-  'mid-yearly': { amount: 12500, name: "Mid Plan — $125/year (save $30.40!)", tier: 'mid' },
-  'top-yearly': { amount: 19000, name: "Top Plan — $190/year (save $49.40!)", tier: 'top' }
+  'starter-founding-yearly': { amount: 3475, name: "Unlimited Plan — Founding Rate $34.75/year", tier: 'starter' },
 };
 
 app.get('/api/billing/plans', (req, res) => {
@@ -477,7 +466,7 @@ app.get('/api/billing/plans', (req, res) => {
     foundingMember: true,
     plans: [
       { id: 'free', name: 'Free', price: 0, yearlyPrice: 0, features: ['20 pieces', '1 photo each', 'Personal clay & glaze library', 'Basic search', 'Community forum access', 'Ask a Potter (10 questions/month)'] },
-      { id: 'starter', name: 'Starter', price: 6.95, yearlyPrice: 69.50, foundingPrice: 3.48, foundingYearly: 34.75, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', 'Community glaze library', 'Sales tracking', 'Full forum access (read & post)', 'Unlimited Ask a Potter', 'Cancel anytime'] }
+      { id: 'starter', name: 'Unlimited', price: 6.95, yearlyPrice: 69.50, foundingPrice: 3.48, foundingYearly: 34.75, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', 'Community glaze library', 'Sales tracking', 'Full forum access (read & post)', 'Unlimited Ask a Potter', 'Cancel anytime'] }
     ],
     stripeEnabled: !!stripe
   });
