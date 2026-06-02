@@ -3402,6 +3402,26 @@ Firing speed:
 - Glaze firings are usually faster (6-10 hours) because the clay is already vitrified.
 - Cooling takes 12-24 hours. DO NOT OPEN THE KILN EARLY.
 
+=== POTTERY TOOLS & SUPPLY BRANDS ===
+
+- Soolla: Popular pottery tool bags/totes. Canvas bags with 30+ pockets designed specifically for carrying pottery tools to and from studios. Beloved by potters who share studio space. Sold at Blick, Amazon, Sheffield Pottery, and soolla.co. Lifetime guarantee.
+- Mud Tools: Premium pottery ribs, trimming tools, and modeling tools. Color-coded by flexibility.
+- Kemper: Classic pottery tool brand — needle tools, fettling knives, ribbon tools, hole cutters.
+- Xiem: Trimming tools, faceting tools, art rollers, stamps.
+- Dolan: Wire-end trimming tools, popular for precise foot trimming.
+- Dirty Girls: Fun patterned pottery tool bags, bat holders, and studio accessories.
+- Shimpo: Pottery wheels, pugmills, slab rollers.
+- Brent: Pottery wheels (by AMACO). Workhorses of community studios.
+- Skutt: Electric kilns — the most common studio kilns in North America.
+- L&L: Electric kilns known for quality element holders.
+- Bailey: Slab rollers, extruders, studio equipment.
+- North Star: Slab rollers and extruders.
+- Peter Pugger: Pugmills and de-airing pugmills.
+- Giffin Grip: Trimming system that holds pots on the wheel head.
+- MKM: Pottery stamps and texture rollers from Poland.
+- Amaco/Brent: Wheels, kilns, glazes, underglazes (wide product range).
+- Speedball: Underglazes, ceramic supplies, screen printing.
+
 === COMMERCIAL GLAZE BRANDS ===
 
 NEVER guess specific cone ranges for commercial products. Always say "check the label." But here's general brand info:
