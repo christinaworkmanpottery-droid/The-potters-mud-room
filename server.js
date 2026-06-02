@@ -426,7 +426,26 @@ app.put('/api/profile', auth, (req, res) => {
   const { displayName, username, bio, location, website, isPrivate, unitSystem, tempUnit } = req.body;
   db.prepare(`UPDATE users SET display_name=?,username=?,bio=?,location=?,website=?,is_private=?,unit_system=?,temp_unit=?,updated_at=datetime('now') WHERE id=?`)
     .run(displayName, username || null, bio, location, website, isPrivate ? 1 : 0, unitSystem || 'imperial', tempUnit || 'fahrenheit', req.userId);
-  res.json({ success: true });
+  const user = db.prepare('SELECT * FROM users WHERE id=?').get(req.userId);
+  res.json({ success: true, user });
+});
+
+// Alias: GET /api/user/profile
+app.get('/api/user/profile', auth, (req, res) => {
+  const user = db.prepare('SELECT * FROM users WHERE id=?').get(req.userId);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  const { password_hash, ...safe } = user;
+  res.json({ user: safe });
+});
+
+// Alias: PUT /api/user/profile
+app.put('/api/user/profile', auth, (req, res) => {
+  const { displayName, username, bio, location, website, isPrivate, unitSystem, tempUnit } = req.body;
+  db.prepare(`UPDATE users SET display_name=?,username=?,bio=?,location=?,website=?,is_private=?,unit_system=?,temp_unit=?,updated_at=datetime('now') WHERE id=?`)
+    .run(displayName || null, username || null, bio || null, location || null, website || null, isPrivate ? 1 : 0, unitSystem || 'imperial', tempUnit || 'fahrenheit', req.userId);
+  const user = db.prepare('SELECT * FROM users WHERE id=?').get(req.userId);
+  const { password_hash, ...safe } = user;
+  res.json({ user: safe });
 });
 
 // Newsletter subscription toggle
