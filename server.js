@@ -24,6 +24,10 @@ db.exec(`CREATE TABLE IF NOT EXISTS ai_usage (
 )`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_ai_usage_user_month ON ai_usage(user_id, created_at)`);
 
+// Migrate all tiers to free/starter ("Unlimited")
+try {
+  db.prepare("UPDATE users SET tier='starter' WHERE tier IN ('basic','mid','top')").run();
+} catch(e) { /* already done or no rows */ }
 // Nodemailer setup for newsletter emails
 let transporter = null;
 function setupTransporter(user, pass, host, port) {
