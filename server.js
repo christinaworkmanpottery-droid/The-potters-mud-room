@@ -821,7 +821,7 @@ app.delete('/api/clay-bodies/:id', auth, (req, res) => {
 app.post('/api/clay-bodies/:id/photos', auth, upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo' });
   const count = db.prepare('SELECT COUNT(*) as c FROM clay_photos WHERE clay_id=?').get(req.params.id).c;
-  if (count >= 2) return res.status(403).json({ error: 'Max 2 photos per clay (raw & bisque)' });
+  if (count >= 3) return res.status(403).json({ error: 'Max 3 photos per clay body' });
   const id = uuidv4();
   db.prepare('INSERT INTO clay_photos (id,clay_id,filename,original_name,photo_label,notes,sort_order) VALUES (?,?,?,?,?,?,?)')
     .run(id, req.params.id, req.file.filename, req.file.originalname, req.body.label||null, req.body.notes||null, count);
@@ -892,7 +892,6 @@ app.delete('/api/glazes/:id', auth, (req, res) => {
 
 app.post('/api/glazes/:id/photos', auth, upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo' });
-  if (req.userTier === 'free') return res.status(403).json({ error: 'Upgrade to add glaze photos' });
   const count = db.prepare('SELECT COUNT(*) as c FROM glaze_photos WHERE glaze_id=?').get(req.params.id).c;
   if (count >= 3) return res.status(403).json({ error: 'Max 3 photos per glaze' });
   const id = uuidv4();
@@ -1271,9 +1270,9 @@ app.delete('/api/pieces/:id', auth, (req, res) => {
 app.post('/api/pieces/:id/photos', auth, upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo' });
   const u = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
-  const maxPhotos = (u?.tier || 'free') === 'free' ? 1 : 3;
+  const maxPhotos = 3;
   const count = db.prepare('SELECT COUNT(*) as c FROM piece_photos WHERE piece_id=?').get(req.params.id).c;
-  if (count >= maxPhotos) return res.status(403).json({ error: (u?.tier || 'free') === 'free' ? 'Free tier: 1 photo per piece. Upgrade for 3!' : 'Max 3 photos per piece' });
+  if (count >= maxPhotos) return res.status(403).json({ error: 'Max 3 photos per piece' });
   const id = uuidv4();
   db.prepare('INSERT INTO piece_photos (id,piece_id,filename,original_name,stage,sort_order) VALUES (?,?,?,?,?,?)')
     .run(id, req.params.id, req.file.filename, req.file.originalname, req.body.stage || 'other', count);
