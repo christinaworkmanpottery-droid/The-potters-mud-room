@@ -4133,6 +4133,8 @@ let aiChatHistory = JSON.parse(localStorage.getItem('aiChatHistory') || '[]');
 function loadAiChatHistory() {
   const container = document.getElementById('aiChatMessages');
   if (!container) return;
+  // Load usage counter
+  loadAiUsage();
   // Keep welcome message, add saved history
   if (aiChatHistory.length > 0) {
     container.innerHTML = '';
@@ -4186,8 +4188,12 @@ async function sendAiMessage() {
       body: JSON.stringify({ message: text, history: aiChatHistory.slice(-10) })
     });
     const data = await res.json();
-    if (data.reply) {
+    if (data.limitReached) {
+      appendAiMessage('assistant', 'You\'ve used all 10 free questions this month! Upgrade to any paid plan for unlimited access to Ask a Potter. \n\nYour questions reset at the start of each month.');
+      loadAiUsage();
+    } else if (data.reply) {
       appendAiMessage('assistant', data.reply);
+      loadAiUsage();
     } else {
       appendAiMessage('assistant', data.error || 'Sorry, something went wrong. Try again!');
     }
@@ -4215,4 +4221,26 @@ function previewSalePhoto(event) {
     preview.innerHTML = '<img src="' + e.target.result + '" style="max-width:120px;max-height:120px;border-radius:8px;object-fit:cover">';
   };
   reader.readAsDataURL(file);
+}
+
+// ─── AI Usage Tracking ──────────────────────────────────────────────────────
+async function loadAiUsage() {
+  try {
+    const data = await api('/api/ai/usage');
+    const banner = document.getElementById('aiUsageBanner');
+    if (!banner) return;
+    if (data.unlimited) {
+      banner.style.display = 'none';
+    } else {
+      const remaining = Math.max(0, data.limit - data.used);
+      banner.style.display = 'block';
+      if (remaining === 0) {
+        banner.style.background = '#fef2f2';
+        banner.innerHTML = '🚫 You\'ve used all 10 free questions this month. <a href="#" onclick="navigate(\'upgrade\');return false" style="color:var(--primary);font-weight:600">Upgrade for unlimited access</a>';
+      } else {
+        banner.style.background = '#f5f0eb';
+        banner.innerHTML = '💬 ' + remaining + ' of 10 free questions remaining this month. <a href="#" onclick="navigate(\'upgrade\');return false" style="color:var(--primary);font-weight:600">Upgrade for unlimited</a>';
+      }
+    }
+  } catch(e) { /* silent */ }
 }

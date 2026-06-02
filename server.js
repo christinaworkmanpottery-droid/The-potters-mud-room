@@ -15,6 +15,15 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'pottery-app-dev-secret-change-in-prod';
 const db = initDB();
 
+// AI usage tracking table
+db.exec(`CREATE TABLE IF NOT EXISTS ai_usage (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  created_at DATETIME DEFAULT (datetime('now')),
+  message TEXT
+)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_ai_usage_user_month ON ai_usage(user_id, created_at)`);
+
 // Nodemailer setup for newsletter emails
 let transporter = null;
 function setupTransporter(user, pass, host, port) {
@@ -467,8 +476,8 @@ app.get('/api/billing/plans', (req, res) => {
   res.json({
     foundingMember: true,
     plans: [
-      { id: 'free', name: 'Free', price: 0, yearlyPrice: 0, features: ['20 pieces', '1 photo each', 'Personal clay & glaze library', 'Basic search', 'Community forum access'] },
-      { id: 'starter', name: 'Starter', price: 6.95, yearlyPrice: 69.50, foundingPrice: 3.48, foundingYearly: 34.75, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', 'Community glaze library', 'Sales tracking', 'Full forum access (read & post)', 'Cancel anytime'] }
+      { id: 'free', name: 'Free', price: 0, yearlyPrice: 0, features: ['20 pieces', '1 photo each', 'Personal clay & glaze library', 'Basic search', 'Community forum access', 'Ask a Potter (10 questions/month)'] },
+      { id: 'starter', name: 'Starter', price: 6.95, yearlyPrice: 69.50, foundingPrice: 3.48, foundingYearly: 34.75, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', 'Community glaze library', 'Sales tracking', 'Full forum access (read & post)', 'Unlimited Ask a Potter', 'Cancel anytime'] }
     ],
     stripeEnabled: !!stripe
   });
@@ -820,8 +829,9 @@ app.delete('/api/clay-bodies/:id', auth, (req, res) => {
 // Clay photo upload
 app.post('/api/clay-bodies/:id/photos', auth, upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo' });
+  const maxPhotos = (req.userTier === 'free') ? 1 : 3;
   const count = db.prepare('SELECT COUNT(*) as c FROM clay_photos WHERE clay_id=?').get(req.params.id).c;
-  if (count >= 3) return res.status(403).json({ error: 'Max 3 photos per clay body' });
+  if (count >= maxPhotos) return res.status(403).json({ error: req.userTier === 'free' ? 'Free tier allows 1 photo per clay body. Upgrade to add up to 3!' : 'Max 3 photos per clay body' });
   const id = uuidv4();
   db.prepare('INSERT INTO clay_photos (id,clay_id,filename,original_name,photo_label,notes,sort_order) VALUES (?,?,?,?,?,?,?)')
     .run(id, req.params.id, req.file.filename, req.file.originalname, req.body.label||null, req.body.notes||null, count);
@@ -892,8 +902,9 @@ app.delete('/api/glazes/:id', auth, (req, res) => {
 
 app.post('/api/glazes/:id/photos', auth, upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo' });
+  const maxPhotos = (req.userTier === 'free') ? 1 : 3;
   const count = db.prepare('SELECT COUNT(*) as c FROM glaze_photos WHERE glaze_id=?').get(req.params.id).c;
-  if (count >= 3) return res.status(403).json({ error: 'Max 3 photos per glaze' });
+  if (count >= maxPhotos) return res.status(403).json({ error: req.userTier === 'free' ? 'Free tier allows 1 photo per glaze. Upgrade to add up to 3!' : 'Max 3 photos per glaze' });
   const id = uuidv4();
   db.prepare('INSERT INTO glaze_photos (id,glaze_id,filename,original_name,photo_label,notes,sort_order) VALUES (?,?,?,?,?,?,?)').run(id, req.params.id, req.file.filename, req.file.originalname, req.body.label||null, req.body.notes||null, count);
   res.json({ id, filename: req.file.filename });
@@ -1270,9 +1281,9 @@ app.delete('/api/pieces/:id', auth, (req, res) => {
 app.post('/api/pieces/:id/photos', auth, upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo' });
   const u = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
-  const maxPhotos = 3;
+  const maxPhotos = (req.userTier === 'free') ? 1 : 3;
   const count = db.prepare('SELECT COUNT(*) as c FROM piece_photos WHERE piece_id=?').get(req.params.id).c;
-  if (count >= maxPhotos) return res.status(403).json({ error: 'Max 3 photos per piece' });
+  if (count >= maxPhotos) return res.status(403).json({ error: req.userTier === 'free' ? 'Free tier allows 1 photo per piece. Upgrade to add up to 3!' : 'Max 3 photos per piece' });
   const id = uuidv4();
   db.prepare('INSERT INTO piece_photos (id,piece_id,filename,original_name,stage,sort_order) VALUES (?,?,?,?,?,?)')
     .run(id, req.params.id, req.file.filename, req.file.originalname, req.body.stage || 'other', count);
@@ -3252,12 +3263,35 @@ app.use((err, req, res, next) => {
   }
 });
 
+app.get("/api/ai/usage", auth, (req, res) => {
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const count = db.prepare("SELECT COUNT(*) as c FROM ai_usage WHERE user_id=? AND created_at >= ?").get(req.userId, monthStart.toISOString()).c;
+  const limit = req.userTier === "free" ? 10 : null;
+  res.json({ used: count, limit, unlimited: req.userTier !== "free" });
+});
+
 // ─── Pottery AI Assistant ─────────────────────────────────────────────────────
 app.post('/api/ai/chat', auth, async (req, res) => {
   try {
     if (!OPENAI_API_KEY) return res.status(503).json({ error: 'AI assistant not configured' });
     const { message, history } = req.body;
     if (!message || typeof message !== 'string') return res.status(400).json({ error: 'message required' });
+
+    // Rate limit: free tier gets 10 questions/month, paid gets unlimited
+    if (req.userTier === 'free') {
+      const monthStart = new Date();
+      monthStart.setDate(1);
+      monthStart.setHours(0, 0, 0, 0);
+      const count = db.prepare('SELECT COUNT(*) as c FROM ai_usage WHERE user_id=? AND created_at >= ?').get(req.userId, monthStart.toISOString()).c;
+      if (count >= 10) {
+        return res.status(403).json({ error: 'You\'ve used your 10 free questions this month. Upgrade to any paid plan for unlimited access!', limitReached: true, used: count, limit: 10 });
+      }
+    }
+
+    // Track usage
+    db.prepare('INSERT INTO ai_usage (id, user_id, message) VALUES (?, ?, ?)').run(uuidv4(), req.userId, message.slice(0, 200));
 
     // Build conversation with system prompt
     const systemPrompt = `You are a friendly, knowledgeable pottery assistant inside The Potter's Mud Room app. You help potters of all skill levels — especially beginners who may not know what can go wrong.
