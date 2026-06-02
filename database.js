@@ -938,6 +938,16 @@ function initDB() {
   safeAdd('users', 'is_beta_tester', 'INTEGER DEFAULT 0');
   safeAdd('blog_posts', 'view_count', 'INTEGER DEFAULT 0');
 
+  // Project enhancements: priority, contacts, shopping, calendar
+  safeAdd('projects', 'priority', "TEXT DEFAULT 'medium'");
+  safeAdd('projects', 'contact_name', 'TEXT');
+  safeAdd('projects', 'contact_email', 'TEXT');
+  safeAdd('projects', 'contact_phone', 'TEXT');
+  safeAdd('projects', 'contact_notes', 'TEXT');
+  safeAdd('projects', 'shopping_list', 'TEXT');
+  safeAdd('projects', 'budget', 'TEXT');
+  safeAdd('projects', 'notes', 'TEXT');
+
   // Migration: update firing_logs CHECK constraint to include 'lustre'
   try {
     const flSchema = db.prepare("SELECT sql FROM sqlite_master WHERE name='firing_logs'").get();

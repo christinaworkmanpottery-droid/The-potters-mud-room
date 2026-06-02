@@ -2219,20 +2219,20 @@ app.get('/api/projects', auth, (req, res) => {
 });
 
 app.post('/api/projects', auth, requireTier('starter'), (req, res) => {
-  const { title, name, description, status, dueDate, deadline, notes } = req.body;
+  const { title, name, description, status, dueDate, deadline, notes, priority, contactName, contactEmail, contactPhone, contactNotes, shoppingList, budget } = req.body;
   const projectTitle = title || name;
   if (!projectTitle) return res.status(400).json({ error: 'Project name is required' });
   const id = uuidv4();
-  db.prepare('INSERT INTO projects (id,user_id,title,description,status,due_date) VALUES (?,?,?,?,?,?)')
-    .run(id, req.userId, projectTitle, description || notes || null, status || 'active', dueDate || deadline || null);
+  db.prepare('INSERT INTO projects (id,user_id,title,description,status,due_date,priority,contact_name,contact_email,contact_phone,contact_notes,shopping_list,budget,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .run(id, req.userId, projectTitle, description || null, status || 'active', dueDate || deadline || null, priority || 'medium', contactName || null, contactEmail || null, contactPhone || null, contactNotes || null, shoppingList || null, budget || null, notes || null);
   res.json({ id });
 });
 
 app.put('/api/projects/:id', auth, (req, res) => {
-  const { title, name, description, status, dueDate, deadline, notes } = req.body;
+  const { title, name, description, status, dueDate, deadline, notes, priority, contactName, contactEmail, contactPhone, contactNotes, shoppingList, budget } = req.body;
   const projectTitle = title || name;
-  db.prepare('UPDATE projects SET title=?,description=?,status=?,due_date=?,updated_at=datetime(\'now\') WHERE id=? AND user_id=?')
-    .run(projectTitle, description || notes || null, status, dueDate || deadline || null, req.params.id, req.userId);
+  db.prepare('UPDATE projects SET title=?,description=?,status=?,due_date=?,priority=?,contact_name=?,contact_email=?,contact_phone=?,contact_notes=?,shopping_list=?,budget=?,notes=?,updated_at=datetime(\'now\') WHERE id=? AND user_id=?')
+    .run(projectTitle, description || null, status, dueDate || deadline || null, priority || 'medium', contactName || null, contactEmail || null, contactPhone || null, contactNotes || null, shoppingList || null, budget || null, notes || null, req.params.id, req.userId);
   res.json({ success: true });
 });
 
