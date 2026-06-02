@@ -1153,11 +1153,20 @@ async function saveSale(e) {
   try {
     const method = saleId ? 'PUT' : 'POST';
     const url = saleId ? '/api/sales/' + saleId : '/api/sales';
-    await api(url, { method, body });
+    const result = await api(url, { method, body });
+    // Upload photo if selected
+    const photoFile = document.getElementById('salePhotoInput').files[0];
+    const targetId = saleId || result.id;
+    if (photoFile && targetId) {
+      const fd = new FormData();
+      fd.append('photo', photoFile);
+      await fetch('/api/sales/' + targetId + '/photo', { method:'POST', headers:{'Authorization':'Bearer '+token}, body:fd });
+    }
     toast(saleId ? 'Sale updated!' : 'Sale logged!', 'success');
     trackActivity(saleId ? 'edit_sale' : 'create_sale', 'sales');
     closeModal('saleModal');
     document.getElementById('saleId').value = '';
+    document.getElementById('salePhotoPreview').innerHTML = '';
     loadSales();
   } catch(e) { toast(e.message, 'error'); }
 }
@@ -4194,4 +4203,16 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+// ─── Sale Photo Preview ─────────────────────────────────────────────────────
+function previewSalePhoto(event) {
+  const file = event.target.files[0];
+  const preview = document.getElementById('salePhotoPreview');
+  if (!file) { preview.innerHTML = ''; return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    preview.innerHTML = '<img src="' + e.target.result + '" style="max-width:120px;max-height:120px;border-radius:8px;object-fit:cover">';
+  };
+  reader.readAsDataURL(file);
 }

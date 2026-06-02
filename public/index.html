@@ -1831,6 +1831,12 @@
           <input type="text" class="form-input" id="saleBuyerName" placeholder="e.g., Marina">
         </div>
       </div>
+      <div class="form-group">
+        <label>📷 Photo</label>
+        <div id="salePhotoPreview" style="margin-bottom:8px"></div>
+        <input type="file" id="salePhotoInput" accept="image/*" style="display:none" onchange="previewSalePhoto(event)">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('salePhotoInput').click()">📷 Add Photo</button>
+      </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('saleModal')">Cancel</button>
         <button type="submit" class="btn btn-primary">Save Sale</button>
