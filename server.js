@@ -441,8 +441,21 @@ app.get('/api/user/profile', auth, (req, res) => {
 // Alias: PUT /api/user/profile
 app.put('/api/user/profile', auth, (req, res) => {
   const { displayName, username, bio, location, website, isPrivate, unitSystem, tempUnit } = req.body;
+  // Only update fields that are actually provided
+  const current = db.prepare('SELECT * FROM users WHERE id=?').get(req.userId);
+  if (!current) return res.status(404).json({ error: 'User not found' });
   db.prepare(`UPDATE users SET display_name=?,username=?,bio=?,location=?,website=?,is_private=?,unit_system=?,temp_unit=?,updated_at=datetime('now') WHERE id=?`)
-    .run(displayName || null, username || null, bio || null, location || null, website || null, isPrivate ? 1 : 0, unitSystem || 'imperial', tempUnit || 'fahrenheit', req.userId);
+    .run(
+      displayName !== undefined ? displayName : current.display_name,
+      username !== undefined ? username : current.username,
+      bio !== undefined ? bio : current.bio,
+      location !== undefined ? location : current.location,
+      website !== undefined ? website : current.website,
+      isPrivate !== undefined ? (isPrivate ? 1 : 0) : current.is_private,
+      unitSystem || current.unit_system || 'imperial',
+      tempUnit || current.temp_unit || 'fahrenheit',
+      req.userId
+    );
   const user = db.prepare('SELECT * FROM users WHERE id=?').get(req.userId);
   const { password_hash, ...safe } = user;
   res.json({ user: safe });
