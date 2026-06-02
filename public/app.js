@@ -4189,7 +4189,7 @@ async function sendAiMessage() {
     });
     const data = await res.json();
     if (data.limitReached) {
-      appendAiMessage('assistant', 'You\'ve used all 10 free questions this month! Upgrade to any paid plan for unlimited access to Ask a Potter. \n\nYour questions reset at the start of each month.');
+      appendAiMessage('assistant', 'You\'ve used your 5 free questions this month! You can buy more questions or upgrade to Unlimited for unlimited access. \n\nYour free questions reset at the start of each month.');
       loadAiUsage();
     } else if (data.reply) {
       appendAiMessage('assistant', data.reply);
@@ -4230,17 +4230,74 @@ async function loadAiUsage() {
     const banner = document.getElementById('aiUsageBanner');
     if (!banner) return;
     if (data.unlimited) {
-      banner.style.display = 'none';
+      banner.style.display = 'block';
+      banner.style.background = '#f0f9f0';
+      banner.innerHTML = '✨ Unlimited questions — ask away!';
     } else {
       const remaining = Math.max(0, data.limit - data.used);
+      const tokens = data.tokens || 0;
       banner.style.display = 'block';
-      if (remaining === 0) {
+      if (remaining === 0 && tokens === 0) {
         banner.style.background = '#fef2f2';
-        banner.innerHTML = '🚫 You\'ve used all 10 free questions this month. <a href="#" onclick="navigate(\'upgrade\');return false" style="color:var(--primary);font-weight:600">Upgrade for unlimited access</a>';
+        banner.innerHTML = '🚫 You\'ve used all 5 free questions this month. ' +
+          '<a href="#" onclick="openTokenShop();return false" style="color:var(--primary);font-weight:600">Buy more questions</a> or ' +
+          '<a href="#" onclick="navigate(\'upgrade\');return false" style="color:var(--primary);font-weight:600">upgrade for unlimited</a>';
+      } else if (remaining === 0 && tokens > 0) {
+        banner.style.background = '#f5f0eb';
+        banner.innerHTML = '🎫 ' + tokens + ' purchased question' + (tokens !== 1 ? 's' : '') + ' remaining. ' +
+          '<a href="#" onclick="openTokenShop();return false" style="color:var(--primary);font-weight:600">Buy more</a> | ' +
+          '<a href="#" onclick="navigate(\'upgrade\');return false" style="color:var(--primary);font-weight:600">Go unlimited</a>';
       } else {
         banner.style.background = '#f5f0eb';
-        banner.innerHTML = '💬 ' + remaining + ' of 10 free questions remaining this month. <a href="#" onclick="navigate(\'upgrade\');return false" style="color:var(--primary);font-weight:600">Upgrade for unlimited</a>';
+        banner.innerHTML = '💬 ' + remaining + ' of 5 free questions remaining this month.' +
+          (tokens > 0 ? ' Plus ' + tokens + ' purchased.' : '') +
+          ' <a href="#" onclick="openTokenShop();return false" style="color:var(--primary);font-weight:600">Buy more</a> | ' +
+          '<a href="#" onclick="navigate(\'upgrade\');return false" style="color:var(--primary);font-weight:600">Go unlimited</a>';
       }
     }
   } catch(e) { /* silent */ }
+}
+
+// ─── Token Shop ─────────────────────────────────────────────────────────────
+function openTokenShop() {
+  const html = `<div class="modal-overlay" id="tokenShopModal" onclick="if(event.target===this)closeModal('tokenShopModal')" style="display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999">
+    <div class="modal" style="max-width:400px;width:90%;padding:24px;border-radius:16px;background:white">
+      <h2 style="margin-bottom:8px">Buy More Questions</h2>
+      <p style="color:var(--text-light);margin-bottom:20px;font-size:0.9rem">Purchased questions never expire. Use them anytime!</p>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <button onclick="buyTokenPack('starter')" style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#f5f0eb;border:2px solid var(--border);border-radius:12px;cursor:pointer;transition:border-color 0.2s" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="text-align:left"><div style="font-weight:600">10 Questions</div><div style="font-size:0.8rem;color:var(--text-light)">$0.20 each</div></div>
+          <div style="font-weight:700;color:var(--primary)">$1.99</div>
+        </button>
+        <button onclick="buyTokenPack('studio')" style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#f5f0eb;border:2px solid var(--border);border-radius:12px;cursor:pointer;transition:border-color 0.2s" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="text-align:left"><div style="font-weight:600">30 Questions</div><div style="font-size:0.8rem;color:var(--text-light)">$0.17 each — save 15%</div></div>
+          <div style="font-weight:700;color:var(--primary)">$4.99</div>
+        </button>
+        <button onclick="buyTokenPack('master')" style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#f5f0eb;border:2px solid var(--primary);border-radius:12px;cursor:pointer;position:relative" >
+          <div style="position:absolute;top:-8px;right:12px;background:var(--primary);color:white;font-size:0.7rem;padding:2px 8px;border-radius:4px;font-weight:600">BEST VALUE</div>
+          <div style="text-align:left"><div style="font-weight:600">75 Questions</div><div style="font-size:0.8rem;color:var(--text-light)">$0.13 each — save 35%</div></div>
+          <div style="font-weight:700;color:var(--primary)">$9.99</div>
+        </button>
+      </div>
+      <div style="text-align:center;margin-top:16px">
+        <p style="font-size:0.85rem;color:var(--text-light);margin-bottom:8px">Or get <strong>unlimited</strong> questions for $6.95/mo</p>
+        <a href="#" onclick="closeModal('tokenShopModal');navigate('upgrade');return false" style="color:var(--primary);font-weight:600;font-size:0.9rem">View Plans →</a>
+      </div>
+      <button onclick="closeModal('tokenShopModal')" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:1.5rem;cursor:pointer;color:var(--text-light)">×</button>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+async function buyTokenPack(pack) {
+  try {
+    const data = await api('/api/ai/buy-tokens', { method: 'POST', body: { pack } });
+    if (data.url) {
+      window.location.href = data.url;
+    } else {
+      toast(data.error || 'Something went wrong', 'error');
+    }
+  } catch(e) {
+    toast(e.message || 'Payment error', 'error');
+  }
 }

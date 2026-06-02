@@ -28,6 +28,9 @@ db.exec(`CREATE INDEX IF NOT EXISTS idx_ai_usage_user_month ON ai_usage(user_id,
 try {
   db.prepare("UPDATE users SET tier='starter' WHERE tier IN ('basic','mid','top')").run();
 } catch(e) { /* already done or no rows */ }
+
+// AI tokens column
+try { db.exec("ALTER TABLE users ADD COLUMN ai_tokens INTEGER DEFAULT 0"); } catch(e) { /* already exists */ }
 // Nodemailer setup for newsletter emails
 let transporter = null;
 function setupTransporter(user, pass, host, port) {
@@ -136,6 +139,12 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req,
             }).catch(e => console.error('Purchase email failed:', e.message));
           }
         } catch(emailErr) { console.error('Purchase email error:', emailErr.message); }
+      } else if (purchaseType === 'ai_tokens') {
+        // Add purchased AI tokens to user's balance
+        const questions = parseInt(session.metadata.questions) || 0;
+        if (questions > 0) {
+          db.prepare('UPDATE users SET ai_tokens = COALESCE(ai_tokens, 0) + ? WHERE id=?').run(questions, userId);
+        }
       }
       break;
     }
@@ -469,7 +478,7 @@ app.get('/api/billing/plans', (req, res) => {
   res.json({
     foundingMember: true,
     plans: [
-      { id: 'free', name: 'Free', price: 0, yearlyPrice: 0, features: ['20 pieces', '1 photo each', 'Personal clay & glaze library', 'Basic search', 'Community forum access', 'Ask a Potter (10 questions/month)'] },
+      { id: 'free', name: 'Free', price: 0, yearlyPrice: 0, features: ['20 pieces', '1 photo each', 'Personal clay & glaze library', 'Basic search', 'Community forum access', 'Ask a Potter (5 questions/month)'] },
       { id: 'starter', name: 'Unlimited', price: 6.95, yearlyPrice: 69.50, foundingPrice: 3.48, foundingYearly: 34.75, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', 'Community glaze library', 'Sales tracking', 'Full forum access (read & post)', 'Unlimited Ask a Potter', 'Cancel anytime'] }
     ],
     stripeEnabled: !!stripe
@@ -3256,13 +3265,54 @@ app.use((err, req, res, next) => {
   }
 });
 
-app.get("/api/ai/usage", auth, (req, res) => {
+app.get('/api/ai/usage', auth, (req, res) => {
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
-  const count = db.prepare("SELECT COUNT(*) as c FROM ai_usage WHERE user_id=? AND created_at >= ?").get(req.userId, monthStart.toISOString()).c;
-  const limit = req.userTier === "free" ? 10 : null;
-  res.json({ used: count, limit, unlimited: req.userTier !== "free" });
+  const count = db.prepare('SELECT COUNT(*) as c FROM ai_usage WHERE user_id=? AND created_at >= ?').get(req.userId, monthStart.toISOString()).c;
+  const user = db.prepare('SELECT ai_tokens FROM users WHERE id=?').get(req.userId);
+  const tokens = user ? (user.ai_tokens || 0) : 0;
+  const limit = req.userTier === 'free' ? 5 : null;
+  res.json({ used: count, limit, unlimited: req.userTier !== 'free', tokens });
+});
+
+// Token packs for Ask a Potter
+const TOKEN_PACKS = {
+  starter: { questions: 10, amount: 199, name: '10 Questions — $1.99' },
+  studio: { questions: 30, amount: 499, name: '30 Questions — $4.99' },
+  master: { questions: 75, amount: 999, name: '75 Questions — $9.99' },
+};
+
+app.get('/api/ai/token-packs', auth, (req, res) => {
+  const user = db.prepare('SELECT ai_tokens FROM users WHERE id=?').get(req.userId);
+  res.json({ packs: TOKEN_PACKS, currentTokens: user ? (user.ai_tokens || 0) : 0 });
+});
+
+app.post('/api/ai/buy-tokens', auth, async (req, res) => {
+  if (!stripe) return res.status(503).json({ error: 'Payments not configured' });
+  const { pack } = req.body;
+  const config = TOKEN_PACKS[pack];
+  if (!config) return res.status(400).json({ error: 'Invalid pack. Options: starter, studio, master' });
+  try {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      mode: 'payment',
+      line_items: [{
+        price_data: {
+          currency: 'usd',
+          product_data: { name: 'Ask a Potter — ' + config.name },
+          unit_amount: config.amount
+        },
+        quantity: 1
+      }],
+      metadata: { userId: req.userId, purchaseType: 'ai_tokens', pack, questions: String(config.questions) },
+      success_url: process.env.BASE_URL ? process.env.BASE_URL + '/#aiChat' : 'https://thepottersmudroom.com/#aiChat',
+      cancel_url: process.env.BASE_URL ? process.env.BASE_URL + '/#aiChat' : 'https://thepottersmudroom.com/#aiChat',
+    });
+    res.json({ url: session.url });
+  } catch(e) {
+    res.status(500).json({ error: 'Payment error: ' + e.message });
+  }
 });
 
 // ─── Pottery AI Assistant ─────────────────────────────────────────────────────
@@ -3272,14 +3322,20 @@ app.post('/api/ai/chat', auth, async (req, res) => {
     const { message, history } = req.body;
     if (!message || typeof message !== 'string') return res.status(400).json({ error: 'message required' });
 
-    // Rate limit: free tier gets 10 questions/month, paid gets unlimited
+    // Rate limit: free tier gets 5 questions/month, can use purchased tokens, paid gets unlimited
     if (req.userTier === 'free') {
       const monthStart = new Date();
       monthStart.setDate(1);
       monthStart.setHours(0, 0, 0, 0);
       const count = db.prepare('SELECT COUNT(*) as c FROM ai_usage WHERE user_id=? AND created_at >= ?').get(req.userId, monthStart.toISOString()).c;
-      if (count >= 10) {
-        return res.status(403).json({ error: 'You\'ve used your 10 free questions this month. Upgrade to any paid plan for unlimited access!', limitReached: true, used: count, limit: 10 });
+      if (count >= 5) {
+        // Check if user has purchased tokens
+        const user = db.prepare('SELECT ai_tokens FROM users WHERE id=?').get(req.userId);
+        if (!user || (user.ai_tokens || 0) <= 0) {
+          return res.status(403).json({ error: 'You\'ve used your 5 free questions this month. Buy more questions or upgrade to Unlimited for unlimited access!', limitReached: true, used: count, limit: 5 });
+        }
+        // Deduct a token
+        db.prepare('UPDATE users SET ai_tokens = ai_tokens - 1 WHERE id=?').run(req.userId);
       }
     }
 
