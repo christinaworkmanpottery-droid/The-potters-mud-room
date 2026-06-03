@@ -460,6 +460,11 @@ function initDB() {
   safeAdd('firing_logs', 'load_description', 'TEXT');
   safeAdd('firing_logs', 'firing_mode_notes', 'TEXT');
 
+  // Firing log time/temp tracking (start, end, open temp)
+  safeAdd('firing_logs', 'start_time', 'TEXT');
+  safeAdd('firing_logs', 'end_time', 'TEXT');
+  safeAdd('firing_logs', 'open_temp', 'TEXT');
+
   // Firing photos table
   db.exec(`
     CREATE TABLE IF NOT EXISTS firing_photos (
