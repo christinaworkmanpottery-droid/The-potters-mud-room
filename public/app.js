@@ -1877,6 +1877,15 @@ async function exportData(endpoint) {
 }
 
 // ---- Admin Dashboard ----
+function toggleAdminSection(el) {
+  var body;
+  if (typeof el === 'string') { body = document.getElementById(el); }
+  else { body = el.nextElementSibling; }
+  if (!body) return;
+  var open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+}
+
 async function loadAdmin() {
   const el = document.getElementById('adminContent');
   if (currentUser?.email !== 'christinaworkmanpottery@gmail.com') {
@@ -1927,17 +1936,19 @@ async function loadAdmin() {
     html += '</table></div></div></div>';
 
     // Discount codes section
-    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">🏷️ Shop Discount Codes</h3>' +
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(this)">🏷️ Shop Discount Codes ▸ <span style="font-size:0.8rem;color:var(--text-light);font-weight:normal">tap to expand</span></h3>' +
+      '<div style="display:none">' +
       '<p class="text-sm mb-16" style="color:var(--text-light)">Create discount codes for professionals promoting your site. These give a % off in the shop.</p>' +
       '<div class="form-row" style="gap:8px">' +
       '<div class="form-group"><label>Code</label><input type="text" class="form-input" id="discountCode" placeholder="e.g., POTTER20" style="text-transform:uppercase"></div>' +
       '<div class="form-group"><label>Discount %</label><input type="number" class="form-input" id="discountPct" value="10" min="1" max="100"></div>' +
       '<div class="form-group"><label>Max Uses (0=∞)</label><input type="number" class="form-input" id="discountMaxUses" value="0"></div>' +
       '</div><button class="btn btn-primary btn-sm" onclick="createDiscountCode()">Create Discount Code</button>' +
-      '<div id="discountCodesList" class="mt-16"></div></div>';
+      '<div id="discountCodesList" class="mt-16"></div></div></div>';
 
-    // Promo codes section (gift tier upgrades to friends)
-    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">🎟️ Promo Codes</h3>' +
+    // Promo codes section
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(this)">🎟️ Promo Codes ▸ <span style="font-size:0.8rem;color:var(--text-light);font-weight:normal">tap to expand</span></h3>' +
+      '<div style="display:none">' +
       '<p class="text-sm mb-16" style="color:var(--text-light)">Create promo codes to gift tier upgrades to friends. Users redeem these on the Plans page.</p>' +
       '<div class="form-group"><label>Type</label><select class="form-select" id="newPromoType" onchange="togglePromoType()">' +
       '<option value="tier">Tier Upgrade</option></select></div>' +
@@ -1946,54 +1957,59 @@ async function loadAdmin() {
       '<div class="form-row" style="gap:8px"><div class="form-group"><label>Days (tier duration)</label><input type="number" class="form-input" id="newPromoDays" value="30"></div>' +
       '<div class="form-group"><label>Max Uses (0=unlimited)</label><input type="number" class="form-input" id="newPromoUses" value="0"></div></div>' +
       '<button class="btn btn-primary btn-sm" onclick="createPromoCode()">Create Code</button>' +
-      '<div id="promoCodesList" class="mt-16"></div></div>';
+      '<div id="promoCodesList" class="mt-16"></div></div></div>';
 
     // Orders section
-    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">🛍️ Recent Orders</h3><div id="adminOrders">Loading...</div></div>';
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(\'adminOrdersWrap\')">🛍️ Recent Orders ▸ <span style=\'font-size:0.8rem;color:var(--text-light);font-weight:normal\'>tap to expand</span></h3><div id="adminOrdersWrap" style="display:none"><div id="adminOrders">Loading...</div></div></div>';
 
     // Analytics section
-    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">📊 Site Traffic</h3><div id="adminAnalytics">Loading...</div></div>';
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(\'adminAnalyticsWrap\')">📊 Site Traffic ▸ <span style=\'font-size:0.8rem;color:var(--text-light);font-weight:normal\'>tap to expand</span></h3><div id="adminAnalyticsWrap" style="display:none"><div id="adminAnalytics">Loading...</div></div></div>';
 
     // Reviews section
-    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">⭐ Reviews</h3><div id="adminReviewsList">Loading...</div></div>';
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(\'adminReviewsWrap\')">⭐ Reviews ▸ <span style=\'font-size:0.8rem;color:var(--text-light);font-weight:normal\'>tap to expand</span></h3><div id="adminReviewsWrap" style="display:none"><div id="adminReviewsList">Loading...</div></div></div>';
 
     // Blog management section
-    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">📝 Blog Posts</h3>' +
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(\'adminBlogWrap\')">📝 Blog Posts ▸ <span style=\'font-size:0.8rem;color:var(--text-light);font-weight:normal\'>tap to expand</span></h3><div id="adminBlogWrap" style="display:none">' +
       '<button class="btn btn-primary btn-sm mb-16" onclick="openBlogPostEditor()">+ New Post</button>' +
-      '<div id="adminBlogList">Loading...</div></div>';
+      '<div id="adminBlogList">Loading...</div></div></div>';
 
     // Featured potter section
-    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">🌟 Featured Potter</h3>' +
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(this)">🌟 Featured Potter ▸ <span style="font-size:0.8rem;color:var(--text-light);font-weight:normal">tap to expand</span></h3>' +
+      '<div style="display:none">' +
       '<p class="text-sm mb-16" style="color:var(--text-light)">Select a user to feature on the landing page.</p>' +
       '<div class="form-row" style="gap:8px">' +
       '<div class="form-group"><label>User Email</label><input type="text" class="form-input" id="featuredPotterEmail" placeholder="user@example.com"></div>' +
       '<div class="form-group"><label>Quote</label><input type="text" class="form-input" id="featuredPotterQuote" placeholder="A quote from the potter..."></div></div>' +
       '<button class="btn btn-primary btn-sm" onclick="setFeaturedPotter()">Set Featured Potter</button>' +
-      '<div id="featuredPotterHistory" class="mt-16"></div></div>';
+      '<div id="featuredPotterHistory" class="mt-16"></div></div></div>';
 
     // Beta testers section
-    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">🧪 Beta Testers</h3>' +
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(this)">🧪 Beta Testers ▸ <span style="font-size:0.8rem;color:var(--text-light);font-weight:normal">tap to expand</span></h3>' +
+      '<div style="display:none">' +
       '<p class="text-sm mb-12" style="color:var(--text-light)">People who signed up to beta test the app. Copy their Gmail addresses into Google Play\'s closed testing list.</p>' +
-      '<div id="adminBetaContent">Loading...</div></div>';
+      '<div id="adminBetaContent">Loading...</div></div></div>';
 
     // Newsletter section
-    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">📬 Newsletter</h3>' +
-      '<div id="adminNewsletterContent">Loading...</div></div>';
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(this)">📬 Newsletter ▸ <span style="font-size:0.8rem;color:var(--text-light);font-weight:normal">tap to expand</span></h3>' +
+      '<div style="display:none"><div id="adminNewsletterContent">Loading...</div></div></div>';
 
     // Email settings section
-    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">📧 Email Settings</h3>' +
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(this)">📧 Email Settings ▸ <span style="font-size:0.8rem;color:var(--text-light);font-weight:normal">tap to expand</span></h3>' +
+      '<div style="display:none">' +
       '<p class="text-sm mb-12" style="color:var(--text-light)">Configure Gmail for sending newsletters. You need a <a href="https://myaccount.google.com/apppasswords" target="_blank">Gmail App Password</a> (requires 2-Step Verification).</p>' +
-      '<div id="adminEmailSettingsContent">Loading...</div></div>';
+      '<div id="adminEmailSettingsContent">Loading...</div></div></div>';
 
     // Usage analytics section
-    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">📊 Feature Usage</h3>' +
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(this)">📊 Feature Usage ▸ <span style="font-size:0.8rem;color:var(--text-light);font-weight:normal">tap to expand</span></h3>' +
+      '<div style="display:none">' +
       '<p class="text-sm mb-12" style="color:var(--text-light)">See which features members are actually using — and which ones they\'re ignoring.</p>' +
-      '<div id="adminUsageContent">Loading...</div></div>';
+      '<div id="adminUsageContent">Loading...</div></div></div>';
 
     // Docs & Templates section
-    html += '<div class="card mb-16"><h3 style="margin-bottom:12px">📋 Docs & Templates</h3>' +
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(this)">📋 Docs & Templates ▸ <span style="font-size:0.8rem;color:var(--text-light);font-weight:normal">tap to expand</span></h3>' +
+      '<div style="display:none">' +
       '<p class="text-sm mb-12" style="color:var(--text-light)">Quick-access documents, templates, and guides for managing the app.</p>' +
-      '<div id="adminDocsContent">Loading...</div></div>';
+      '<div id="adminDocsContent">Loading...</div></div></div>';
 
     try {
       el.innerHTML = html;
