@@ -2,6 +2,7 @@
 const API = '';
 let token = localStorage.getItem('mudlog_token');
 let currentUser = null;
+let guestMode = false;
 let clayBodies = [];
 let glazes = [];
 let debounceTimer = null;
@@ -19,6 +20,16 @@ async function api(path, opts = {}) {
   const d = await res.json();
   if (!res.ok) throw new Error(d.error || 'Something went wrong');
   return d;
+}
+function requireSignup(feature) {
+  const msg = feature ? `Sign up free to ${feature}.` : 'Sign up free to use this feature.';
+  toast(msg, '');
+  document.getElementById('landingPage').style.display = 'none';
+  document.getElementById('mainApp').classList.add('hidden');
+  document.getElementById('authScreen').style.display = 'flex';
+}
+function isGuestPreviewPage(page) {
+  return ['blog','forum','community','communityMembers','shop','upgrade','help'].includes(page);
 }
 function toast(msg, type = '') {
   const el = document.createElement('div');
@@ -200,6 +211,7 @@ async function checkAuth() {
   try { document.getElementById('landingPage').style.display = 'none'; const d = await api('/api/auth/me'); currentUser = d.user; showApp(); } catch { logout(); }
 }
 function showApp() {
+  guestMode = false;
   document.getElementById('landingPage').style.display = 'none';
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('mainApp').classList.remove('hidden');
@@ -239,6 +251,18 @@ function showApp() {
 let currentPage = 'dashboard';
 function navigate(page) {
   try {
+    if (!token && !guestMode) {
+      if (isGuestPreviewPage(page)) {
+        showGuestPreview(page);
+        return;
+      }
+      requireSignup('use the app');
+      return;
+    }
+    if (guestMode && !isGuestPreviewPage(page)) {
+      requireSignup('use ' + page.replace(/([A-Z])/g, ' $1').toLowerCase());
+      return;
+    }
     currentPage = page;
     // Update URL hash so refresh stays on same page
     if (page !== 'dashboard') {
@@ -1216,9 +1240,10 @@ async function loadCombos() {
     if (filter) u += 'filter=' + encodeURIComponent(filter) + '&';
     const combos = await api(u);
     const c = document.getElementById('comboList'), em = document.getElementById('communityEmpty');
+    const guestBanner = guestMode ? '<div class="card mb-16" style="background:var(--bg-light);border:1px dashed var(--primary)"><strong>Preview mode</strong><p class="text-sm" style="margin-top:6px;color:var(--text-light)">You can browse shared combos here. Sign up free to save your own combos, like, comment, and message members.</p><button class="btn btn-primary btn-sm mt-8" onclick="requireSignup(\'save combos and join the community\')">Sign Up Free</button></div>' : '';
     if (!combos.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
-    c.innerHTML = combos.map(cb =>
+    c.innerHTML = guestBanner + combos.map(cb =>
       '<div class="card"><div class="card-header"><div><div class="card-title">' + esc(cb.name) + '</div>' +
       '<div class="text-sm" style="color:var(--text-light)">by ' + esc(cb.author||'Anonymous') + '</div></div>' +
       '<div style="display:flex;gap:8px;align-items:center">' +
@@ -1295,6 +1320,7 @@ function populateComboDataLists() {
   brandDL.innerHTML = brands.map(b => '<option value="' + esc(b) + '">').join('');
 }
 function openComboModal() {
+  if (guestMode) { requireSignup('save your own glaze combos'); return; }
   document.getElementById('comboId').value = '';
   document.getElementById('comboName').value = '';
   document.getElementById('comboClay').value = '';
@@ -1351,6 +1377,12 @@ function selectForumCategory(catId) {
   setTimeout(() => { const el = document.getElementById('forumPostsArea'); if (el) el.scrollIntoView({behavior:'smooth', block:'start'}); }, 150);
 }
 async function loadForum() {
+  if (guestMode) {
+    const catEl = document.getElementById('forumCategories');
+    const postsEl = document.getElementById('forumPosts');
+    if (catEl) catEl.innerHTML = '';
+    if (postsEl) postsEl.innerHTML = '<div class="card mb-16" style="background:var(--bg-light);border:1px dashed var(--primary)"><strong>Preview mode</strong><p class="text-sm" style="margin-top:6px;color:var(--text-light)">Browse forum conversations before joining. Sign up free to post, reply, and message other potters.</p><button class="btn btn-primary btn-sm mt-8" onclick="requireSignup(\'post in the forum\')">Sign Up Free</button></div>';
+  }
   try {
     forumCategories = await api('/api/forum/categories');
     // Populate category filter
@@ -1500,6 +1532,7 @@ async function submitReply(postId) {
 // Forum post modal, save, shop, profile, upgrade, init
 
 function openForumPostModal() {
+  if (guestMode) { requireSignup('post in the forum'); return; }
   document.getElementById('forumPostTitle').value = '';
   document.getElementById('forumPostBody').value = '';
   if (document.getElementById('forumPostPhotos')) document.getElementById('forumPostPhotos').value = '';
@@ -1547,6 +1580,7 @@ async function loadShop() {
 }
 
 async function buyProduct(id) {
+  if (guestMode) { requireSignup('buy from the shop'); return; }
   try {
     const d = await api('/api/shop/checkout', { method:'POST', body: { productId: id } });
     if (d.url) window.location.href = d.url;
@@ -3991,18 +4025,24 @@ async function loadLandingBlogPosts() {
 }
 
 // Show blog from landing page (before login)
-function showBlogFromLanding() {
+function showGuestPreview(page = 'community') {
+  guestMode = true;
   document.getElementById('landingPage').style.display = 'none';
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('mainApp').classList.remove('hidden');
-  navigate('blog');
-  // If not logged in, just show blog publicly
-  if (!token) {
-    loadBlog();
-  }
+  const badge = document.getElementById('navTier');
+  if (badge) { badge.textContent = 'PREVIEW'; badge.className = 'tier-badge tier-free'; }
+  const adminNav = document.getElementById('navAdmin');
+  if (adminNav) adminNav.style.display = 'none';
+  navigate(page);
+}
+
+function showBlogFromLanding() {
+  showGuestPreview('blog');
 }
 
 function showBlogPostFromLanding(slug) {
+  guestMode = true;
   document.getElementById('landingPage').style.display = 'none';
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('mainApp').classList.remove('hidden');
