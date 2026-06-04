@@ -38,6 +38,30 @@ function previewRibbon(message, cta = 'Sign Up Free', action = "requireSignup('u
     '<button class="btn btn-primary btn-sm" onclick="' + action + '">' + cta + '</button>' +
     '</div></div>';
 }
+function previewHero(title, subtitle, bullets = [], cta = 'Sign Up Free', action = "requireSignup('start tracking your pottery')") {
+  return '<div class="card mb-16" style="background:linear-gradient(135deg,#2f2118 0%,#5c4033 100%);color:#fff;border:none">' +
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">' +
+    '<div style="flex:1;min-width:260px">' +
+    '<div style="display:inline-block;background:rgba(255,255,255,0.14);padding:6px 10px;border-radius:999px;font-size:0.8rem;margin-bottom:12px">POTTER PREVIEW</div>' +
+    '<h2 style="margin:0 0 10px 0;font-size:1.7rem;line-height:1.15;color:#fff">' + title + '</h2>' +
+    '<p style="margin:0;color:rgba(255,255,255,0.88);font-size:1rem;line-height:1.6">' + subtitle + '</p>' +
+    '</div>' +
+    '<div style="min-width:220px;flex:0 0 260px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:16px;padding:16px">' +
+    '<div style="font-weight:700;margin-bottom:8px">What you unlock after signup</div>' +
+    bullets.map(b => '<div style="margin:7px 0;color:rgba(255,255,255,0.92)">✓ ' + b + '</div>').join('') +
+    '<button class="btn btn-primary" style="margin-top:14px;width:100%" onclick="' + action + '">' + cta + '</button>' +
+    '</div>' +
+    '</div></div>';
+}
+
+function previewEmptyState(icon, title, body, cta = 'Sign Up Free', action = "requireSignup('unlock the full app')") {
+  return '<div class="card" style="text-align:center;padding:32px 20px;background:var(--bg-light);border:1px dashed var(--primary)">' +
+    '<div style="font-size:2.5rem;margin-bottom:10px">' + icon + '</div>' +
+    '<h3 style="margin-bottom:8px;color:var(--primary)">' + title + '</h3>' +
+    '<p style="color:var(--text-light);max-width:560px;margin:0 auto 16px;line-height:1.6">' + body + '</p>' +
+    '<button class="btn btn-primary" onclick="' + action + '">' + cta + '</button>' +
+    '</div>';
+}
 function toast(msg, type = '') {
   const el = document.createElement('div');
   el.className = 'toast ' + type;
@@ -1247,7 +1271,7 @@ async function loadCombos() {
     if (filter) u += 'filter=' + encodeURIComponent(filter) + '&';
     const combos = await api(u);
     const c = document.getElementById('comboList'), em = document.getElementById('communityEmpty');
-    const guestBanner = guestMode ? '<div class="card mb-16" style="background:var(--bg-light);border:1px dashed var(--primary)"><strong>Preview mode</strong><p class="text-sm" style="margin-top:6px;color:var(--text-light)">You can browse shared combos here. Sign up free to save your own combos, like, comment, and message members.</p><button class="btn btn-primary btn-sm mt-8" onclick="requireSignup(\'save combos and join the community\')">Sign Up Free</button></div>' : '';
+    const guestBanner = guestMode ? previewHero('See real glaze combos before you join.', 'This preview is here to show you the kind of pottery knowledge and inspiration waiting inside The Potter's Mud Room — layered glazes, cone notes, clay pairings, and shared results from other potters.', ['Save your own glaze tests and combo results', 'Track clay bodies, firings, and finished pieces together', 'Comment, like, and message other potters'], 'Start Free', "requireSignup('save combos, track firings, and join the community')") : '';
     if (!combos.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
     c.innerHTML = guestBanner + combos.map(cb =>
@@ -1388,7 +1412,7 @@ async function loadForum() {
     const catEl = document.getElementById('forumCategories');
     const postsEl = document.getElementById('forumPosts');
     if (catEl) catEl.innerHTML = '';
-    if (postsEl) postsEl.innerHTML = '<div class="card mb-16" style="background:var(--bg-light);border:1px dashed var(--primary)"><strong>Preview mode</strong><p class="text-sm" style="margin-top:6px;color:var(--text-light)">Browse forum conversations before joining. Sign up free to post, reply, and message other potters.</p><button class="btn btn-primary btn-sm mt-8" onclick="requireSignup(\'post in the forum\')">Sign Up Free</button></div>';
+    if (postsEl) postsEl.innerHTML = previewHero('Step inside the pottery community.', 'Browse real conversations from potters sharing glaze questions, kiln lessons, studio wins, and hard-earned advice. The goal is to let you feel the community before you commit.', ['Post your own questions and studio updates', 'Reply, message, and connect with potters directly', 'Keep your pottery tracking and community in one place'], 'Join the Mud Room Free', "requireSignup('post in the forum and join the pottery community')");
   }
   try {
     forumCategories = await api('/api/forum/categories');
@@ -2272,8 +2296,7 @@ async function loadAdminBlogPosts() {
     const el = document.getElementById('adminBlogList');
     if (!el) return;
     if (!posts.length) { el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">No blog posts yet</div>'; return; }
-    const ribbon = guestMode ? previewRibbon('Read the blog freely. Sign up when you want to track your work, post, and join the community.', 'Join Free', "requireSignup('track your pottery and join the community')") : '';
-    el.innerHTML = ribbon + posts.map(p =>
+    el.innerHTML = posts.map(p =>
       '<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">' +
       '<div><strong>' + esc(p.title) + '</strong> <span class="text-sm" style="color:' + (p.is_published ? 'var(--success)' : 'var(--text-muted)') + '">' + (p.is_published ? '✅ Published' : '📝 Draft') + '</span>' +
       '<div class="text-sm" style="color:var(--text-muted)">' + fmtDate(p.published_at) + ' · /' + esc(p.slug) + ' · 👁️ ' + (p.view_count || 0) + ' views</div></div>' +
@@ -3824,9 +3847,9 @@ function filterMembers() {
 }
 function renderMembers(members) {
   const c = document.getElementById('membersList'), em = document.getElementById('membersEmpty');
-  if (!members.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
+  if (!members.length) { c.innerHTML=''; if (guestMode) { em.innerHTML = previewEmptyState('👥', 'A pottery community belongs here.', 'The member space is meant to help potters find each other, share their work, and feel less alone in the studio. Sign up free to build your profile and be part of it.', 'Join Free', "requireSignup('create your profile and join the community')"); } em.classList.remove('hidden'); return; }
   em.classList.add('hidden');
-  const ribbon = guestMode ? previewRibbon('Browse potters in the community, then sign up free to message people and build your own profile.', 'Join Free', "requireSignup('message potters and create your profile')") : '';
+  const ribbon = guestMode ? previewHero('Meet the potters already inside.', 'This is the people side of the app — real makers, different styles, different studios, all in one pottery-focused space. Browse first, then sign up when you're ready to connect.', ['Create your own pottery profile', 'Message other members directly', 'Be part of a pottery community built around making, not noise'], 'Create Your Free Account', "requireSignup('message potters and create your profile')") : '';
   c.innerHTML = ribbon + members.map(u =>
     '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg-card)">' +
     '<div style="cursor:pointer;flex-shrink:0" onclick="viewMemberProfile(\'' + u.id + '\')">' +
@@ -3853,7 +3876,7 @@ async function viewMemberProfile(userId) {
         '<div style="font-size:3rem;margin-bottom:12px">🔒</div>' +
         '<h2>' + esc(u.displayName || 'Member') + '</h2>' +
         '<p style="color:var(--text-light);margin-top:8px">This profile is private.</p>' +
-        '<button onclick="navigate(\'messageThread\');loadMessageThread(\'' + u.id + '\')" class="btn btn-primary mt-16">✉️ Send Message</button>' +
+        (guestMode ? '<p style="color:var(--text-light);margin-top:10px">Join free to build your own profile and connect with potters inside the community.</p><button onclick="requireSignup(\'create your profile and message other potters\')" class="btn btn-primary mt-16">Join Free</button>' : '<button onclick="navigate(\'messageThread\');loadMessageThread(\'' + u.id + '\')" class="btn btn-primary mt-16">✉️ Send Message</button>') +
         '</div>';
     } else {
       c.innerHTML = '<div class="card" style="max-width:500px">' +
@@ -3959,9 +3982,9 @@ async function loadBlog() {
     const posts = guestMode ? await fetch('/api/blog/posts').then(r => r.json()) : await api('/api/blog/posts');
     const el = document.getElementById('blogPostsList');
     const em = document.getElementById('blogEmpty');
-    if (!posts.length) { el.innerHTML = guestMode ? previewRibbon('Read pottery writing and studio updates before signing up.', 'Join Free', "requireSignup('save your work and join the community')") : ''; em.classList.remove('hidden'); return; }
+    if (!posts.length) { el.innerHTML = guestMode ? previewEmptyState('📰', 'Pottery writing lives here.', 'This part of The Potter's Mud Room is for studio notes, pottery tips, and helpful writing from inside the community. Sign up free to track your work and stay connected as more content lands.', 'Join Free', "requireSignup('save your work and join the community')") : ''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
-    const ribbon = guestMode ? previewRibbon('Read the blog freely. Sign up when you want to track your work, post, and join the community.', 'Join Free', "requireSignup('track your pottery and join the community')") : '';
+    const ribbon = guestMode ? previewHero('Studio wisdom, pottery tips, and real process notes.', 'The blog should help potters feel the voice behind the app — thoughtful, practical, and grounded in real ceramic work. Read freely, then join when you want the full tracking system too.', ['Track pieces, firings, glazes, and sales in one place', 'Join the community conversation around each lesson', 'Build a pottery record you can actually use later'], 'Track Your Pottery Free', "requireSignup('track your pottery and join the community')") : '';
     el.innerHTML = ribbon + posts.map(p =>
       '<div class="card" style="cursor:pointer" onclick="viewBlogPost(\'' + esc(p.slug) + '\')">' +
       '<h3 style="margin-bottom:8px;color:var(--primary)">' + esc(p.title) + '</h3>' +
@@ -4059,7 +4082,9 @@ function showGuestPreview(page = 'community') {
   if (badge) { badge.textContent = 'PREVIEW'; badge.className = 'tier-badge tier-free'; }
   const adminNav = document.getElementById('navAdmin');
   if (adminNav) adminNav.style.display = 'none';
-  navigate(page);
+  const pages = ['community', 'forum', 'communityMembers', 'blog', 'shop'];
+  const target = pages.includes(page) ? page : 'community';
+  navigate(target);
 }
 
 function showBlogFromLanding() {
