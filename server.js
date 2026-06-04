@@ -368,6 +368,22 @@ app.post('/api/create-checkout-session', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Stripe Customer Portal (manage subscription from mobile app)
+app.post('/api/create-portal-session', auth, async (req, res) => {
+  if (!stripe) return res.status(400).json({ error: 'Stripe not configured' });
+  try {
+    const user = db.prepare('SELECT stripe_customer_id FROM users WHERE id=?').get(req.userId);
+    if (!user || !user.stripe_customer_id) {
+      return res.status(404).json({ error: 'No active subscription found. Nothing to manage.' });
+    }
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: user.stripe_customer_id,
+      return_url: `${APP_URL || 'https://thepottersmudroom.com'}`,
+    });
+    res.json({ url: portalSession.url });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Change password
 app.put('/api/auth/password', auth, (req, res) => {
   try {
