@@ -943,6 +943,21 @@ function initDB() {
   safeAdd('users', 'is_beta_tester', 'INTEGER DEFAULT 0');
   safeAdd('blog_posts', 'view_count', 'INTEGER DEFAULT 0');
 
+  // Sync beta signups to lifetime beta access on startup
+  try {
+    const betaRows = db.prepare('SELECT LOWER(email) as email FROM beta_signups').all();
+    if (betaRows.length) {
+      const syncBetaUser = db.prepare(`
+        UPDATE users
+        SET tier='top', billing_period='promo', plan_expires_at=NULL, is_beta_tester=1
+        WHERE LOWER(email)=? AND LOWER(email) != 'christinaworkmanpottery@gmail.com'
+      `);
+      betaRows.forEach(row => syncBetaUser.run(row.email));
+    }
+  } catch (e) {
+    console.error('Beta tester upgrade sync failed:', e.message);
+  }
+
   // Project enhancements: priority, contacts, shopping, calendar
   safeAdd('projects', 'priority', "TEXT DEFAULT 'medium'");
   safeAdd('projects', 'contact_name', 'TEXT');
