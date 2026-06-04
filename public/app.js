@@ -1920,11 +1920,14 @@ async function exportData(endpoint) {
 // ---- Admin Dashboard ----
 function toggleAdminSection(el) {
   var body;
-  if (typeof el === 'string') { body = document.getElementById(el); }
-  else { body = el.nextElementSibling; }
+  if (typeof el === 'string') {
+    body = document.getElementById(el);
+  } else {
+    body = el && el.nextElementSibling;
+  }
   if (!body) return;
-  var open = body.style.display !== 'none';
-  body.style.display = open ? 'none' : 'block';
+  var isHidden = body.style.display === 'none' || getComputedStyle(body).display === 'none';
+  body.style.display = isHidden ? 'block' : 'none';
 }
 
 async function loadAdmin() {
@@ -1960,7 +1963,7 @@ async function loadAdmin() {
       '</div>';
 
     // Members table — collapsed by default
-    html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="document.getElementById(\'adminMembersTable\').style.display=document.getElementById(\'adminMembersTable\').style.display===\'none\'?\'block\':\'none\'">All Members (' + m.length + ') ▸ <span style=\'font-size:0.8rem;color:var(--text-light);font-weight:normal\'>tap to expand</span></h3>';
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(\'adminMembersTable\')">All Members (' + m.length + ') ▸ <span style=\'font-size:0.8rem;color:var(--text-light);font-weight:normal\'>tap to expand</span></h3>';
     html += '<div id="adminMembersTable" style="display:none"><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
     html += '<tr style="border-bottom:2px solid var(--border);text-align:left"><th style="padding:8px">Name</th><th style="padding:8px">Email</th><th style="padding:8px">Tier</th><th style="padding:8px">Billing</th><th style="padding:8px">Joined</th><th style="padding:8px">Actions</th></tr>';
     m.forEach(u => {
@@ -2419,8 +2422,11 @@ async function loadAdminBeta() {
     html += '<div style="background:var(--bg-alt);padding:12px;border-radius:8px;margin-bottom:12px">';
     html += '<label class="text-sm" style="color:var(--text-light);display:block;margin-bottom:4px">Gmail addresses (copy these into Google Play):</label>';
     html += '<textarea id="betaEmailList" readonly style="width:100%;min-height:80px;font-size:0.85rem;padding:8px;border:1px solid var(--border);border-radius:4px;resize:vertical">' + signups.map(s => s.email).join('\n') + '</textarea>';
-    html += '<button class="btn btn-sm" style="margin-top:8px;font-size:0.8rem" onclick="copyBetaEmails()">📋 Copy All Emails</button>';
-    html += ' <button class="btn btn-primary btn-sm" style="margin-top:8px;font-size:0.8rem" onclick="sendBetaInvites()">📨 Send Welcome Email to New Signups</button>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">';
+    html += '<button class="btn btn-sm" style="font-size:0.8rem" onclick="copyBetaEmails()">📋 Copy All Emails</button>';
+    html += '<button class="btn btn-primary btn-sm" style="font-size:0.8rem" onclick="upgradeAllBetaTesters()">⭐ Upgrade All to Lifetime</button>';
+    html += '<button class="btn btn-primary btn-sm" style="font-size:0.8rem" onclick="sendBetaInvites()">📨 Send Welcome Email to New Signups</button>';
+    html += '</div>';
     html += '</div>';
     html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
     html += '<tr style="border-bottom:2px solid var(--border);text-align:left"><th style="padding:6px">Email</th><th style="padding:6px">Name</th><th style="padding:6px">Signed Up</th></tr>';
@@ -2453,6 +2459,15 @@ async function sendBetaInvites() {
       toast('Sent welcome email to ' + result.sent + ' new tester' + (result.sent !== 1 ? 's' : '') + '!', 'success');
     }
     loadAdminBeta();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function upgradeAllBetaTesters() {
+  if (!confirm('Upgrade every beta signup to unlimited lifetime access?')) return;
+  try {
+    const result = await api('/api/admin/beta-signups/upgrade-all', { method: 'POST' });
+    toast('Upgraded ' + result.upgraded + ' beta tester' + (result.upgraded !== 1 ? 's' : '') + '. Total signups: ' + result.total + '.', 'success');
+    loadAdmin();
   } catch(e) { toast(e.message, 'error'); }
 }
 
