@@ -427,6 +427,239 @@
   </div>
 </div>
 
+<!-- PREVIEW PAGE — The "wow, I need this" experience -->
+<div id="previewPage" style="display:none">
+  <!-- Sticky mini-nav for preview -->
+  <div style="position:sticky;top:0;z-index:100;background:var(--bg-dark);color:#fff;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-lg)">
+    <div style="font-family:Georgia,serif;font-size:1.2rem">🏺 The Potter's <span style="color:#C67B4E">Mud Room</span></div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <span style="font-size:0.8rem;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.1);padding:4px 10px;border-radius:20px">PREVIEW</span>
+      <button class="btn btn-primary btn-sm" onclick="exitPreviewToSignup()">Sign Up Free</button>
+    </div>
+  </div>
+
+  <!-- Preview Hero -->
+  <div style="background:linear-gradient(160deg,#2f2118 0%,#5c4033 50%,#8B5E3C 100%);color:#fff;padding:60px 20px 50px;text-align:center;position:relative;overflow:hidden">
+    <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 80%22><circle cx=%2240%22 cy=%2240%22 r=%221%22 fill=%22rgba(255,255,255,0.03)%22/></svg>') repeat;pointer-events:none"></div>
+    <div style="position:relative;max-width:700px;margin:0 auto">
+      <h1 style="font-family:Georgia,serif;font-size:2.2rem;margin-bottom:16px;line-height:1.2">This Is What Your Pottery Studio<br>Looks Like <span style="color:#C67B4E">Organized</span></h1>
+      <p style="font-size:1.1rem;color:rgba(255,255,255,0.8);margin-bottom:8px">Scroll through a sample studio. Everything below is what you get — for free.</p>
+      <p style="font-size:0.9rem;color:rgba(255,255,255,0.5)">Real features, real data examples. Imagine your own pieces here.</p>
+    </div>
+  </div>
+
+  <!-- Sample Dashboard -->
+  <div style="max-width:900px;margin:0 auto;padding:40px 20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h2 style="font-family:Georgia,serif;color:var(--text)">📋 Your Studio Dashboard</h2>
+      <span style="font-size:0.8rem;background:var(--primary-light);color:var(--primary);padding:4px 12px;border-radius:20px;font-weight:600">This could be yours</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:32px">
+      <div style="background:#fff;padding:20px;border-radius:12px;text-align:center;box-shadow:var(--shadow);border:1px solid var(--border)"><div style="font-size:1.8rem;font-weight:700;color:var(--primary)">24</div><div style="font-size:0.8rem;color:var(--text-light);margin-top:4px">Pieces</div></div>
+      <div style="background:#fff;padding:20px;border-radius:12px;text-align:center;box-shadow:var(--shadow);border:1px solid var(--border)"><div style="font-size:1.8rem;font-weight:700;color:var(--primary)">8</div><div style="font-size:0.8rem;color:var(--text-light);margin-top:4px">Clay Bodies</div></div>
+      <div style="background:#fff;padding:20px;border-radius:12px;text-align:center;box-shadow:var(--shadow);border:1px solid var(--border)"><div style="font-size:1.8rem;font-weight:700;color:var(--primary)">15</div><div style="font-size:0.8rem;color:var(--text-light);margin-top:4px">Glazes</div></div>
+      <div style="background:#fff;padding:20px;border-radius:12px;text-align:center;box-shadow:var(--shadow);border:1px solid var(--border)"><div style="font-size:1.8rem;font-weight:700;color:var(--primary)">$430</div><div style="font-size:0.8rem;color:var(--text-light);margin-top:4px">Sales</div></div>
+      <div style="background:#fff;padding:20px;border-radius:12px;text-align:center;box-shadow:var(--shadow);border:1px solid var(--border)"><div style="font-size:1.8rem;font-weight:700;color:var(--primary)">6</div><div style="font-size:0.8rem;color:var(--text-light);margin-top:4px">Firings</div></div>
+    </div>
+
+    <!-- Sample Pieces -->
+    <h2 style="font-family:Georgia,serif;color:var(--text);margin-bottom:16px">🏺 Recent Pieces</h2>
+    <p style="color:var(--text-light);margin-bottom:20px;font-size:0.95rem">Every piece you make, tracked. Clay, glaze, technique, photos, firing history — all connected.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-bottom:40px">
+      <div style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:var(--shadow);border:1px solid var(--border)">
+        <div style="height:160px;background:linear-gradient(135deg,#D4A574 0%,#8B6E4E 100%);display:flex;align-items:center;justify-content:center;font-size:3rem">🫖</div>
+        <div style="padding:16px">
+          <div style="font-weight:600;margin-bottom:4px">Speckled Teapot</div>
+          <div style="font-size:0.8rem;color:var(--text-light);margin-bottom:8px">Hand built · Feb 12, 2026</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <span style="background:var(--primary-light);color:var(--primary);padding:2px 8px;border-radius:12px;font-size:0.75rem">Speckled Buff</span>
+            <span style="background:var(--accent-light);color:var(--accent);padding:2px 8px;border-radius:12px;font-size:0.75rem">Celadon</span>
+            <span style="background:#e8e0d6;color:var(--text-light);padding:2px 8px;border-radius:12px;font-size:0.75rem">Cone 6</span>
+          </div>
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:0.8rem;color:var(--text-light)">Status: <strong style="color:var(--accent)">Done ✓</strong> · Sold for $65</div>
+        </div>
+      </div>
+      <div style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:var(--shadow);border:1px solid var(--border)">
+        <div style="height:160px;background:linear-gradient(135deg,#7B9E6B 0%,#4A6B3A 100%);display:flex;align-items:center;justify-content:center;font-size:3rem">🥣</div>
+        <div style="padding:16px">
+          <div style="font-weight:600;margin-bottom:4px">Ramen Bowl Set (4)</div>
+          <div style="font-size:0.8rem;color:var(--text-light);margin-bottom:8px">Wheel thrown · Mar 3, 2026</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <span style="background:var(--primary-light);color:var(--primary);padding:2px 8px;border-radius:12px;font-size:0.75rem">Porcelain</span>
+            <span style="background:var(--accent-light);color:var(--accent);padding:2px 8px;border-radius:12px;font-size:0.75rem">Temmoku + Iron Red</span>
+            <span style="background:#e8e0d6;color:var(--text-light);padding:2px 8px;border-radius:12px;font-size:0.75rem">Cone 10 Reduction</span>
+          </div>
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:0.8rem;color:var(--text-light)">Status: <strong style="color:var(--primary)">Glaze Fired</strong> · Keeping</div>
+        </div>
+      </div>
+      <div style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:var(--shadow);border:1px solid var(--border)">
+        <div style="height:160px;background:linear-gradient(135deg,#C45B4A 0%,#8B3A2F 100%);display:flex;align-items:center;justify-content:center;font-size:3rem">💀</div>
+        <div style="padding:16px">
+          <div style="font-weight:600;margin-bottom:4px">Large Platter — CASUALTY</div>
+          <div style="font-size:0.8rem;color:var(--text-light);margin-bottom:8px">Slab built · Jan 28, 2026</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <span style="background:var(--danger-light);color:var(--danger);padding:2px 8px;border-radius:12px;font-size:0.75rem">Cracked in bisque</span>
+            <span style="background:#e8e0d6;color:var(--text-light);padding:2px 8px;border-radius:12px;font-size:0.75rem">Too thick at join</span>
+          </div>
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:0.8rem;color:var(--text-light)">Lesson: <em>Score deeper on large slabs. Don't rush drying.</em></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sample Firing Log -->
+    <h2 style="font-family:Georgia,serif;color:var(--text);margin-bottom:16px">🔥 Firing Log</h2>
+    <p style="color:var(--text-light);margin-bottom:20px;font-size:0.95rem">Every kiln load documented. Know exactly what happened and when.</p>
+    <div style="background:#fff;border-radius:12px;box-shadow:var(--shadow);border:1px solid var(--border);overflow:hidden;margin-bottom:40px">
+      <div style="padding:20px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <div>
+            <div style="font-weight:700;font-size:1.05rem">Glaze Firing — Cone 6 Oxidation</div>
+            <div style="font-size:0.85rem;color:var(--text-light);margin-top:4px">March 8, 2026 · Studio L&L e23T · Medium speed · 15 min hold at top</div>
+          </div>
+          <span style="background:var(--accent-light);color:var(--accent);padding:4px 12px;border-radius:20px;font-size:0.8rem;font-weight:600">✓ Successful</span>
+        </div>
+      </div>
+      <div style="padding:20px;background:var(--bg)">
+        <div style="font-size:0.85rem;color:var(--text-light);margin-bottom:8px"><strong>Pieces in this firing:</strong></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <span style="background:#fff;border:1px solid var(--border);padding:4px 10px;border-radius:8px;font-size:0.82rem">🫖 Speckled Teapot</span>
+          <span style="background:#fff;border:1px solid var(--border);padding:4px 10px;border-radius:8px;font-size:0.82rem">🥣 Ramen Bowl #1</span>
+          <span style="background:#fff;border:1px solid var(--border);padding:4px 10px;border-radius:8px;font-size:0.82rem">🥣 Ramen Bowl #2</span>
+          <span style="background:#fff;border:1px solid var(--border);padding:4px 10px;border-radius:8px;font-size:0.82rem">🍵 Matcha Bowl</span>
+        </div>
+        <div style="margin-top:12px;font-size:0.85rem;color:var(--text-light)"><strong>Notes:</strong> Loaded with 1" between pieces. New kiln shelf on bottom — watch for outgassing next time.</div>
+        <div style="margin-top:8px;font-size:0.82rem;color:var(--text-light)"><strong>Start:</strong> 8:00 AM · <strong>End:</strong> 6:45 PM · <strong>Opened at:</strong> 180°F next morning</div>
+      </div>
+    </div>
+
+    <!-- Sample Glaze Library -->
+    <h2 style="font-family:Georgia,serif;color:var(--text);margin-bottom:16px">🎨 Your Glaze Library</h2>
+    <p style="color:var(--text-light);margin-bottom:20px;font-size:0.95rem">Never ask "what glaze was that?" again. Every glaze documented with results.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:40px">
+      <div style="background:#fff;border-radius:12px;padding:20px;box-shadow:var(--shadow);border:1px solid var(--border);border-left:4px solid #6B8E4E">
+        <div style="font-weight:700;margin-bottom:6px">Celadon Green</div>
+        <div style="font-size:0.82rem;color:var(--text-light);line-height:1.5">Amaco · Cone 6 · Oxidation<br>Glossy, smooth, jade-like pooling in texture<br><strong>Used on:</strong> 6 pieces · <strong>Result:</strong> Love it on speckled buff</div>
+      </div>
+      <div style="background:#fff;border-radius:12px;padding:20px;box-shadow:var(--shadow);border:1px solid var(--border);border-left:4px solid #8B4513">
+        <div style="font-weight:700;margin-bottom:6px">Temmoku</div>
+        <div style="font-size:0.82rem;color:var(--text-light);line-height:1.5">Coyote · Cone 6 · Reduction or Oxidation<br>Rich brown-black, breaks amber on edges<br><strong>Used on:</strong> 4 pieces · <strong>Result:</strong> Best on porcelain</div>
+      </div>
+      <div style="background:#fff;border-radius:12px;padding:20px;box-shadow:var(--shadow);border:1px solid var(--border);border-left:4px solid #C67B4E">
+        <div style="font-weight:700;margin-bottom:6px">Iron Red (recipe)</div>
+        <div style="font-size:0.82rem;color:var(--text-light);line-height:1.5">Custom · Cone 10 · Reduction only<br>Rusty orange to deep red, unpredictable but beautiful<br><strong>Used on:</strong> 3 pieces · <strong>Lesson:</strong> Thick = metallic. Thin = orange.</div>
+      </div>
+      <div style="background:#fff;border-radius:12px;padding:20px;box-shadow:var(--shadow);border:1px solid var(--border);border-left:4px solid #6B6B9E">
+        <div style="font-weight:700;margin-bottom:6px">Floating Blue</div>
+        <div style="font-size:0.82rem;color:var(--text-light);line-height:1.5">Archie Bray recipe · Cone 6 · Oxidation<br>Blue with white crystal clusters, stunning over dark clay<br><strong>Used on:</strong> 2 pieces · <strong>Combo:</strong> Layer over Temmoku 🔥</div>
+      </div>
+    </div>
+
+    <!-- Sample Clay Bodies -->
+    <h2 style="font-family:Georgia,serif;color:var(--text);margin-bottom:16px">🪨 Clay Body Tracker</h2>
+    <p style="color:var(--text-light);margin-bottom:20px;font-size:0.95rem">Compare clays side-by-side. Cost, shrinkage, cone range — everything you need to decide.</p>
+    <div style="background:#fff;border-radius:12px;box-shadow:var(--shadow);border:1px solid var(--border);overflow:hidden;margin-bottom:40px">
+      <table style="width:100%;border-collapse:collapse;font-size:0.85rem">
+        <thead style="background:var(--bg-dark);color:#fff">
+          <tr><th style="padding:12px 16px;text-align:left">Clay Body</th><th style="padding:12px 16px;text-align:left">Brand</th><th style="padding:12px 16px;text-align:center">Cone</th><th style="padding:12px 16px;text-align:center">Shrinkage</th><th style="padding:12px 16px;text-align:right">$/bag</th></tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:12px 16px;font-weight:600">Speckled Buff</td><td style="padding:12px 16px;color:var(--text-light)">Laguna</td><td style="padding:12px 16px;text-align:center">5-6</td><td style="padding:12px 16px;text-align:center">11%</td><td style="padding:12px 16px;text-align:right">$28</td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:12px 16px;font-weight:600">Porcelain (Frost)</td><td style="padding:12px 16px;color:var(--text-light)">Standard</td><td style="padding:12px 16px;text-align:center">6-10</td><td style="padding:12px 16px;text-align:center">13%</td><td style="padding:12px 16px;text-align:right">$42</td></tr>
+          <tr style="border-bottom:1px solid var(--border)"><td style="padding:12px 16px;font-weight:600">Dark Brown Stoneware</td><td style="padding:12px 16px;color:var(--text-light)">Highwater</td><td style="padding:12px 16px;text-align:center">6</td><td style="padding:12px 16px;text-align:center">12%</td><td style="padding:12px 16px;text-align:right">$32</td></tr>
+          <tr><td style="padding:12px 16px;font-weight:600">B-Mix with Sand</td><td style="padding:12px 16px;color:var(--text-light)">Laguna</td><td style="padding:12px 16px;text-align:center">5-6</td><td style="padding:12px 16px;text-align:center">10.5%</td><td style="padding:12px 16px;text-align:right">$30</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Sample Sales -->
+    <h2 style="font-family:Georgia,serif;color:var(--text);margin-bottom:16px">💰 Sales & Revenue</h2>
+    <p style="color:var(--text-light);margin-bottom:20px;font-size:0.95rem">Know your numbers. Track every sale, every show, every commission.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:16px">
+      <div style="background:#fff;padding:16px;border-radius:12px;box-shadow:var(--shadow);border:1px solid var(--border)">
+        <div style="font-size:0.8rem;color:var(--text-light)">This Month</div>
+        <div style="font-size:1.4rem;font-weight:700;color:var(--primary);margin-top:4px">$185</div>
+        <div style="font-size:0.75rem;color:var(--accent);margin-top:4px">↑ from $120 last month</div>
+      </div>
+      <div style="background:#fff;padding:16px;border-radius:12px;box-shadow:var(--shadow);border:1px solid var(--border)">
+        <div style="font-size:0.8rem;color:var(--text-light)">Avg. Piece Price</div>
+        <div style="font-size:1.4rem;font-weight:700;color:var(--primary);margin-top:4px">$38</div>
+      </div>
+      <div style="background:#fff;padding:16px;border-radius:12px;box-shadow:var(--shadow);border:1px solid var(--border)">
+        <div style="font-size:0.8rem;color:var(--text-light)">Top Venue</div>
+        <div style="font-size:1.4rem;font-weight:700;color:var(--primary);margin-top:4px">Etsy</div>
+        <div style="font-size:0.75rem;color:var(--text-light);margin-top:4px">5 sales this month</div>
+      </div>
+      <div style="background:#fff;padding:16px;border-radius:12px;box-shadow:var(--shadow);border:1px solid var(--border)">
+        <div style="font-size:0.8rem;color:var(--text-light)">Year Total</div>
+        <div style="font-size:1.4rem;font-weight:700;color:var(--primary);margin-top:4px">$1,240</div>
+        <div style="font-size:0.75rem;color:var(--text-light);margin-top:4px">Export to CSV for taxes</div>
+      </div>
+    </div>
+    <div style="background:#fff;border-radius:12px;padding:16px;box-shadow:var(--shadow);border:1px solid var(--border);margin-bottom:40px">
+      <div style="font-size:0.85rem;color:var(--text-light);margin-bottom:12px"><strong>Recent Sales</strong></div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:0.9rem">🫖 Speckled Teapot</span><span style="font-size:0.9rem;color:var(--text-light)">Etsy · Mar 15</span><span style="font-weight:600;color:var(--accent)">$65</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:0.9rem">🍵 Matcha Bowl (2)</span><span style="font-size:0.9rem;color:var(--text-light)">Local market · Mar 9</span><span style="font-weight:600;color:var(--accent)">$50</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0"><span style="font-size:0.9rem">🏺 Custom planter</span><span style="font-size:0.9rem;color:var(--text-light)">Commission · Mar 1</span><span style="font-weight:600;color:var(--accent)">$70</span></div>
+      </div>
+    </div>
+
+    <!-- Glaze Combos -->
+    <h2 style="font-family:Georgia,serif;color:var(--text);margin-bottom:16px">🧪 Community Glaze Combos</h2>
+    <p style="color:var(--text-light);margin-bottom:20px;font-size:0.95rem">See what other potters are layering. Find your next favorite combo.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;margin-bottom:40px">
+      <div style="background:#fff;border-radius:12px;padding:20px;box-shadow:var(--shadow);border:1px solid var(--border)">
+        <div style="font-weight:700;margin-bottom:8px">Floating Blue over Temmoku</div>
+        <div style="font-size:0.82rem;color:var(--text-light);margin-bottom:10px">Cone 6 · Oxidation · Speckled buff clay</div>
+        <div style="background:linear-gradient(135deg,#4A6B8E,#2F3D4E);height:60px;border-radius:8px;margin-bottom:10px"></div>
+        <div style="font-size:0.8rem;color:var(--text-light)">"Blue crystals form where the glazes meet. Apply Temmoku first, then one coat of Floating Blue on top third only."</div>
+        <div style="margin-top:8px;font-size:0.75rem;color:var(--primary)">❤️ 12 saves · Shared by @amandapots</div>
+      </div>
+      <div style="background:#fff;border-radius:12px;padding:20px;box-shadow:var(--shadow);border:1px solid var(--border)">
+        <div style="font-weight:700;margin-bottom:8px">Shino under Clear</div>
+        <div style="font-size:0.82rem;color:var(--text-light);margin-bottom:10px">Cone 10 · Reduction · Porcelain</div>
+        <div style="background:linear-gradient(135deg,#D4A574,#E8C9A0);height:60px;border-radius:8px;margin-bottom:10px"></div>
+        <div style="font-size:0.8rem;color:var(--text-light)">"The carbon trapping is insane. Every piece comes out different. Thick shino = more carbon = darker spots."</div>
+        <div style="margin-top:8px;font-size:0.75rem;color:var(--primary)">❤️ 8 saves · Shared by @kilnqueen</div>
+      </div>
+      <div style="background:#fff;border-radius:12px;padding:20px;box-shadow:var(--shadow);border:1px solid var(--border)">
+        <div style="font-weight:700;margin-bottom:8px">Iron Red + Celadon drip</div>
+        <div style="font-size:0.82rem;color:var(--text-light);margin-bottom:10px">Cone 10 · Reduction · Dark stoneware</div>
+        <div style="background:linear-gradient(135deg,#8B3A2F,#6B8E4E);height:60px;border-radius:8px;margin-bottom:10px"></div>
+        <div style="font-size:0.8rem;color:var(--text-light)">"Dip in iron red, then pour celadon from rim. The drip pattern is 🔥 every time."</div>
+        <div style="margin-top:8px;font-size:0.75rem;color:var(--primary)">❤️ 15 saves · Shared by @stoneware_steve</div>
+      </div>
+    </div>
+
+    <!-- Community Forum Preview -->
+    <h2 style="font-family:Georgia,serif;color:var(--text);margin-bottom:16px">💬 Potter Community</h2>
+    <p style="color:var(--text-light);margin-bottom:20px;font-size:0.95rem">Real conversations from real potters. Questions, wins, lessons, and shared knowledge.</p>
+    <div style="background:#fff;border-radius:12px;box-shadow:var(--shadow);border:1px solid var(--border);overflow:hidden;margin-bottom:40px">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:flex-start">
+        <div style="width:36px;height:36px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.8rem;font-weight:700;flex-shrink:0">AM</div>
+        <div><div style="font-weight:600;font-size:0.9rem">Help! Glaze crawling on every piece</div><div style="font-size:0.8rem;color:var(--text-light);margin-top:4px">I bisqued to 06, using Amaco Celadon at cone 6. Every single piece has crawling on the inside. What am I doing wrong?</div><div style="font-size:0.75rem;color:var(--text-light);margin-top:6px">💬 8 replies · Posted 2 hours ago</div></div>
+      </div>
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:flex-start">
+        <div style="width:36px;height:36px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.8rem;font-weight:700;flex-shrink:0">CW</div>
+        <div><div style="font-weight:600;font-size:0.9rem">First reduction firing — thoughts?</div><div style="font-size:0.8rem;color:var(--text-light);margin-top:4px">Finally got access to a gas kiln and did my first cone 10 reduction. The colors are UNREAL. Sharing results inside.</div><div style="font-size:0.75rem;color:var(--text-light);margin-top:6px">💬 14 replies · 🔥 Posted yesterday</div></div>
+      </div>
+      <div style="padding:16px 20px;display:flex;gap:12px;align-items:flex-start">
+        <div style="width:36px;height:36px;border-radius:50%;background:#6B6B9E;display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.8rem;font-weight:700;flex-shrink:0">NK</div>
+        <div><div style="font-weight:600;font-size:0.9rem">Clay recycling setup that actually works</div><div style="font-size:0.8rem;color:var(--text-light);margin-top:4px">Spent $40 on a plaster bat and a bucket. Now I recycle ALL my clay scraps. Here's my method step by step.</div><div style="font-size:0.75rem;color:var(--text-light);margin-top:6px">💬 22 replies · Pinned</div></div>
+      </div>
+    </div>
+
+    <!-- The emotional closer -->
+    <div style="background:linear-gradient(135deg,#2f2118 0%,#5c4033 100%);border-radius:16px;padding:40px 28px;text-align:center;color:#fff;margin-bottom:20px">
+      <h2 style="font-family:Georgia,serif;font-size:1.6rem;margin-bottom:12px;color:#fff">Your pottery deserves to be remembered.</h2>
+      <p style="color:rgba(255,255,255,0.8);margin-bottom:8px;font-size:1rem">Every piece you make tells a story — the clay, the glaze, the firing, the lesson.</p>
+      <p style="color:rgba(255,255,255,0.6);margin-bottom:24px;font-size:0.9rem">Stop losing those stories. Start tracking for free.</p>
+      <button class="btn btn-primary btn-lg" onclick="exitPreviewToSignup()" style="font-size:1.1rem;padding:16px 40px">Create My Free Account</button>
+      <p style="margin-top:12px;color:rgba(255,255,255,0.4);font-size:0.85rem">20 pieces, full glaze library, clay tracker — free forever. No credit card.</p>
+    </div>
+  </div>
+</div>
+
 <!-- AUTH SCREEN -->
 <div id="authScreen" class="auth-screen" style="display:none">
   <div class="auth-card">

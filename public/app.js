@@ -4072,30 +4072,39 @@ async function loadLandingBlogPosts() {
   } catch(e) { /* ignore */ }
 }
 
-// Show blog from landing page (before login)
+// Show the immersive preview page
 function showGuestPreview(page = 'community') {
   guestMode = true;
   document.getElementById('landingPage').style.display = 'none';
   document.getElementById('authScreen').style.display = 'none';
-  document.getElementById('mainApp').classList.remove('hidden');
-  const badge = document.getElementById('navTier');
-  if (badge) { badge.textContent = 'PREVIEW'; badge.className = 'tier-badge tier-free'; }
-  const adminNav = document.getElementById('navAdmin');
-  if (adminNav) adminNav.style.display = 'none';
-  const pages = ['community', 'forum', 'communityMembers', 'blog', 'shop'];
-  const target = pages.includes(page) ? page : 'community';
-  navigate(target);
+  document.getElementById('mainApp').classList.add('hidden');
+  document.getElementById('previewPage').style.display = 'block';
+  window.scrollTo(0, 0);
+}
+function exitPreviewToSignup() {
+  document.getElementById('previewPage').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'flex';
+  guestMode = false;
 }
 
 function showBlogFromLanding() {
   showGuestPreview('blog');
 }
+function exitPreviewToLanding() {
+  document.getElementById('previewPage').style.display = 'none';
+  document.getElementById('landingPage').style.display = '';
+  guestMode = false;
+  window.scrollTo(0, 0);
+}
 
 function showBlogPostFromLanding(slug) {
   guestMode = true;
   document.getElementById('landingPage').style.display = 'none';
+  document.getElementById('previewPage').style.display = 'none';
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('mainApp').classList.remove('hidden');
+  const badge = document.getElementById('navTier');
+  if (badge) { badge.textContent = 'PREVIEW'; badge.className = 'tier-badge tier-free'; }
   viewBlogPost(slug);
 }
 
