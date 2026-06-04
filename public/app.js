@@ -31,6 +31,13 @@ function requireSignup(feature) {
 function isGuestPreviewPage(page) {
   return ['blog','forum','community','communityMembers','shop','upgrade','help'].includes(page);
 }
+function previewRibbon(message, cta = 'Sign Up Free', action = "requireSignup('unlock the full app')") {
+  return '<div class="card mb-16" style="background:linear-gradient(135deg,#f7efe7 0%,#fff8f2 100%);border:1px dashed var(--primary)">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">' +
+    '<div><strong>👀 Preview mode</strong><p class="text-sm" style="margin-top:6px;color:var(--text-light)">' + message + '</p></div>' +
+    '<button class="btn btn-primary btn-sm" onclick="' + action + '">' + cta + '</button>' +
+    '</div></div>';
+}
 function toast(msg, type = '') {
   const el = document.createElement('div');
   el.className = 'toast ' + type;
@@ -1557,7 +1564,7 @@ async function saveForumPost(e) {
 // ---- Shop ----
 async function loadShop() {
   try {
-    const products = await api('/api/shop/products');
+    const products = guestMode ? await fetch('/api/shop/products').then(r => r.json()) : await api('/api/shop/products');
     const c = document.getElementById('shopProducts');
     if (!products.length) {
       c.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🛍️</div><div class="empty-state-title">Shop coming soon!</div><p>Stickers, journals, and pottery resources — stay tuned.</p></div>';
@@ -2262,7 +2269,8 @@ async function loadAdminBlogPosts() {
     const el = document.getElementById('adminBlogList');
     if (!el) return;
     if (!posts.length) { el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">No blog posts yet</div>'; return; }
-    el.innerHTML = posts.map(p =>
+    const ribbon = guestMode ? previewRibbon('Read the blog freely. Sign up when you want to track your work, post, and join the community.', 'Join Free', "requireSignup('track your pottery and join the community')") : '';
+    el.innerHTML = ribbon + posts.map(p =>
       '<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">' +
       '<div><strong>' + esc(p.title) + '</strong> <span class="text-sm" style="color:' + (p.is_published ? 'var(--success)' : 'var(--text-muted)') + '">' + (p.is_published ? '✅ Published' : '📝 Draft') + '</span>' +
       '<div class="text-sm" style="color:var(--text-muted)">' + fmtDate(p.published_at) + ' · /' + esc(p.slug) + ' · 👁️ ' + (p.view_count || 0) + ' views</div></div>' +
@@ -3789,7 +3797,7 @@ async function deleteContact(id) {
 let allMembers = [];
 async function loadCommunityMembers() {
   try {
-    allMembers = await api('/api/community/members');
+    allMembers = guestMode ? await fetch('/api/community/members').then(r => r.json()) : await api('/api/community/members');
     document.getElementById('memberSearch').value = '';
     renderMembers(allMembers);
   } catch(e) { toast(e.message,'error'); }
@@ -3803,7 +3811,8 @@ function renderMembers(members) {
   const c = document.getElementById('membersList'), em = document.getElementById('membersEmpty');
   if (!members.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
   em.classList.add('hidden');
-  c.innerHTML = members.map(u =>
+  const ribbon = guestMode ? previewRibbon('Browse potters in the community, then sign up free to message people and build your own profile.', 'Join Free', "requireSignup('message potters and create your profile')") : '';
+  c.innerHTML = ribbon + members.map(u =>
     '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg-card)">' +
     '<div style="cursor:pointer;flex-shrink:0" onclick="viewMemberProfile(\'' + u.id + '\')">' +
     (u.avatar_filename ? '<img src="/uploads/' + u.avatar_filename + '" style="width:44px;height:44px;border-radius:50%;object-fit:cover">' : '<div style="width:44px;height:44px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;color:var(--primary)">' + (u.display_name||'?')[0].toUpperCase() + '</div>') +
@@ -3821,7 +3830,7 @@ function renderMembers(members) {
 
 async function viewMemberProfile(userId) {
   try {
-    const d = await api('/api/profile/' + userId);
+    const d = guestMode ? await fetch('/api/profile/' + userId).then(r => r.json()) : await api('/api/profile/' + userId);
     const u = d.user;
     const c = document.getElementById('memberProfileContent');
     if (u.isPrivate) {
@@ -3932,12 +3941,13 @@ async function subscribeNewsletter(e) {
 // ============ BLOG ============
 async function loadBlog() {
   try {
-    const posts = await api('/api/blog/posts');
+    const posts = guestMode ? await fetch('/api/blog/posts').then(r => r.json()) : await api('/api/blog/posts');
     const el = document.getElementById('blogPostsList');
     const em = document.getElementById('blogEmpty');
-    if (!posts.length) { el.innerHTML = ''; em.classList.remove('hidden'); return; }
+    if (!posts.length) { el.innerHTML = guestMode ? previewRibbon('Read pottery writing and studio updates before signing up.', 'Join Free', "requireSignup('save your work and join the community')") : ''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
-    el.innerHTML = posts.map(p =>
+    const ribbon = guestMode ? previewRibbon('Read the blog freely. Sign up when you want to track your work, post, and join the community.', 'Join Free', "requireSignup('track your pottery and join the community')") : '';
+    el.innerHTML = ribbon + posts.map(p =>
       '<div class="card" style="cursor:pointer" onclick="viewBlogPost(\'' + esc(p.slug) + '\')">' +
       '<h3 style="margin-bottom:8px;color:var(--primary)">' + esc(p.title) + '</h3>' +
       '<p style="color:var(--text-light);font-size:0.9rem;margin-bottom:8px">' + esc(p.excerpt || '') + '</p>' +
@@ -3949,7 +3959,7 @@ async function loadBlog() {
 
 async function viewBlogPost(slug) {
   try {
-    const post = await api('/api/blog/posts/' + slug);
+    const post = guestMode ? await fetch('/api/blog/posts/' + slug).then(r => r.json()) : await api('/api/blog/posts/' + slug);
     navigate('blogPost');
     window.history.replaceState(null, '', '#blog/' + slug);
     const el = document.getElementById('blogPostContent');
