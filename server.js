@@ -332,15 +332,39 @@ app.get('/api/auth/me', auth, (req, res) => {
 });
 
 // User subscription status (used by mobile app BillingScreen)
-app.get('/api/user/subscription', auth, (req, res) => {
-  const u = db.prepare('SELECT tier, billing_period, plan_expires_at, stripe_subscription_id FROM users WHERE id=?').get(req.userId);
+app.get('/api/user/subscription', auth, async (req, res) => {
+  const u = db.prepare('SELECT tier, billing_period, plan_expires_at, stripe_subscription_id, stripe_customer_id, email FROM users WHERE id=?').get(req.userId);
   if (!u) return res.status(404).json({ error: 'User not found' });
+
+  let hasStripe = !!u.stripe_subscription_id;
+
+  // If no stripe_subscription_id stored but user has a paid tier, try to sync from Stripe
+  if (!hasStripe && u.tier && u.tier !== 'free' && stripe && u.email) {
+    try {
+      let customerId = u.stripe_customer_id;
+      if (!customerId) {
+        const customers = await stripe.customers.list({ email: u.email, limit: 1 });
+        if (customers.data.length > 0) {
+          customerId = customers.data[0].id;
+          db.prepare('UPDATE users SET stripe_customer_id=? WHERE id=?').run(customerId, req.userId);
+        }
+      }
+      if (customerId) {
+        const subs = await stripe.subscriptions.list({ customer: customerId, status: 'active', limit: 1 });
+        if (subs.data.length > 0) {
+          db.prepare('UPDATE users SET stripe_subscription_id=? WHERE id=?').run(subs.data[0].id, req.userId);
+          hasStripe = true;
+        }
+      }
+    } catch (e) { /* non-critical — just means we can't confirm Stripe link */ }
+  }
+
   res.json({
     plan: u.tier || 'free',
     status: 'active',
     billingPeriod: u.billing_period || null,
     expiresAt: u.plan_expires_at || null,
-    hasStripeSubscription: !!u.stripe_subscription_id
+    hasStripeSubscription: hasStripe
   });
 });
 
@@ -372,12 +396,32 @@ app.post('/api/create-checkout-session', auth, async (req, res) => {
 app.post('/api/create-portal-session', auth, async (req, res) => {
   if (!stripe) return res.status(400).json({ error: 'Stripe not configured' });
   try {
-    const user = db.prepare('SELECT stripe_customer_id FROM users WHERE id=?').get(req.userId);
-    if (!user || !user.stripe_customer_id) {
-      return res.status(404).json({ error: 'No active subscription found. Nothing to manage.' });
+    let user = db.prepare('SELECT stripe_customer_id, email FROM users WHERE id=?').get(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+
+    let customerId = user.stripe_customer_id;
+
+    // If no stripe_customer_id stored, try to find customer by email in Stripe
+    if (!customerId && user.email) {
+      const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+      if (customers.data.length > 0) {
+        customerId = customers.data[0].id;
+        // Sync back to DB so this lookup only happens once
+        db.prepare('UPDATE users SET stripe_customer_id=? WHERE id=?').run(customerId, req.userId);
+        // Also find and save active subscription ID
+        const subs = await stripe.subscriptions.list({ customer: customerId, status: 'active', limit: 1 });
+        if (subs.data.length > 0) {
+          db.prepare('UPDATE users SET stripe_subscription_id=? WHERE id=?').run(subs.data[0].id, req.userId);
+        }
+      }
     }
+
+    if (!customerId) {
+      return res.status(404).json({ error: 'No Stripe subscription found for your account. Contact support if you believe this is an error.' });
+    }
+
     const portalSession = await stripe.billingPortal.sessions.create({
-      customer: user.stripe_customer_id,
+      customer: customerId,
       return_url: `${APP_URL || 'https://thepottersmudroom.com'}`,
     });
     res.json({ url: portalSession.url });
