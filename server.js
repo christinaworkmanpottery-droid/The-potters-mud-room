@@ -31,6 +31,10 @@ try {
 
 // AI tokens column
 try { db.exec("ALTER TABLE users ADD COLUMN ai_tokens INTEGER DEFAULT 0"); } catch(e) { /* already exists */ }
+// Potter demographics columns
+try { db.exec("ALTER TABLE users ADD COLUMN potter_type TEXT DEFAULT NULL"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN years_experience TEXT DEFAULT NULL"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN studio_type TEXT DEFAULT NULL"); } catch(e) {}
 // Nodemailer setup for newsletter emails
 let transporter = null;
 function setupTransporter(user, pass, host, port) {
@@ -519,6 +523,49 @@ app.put('/api/user/profile', auth, (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE id=?').get(req.userId);
   const { password_hash, ...safe } = user;
   res.json({ user: safe });
+});
+
+// Potter demographics
+app.get('/api/user/demographics', auth, (req, res) => {
+  const user = db.prepare('SELECT potter_type, years_experience, studio_type, location FROM users WHERE id=?').get(req.userId);
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  res.json(user);
+});
+
+app.put('/api/user/demographics', auth, (req, res) => {
+  const { potterType, yearsExperience, studioType, location } = req.body;
+  const current = db.prepare('SELECT * FROM users WHERE id=?').get(req.userId);
+  if (!current) return res.status(404).json({ error: 'User not found' });
+  db.prepare(`UPDATE users SET potter_type=?, years_experience=?, studio_type=?, location=?, updated_at=datetime('now') WHERE id=?`)
+    .run(
+      potterType !== undefined ? potterType : current.potter_type,
+      yearsExperience !== undefined ? yearsExperience : current.years_experience,
+      studioType !== undefined ? studioType : current.studio_type,
+      location !== undefined ? location : current.location,
+      req.userId
+    );
+  res.json({ success: true });
+});
+
+// Admin: view all user demographics
+app.get('/api/admin/demographics', auth, (req, res) => {
+  const user = db.prepare('SELECT is_admin FROM users WHERE id=?').get(req.userId);
+  if (!user?.is_admin) return res.status(403).json({ error: 'Admin only' });
+  const users = db.prepare('SELECT id, display_name, email, potter_type, years_experience, studio_type, location, created_at FROM users ORDER BY created_at DESC').all();
+  const summary = {
+    total: users.length,
+    byType: {},
+    byExperience: {},
+    byStudio: {},
+    byLocation: {}
+  };
+  users.forEach(u => {
+    if (u.potter_type) summary.byType[u.potter_type] = (summary.byType[u.potter_type] || 0) + 1;
+    if (u.years_experience) summary.byExperience[u.years_experience] = (summary.byExperience[u.years_experience] || 0) + 1;
+    if (u.studio_type) summary.byStudio[u.studio_type] = (summary.byStudio[u.studio_type] || 0) + 1;
+    if (u.location) summary.byLocation[u.location] = (summary.byLocation[u.location] || 0) + 1;
+  });
+  res.json({ users, summary });
 });
 
 // Newsletter subscription toggle
