@@ -1271,7 +1271,7 @@ async function loadCombos() {
     if (filter) u += 'filter=' + encodeURIComponent(filter) + '&';
     const combos = await api(u);
     const c = document.getElementById('comboList'), em = document.getElementById('communityEmpty');
-    const guestBanner = guestMode ? previewHero('See real glaze combos before you join.', 'This preview is here to show you the kind of pottery knowledge and inspiration waiting inside The Potter's Mud Room — layered glazes, cone notes, clay pairings, and shared results from other potters.', ['Save your own glaze tests and combo results', 'Track clay bodies, firings, and finished pieces together', 'Comment, like, and message other potters'], 'Start Free', "requireSignup('save combos, track firings, and join the community')") : '';
+    const guestBanner = guestMode ? previewHero('See real glaze combos before you join.', 'This preview is here to show you the kind of pottery knowledge and inspiration waiting inside The Potter’s Mud Room — layered glazes, cone notes, clay pairings, and shared results from other potters.', ['Save your own glaze tests and combo results', 'Track clay bodies, firings, and finished pieces together', 'Comment, like, and message other potters'], 'Start Free', "requireSignup('save combos, track firings, and join the community')") : '';
     if (!combos.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
     c.innerHTML = guestBanner + combos.map(cb =>
@@ -3849,7 +3849,7 @@ function renderMembers(members) {
   const c = document.getElementById('membersList'), em = document.getElementById('membersEmpty');
   if (!members.length) { c.innerHTML=''; if (guestMode) { em.innerHTML = previewEmptyState('👥', 'A pottery community belongs here.', 'The member space is meant to help potters find each other, share their work, and feel less alone in the studio. Sign up free to build your profile and be part of it.', 'Join Free', "requireSignup('create your profile and join the community')"); } em.classList.remove('hidden'); return; }
   em.classList.add('hidden');
-  const ribbon = guestMode ? previewHero('Meet the potters already inside.', 'This is the people side of the app — real makers, different styles, different studios, all in one pottery-focused space. Browse first, then sign up when you're ready to connect.', ['Create your own pottery profile', 'Message other members directly', 'Be part of a pottery community built around making, not noise'], 'Create Your Free Account', "requireSignup('message potters and create your profile')") : '';
+  const ribbon = guestMode ? previewHero('Meet the potters already inside.', 'This is the people side of the app — real makers, different styles, different studios, all in one pottery-focused space. Browse first, then sign up when you are ready to connect.', ['Create your own pottery profile', 'Message other members directly', 'Be part of a pottery community built around making, not noise'], 'Create Your Free Account', "requireSignup('message potters and create your profile')") : '';
   c.innerHTML = ribbon + members.map(u =>
     '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg-card)">' +
     '<div style="cursor:pointer;flex-shrink:0" onclick="viewMemberProfile(\'' + u.id + '\')">' +
@@ -3982,7 +3982,7 @@ async function loadBlog() {
     const posts = guestMode ? await fetch('/api/blog/posts').then(r => r.json()) : await api('/api/blog/posts');
     const el = document.getElementById('blogPostsList');
     const em = document.getElementById('blogEmpty');
-    if (!posts.length) { el.innerHTML = guestMode ? previewEmptyState('📰', 'Pottery writing lives here.', 'This part of The Potter's Mud Room is for studio notes, pottery tips, and helpful writing from inside the community. Sign up free to track your work and stay connected as more content lands.', 'Join Free', "requireSignup('save your work and join the community')") : ''; em.classList.remove('hidden'); return; }
+    if (!posts.length) { el.innerHTML = guestMode ? previewEmptyState('📰', 'Pottery writing lives here.', 'This part of The Potter’s Mud Room is for studio notes, pottery tips, and helpful writing from inside the community. Sign up free to track your work and stay connected as more content lands.', 'Join Free', "requireSignup('save your work and join the community')") : ''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
     const ribbon = guestMode ? previewHero('Studio wisdom, pottery tips, and real process notes.', 'The blog should help potters feel the voice behind the app — thoughtful, practical, and grounded in real ceramic work. Read freely, then join when you want the full tracking system too.', ['Track pieces, firings, glazes, and sales in one place', 'Join the community conversation around each lesson', 'Build a pottery record you can actually use later'], 'Track Your Pottery Free', "requireSignup('track your pottery and join the community')") : '';
     el.innerHTML = ribbon + posts.map(p =>
