@@ -1466,6 +1466,13 @@ app.get('/api/firing-logs', auth, (req, res) => {
   res.json(result);
 });
 
+app.get('/api/firing-logs/:id', auth, (req, res) => {
+  const log = db.prepare('SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id WHERE fl.id=? AND fl.user_id=?').get(req.params.id, req.userId);
+  if (!log) return res.status(404).json({ error: 'Not found' });
+  const photos = db.prepare('SELECT id,filename FROM firing_photos WHERE firing_id=? ORDER BY sort_order ASC').all(req.params.id);
+  res.json({ ...log, photos });
+});
+
 app.post('/api/firing-logs', auth, requireTier('starter'), (req, res) => {
   const { pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail, holdUsed, holdDuration, date, results, notes, firingTime, firingMode, loadDescription, firingModeNotes, startTime, endTime, openTemp } = req.body;
   const id = uuidv4();
