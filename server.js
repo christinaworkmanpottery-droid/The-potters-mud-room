@@ -617,8 +617,8 @@ app.get('/api/billing/plans', (req, res) => {
   res.json({
     foundingMember: true,
     plans: [
-      { id: 'free', name: 'Free', price: 0, yearlyPrice: 0, features: ['20 pieces', '1 photo each', 'Personal clay & glaze library', 'Basic search', 'Community forum access', 'Ask a Potter (5 questions/month)'] },
-      { id: 'starter', name: 'Unlimited', price: 6.95, yearlyPrice: 69.50, foundingPrice: 3.48, foundingYearly: 34.75, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', 'Community glaze library', 'Sales tracking', 'Full forum access (read & post)', 'Unlimited Ask a Potter', 'Cancel anytime'] }
+      { id: 'free', name: 'Free', price: 0, yearlyPrice: 0, features: ['10 pieces', '1 photo each', 'Personal clay & glaze library', 'Basic search', 'Community forum access', 'Ask a Potter (5 questions/month)'] },
+      { id: 'starter', name: 'Unlimited', price: 6.95, yearlyPrice: 69.50, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', 'Community glaze library', 'Sales tracking', 'Full forum access (read & post)', 'Unlimited Ask a Potter', 'Cancel anytime'] }
     ],
     stripeEnabled: !!stripe
   });
@@ -1326,7 +1326,7 @@ app.post('/api/pieces', auth, safeUpload('photo'), (req, res) => {
   console.log('[DEBUG] POST /api/pieces content-type:', req.headers['content-type'], 'body:', JSON.stringify(body), 'file:', req.file ? req.file.originalname : 'none', 'title:', title, 'status:', status, 'clay:', clayText, 'glaze:', glazeText, 'notes:', notes);
 
   const u = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
-  if ((u?.tier || 'free') === 'free' && getPieceCount(req.userId) >= 20) return res.status(403).json({ error: 'Free tier limited to 20 pieces. Upgrade to add more!' });
+  if ((u?.tier || 'free') === 'free' && getPieceCount(req.userId) >= 10) return res.status(403).json({ error: 'Free tier limited to 10 pieces. Upgrade to Unlimited for more!' });
 
   const id = uuidv4();
   const isCasualty = (status === 'broken' || status === 'recycled');
