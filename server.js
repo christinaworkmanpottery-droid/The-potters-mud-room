@@ -605,6 +605,49 @@ app.delete('/api/block/:userId', auth, (req, res) => {
   res.json({ success: true });
 });
 
+// ============ CONTENT REPORTS ============
+app.post('/api/reports', auth, (req, res) => {
+  try {
+    const { contentType, contentId, reason, details } = req.body;
+    if (!contentType || !contentId || !reason) {
+      return res.status(400).json({ error: 'contentType, contentId, and reason are required' });
+    }
+    const id = uuidv4();
+    db.prepare('INSERT INTO content_reports (id, reporter_id, content_type, content_id, reason, details) VALUES (?, ?, ?, ?, ?, ?)').run(id, req.userId, contentType, contentId, reason, details || '');
+    res.json({ success: true, id });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Block user (alternative path to match mobile app API)
+app.post('/api/users/:userId/block', auth, (req, res) => {
+  try {
+    db.prepare('INSERT OR IGNORE INTO blocked_users (id, user_id, blocked_user_id) VALUES (?, ?, ?)').run(uuidv4(), req.userId, req.params.userId);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/users/:userId/unblock', auth, (req, res) => {
+  try {
+    db.prepare('DELETE FROM blocked_users WHERE user_id=? AND blocked_user_id=?').run(req.userId, req.params.userId);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/users/blocked', auth, (req, res) => {
+  try {
+    const blocked = db.prepare('SELECT b.blocked_user_id as id, u.name, u.display_name, b.created_at FROM blocked_users b LEFT JOIN users u ON u.id = b.blocked_user_id WHERE b.user_id = ?').all(req.userId);
+    res.json(blocked);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ============ STRIPE BILLING ============
 const PRICE_CONFIG = {
   starter: { amount: 695, name: "Starter Plan — $6.95/mo" },

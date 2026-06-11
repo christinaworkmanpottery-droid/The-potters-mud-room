@@ -1050,7 +1050,22 @@ function initDB() {
     'Christina Workman'
   );
 
-  return db;
+      // Content Reports
+    db.exec(`
+    CREATE TABLE IF NOT EXISTS content_reports (
+      id TEXT PRIMARY KEY,
+      reporter_id TEXT NOT NULL,
+      content_type TEXT NOT NULL,
+      content_id TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      details TEXT,
+      status TEXT DEFAULT 'pending',
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (reporter_id) REFERENCES users(id)
+    );
+    `);
+
+return db;
 }
 
 module.exports = { initDB, DB_PATH };
