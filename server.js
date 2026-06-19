@@ -2334,8 +2334,10 @@ app.post('/api/messages/:userId', auth, (req, res) => {
   db.prepare('INSERT INTO messages (id,from_user_id,to_user_id,body) VALUES (?,?,?,?)').run(id, req.userId, req.params.userId, body.trim());
   // Notify recipient
   const fromUser = db.prepare('SELECT display_name FROM users WHERE id=?').get(req.userId);
+  const msg = (fromUser?.display_name||'Someone') + ' sent you a message';
   db.prepare('INSERT INTO notifications (id,user_id,type,message,link,from_user_id) VALUES (?,?,?,?,?,?)')
-    .run(uuidv4(), req.params.userId, 'message', (fromUser?.display_name||'Someone') + ' sent you a message', 'messages_'+req.userId, req.userId);
+    .run(uuidv4(), req.params.userId, 'message', msg, 'messages_'+req.userId, req.userId);
+  sendPushToUser(req.params.userId, 'New Message', msg, { type: 'message', fromUserId: req.userId });
   res.json({ id });
 });
 
