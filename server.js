@@ -2205,8 +2205,10 @@ app.post('/api/forum/posts/:id/like', auth, (req, res) => {
       const post = db.prepare('SELECT user_id,title FROM forum_posts WHERE id=?').get(req.params.id);
       if (post && post.user_id !== req.userId) {
         const fromUser = db.prepare('SELECT display_name FROM users WHERE id=?').get(req.userId);
+        const msg = (fromUser?.display_name||'Someone') + ' liked your post "' + post.title + '"';
         db.prepare('INSERT INTO notifications (id,user_id,type,message,link,from_user_id) VALUES (?,?,?,?,?,?)')
-          .run(uuidv4(), post.user_id, 'forum_like', (fromUser?.display_name||'Someone') + ' liked your post "' + post.title + '"', 'forum', req.userId);
+          .run(uuidv4(), post.user_id, 'forum_like', msg, 'forumPost_'+req.params.id, req.userId);
+        sendPushToUser(post.user_id, 'Post Liked', msg, { type: 'forum_like', postId: req.params.id });
       }
       res.json({ liked: true });
     }
