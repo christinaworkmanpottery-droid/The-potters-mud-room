@@ -8,7 +8,10 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const { Expo } = require('expo-server-sdk');
 const { initDB } = require('./database');
+
+const expo = new Expo();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1010,12 +1013,19 @@ app.delete('/api/clay-bodies/:id', auth, (req, res) => {
   res.json({ success: true });
 });
 
-// Clay photo upload
+// Clay photo upload (replaces existing photo if at max, so edits always persist)
 app.post('/api/clay-bodies/:id/photos', auth, upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo' });
   const maxPhotos = (req.userTier === 'free') ? 1 : 3;
+  const existing = db.prepare('SELECT * FROM clay_photos WHERE clay_id=? ORDER BY sort_order').all(req.params.id);
+  // If at max, replace the oldest photo instead of rejecting
+  if (existing.length >= maxPhotos) {
+    const oldest = existing[0];
+    const oldFile = path.join(UPLOADS_DIR, oldest.filename);
+    if (fs.existsSync(oldFile)) fs.unlinkSync(oldFile);
+    db.prepare('DELETE FROM clay_photos WHERE id=?').run(oldest.id);
+  }
   const count = db.prepare('SELECT COUNT(*) as c FROM clay_photos WHERE clay_id=?').get(req.params.id).c;
-  if (count >= maxPhotos) return res.status(403).json({ error: req.userTier === 'free' ? 'Free tier allows 1 photo per clay body. Upgrade to add up to 3!' : 'Max 3 photos per clay body' });
   const id = uuidv4();
   db.prepare('INSERT INTO clay_photos (id,clay_id,filename,original_name,photo_label,notes,sort_order) VALUES (?,?,?,?,?,?,?)')
     .run(id, req.params.id, req.file.filename, req.file.originalname, req.body.label||null, req.body.notes||null, count);
@@ -2210,8 +2220,11 @@ function notifyForumReply(postId, replyUserId) {
     const post = db.prepare('SELECT user_id,title FROM forum_posts WHERE id=?').get(postId);
     if (post && post.user_id !== replyUserId) {
       const fromUser = db.prepare('SELECT display_name FROM users WHERE id=?').get(replyUserId);
+      const msg = (fromUser?.display_name||'Someone') + ' replied to your post "' + post.title + '"';
       db.prepare('INSERT INTO notifications (id,user_id,type,message,link,from_user_id) VALUES (?,?,?,?,?,?)')
-        .run(uuidv4(), post.user_id, 'forum_reply', (fromUser?.display_name||'Someone') + ' replied to your post "' + post.title + '"', 'forumPost_'+postId, replyUserId);
+        .run(uuidv4(), post.user_id, 'forum_reply', msg, 'forumPost_'+postId, replyUserId);
+      // Send push notification
+      sendPushToUser(post.user_id, 'New Reply', msg, { type: 'forum_reply', postId });
     }
   } catch(e) { /* silent */ }
 }
@@ -2232,6 +2245,49 @@ app.post('/api/notifications/:id/read', auth, (req, res) => {
   db.prepare('UPDATE notifications SET is_read=1 WHERE id=? AND user_id=?').run(req.params.id, req.userId);
   res.json({ success: true });
 });
+
+// ============ PUSH TOKENS ============
+app.post('/api/push-token', auth, (req, res) => {
+  const { token, platform } = req.body;
+  if (!token) return res.status(400).json({ error: 'Token required' });
+  // Upsert: if token exists for another user, reassign it
+  db.prepare('DELETE FROM push_tokens WHERE token=?').run(token);
+  db.prepare('INSERT INTO push_tokens (id,user_id,token,platform) VALUES (?,?,?,?)')
+    .run(uuidv4(), req.userId, token, platform || 'unknown');
+  res.json({ success: true });
+});
+
+app.delete('/api/push-token', auth, (req, res) => {
+  const { token } = req.body;
+  if (token) {
+    db.prepare('DELETE FROM push_tokens WHERE token=? AND user_id=?').run(token, req.userId);
+  } else {
+    db.prepare('DELETE FROM push_tokens WHERE user_id=?').run(req.userId);
+  }
+  res.json({ success: true });
+});
+
+// Helper: send push notifications to a user
+async function sendPushToUser(userId, title, body, data = {}) {
+  try {
+    const tokens = db.prepare('SELECT token FROM push_tokens WHERE user_id=?').all(userId);
+    if (!tokens.length) return;
+    const messages = tokens
+      .filter(t => Expo.isExpoPushToken(t.token))
+      .map(t => ({
+        to: t.token,
+        sound: 'default',
+        title,
+        body,
+        data,
+      }));
+    if (!messages.length) return;
+    const chunks = expo.chunkPushNotifications(messages);
+    for (const chunk of chunks) {
+      try { await expo.sendPushNotificationsAsync(chunk); } catch (e) { console.warn('[push] chunk error:', e.message); }
+    }
+  } catch (e) { console.warn('[push] sendPushToUser error:', e.message); }
+}
 
 // ============ IN-APP MESSAGING ============
 app.get('/api/messages', auth, (req, res) => {

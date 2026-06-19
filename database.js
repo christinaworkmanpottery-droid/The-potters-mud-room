@@ -655,6 +655,9 @@ function initDB() {
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_clay_photos ON clay_photos(clay_id)`);
 
+  // Add updated_at to forum_replies (missing from original schema)
+  safeAdd('forum_replies', 'updated_at', "TEXT DEFAULT NULL");
+
   // Part 1 revamp — glaze chemical inventory
   db.exec(`
     CREATE TABLE IF NOT EXISTS glaze_chemicals (
@@ -1064,6 +1067,19 @@ function initDB() {
       FOREIGN KEY (reporter_id) REFERENCES users(id)
     );
     `);
+
+  // Push notification tokens
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS push_tokens (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      token TEXT NOT NULL UNIQUE,
+      platform TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_push_tokens_user ON push_tokens(user_id)`);
 
 return db;
 }
