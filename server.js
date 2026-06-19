@@ -377,21 +377,22 @@ app.get('/api/user/subscription', auth, async (req, res) => {
 
 // Alias for mobile app checkout (app calls /api/create-checkout-session)
 app.post('/api/create-checkout-session', auth, async (req, res) => {
-  if (!stripe) return res.status(400).json({ error: 'Stripe not configured yet — coming soon!' });
-  const { plan } = req.body;
+  if (!stripe) return res.status(400).json({ error: 'Stripe not configured' });
+  const { planId, plan } = req.body;
+  const selectedPlan = planId || plan;
   const PRICE_CONFIG_LOCAL = {
     free: null,
-    starter: { amount: 695, name: "Unlimited Plan — $6.95/mo", tier: 'starter' },
-    'starter-yearly': { amount: 6950, name: "Unlimited Plan — $69.50/year", tier: 'starter' },
+    starter: { amount: 695, name: "Unlimited Plan — $6.95/mo", tier: 'starter', interval: 'month' },
+    'starter-yearly': { amount: 6950, name: "Unlimited Plan — $69.50/year", tier: 'starter', interval: 'year' },
   };
-  const config = PRICE_CONFIG_LOCAL[plan];
+  const config = PRICE_CONFIG_LOCAL[selectedPlan];
   if (!config) return res.status(400).json({ error: 'Invalid plan' });
   try {
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       mode: 'subscription',
-      line_items: [{ price_data: { currency: 'usd', recurring: { interval: 'month' }, product_data: { name: config.name }, unit_amount: config.amount }, quantity: 1 }],
-      metadata: { userId: req.userId, purchaseType: 'subscription', tier: config.tier, billing: 'monthly' },
+      line_items: [{ price_data: { currency: 'usd', recurring: { interval: config.interval || 'month' }, product_data: { name: config.name }, unit_amount: config.amount }, quantity: 1 }],
+      metadata: { userId: req.userId, purchaseType: 'subscription', tier: config.tier, billing: config.interval || 'monthly' },
       success_url: `${APP_URL || 'https://thepottersmudroom.com'}?upgraded=${config.tier}`,
       cancel_url: `${APP_URL || 'https://thepottersmudroom.com'}?cancelled=true`,
     });
