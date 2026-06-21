@@ -1522,7 +1522,7 @@ async function viewForumPost(id) {
       '<div><h2>' + esc(post.title) + '</h2>' +
       '<div class="text-sm" style="color:var(--text-light)">by <strong>' + esc(post.author_name||'Anonymous') + '</strong> · ' + timeAgo(post.created_at) +
       ' · 👁 ' + post.view_count + ' views · 💬 ' + post.reply_count + ' replies</div></div></div>' +
-      ((post.user_id === currentUser?.id || currentUser?.email === 'christinaworkmanpottery@gmail.com') ? '<div style="margin-bottom:12px"><button class="btn btn-danger btn-sm" onclick="deleteForumPost(\'' + post.id + '\')">🗑️ Delete Post</button></div>' : '') +
+      ((post.user_id === currentUser?.id || currentUser?.email === 'christinaworkmanpottery@gmail.com') ? '<div style="margin-bottom:12px;display:flex;gap:8px"><button class="btn btn-secondary btn-sm" onclick="editForumPost(\'' + post.id + '\',\'' + esc(post.title).replace(/'/g,'&#39;') + '\')" style="background:var(--primary);color:#fff">✏️ Edit Post</button><button class="btn btn-danger btn-sm" onclick="deleteForumPost(\'' + post.id + '\')">🗑️ Delete Post</button></div>' : '') +
       '<div style="white-space:pre-wrap;margin-bottom:16px">' + esc(post.body) + '</div>' +
       (photos ? '<div class="forum-photos-row mb-16">' + photos + '</div>' : '') +
       '</div>' +
@@ -1534,6 +1534,35 @@ async function viewForumPost(id) {
       '<div style="display:flex;justify-content:flex-end;margin-top:8px">' +
       '<button class="btn btn-primary" onclick="submitReply(\'' + post.id + '\')">Reply</button></div></div>';
   } catch(e) { toast(e.message,'error'); }
+}
+
+async function editForumPost(id) {
+  const post = document.querySelector('#forumPostContent');
+  // Get current post data from the displayed content
+  try {
+    const data = await api('/api/forum/posts/' + id);
+    const p = data.post || data;
+    const title = p.title || '';
+    const body = p.body || p.content || '';
+    document.getElementById('forumPostContent').querySelector('.card').innerHTML =
+      '<h3 style="margin-bottom:12px">Edit Post</h3>' +
+      '<input type="text" id="editPostTitle" class="form-input" value="' + esc(title).replace(/"/g,'&quot;') + '" style="margin-bottom:12px;font-size:1.1rem;font-weight:600">' +
+      '<textarea class="form-textarea" id="editPostBody" style="min-height:150px">' + esc(body) + '</textarea>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">' +
+      '<button class="btn btn-secondary" onclick="viewForumPost(\'' + id + '\')">Cancel</button>' +
+      '<button class="btn btn-primary" onclick="saveForumPost(\'' + id + '\')">Save</button></div>';
+  } catch(e) { toast(e.message || 'Could not load post for editing', 'error'); }
+}
+
+async function saveForumPost(id) {
+  const title = document.getElementById('editPostTitle').value.trim();
+  const body = document.getElementById('editPostBody').value.trim();
+  if (!title || !body) { toast('Title and content cannot be empty', 'error'); return; }
+  try {
+    await api('/api/forum/posts/' + id, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ title, content: body }) });
+    toast('Post updated!', 'success');
+    viewForumPost(id);
+  } catch(e) { toast(e.message || 'Could not save', 'error'); }
 }
 
 async function deleteForumPost(id) {
