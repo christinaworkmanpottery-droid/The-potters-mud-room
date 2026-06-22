@@ -3995,6 +3995,16 @@ function shareBlog(url, title) {
   }
 }
 
+function printBlogPost() {
+  const article = document.querySelector('#blogPostContent article');
+  if (!article) return;
+  const printWin = window.open('', '_blank');
+  printWin.document.write('<html><head><title>Print</title><style>body{font-family:Georgia,serif;padding:40px;line-height:1.8;color:#333;max-width:700px;margin:0 auto}h1{font-size:1.8em;margin-bottom:8px}h2{font-size:1.4em;margin-top:24px}h3{font-size:1.2em;margin-top:18px}p{margin-bottom:12px}ul,ol{margin-left:20px}li{margin-bottom:8px}button,.share-section{display:none!important}.footer-print{margin-top:40px;padding-top:16px;border-top:1px solid #ddd;font-size:0.85em;color:#999;text-align:center}</style></head><body>' + article.innerHTML + '<div class="footer-print">The Potter\'s Mud Room — thepottersmudroom.com</div></body></html>');
+  printWin.document.close();
+  printWin.focus();
+  setTimeout(() => { printWin.print(); printWin.close(); }, 300);
+}
+
 // ============ NEWSLETTER SIGNUP ============
 async function subscribeNewsletter(e) {
   e.preventDefault();
@@ -4066,6 +4076,7 @@ async function viewBlogPost(slug) {
       '<button class="btn btn-sm" onclick="window.open(\'https://pinterest.com/pin/create/button/?url=' + encodeURIComponent(postUrl) + '&description=' + encodeURIComponent(postTitle + ' — ' + postExcerpt) + '&media=' + encodeURIComponent('https://thepottersmudroom.com/og-image.png') + '\',\'_blank\',\'width=600,height=400\')" style="background:#E60023;color:#fff;border:none">📌 Pinterest</button>' +
       '<button class="btn btn-sm" onclick="window.open(\'https://twitter.com/intent/tweet?url=' + encodeURIComponent(postUrl) + '&text=' + encodeURIComponent(postTitle) + '\',\'_blank\',\'width=600,height=400\')" style="background:#000;color:#fff;border:none">𝕏 Post</button>' +
       '<button class="btn btn-sm" onclick="shareBlog(\'' + esc(postUrl) + '\',\'' + esc(postTitle) + '\')" style="background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);color:#fff;border:none">📲 Share</button>' +
+      '<button class="btn btn-sm" onclick="printBlogPost()" style="background:#555;color:#fff;border:none">🖨️ Print</button>' +
       '</div>' +
       '<p class="text-sm" style="color:var(--text-muted);margin-top:8px">On mobile, tap 📲 Share to send to Instagram, WhatsApp, Messages, and more!</p></div>';
     el.innerHTML = '<article class="card" style="max-width:700px">' +
