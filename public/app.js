@@ -219,7 +219,7 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
   try {
     const referredBy = sessionStorage.getItem('referral_code') || null;
     const data = await api(isSignUp ? '/api/auth/register' : '/api/auth/login', {
-      method: 'POST', body: isSignUp ? { email, password, displayName: name, referredBy } : { email, password }
+      method: 'POST', body: isSignUp ? { email, password, displayName: name, referredBy, signupSource: 'web_app' } : { email, password }
     });
     if (isSignUp && referredBy) sessionStorage.removeItem('referral_code');
     token = data.token;
@@ -2187,6 +2187,28 @@ async function loadAdminAnalytics() {
       html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
       a.signupsByDay.forEach(d => {
         html += '<div style="text-align:center;padding:4px 8px;background:var(--primary-light);border-radius:4px;font-size:0.8rem"><div style="font-weight:700">' + d.signups + '</div><div style="color:var(--text-muted)">' + d.day.substring(5) + '</div></div>';
+      });
+      html += '</div>';
+    }
+
+    // Signup sources
+    if (a.signupSources?.length) {
+      html += '<h4 style="margin:16px 0 8px">📍 Where Signups Come From</h4>';
+      a.signupSources.forEach(s => {
+        const label = s.source === 'unknown' ? 'Direct / Unknown' : s.source.replace(/_/g, ' ');
+        html += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:0.85rem"><span>' + esc(label) + '</span><strong>' + s.count + '</strong></div>';
+      });
+    }
+
+    // Recent signups
+    if (a.recentSignups?.length) {
+      html += '<h4 style="margin:16px 0 8px">🆕 Recent Signups</h4>';
+      html += '<div style="font-size:0.82rem">';
+      a.recentSignups.slice(0, 15).forEach(u => {
+        const src = u.source === 'unknown' ? 'Direct' : u.source.replace(/_/g, ' ');
+        const ref = u.referred_by ? ' (ref: ' + esc(u.referred_by) + ')' : '';
+        const date = u.created_at ? new Date(u.created_at).toLocaleDateString() : '';
+        html += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border)"><span>' + esc(u.display_name || u.email) + ' <span style="color:var(--text-light)">' + esc(src) + ref + '</span></span><span style="color:var(--text-light)">' + date + '</span></div>';
       });
       html += '</div>';
     }

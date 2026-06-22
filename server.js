@@ -38,6 +38,7 @@ try { db.exec("ALTER TABLE users ADD COLUMN ai_tokens INTEGER DEFAULT 0"); } cat
 try { db.exec("ALTER TABLE users ADD COLUMN potter_type TEXT DEFAULT NULL"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN years_experience TEXT DEFAULT NULL"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN studio_type TEXT DEFAULT NULL"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN signup_source TEXT DEFAULT NULL"); } catch(e) {}
 // Nodemailer setup for newsletter emails
 let transporter = null;
 function setupTransporter(user, pass, host, port) {
@@ -279,14 +280,14 @@ function generateReferralCode() {
 // ============ AUTH ============
 app.post('/api/auth/register', (req, res) => {
   try {
-    const { password, displayName, referredBy } = req.body;
+    const { password, displayName, referredBy, signupSource } = req.body;
     const email = (req.body.email || '').trim().toLowerCase();
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
     if (db.prepare('SELECT id FROM users WHERE email=?').get(email)) return res.status(409).json({ error: 'Email already registered' });
     const id = uuidv4(), hash = bcrypt.hashSync(password, 10);
     const refCode = generateReferralCode();
-    db.prepare('INSERT INTO users (id,email,password_hash,display_name,referral_code,referred_by) VALUES (?,?,?,?,?,?)')
-      .run(id, email, hash, displayName || email.split('@')[0], refCode, referredBy || null);
+    db.prepare('INSERT INTO users (id,email,password_hash,display_name,referral_code,referred_by,signup_source) VALUES (?,?,?,?,?,?,?)')
+      .run(id, email, hash, displayName || email.split('@')[0], refCode, referredBy || null, signupSource || null);
 
     // Process referral rewards — both get 1 free month of starter
     if (referredBy) {
@@ -830,8 +831,11 @@ app.get('/api/admin/analytics', auth, (req, res) => {
     const topPages = db.prepare("SELECT path, COUNT(*) as c FROM page_views GROUP BY path ORDER BY c DESC LIMIT 10").all();
     const uniqueIPs = db.prepare("SELECT COUNT(DISTINCT ip) as c FROM page_views WHERE created_at >= datetime('now', '-30 day')").get().c;
     const signupsByDay = db.prepare("SELECT date(created_at) as day, COUNT(*) as signups FROM users WHERE created_at >= datetime('now', '-30 day') GROUP BY day ORDER BY day").all();
-    res.json({ today, week, month, total, byDay, topReferrers, topPages, uniqueIPs, signupsByDay });
-  } catch(e) { res.json({ today:0, week:0, month:0, total:0, byDay:[], topReferrers:[], topPages:[], uniqueIPs:0, signupsByDay:[] }); }
+    // Signup sources breakdown
+    const signupSources = db.prepare("SELECT COALESCE(signup_source, 'unknown') as source, COUNT(*) as count FROM users GROUP BY source ORDER BY count DESC").all();
+    const recentSignups = db.prepare("SELECT display_name, email, COALESCE(signup_source, 'unknown') as source, referred_by, created_at FROM users ORDER BY created_at DESC LIMIT 20").all();
+    res.json({ today, week, month, total, byDay, topReferrers, topPages, uniqueIPs, signupsByDay, signupSources, recentSignups });
+  } catch(e) { res.json({ today:0, week:0, month:0, total:0, byDay:[], topReferrers:[], topPages:[], uniqueIPs:0, signupsByDay:[], signupSources:[], recentSignups:[] }); }
 });
 
 // ============ PROMO CODES ============
