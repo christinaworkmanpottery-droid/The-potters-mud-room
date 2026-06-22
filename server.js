@@ -3858,7 +3858,9 @@ if (!transporter) {
   } catch(e) { /* site_settings table might not exist yet */ }
 }
 
-// ONE-TIME blog seed endpoint — remove after use
+// Seed draft blog posts on startup
+try { const { seedBlogDrafts } = require('./seed-blog-drafts'); seedBlogDrafts(db); } catch(e) { console.warn('Blog seed skipped:', e.message); }
+
 // Global error handler — always return JSON, never HTML
 app.use((err, req, res, next) => {
   console.error('[ERROR]', err.message);
