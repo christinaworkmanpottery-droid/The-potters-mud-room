@@ -778,18 +778,6 @@ function isAdmin(req) {
   return u?.email === ADMIN_EMAIL;
 }
 
-// Admin diagnostic — check a user's pieces by email (temporary debug endpoint)
-app.get('/api/admin/debug/user-pieces', auth, (req, res) => {
-  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
-  const { email } = req.query;
-  if (!email) return res.status(400).json({ error: 'email query param required' });
-  const user = db.prepare('SELECT id, email, display_name, tier FROM users WHERE email=?').get(email);
-  if (!user) return res.json({ error: 'User not found', email });
-  const pieces = db.prepare('SELECT id, title, status, clay_body_id, studio, notes, created_at, updated_at FROM pieces WHERE user_id=?').all(user.id);
-  const glazes = db.prepare('SELECT id, name, brand FROM glazes WHERE user_id=?').all(user.id);
-  res.json({ user, pieces, glazes });
-});
-
 // Admin dashboard — see all members, signups, cancellations, tiers
 app.get('/api/admin/members', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
