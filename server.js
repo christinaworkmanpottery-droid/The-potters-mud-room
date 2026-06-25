@@ -1264,7 +1264,7 @@ app.get('/api/pieces', auth, (req, res) => {
   const { status, clayBodyId, search, limit, offset, excludeCasualties } = req.query;
   let sql = 'SELECT p.*, cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id WHERE p.user_id=?';
   const params = [req.userId];
-  if (excludeCasualties) { sql += " AND p.status NOT IN ('broken','recycled')"; }
+  if (excludeCasualties) { sql += " AND (p.status IS NULL OR p.status NOT IN ('broken','recycled'))"; }
   if (status) { sql += ' AND p.status=?'; params.push(status); }
   if (clayBodyId) { sql += ' AND p.clay_body_id=?'; params.push(clayBodyId); }
   if (search) { sql += ' AND (p.title LIKE ? OR p.description LIKE ? OR p.notes LIKE ?)'; params.push(`%${search}%`, `%${search}%`, `%${search}%`); }
@@ -2044,7 +2044,7 @@ app.get('/api/dashboard', auth, (req, res) => {
   const tier = u?.tier || 'free';
   const totalPieces = db.prepare('SELECT COUNT(*) as c FROM pieces WHERE user_id=?').get(req.userId).c;
   const byStatus = db.prepare('SELECT status,COUNT(*) as count FROM pieces WHERE user_id=? GROUP BY status').all(req.userId);
-  const recentPieces = db.prepare("SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id WHERE p.user_id=? AND p.status NOT IN ('broken','recycled') ORDER BY p.updated_at DESC LIMIT 5").all(req.userId);
+  const recentPieces = db.prepare("SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id WHERE p.user_id=? AND (p.status IS NULL OR p.status NOT IN ('broken','recycled')) ORDER BY p.updated_at DESC LIMIT 5").all(req.userId);
   const totalClays = db.prepare('SELECT COUNT(*) as c FROM clay_bodies WHERE user_id=?').get(req.userId).c;
   const totalGlazes = db.prepare('SELECT COUNT(*) as c FROM glazes WHERE user_id=?').get(req.userId).c;
 
