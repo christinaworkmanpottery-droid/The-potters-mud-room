@@ -2497,9 +2497,17 @@ app.post('/api/projects', auth, requireTier('starter'), (req, res) => {
 app.put('/api/projects/:id', auth, (req, res) => {
   const { title, name, description, status, dueDate, deadline, notes, priority, contactName, contactEmail, contactPhone, contactNotes, shoppingList, budget } = req.body;
   const projectTitle = title || name;
-  db.prepare('UPDATE projects SET title=?,description=?,status=?,due_date=?,priority=?,contact_name=?,contact_email=?,contact_phone=?,contact_notes=?,shopping_list=?,budget=?,notes=?,updated_at=datetime(\'now\') WHERE id=? AND user_id=?')
-    .run(projectTitle, description || null, status, dueDate || deadline || null, priority || 'medium', contactName || null, contactEmail || null, contactPhone || null, contactNotes || null, shoppingList || null, budget || null, notes || null, req.params.id, req.userId);
-  res.json({ success: true });
+  if (!projectTitle) return res.status(400).json({ error: 'Project name is required' });
+  const validStatuses = ['active', 'completed', 'archived'];
+  const safeStatus = validStatuses.includes(status) ? status : 'active';
+  try {
+    db.prepare('UPDATE projects SET title=?,description=?,status=?,due_date=?,priority=?,contact_name=?,contact_email=?,contact_phone=?,contact_notes=?,shopping_list=?,budget=?,notes=?,updated_at=datetime(\'now\') WHERE id=? AND user_id=?')
+      .run(projectTitle, description || null, safeStatus, dueDate || deadline || null, priority || 'medium', contactName || null, contactEmail || null, contactPhone || null, contactNotes || null, shoppingList || null, budget || null, notes || null, req.params.id, req.userId);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Project update error:', err.message);
+    res.status(500).json({ error: 'Could not update project' });
+  }
 });
 
 app.delete('/api/projects/:id', auth, (req, res) => {
