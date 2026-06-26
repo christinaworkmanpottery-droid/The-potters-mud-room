@@ -2797,6 +2797,23 @@ app.put('/api/admin/blog/:id/publish', auth, (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Admin blog via password (for remote management without JWT)
+app.post('/api/admin/blog/remote', (req, res) => {
+  const { password, title, slug, content, excerpt, author, isPublished } = req.body;
+  if (password !== (process.env.ADMIN_BLOG_PASSWORD || 'mudroom-blog-2026')) return res.status(401).json({ error: 'Unauthorized' });
+  if (!title || !content) return res.status(400).json({ error: 'Title and content required' });
+  const finalSlug = slug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  const id = require('uuid').v4();
+  try {
+    db.prepare('INSERT INTO blog_posts (id, title, slug, content, excerpt, author, is_published) VALUES (?,?,?,?,?,?,?)')
+      .run(id, title, finalSlug, content, excerpt || content.substring(0, 200) + '...', author || 'Christina Workman', isPublished ? 1 : 0);
+    res.json({ id, slug: finalSlug, published: !!isPublished });
+  } catch(e) {
+    if (e.message.includes('UNIQUE')) return res.status(409).json({ error: 'A post with that slug already exists' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ============ FEATURED POTTER ============
 // Public: get current featured potter
 app.get('/api/featured-potter', (req, res) => {
