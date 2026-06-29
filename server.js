@@ -2308,6 +2308,42 @@ async function sendPushToUser(userId, title, body, data = {}) {
   } catch (e) { console.warn('[push] sendPushToUser error:', e.message); }
 }
 
+// Helper: send push notification to ALL users (for blog posts, announcements)
+async function sendPushToAll(title, body, data = {}) {
+  try {
+    const tokens = db.prepare('SELECT DISTINCT token FROM push_tokens').all();
+    if (!tokens.length) return;
+    const messages = tokens
+      .filter(t => Expo.isExpoPushToken(t.token))
+      .map(t => ({
+        to: t.token,
+        sound: 'default',
+        title,
+        body,
+        data,
+      }));
+    if (!messages.length) return;
+    const chunks = expo.chunkPushNotifications(messages);
+    for (const chunk of chunks) {
+      try { await expo.sendPushNotificationsAsync(chunk); } catch (e) { console.warn('[push] chunk error:', e.message); }
+    }
+    console.log(`[push] Sent to ${messages.length} devices: "${title}"`);
+  } catch (e) { console.warn('[push] sendPushToAll error:', e.message); }
+}
+
+// Helper: notify all members about a new blog post (in-app + push)
+function notifyAllBlogPost(postId, title, slug) {
+  try {
+    const users = db.prepare('SELECT id FROM users').all();
+    users.forEach(user => {
+      db.prepare(`INSERT INTO notifications (id, user_id, type, message, link, created_at) VALUES (?,?,?,?,?,datetime('now'))`)
+        .run(uuidv4(), user.id, 'blog', '📝 New blog post: ' + title, '/blog/' + slug);
+    });
+    // Send push to all devices
+    sendPushToAll('New Blog Post', title, { type: 'blog_post', postId, slug });
+  } catch (e) { console.warn('[notify] notifyAllBlogPost error:', e.message); }
+}
+
 // ============ IN-APP MESSAGING ============
 app.get('/api/messages', auth, (req, res) => {
   // Get conversation list (latest message per conversation partner)
@@ -2760,6 +2796,8 @@ app.post('/api/admin/blog/posts', auth, (req, res) => {
     const id = uuidv4();
     db.prepare('INSERT INTO blog_posts (id, title, slug, content, excerpt, author, is_published) VALUES (?,?,?,?,?,?,?)')
       .run(id, title, finalSlug, content, excerpt || content.substring(0, 200) + '...', author || 'Christina Workman', isPublished ? 1 : 0);
+    // If published immediately, notify all members
+    if (isPublished) notifyAllBlogPost(id, title, finalSlug);
     res.json({ id, slug: finalSlug });
   } catch(e) {
     if (e.message.includes('UNIQUE')) return res.status(409).json({ error: 'A post with that slug already exists' });
@@ -2772,8 +2810,13 @@ app.put('/api/admin/blog/posts/:id', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
     const { title, slug, content, excerpt, author, isPublished } = req.body;
+    // Check if this is transitioning from unpublished to published
+    const existing = db.prepare('SELECT is_published FROM blog_posts WHERE id=?').get(req.params.id);
+    const wasPublished = existing && existing.is_published === 1;
     db.prepare(`UPDATE blog_posts SET title=?, slug=?, content=?, excerpt=?, author=?, is_published=?, updated_at=datetime('now') WHERE id=?`)
       .run(title, slug, content, excerpt, author || 'Christina Workman', isPublished ? 1 : 0, req.params.id);
+    // Notify only when transitioning from draft to published
+    if (isPublished && !wasPublished) notifyAllBlogPost(req.params.id, title, slug);
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -2791,8 +2834,11 @@ app.delete('/api/admin/blog/posts/:id', auth, (req, res) => {
 app.put('/api/admin/blog/:id/publish', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
-    db.prepare(`UPDATE blog_posts SET is_published=1, updated_at=datetime('now') WHERE id=?`)
+    db.prepare(`UPDATE blog_posts SET is_published=1, published_at=datetime('now'), updated_at=datetime('now') WHERE id=?`)
       .run(req.params.id);
+    // Notify all members about the new blog post
+    const post = db.prepare('SELECT id, title, slug FROM blog_posts WHERE id=?').get(req.params.id);
+    if (post) notifyAllBlogPost(post.id, post.title, post.slug);
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -2807,6 +2853,8 @@ app.post('/api/admin/blog/remote', (req, res) => {
   try {
     db.prepare('INSERT INTO blog_posts (id, title, slug, content, excerpt, author, is_published) VALUES (?,?,?,?,?,?,?)')
       .run(id, title, finalSlug, content, excerpt || content.substring(0, 200) + '...', author || 'Christina Workman', isPublished ? 1 : 0);
+    // If published immediately, notify all members
+    if (isPublished) notifyAllBlogPost(id, title, finalSlug);
     res.json({ id, slug: finalSlug, published: !!isPublished });
   } catch(e) {
     if (e.message.includes('UNIQUE')) return res.status(409).json({ error: 'A post with that slug already exists' });
