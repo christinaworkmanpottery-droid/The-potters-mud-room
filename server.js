@@ -4021,39 +4021,50 @@ if (!transporter) {
 // Seed draft blog posts on startup
 try { const { seedBlogDrafts } = require('./seed-blog-drafts'); seedBlogDrafts(db); } catch(e) { console.warn('Blog seed skipped:', e.message); }
 
-// ============ PHOTO SEARCH (Perceptual Hash) ============
+// ============ PHOTO SEARCH (Perceptual Hash + Color) ============
 
-// Simple average-hash: resize to 8x8 grayscale, compare to mean
-// Returns a 64-bit hex string fingerprint of an image buffer
 const sharp = require('sharp');
 
+// Compute perceptual hash (shape/structure)
 async function computeAHash(buffer) {
-  // Perceptual average hash (aHash):
-  // 1. Resize to 8x8, 2. Grayscale, 3. Compare each pixel to mean
-  // Returns a 16-char hex string (64 bits)
   const pixels = await sharp(buffer)
     .resize(8, 8, { fit: 'fill' })
     .grayscale()
     .raw()
     .toBuffer();
 
-  // Compute mean pixel value
   let sum = 0;
   for (let i = 0; i < 64; i++) sum += pixels[i];
   const mean = sum / 64;
 
-  // Build 64-bit hash: 1 if pixel >= mean, 0 otherwise
   let hashBits = '';
   for (let i = 0; i < 64; i++) {
     hashBits += pixels[i] >= mean ? '1' : '0';
   }
 
-  // Convert binary string to hex
   let hex = '';
   for (let i = 0; i < 64; i += 4) {
     hex += parseInt(hashBits.slice(i, i + 4), 2).toString(16);
   }
   return hex;
+}
+
+// Compute average color (RGB) — catches blue vs green, warm vs cool
+async function computeAvgColor(buffer) {
+  const pixel = await sharp(buffer)
+    .resize(1, 1, { fit: 'cover' })
+    .removeAlpha()
+    .raw()
+    .toBuffer();
+  return `${pixel[0]},${pixel[1]},${pixel[2]}`;
+}
+
+// Euclidean distance between two RGB color strings "r,g,b"
+function colorDistance(color1, color2) {
+  if (!color1 || !color2) return 999;
+  const [r1, g1, b1] = color1.split(',').map(Number);
+  const [r2, g2, b2] = color2.split(',').map(Number);
+  return Math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2);
 }
 
 function hammingDistance(hash1, hash2) {
@@ -4068,13 +4079,15 @@ function hammingDistance(hash1, hash2) {
   return distance;
 }
 
-// Add phash column to piece_photos if not exists
+// Add phash and avg_color columns to piece_photos if not exists
 try {
   db.exec(`ALTER TABLE piece_photos ADD COLUMN phash TEXT`);
   console.log('[Photo Search] Added phash column to piece_photos');
-} catch(e) {
-  // Column already exists — that's fine
-}
+} catch(e) { /* Column already exists */ }
+try {
+  db.exec(`ALTER TABLE piece_photos ADD COLUMN avg_color TEXT`);
+  console.log('[Photo Search] Added avg_color column to piece_photos');
+} catch(e) { /* Column already exists */ }
 
 // Endpoint: search pieces by photo
 app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, res) => {
@@ -4083,10 +4096,11 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
   try {
     const searchBuffer = fs.readFileSync(req.file.path);
     const searchHash = await computeAHash(searchBuffer);
+    const searchColor = await computeAvgColor(searchBuffer);
 
-    // Get all piece photos for this user that have a stored hash
+    // Get all piece photos for this user
     const userPhotos = db.prepare(`
-      SELECT pp.*, pp.phash, p.id as piece_id, p.title, p.status, p.notes,
+      SELECT pp.*, pp.phash, pp.avg_color, p.id as piece_id, p.title, p.status, p.notes,
              p.clay_body_id, p.description, p.technique, p.form,
              p.date_started, p.date_completed,
              cb.name as clay_body_name
@@ -4096,23 +4110,30 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       WHERE p.user_id = ?
     `).all(req.userId);
 
-    // Backfill hashes for photos that don't have one yet (limit to 20 per request to avoid timeout)
-    const needsHash = userPhotos.filter(ph => !ph.phash || ph.phash.length === 32).slice(0, 20);
+    // Backfill hashes AND colors for photos that need them (limit to 20 per request)
+    const needsHash = userPhotos.filter(ph => !ph.phash || ph.phash.length === 32 || !ph.avg_color).slice(0, 20);
     for (const ph of needsHash) {
       try {
         const filePath = path.join(UPLOADS_DIR, ph.filename);
         if (fs.existsSync(filePath)) {
           const buf = fs.readFileSync(filePath);
-          const hash = await computeAHash(buf);
-          db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ?').run(hash, ph.id);
-          ph.phash = hash;
+          if (!ph.phash || ph.phash.length === 32) {
+            const hash = await computeAHash(buf);
+            db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ?').run(hash, ph.id);
+            ph.phash = hash;
+          }
+          if (!ph.avg_color) {
+            const color = await computeAvgColor(buf);
+            db.prepare('UPDATE piece_photos SET avg_color = ? WHERE id = ?').run(color, ph.id);
+            ph.avg_color = color;
+          }
         }
       } catch (hashErr) {
         console.warn('[Photo Search] Failed to hash', ph.filename, hashErr.message);
       }
     }
 
-    // Compare using hamming distance on perceptual hashes
+    // Compare using hamming distance on perceptual hashes + color check
     const matches = [];
     const seenPieces = new Set();
 
@@ -4127,6 +4148,12 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       // Free tier: <= 18 (strict, ~same photo); Paid: <= 22 (flexible but filters noise)
       const maxDistance = (req.userTier === 'free') ? 18 : 22;
       if (distance <= maxDistance) {
+        // COLOR CHECK: reject if colors are too different (blue vs green, etc.)
+        const cDist = colorDistance(ph.avg_color, searchColor);
+        // Max color distance: 80 for paid (allows lighting variation), 60 for free
+        const maxColorDist = (req.userTier === 'free') ? 60 : 80;
+        if (cDist > maxColorDist) continue; // Skip — wrong color entirely
+
         seenPieces.add(ph.piece_id);
 
         const piecePhotos = db.prepare('SELECT * FROM piece_photos WHERE piece_id = ? ORDER BY sort_order').all(ph.piece_id);
