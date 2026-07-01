@@ -4051,7 +4051,17 @@ async function computeAHash(buffer) {
 
 // Compute average color (RGB) — catches blue vs green, warm vs cool
 async function computeAvgColor(buffer) {
+  // Sample the CENTER 50% of the image (where the piece is, not background)
+  const meta = await sharp(buffer).metadata();
+  const w = meta.width || 100;
+  const h = meta.height || 100;
+  const cropW = Math.round(w * 0.5);
+  const cropH = Math.round(h * 0.5);
+  const left = Math.round((w - cropW) / 2);
+  const top = Math.round((h - cropH) / 2);
+
   const pixel = await sharp(buffer)
+    .extract({ left, top, width: cropW, height: cropH })
     .resize(1, 1, { fit: 'cover' })
     .removeAlpha()
     .raw()
