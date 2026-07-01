@@ -206,28 +206,42 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(UPLOADS_DIR));
-// Expo web export uses root-relative /assets/... paths, even when mounted under /app.
-// Mirror the app bundle's assets there so icon fonts and images resolve correctly.
+
+const noCacheWebHeaders = (res, filePath) => {
+  if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('.css')) {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+};
+
+// Explicit app asset mounts first so SPA fallbacks never swallow icon/font/image requests.
+app.use('/app/assets', express.static(path.join(__dirname, 'public', 'app', 'assets'), {
+  etag: false,
+  fallthrough: false,
+  redirect: false,
+  setHeaders: noCacheWebHeaders,
+}));
+app.use('/app/_expo', express.static(path.join(__dirname, 'public', 'app', '_expo'), {
+  etag: false,
+  fallthrough: false,
+  redirect: false,
+  setHeaders: noCacheWebHeaders,
+}));
+
+// Expo web export uses root-relative /assets/... paths in some bundles.
 app.use('/assets', express.static(path.join(__dirname, 'public', 'app', 'assets'), {
   etag: false,
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('.css')) {
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-    }
-  }
+  fallthrough: false,
+  redirect: false,
+  setHeaders: noCacheWebHeaders,
 }));
+
 // Serve Expo web app static assets from /app/ subfolder
 app.use('/app', express.static(path.join(__dirname, 'public', 'app'), {
   etag: false,
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('.css')) {
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-    }
-  }
+  redirect: false,
+  setHeaders: noCacheWebHeaders,
 }));
 // Prevent browser caching of HTML/JS/CSS so updates show immediately
 app.use(express.static(path.join(__dirname, 'public'), {
