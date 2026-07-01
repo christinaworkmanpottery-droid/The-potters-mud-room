@@ -4124,8 +4124,8 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       const score = 1.0 - (distance / 64);
 
       // Paid/unlimited users get relaxed threshold (different angles, lighting)
-      // Free tier: <= 18 (strict, ~same photo); Paid: <= 28 (flexible, different angles)
-      const maxDistance = (req.userTier === 'free') ? 18 : 28;
+      // Free tier: <= 18 (strict, ~same photo); Paid: <= 22 (flexible but filters noise)
+      const maxDistance = (req.userTier === 'free') ? 18 : 22;
       if (distance <= maxDistance) {
         seenPieces.add(ph.piece_id);
 
