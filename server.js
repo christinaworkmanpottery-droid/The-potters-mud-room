@@ -4134,8 +4134,10 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       // Score: 0 distance = perfect match (1.0), 64 distance = no match (0.0)
       const score = 1.0 - (distance / 64);
 
-      // Threshold: hamming distance <= 18 (~72% similarity) for free tier
-      if (distance <= 18) {
+      // Paid/unlimited users get relaxed threshold (different angles, lighting)
+      // Free tier: <= 18 (strict, ~same photo); Paid: <= 28 (flexible, different angles)
+      const maxDistance = (req.userTier === 'free') ? 18 : 28;
+      if (distance <= maxDistance) {
         seenPieces.add(ph.piece_id);
 
         const piecePhotos = db.prepare('SELECT * FROM piece_photos WHERE piece_id = ? ORDER BY sort_order').all(ph.piece_id);
