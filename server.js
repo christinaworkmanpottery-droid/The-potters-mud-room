@@ -4111,15 +4111,19 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       WHERE p.user_id = ?
     `).all(req.userId);
 
-    // Backfill hashes for photos that don't have one yet
-    const needsHash = userPhotos.filter(ph => !ph.phash || ph.phash.length === 32);
+    // Backfill hashes for photos that don't have one yet (limit to 20 per request to avoid timeout)
+    const needsHash = userPhotos.filter(ph => !ph.phash || ph.phash.length === 32).slice(0, 20);
     for (const ph of needsHash) {
-      const filePath = path.join(UPLOADS_DIR, ph.filename);
-      if (fs.existsSync(filePath)) {
-        const buf = fs.readFileSync(filePath);
-        const hash = await computeAHash(buf);
-        db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ?').run(hash, ph.id);
-        ph.phash = hash;
+      try {
+        const filePath = path.join(UPLOADS_DIR, ph.filename);
+        if (fs.existsSync(filePath)) {
+          const buf = fs.readFileSync(filePath);
+          const hash = await computeAHash(buf);
+          db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ?').run(hash, ph.id);
+          ph.phash = hash;
+        }
+      } catch (hashErr) {
+        console.warn('[Photo Search] Failed to hash', ph.filename, hashErr.message);
       }
     }
 
