@@ -253,15 +253,14 @@ function refreshTier(req, res, next) {
   next();
 }
 function requireTier(min) {
-  // New simplified tiers: free=0, starter=1
-  // Backward compat: basic/mid/top all treated as >= starter
-  const lv = { free: 0, starter: 1, basic: 1, mid: 1, top: 1 };
-  const minLv = min === 'starter' ? 1 : (lv[min] || 0);
+  const normalizeTier = (tier) => (tier === 'starter' ? 'starter' : 'free');
+  const lv = { free: 0, starter: 1 };
+  const minLv = min === 'starter' ? 1 : 0;
   return (req, res, next) => {
     const u = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
-    const currentTier = u?.tier || req.userTier;
+    const currentTier = normalizeTier(u?.tier || req.userTier);
     if ((lv[currentTier] || 0) >= minLv) { req.userTier = currentTier; return next(); }
-    res.status(403).json({ error: `Requires ${min} tier or above` });
+    res.status(403).json({ error: min === 'starter' ? 'Upgrade to Unlimited to use this feature.' : 'Upgrade required.' });
   };
 }
 function getPieceCount(uid) { return db.prepare('SELECT COUNT(*) as c FROM pieces WHERE user_id=?').get(uid).c; }
@@ -787,13 +786,14 @@ app.get('/api/admin/members', auth, (req, res) => {
       FROM users ORDER BY created_at DESC`).all();
     const stats = {
       total: members.length,
-      byTier: { free: 0, basic: 0, mid: 0, top: 0 },
+      byTier: { free: 0, starter: 0 },
       recent7d: 0,
       recent30d: 0
     };
     const now = Date.now();
     members.forEach(m => {
-      stats.byTier[m.tier || 'free']++;
+      const tier = m.tier === 'starter' ? 'starter' : 'free';
+      stats.byTier[tier]++;
       const age = now - new Date(m.created_at).getTime();
       if (age < 7 * 86400000) stats.recent7d++;
       if (age < 30 * 86400000) stats.recent30d++;
@@ -1543,8 +1543,18 @@ app.get('/api/firing-logs/:id', auth, (req, res) => {
   res.json({ ...log, photos });
 });
 
-app.post('/api/firing-logs', auth, requireTier('starter'), (req, res) => {
+app.post('/api/firing-logs', auth, (req, res) => {
   const { pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail, holdUsed, holdDuration, date, results, notes, firingTime, firingMode, loadDescription, firingModeNotes, startTime, endTime, openTemp } = req.body;
+
+  const user = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
+  const tier = user?.tier === 'starter' ? 'starter' : 'free';
+  if (tier === 'free') {
+    const firingCount = db.prepare('SELECT COUNT(*) as c FROM firing_logs WHERE user_id=?').get(req.userId)?.c || 0;
+    if (firingCount >= 1) {
+      return res.status(403).json({ error: 'Free members can save 1 firing log. Upgrade to Unlimited for more.' });
+    }
+  }
+
   const id = uuidv4();
   db.prepare('INSERT INTO firing_logs (id,user_id,piece_id,firing_type,cone,temperature,atmosphere,kiln_name,schedule,duration,firing_speed,custom_speed_detail,hold_used,hold_duration,date,results,notes,firing_time,firing_mode,load_description,firing_mode_notes,start_time,end_time,open_temp) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
     .run(id, req.userId, pieceId, firingType || null, cone, temperature, atmosphere || null, kilnName, schedule, duration, firingSpeed || null, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null, firingModeNotes || null, startTime || null, endTime || null, openTemp || null);
@@ -1606,7 +1616,7 @@ app.get('/api/export/firing-logs', auth, (req, res) => {
 });
 
 // ============ SALES ============
-app.get('/api/sales', auth, requireTier('starter'), (req, res) => {
+app.get('/api/sales', auth, (req, res) => {
   const { dateFrom, dateTo } = req.query;
   let sql = 'SELECT s.*,p.title as piece_title FROM sales s LEFT JOIN pieces p ON s.piece_id=p.id WHERE s.user_id=?';
   const params = [req.userId];
@@ -1616,8 +1626,18 @@ app.get('/api/sales', auth, requireTier('starter'), (req, res) => {
   res.json(db.prepare(sql).all(...params));
 });
 
-app.post('/api/sales', auth, requireTier('starter'), (req, res) => {
+app.post('/api/sales', auth, (req, res) => {
   const { pieceId, date, price, venue, venueType, buyerName, buyerEmail, buyerPhone, notes, quantity, itemDescription, eventName, contactId } = req.body;
+
+  const user = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
+  const tier = user?.tier === 'starter' ? 'starter' : 'free';
+  if (tier === 'free') {
+    const saleCount = db.prepare('SELECT COUNT(*) as c FROM sales WHERE user_id=?').get(req.userId)?.c || 0;
+    if (saleCount >= 1) {
+      return res.status(403).json({ error: 'Free members can save 1 sale. Upgrade to Unlimited for more.' });
+    }
+  }
+
   const id = uuidv4();
   db.prepare('INSERT INTO sales (id,user_id,piece_id,date,price,venue,venue_type,buyer_name,buyer_email,buyer_phone,notes,quantity,item_description,event_name,contact_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
     .run(id, req.userId, pieceId || null, date, price, venue, venueType, buyerName, buyerEmail || null, buyerPhone || null, notes, quantity || 1, itemDescription || null, eventName || null, contactId || null);
@@ -1625,7 +1645,7 @@ app.post('/api/sales', auth, requireTier('starter'), (req, res) => {
   res.json({ id });
 });
 
-app.put('/api/sales/:id', auth, requireTier('starter'), (req, res) => {
+app.put('/api/sales/:id', auth, (req, res) => {
   const { pieceId, date, price, venue, venueType, buyerName, buyerEmail, buyerPhone, notes, quantity, itemDescription, eventName, contactId } = req.body;
   const existing = db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!existing) return res.status(404).json({ error: 'Sale not found' });
@@ -1635,7 +1655,7 @@ app.put('/api/sales/:id', auth, requireTier('starter'), (req, res) => {
   res.json({ ok: true });
 });
 
-app.delete('/api/sales/:id', auth, requireTier('starter'), (req, res) => {
+app.delete('/api/sales/:id', auth, (req, res) => {
   const existing = db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!existing) return res.status(404).json({ error: 'Sale not found' });
   // If the sale was linked to a piece, revert piece status from 'sold' back to 'done'
@@ -1858,17 +1878,25 @@ app.post('/api/forum/posts', auth, upload.array('photos', 5), (req, res) => {
   res.json({ id });
 });
 
-app.post('/api/forum/posts/:id/reply', auth, upload.array('photos', 3), (req, res) => {
+app.post('/api/forum/posts/:id/reply', auth, upload.array('photos', 1), (req, res) => {
   const { body } = req.body;
   if (!body) return res.status(400).json({ error: 'Reply body required' });
+
+  const user = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
+  if (req.files?.length && user?.tier !== 'starter') {
+    return res.status(403).json({ error: 'Only Unlimited members can attach a photo in comments.' });
+  }
+
   const id = uuidv4();
   db.prepare('INSERT INTO forum_replies (id,post_id,user_id,body) VALUES (?,?,?,?)').run(id, req.params.id, req.userId, body);
   db.prepare(`UPDATE forum_posts SET reply_count=reply_count+1, updated_at=datetime('now') WHERE id=?`).run(req.params.id);
   notifyForumReply(req.params.id, req.userId);
+
   if (req.files?.length) {
     const ins = db.prepare('INSERT INTO forum_photos (id,reply_id,filename,original_name) VALUES (?,?,?,?)');
-    req.files.forEach(f => ins.run(uuidv4(), id, f.filename, f.originalname));
+    ins.run(uuidv4(), id, req.files[0].filename, req.files[0].originalname);
   }
+
   const fullReply = db.prepare(`SELECT fr.*, u.display_name as author_name, u.avatar_filename as author_avatar FROM forum_replies fr JOIN users u ON fr.user_id=u.id WHERE fr.id=?`).get(id);
   fullReply.photos = db.prepare('SELECT * FROM forum_photos WHERE reply_id=?').all(id);
   res.json({ reply: fullReply });
@@ -2490,8 +2518,18 @@ app.get('/api/goals', auth, (req, res) => {
   res.json(goals);
 });
 
-app.post('/api/goals', auth, requireTier('starter'), (req, res) => {
+app.post('/api/goals', auth, (req, res) => {
   const { title, description, status, dueDate, priority } = req.body;
+
+  const user = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
+  const tier = user?.tier === 'starter' ? 'starter' : 'free';
+  if (tier === 'free') {
+    const goalCount = db.prepare('SELECT COUNT(*) as c FROM goals WHERE user_id=?').get(req.userId)?.c || 0;
+    if (goalCount >= 1) {
+      return res.status(403).json({ error: 'Free members can save 1 goal. Upgrade to Unlimited for more.' });
+    }
+  }
+
   const id = uuidv4();
   db.prepare('INSERT INTO goals (id,user_id,title,description,status,due_date,priority) VALUES (?,?,?,?,?,?,?)')
     .run(id, req.userId, title, description, status || 'active', dueDate || null, priority || 'medium');
@@ -2520,14 +2558,31 @@ app.get('/api/projects', auth, (req, res) => {
   res.json(result);
 });
 
-app.post('/api/projects', auth, requireTier('starter'), (req, res) => {
+app.post('/api/projects', auth, (req, res) => {
   const { title, name, description, status, dueDate, deadline, notes, priority, contactName, contactEmail, contactPhone, contactNotes, shoppingList, budget } = req.body;
   const projectTitle = title || name;
   if (!projectTitle) return res.status(400).json({ error: 'Project name is required' });
+
+  const user = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
+  const tier = user?.tier === 'starter' ? 'starter' : 'free';
+  if (tier === 'free') {
+    const projectCount = db.prepare('SELECT COUNT(*) as c FROM projects WHERE user_id=?').get(req.userId)?.c || 0;
+    if (projectCount >= 1) {
+      return res.status(403).json({ error: 'Free members can save 1 project. Upgrade to Unlimited for more.' });
+    }
+  }
+
   const id = uuidv4();
   db.prepare('INSERT INTO projects (id,user_id,title,description,status,due_date,priority,contact_name,contact_email,contact_phone,contact_notes,shopping_list,budget,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
     .run(id, req.userId, projectTitle, description || null, status || 'active', dueDate || deadline || null, priority || 'medium', contactName || null, contactEmail || null, contactPhone || null, contactNotes || null, shoppingList || null, budget || null, notes || null);
   res.json({ id });
+});
+
+app.get('/api/projects/:id', auth, (req, res) => {
+  const project = db.prepare('SELECT * FROM projects WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!project) return res.status(404).json({ error: 'Project not found' });
+  const photos = db.prepare('SELECT id,filename FROM project_photos WHERE project_id=? ORDER BY sort_order ASC').all(project.id);
+  res.json({ ...project, photos });
 });
 
 app.put('/api/projects/:id', auth, (req, res) => {
@@ -2588,9 +2643,19 @@ app.get('/api/events', auth, (req, res) => {
   res.json(events);
 });
 
-app.post('/api/events', auth, requireTier('starter'), (req, res) => {
+app.post('/api/events', auth, (req, res) => {
   const { title, description, eventDate, startTime, endTime, location } = req.body;
   if (!eventDate) return res.status(400).json({ error: 'Event date is required' });
+
+  const user = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
+  const tier = user?.tier === 'starter' ? 'starter' : 'free';
+  if (tier === 'free') {
+    const eventCount = db.prepare('SELECT COUNT(*) as c FROM events WHERE user_id=?').get(req.userId)?.c || 0;
+    if (eventCount >= 1) {
+      return res.status(403).json({ error: 'Free members can save 1 event. Upgrade to Unlimited for more.' });
+    }
+  }
+
   const id = uuidv4();
   db.prepare('INSERT INTO events (id,user_id,title,description,event_date,start_time,end_time,location) VALUES (?,?,?,?,?,?,?,?)')
     .run(id, req.userId, title, description, eventDate, startTime || null, endTime || null, location || null);
@@ -2675,8 +2740,18 @@ app.get('/api/contacts/:id', auth, (req, res) => {
   res.json(contact);
 });
 
-app.post('/api/contacts', auth, requireTier('starter'), (req, res) => {
+app.post('/api/contacts', auth, (req, res) => {
   const { name, email, phone, notes, role, address, instagram, website } = req.body;
+
+  const user = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
+  const tier = user?.tier === 'starter' ? 'starter' : 'free';
+  if (tier === 'free') {
+    const contactCount = db.prepare('SELECT COUNT(*) as c FROM contacts WHERE user_id=?').get(req.userId)?.c || 0;
+    if (contactCount >= 1) {
+      return res.status(403).json({ error: 'Free members can save 1 contact. Upgrade to Unlimited for more.' });
+    }
+  }
+
   const id = uuidv4();
   db.prepare('INSERT INTO contacts (id,user_id,name,email,phone,notes,role,address,instagram,website) VALUES (?,?,?,?,?,?,?,?,?,?)')
     .run(id, req.userId, name, email || null, phone || null, notes || null, role || null, address || null, instagram || null, website || null);

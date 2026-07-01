@@ -362,7 +362,7 @@ async function loadDashboard() {
     const sb = document.getElementById('statSalesBox');
     if (d.sales?.total) { document.getElementById('statSales').textContent = '$' + (d.sales.total||0).toFixed(0); sb.style.display=''; } else { sb.style.display='none'; }
     const ban = document.getElementById('upgradeBanner');
-    if (d.tier === 'free') { ban.classList.remove('hidden'); document.getElementById('pieceCountText').textContent = d.totalPieces + '/20 pieces used'; } else { ban.classList.add('hidden'); }
+    if (d.tier === 'free') { ban.classList.remove('hidden'); document.getElementById('pieceCountText').textContent = d.totalPieces + '/10 pieces used'; } else { ban.classList.add('hidden'); }
     const c = document.getElementById('recentPieces'), em = document.getElementById('dashboardEmpty');
     if (!d.recentPieces.length) { c.innerHTML = ''; em.classList.remove('hidden'); }
     else { em.classList.add('hidden'); c.innerHTML = d.recentPieces.map(pieceCard).join(''); }
