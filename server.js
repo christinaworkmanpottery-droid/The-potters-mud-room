@@ -4004,21 +4004,6 @@ app.get('/llms.txt', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'llms.txt'));
 });
 
-// Catch-all for any method on /api/ that didn't match a route
-app.all('/api/*', (req, res) => {
-  res.status(404).json({ error: 'Not found' });
-});
-// Serve the Expo web app for /app/* routes (SPA catch-all)
-app.get('/app/*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'app', 'index.html'));
-});
-app.get('*', (req, res) => {
-  if (!req.path.startsWith('/uploads/')) {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-  } else {
-    res.status(404).json({ error: 'Not found' });
-  }
-});
 
 // Load SMTP from database on startup (if not in env vars)
 if (!transporter) {
@@ -4183,6 +4168,24 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
 // Also generate hash when photos are uploaded to pieces (hook into existing upload)
 // We'll backfill existing photos on first search, but new uploads get hashed immediately
 const originalPhotoHandler = null; // handled inline above via backfill
+
+// Catch-all for any method on /api/ that didn't match a route
+app.all('/api/*', (req, res) => {
+  res.status(404).json({ error: 'Not found' });
+});
+
+// Serve the Expo web app for /app/* routes (SPA catch-all)
+app.get('/app/*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'app', 'index.html'));
+});
+
+app.get('*', (req, res) => {
+  if (!req.path.startsWith('/uploads/')) {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  } else {
+    res.status(404).json({ error: 'Not found' });
+  }
+});
 
 // Global error handler — always return JSON, never HTML
 app.use((err, req, res, next) => {
