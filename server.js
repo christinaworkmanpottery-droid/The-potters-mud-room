@@ -4163,9 +4163,8 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       const shapeWeight = 1.0 - colorWeight;
       const score = (shapeScore * shapeWeight) + (colorScore * colorWeight);
 
-      // Minimum threshold to show results
-      const minScore = (req.userTier === 'free') ? 0.55 : 0.45;
-      if (score < minScore) continue;
+      // Only show high-confidence results — no junk matches
+      if (score < 0.70) continue;
 
       seenPieces.add(ph.piece_id);
 
