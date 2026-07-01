@@ -3997,6 +3997,10 @@ app.get('/llms.txt', (req, res) => {
 app.all('/api/*', (req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
+// Serve the Expo web app for /app/* routes (SPA catch-all)
+app.get('/app/*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'app', 'index.html'));
+});
 app.get('*', (req, res) => {
   if (!req.path.startsWith('/uploads/')) {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
