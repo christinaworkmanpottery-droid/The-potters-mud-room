@@ -4187,7 +4187,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       const shapeScore = 1.0 - (distance / 64);
 
       // Max hamming distance to even consider (paid gets more flexibility)
-      const maxDistance = (req.userTier === 'free') ? 20 : 26;
+      const maxDistance = (req.userTier === 'free') ? 22 : 30;
       if (distance > maxDistance) continue;
 
       // Color score: closer color = higher score
@@ -4205,7 +4205,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       const score = (shapeScore * shapeWeight) + (colorScore * colorWeight);
 
       // Only show high-confidence results — no junk matches
-      if (score < 0.70) continue;
+      if (score < 0.50) continue;
 
       seenPieces.add(ph.piece_id);
 
