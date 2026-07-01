@@ -206,6 +206,18 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(UPLOADS_DIR));
+// Expo web export uses root-relative /assets/... paths, even when mounted under /app.
+// Mirror the app bundle's assets there so icon fonts and images resolve correctly.
+app.use('/assets', express.static(path.join(__dirname, 'public', 'app', 'assets'), {
+  etag: false,
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('.css')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
 // Serve Expo web app static assets from /app/ subfolder
 app.use('/app', express.static(path.join(__dirname, 'public', 'app'), {
   etag: false,
