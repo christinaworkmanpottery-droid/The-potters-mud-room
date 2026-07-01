@@ -4099,6 +4099,13 @@ try {
   console.log('[Photo Search] Added avg_color column to piece_photos');
 } catch(e) { /* Column already exists */ }
 
+// One-time: clear old avg_color values (computed with full-image, not center-crop)
+// They'll be recomputed on next search using the improved center-50% method
+try {
+  const cleared = db.prepare("UPDATE piece_photos SET avg_color = NULL WHERE avg_color IS NOT NULL").run();
+  if (cleared.changes > 0) console.log(`[Photo Search] Reset ${cleared.changes} avg_color values for center-crop recompute`);
+} catch(e) { /* fine */ }
+
 // Endpoint: search pieces by photo
 app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo provided' });
