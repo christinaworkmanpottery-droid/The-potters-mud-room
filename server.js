@@ -4051,7 +4051,7 @@ async function computeAHash(buffer) {
 
 // Compute average color (RGB) — catches blue vs green, warm vs cool
 async function computeAvgColor(buffer) {
-  // Sample the CENTER 50% of the image (where the piece is, not background)
+  // Sample center 50% as a 4x4 grid (16 pixels) for better color representation
   const meta = await sharp(buffer).metadata();
   const w = meta.width || 100;
   const h = meta.height || 100;
@@ -4060,13 +4060,37 @@ async function computeAvgColor(buffer) {
   const left = Math.round((w - cropW) / 2);
   const top = Math.round((h - cropH) / 2);
 
-  const pixel = await sharp(buffer)
+  const pixels = await sharp(buffer)
     .extract({ left, top, width: cropW, height: cropH })
-    .resize(1, 1, { fit: 'cover' })
+    .resize(4, 4, { fit: 'fill' })
     .removeAlpha()
     .raw()
     .toBuffer();
-  return `${pixel[0]},${pixel[1]},${pixel[2]}`;
+
+  // Find the dominant color (most common among 16 center pixels)
+  // Group by color bucket (round to nearest 32 to cluster similar shades)
+  const buckets = {};
+  for (let i = 0; i < 48; i += 3) {
+    const r = Math.round(pixels[i] / 32) * 32;
+    const g = Math.round(pixels[i+1] / 32) * 32;
+    const b = Math.round(pixels[i+2] / 32) * 32;
+    const key = `${r},${g},${b}`;
+    if (!buckets[key]) buckets[key] = { r: 0, g: 0, b: 0, count: 0 };
+    buckets[key].r += pixels[i];
+    buckets[key].g += pixels[i+1];
+    buckets[key].b += pixels[i+2];
+    buckets[key].count++;
+  }
+
+  // Return the average of the largest bucket (dominant color)
+  let best = null;
+  for (const b of Object.values(buckets)) {
+    if (!best || b.count > best.count) best = b;
+  }
+  const r = Math.round(best.r / best.count);
+  const g = Math.round(best.g / best.count);
+  const b2 = Math.round(best.b / best.count);
+  return `${r},${g},${b2}`;
 }
 
 // Euclidean distance between two RGB color strings "r,g,b"
