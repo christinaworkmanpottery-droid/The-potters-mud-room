@@ -4133,7 +4133,8 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       }
     }
 
-    // Compare using hamming distance on perceptual hashes + color check
+    // Compare using hamming distance + color similarity weighted into final score
+    // Paid tier: more relaxed shape threshold + color weighted heavily for accuracy
     const matches = [];
     const seenPieces = new Set();
 
@@ -4141,41 +4142,52 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       if (!ph.phash || ph.phash.length === 32 || seenPieces.has(ph.piece_id)) continue;
 
       const distance = hammingDistance(ph.phash, searchHash);
-      // Score: 0 distance = perfect match (1.0), 64 distance = no match (0.0)
-      const score = 1.0 - (distance / 64);
+      // Shape score: 0 distance = perfect (1.0), 64 = no match (0.0)
+      const shapeScore = 1.0 - (distance / 64);
 
-      // Paid/unlimited users get relaxed threshold (different angles, lighting)
-      // Free tier: <= 18 (strict, ~same photo); Paid: <= 22 (flexible but filters noise)
-      const maxDistance = (req.userTier === 'free') ? 18 : 22;
-      if (distance <= maxDistance) {
-        // COLOR CHECK: reject if colors are too different (blue vs green, etc.)
-        const cDist = colorDistance(ph.avg_color, searchColor);
-        // Max color distance: 80 for paid (allows lighting variation), 60 for free
-        const maxColorDist = (req.userTier === 'free') ? 60 : 80;
-        if (cDist > maxColorDist) continue; // Skip — wrong color entirely
+      // Max hamming distance to even consider (paid gets more flexibility)
+      const maxDistance = (req.userTier === 'free') ? 20 : 26;
+      if (distance > maxDistance) continue;
 
-        seenPieces.add(ph.piece_id);
+      // Color score: closer color = higher score
+      const cDist = colorDistance(ph.avg_color, searchColor);
+      // Hard reject if color is wildly different (completely different color family)
+      if (cDist > 150) continue;
+      // Normalize: 0 distance = 1.0 (perfect), 150 = 0.0
+      const colorScore = Math.max(0, 1.0 - (cDist / 150));
 
-        const piecePhotos = db.prepare('SELECT * FROM piece_photos WHERE piece_id = ? ORDER BY sort_order').all(ph.piece_id);
-        const pieceGlazes = db.prepare('SELECT pg.*, g.name as glaze_name, g.brand, g.glaze_type FROM piece_glazes pg JOIN glazes g ON pg.glaze_id = g.id WHERE pg.piece_id = ? ORDER BY pg.layer_order').all(ph.piece_id);
+      // Weighted final score: color matters MORE for pottery (glazes define pieces)
+      // Paid tier: 35% shape + 65% color (prioritize color accuracy)
+      // Free tier: 45% shape + 55% color
+      const colorWeight = (req.userTier === 'free') ? 0.55 : 0.65;
+      const shapeWeight = 1.0 - colorWeight;
+      const score = (shapeScore * shapeWeight) + (colorScore * colorWeight);
 
-        matches.push({
-          _id: ph.piece_id,
-          id: ph.piece_id,
-          title: ph.title,
-          status: ph.status,
-          notes: ph.notes,
-          description: ph.description,
-          clay_body_name: ph.clay_body_name,
-          technique: ph.technique,
-          form: ph.form,
-          date_started: ph.date_started,
-          date_completed: ph.date_completed,
-          photos: piecePhotos,
-          glazes: pieceGlazes,
-          matchScore: score,
-        });
-      }
+      // Minimum threshold to show results
+      const minScore = (req.userTier === 'free') ? 0.55 : 0.45;
+      if (score < minScore) continue;
+
+      seenPieces.add(ph.piece_id);
+
+      const piecePhotos = db.prepare('SELECT * FROM piece_photos WHERE piece_id = ? ORDER BY sort_order').all(ph.piece_id);
+      const pieceGlazes = db.prepare('SELECT pg.*, g.name as glaze_name, g.brand, g.glaze_type FROM piece_glazes pg JOIN glazes g ON pg.glaze_id = g.id WHERE pg.piece_id = ? ORDER BY pg.layer_order').all(ph.piece_id);
+
+      matches.push({
+        _id: ph.piece_id,
+        id: ph.piece_id,
+        title: ph.title,
+        status: ph.status,
+        notes: ph.notes,
+        description: ph.description,
+        clay_body_name: ph.clay_body_name,
+        technique: ph.technique,
+        form: ph.form,
+        date_started: ph.date_started,
+        date_completed: ph.date_completed,
+        photos: piecePhotos,
+        glazes: pieceGlazes,
+        matchScore: score,
+      });
     }
 
     // Sort by score descending
