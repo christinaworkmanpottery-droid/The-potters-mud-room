@@ -4232,12 +4232,15 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
     }
 
     // Compare using shape + multi-color signature.
-    // For pottery, color should outrank shape because glaze is usually the stronger signal.
-    const matches = [];
-    const seenPieces = new Set();
+    // Score every photo, then keep the best photo per piece.
+    const candidateMatches = [];
+    const searchSig = parseColorSignature(searchColor);
+    const searchBrightness = searchSig.length
+      ? searchSig.reduce((sum, c) => sum + ((c.r + c.g + c.b) / 3) * (c.weight || 1), 0)
+      : 0;
 
     for (const ph of userPhotos) {
-      if (!ph.phash || ph.phash.length === 32 || seenPieces.has(ph.piece_id)) continue;
+      if (!ph.phash || ph.phash.length === 32) continue;
 
       const distance = hammingDistance(ph.phash, searchHash);
       const shapeScore = 1.0 - (distance / 64);
@@ -4249,32 +4252,23 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       if (cDist > 95) continue;
       const colorScore = Math.max(0, 1.0 - (cDist / 95));
 
-      // Penalize very different brightness so dark navy does not outrank light teal.
-      const searchSig = parseColorSignature(searchColor);
       const photoSig = parseColorSignature(ph.avg_color);
-      const searchBrightness = searchSig.length
-        ? searchSig.reduce((sum, c) => sum + ((c.r + c.g + c.b) / 3) * (c.weight || 1), 0)
-        : 0;
       const photoBrightness = photoSig.length
         ? photoSig.reduce((sum, c) => sum + ((c.r + c.g + c.b) / 3) * (c.weight || 1), 0)
         : 0;
       const brightnessDiff = Math.abs(searchBrightness - photoBrightness);
       const brightnessPenalty = Math.min(0.25, brightnessDiff / 255 * 0.35);
 
-      const colorWeight = (req.userTier === 'free') ? 0.70 : 0.82;
+      // Extra penalty when one piece is materially darker/lighter than the search photo.
+      const valuePenalty = brightnessDiff > 28 ? Math.min(0.20, (brightnessDiff - 28) / 255 * 0.50) : 0;
+
+      const colorWeight = (req.userTier === 'free') ? 0.72 : 0.84;
       const shapeWeight = 1.0 - colorWeight;
-      const score = ((shapeScore * shapeWeight) + (colorScore * colorWeight)) - brightnessPenalty;
+      const score = ((shapeScore * shapeWeight) + (colorScore * colorWeight)) - brightnessPenalty - valuePenalty;
 
-      if (score < 0.58) continue;
-
-      seenPieces.add(ph.piece_id);
-
-      const piecePhotos = db.prepare('SELECT * FROM piece_photos WHERE piece_id = ? ORDER BY sort_order').all(ph.piece_id);
-      const pieceGlazes = db.prepare('SELECT pg.*, g.name as glaze_name, g.brand, g.glaze_type FROM piece_glazes pg JOIN glazes g ON pg.glaze_id = g.id WHERE pg.piece_id = ? ORDER BY pg.layer_order').all(ph.piece_id);
-
-      matches.push({
-        _id: ph.piece_id,
-        id: ph.piece_id,
+      candidateMatches.push({
+        piece_id: ph.piece_id,
+        photo_id: ph.id,
         title: ph.title,
         status: ph.status,
         notes: ph.notes,
@@ -4284,9 +4278,62 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         form: ph.form,
         date_started: ph.date_started,
         date_completed: ph.date_completed,
+        distance,
+        cDist,
+        shapeScore,
+        colorScore,
+        brightnessDiff,
+        brightnessPenalty,
+        valuePenalty,
+        score,
+      });
+    }
+
+    candidateMatches.sort((a, b) => b.score - a.score);
+    console.log('[Photo Search] Top candidates:', candidateMatches.slice(0, 8).map((m) => ({
+      piece: m.title,
+      piece_id: m.piece_id,
+      photo_id: m.photo_id,
+      score: Number(m.score.toFixed(3)),
+      shape: Number(m.shapeScore.toFixed(3)),
+      color: Number(m.colorScore.toFixed(3)),
+      hamming: m.distance,
+      colorDistance: Number(m.cDist.toFixed(1)),
+      brightnessDiff: Number(m.brightnessDiff.toFixed(1)),
+      brightnessPenalty: Number(m.brightnessPenalty.toFixed(3)),
+      valuePenalty: Number(m.valuePenalty.toFixed(3)),
+    })));
+
+    const bestByPiece = new Map();
+    for (const match of candidateMatches) {
+      const existing = bestByPiece.get(match.piece_id);
+      if (!existing || match.score > existing.score) {
+        bestByPiece.set(match.piece_id, match);
+      }
+    }
+
+    const matches = [];
+    for (const best of bestByPiece.values()) {
+      if (best.score < 0.58) continue;
+
+      const piecePhotos = db.prepare('SELECT * FROM piece_photos WHERE piece_id = ? ORDER BY sort_order').all(best.piece_id);
+      const pieceGlazes = db.prepare('SELECT pg.*, g.name as glaze_name, g.brand, g.glaze_type FROM piece_glazes pg JOIN glazes g ON pg.glaze_id = g.id WHERE pg.piece_id = ? ORDER BY pg.layer_order').all(best.piece_id);
+
+      matches.push({
+        _id: best.piece_id,
+        id: best.piece_id,
+        title: best.title,
+        status: best.status,
+        notes: best.notes,
+        description: best.description,
+        clay_body_name: best.clay_body_name,
+        technique: best.technique,
+        form: best.form,
+        date_started: best.date_started,
+        date_completed: best.date_completed,
         photos: piecePhotos,
         glazes: pieceGlazes,
-        matchScore: score,
+        matchScore: best.score,
       });
     }
 
