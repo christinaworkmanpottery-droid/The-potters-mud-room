@@ -1347,7 +1347,7 @@ app.get('/api/pieces/:id', auth, (req, res) => {
   res.json(p);
 });
 
-app.post('/api/pieces', auth, safeUpload('photo'), (req, res) => {
+app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
   // Handle both JSON and FormData (iOS may send either)
   const body = req.body || {};
   const title = String(body.title || body.name || '').trim() || null;
@@ -1414,7 +1414,7 @@ app.post('/api/pieces', auth, safeUpload('photo'), (req, res) => {
     let phash = null;
     try {
       const buf = fs.readFileSync(req.file.path);
-      phash = computeAHash(buf);
+      phash = await computeAHash(buf);
     } catch(e) { /* hash generation failed, not critical */ }
     db.prepare('INSERT INTO piece_photos (id, piece_id, filename, original_name, sort_order, phash) VALUES (?,?,?,?,0,?)').run(photoId, id, req.file.filename, req.file.originalname, phash);
   }
@@ -1494,7 +1494,7 @@ app.delete('/api/pieces/:id', auth, (req, res) => {
 });
 
 // Piece photos
-app.post('/api/pieces/:id/photos', auth, upload.single('photo'), (req, res) => {
+app.post('/api/pieces/:id/photos', auth, upload.single('photo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo' });
   const u = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
   const maxPhotos = (req.userTier === 'free') ? 1 : 3;
@@ -1505,7 +1505,7 @@ app.post('/api/pieces/:id/photos', auth, upload.single('photo'), (req, res) => {
   let phash = null;
   try {
     const buf = fs.readFileSync(req.file.path);
-    phash = computeAHash(buf);
+    phash = await computeAHash(buf);
   } catch(e) { /* hash generation failed, not critical */ }
   db.prepare('INSERT INTO piece_photos (id,piece_id,filename,original_name,stage,sort_order,phash) VALUES (?,?,?,?,?,?,?)')
     .run(id, req.params.id, req.file.filename, req.file.originalname, req.body.stage || 'other', count, phash);
@@ -4040,13 +4040,47 @@ try { const { seedBlogDrafts } = require('./seed-blog-drafts'); seedBlogDrafts(d
 
 // Simple average-hash: resize to 8x8 grayscale, compare to mean
 // Returns a 64-bit hex string fingerprint of an image buffer
-function computeAHash(buffer) {
-  // We use a very lightweight approach: sample pixels at grid positions
-  // For proper pHash we'd need sharp/jimp but this works for same-photo matching
-  // This is a placeholder that will be replaced with proper implementation
-  // For now we store a hash based on file size + first bytes as a simple fingerprint
-  const crypto = require('crypto');
-  return crypto.createHash('md5').update(buffer).digest('hex');
+const sharp = require('sharp');
+
+async function computeAHash(buffer) {
+  // Perceptual average hash (aHash):
+  // 1. Resize to 8x8, 2. Grayscale, 3. Compare each pixel to mean
+  // Returns a 16-char hex string (64 bits)
+  const pixels = await sharp(buffer)
+    .resize(8, 8, { fit: 'fill' })
+    .grayscale()
+    .raw()
+    .toBuffer();
+
+  // Compute mean pixel value
+  let sum = 0;
+  for (let i = 0; i < 64; i++) sum += pixels[i];
+  const mean = sum / 64;
+
+  // Build 64-bit hash: 1 if pixel >= mean, 0 otherwise
+  let hashBits = '';
+  for (let i = 0; i < 64; i++) {
+    hashBits += pixels[i] >= mean ? '1' : '0';
+  }
+
+  // Convert binary string to hex
+  let hex = '';
+  for (let i = 0; i < 64; i += 4) {
+    hex += parseInt(hashBits.slice(i, i + 4), 2).toString(16);
+  }
+  return hex;
+}
+
+function hammingDistance(hash1, hash2) {
+  if (!hash1 || !hash2 || hash1.length !== hash2.length) return 64;
+  let distance = 0;
+  for (let i = 0; i < hash1.length; i++) {
+    const xor = parseInt(hash1[i], 16) ^ parseInt(hash2[i], 16);
+    // Count bits in xor
+    let bits = xor;
+    while (bits) { distance++; bits &= bits - 1; }
+  }
+  return distance;
 }
 
 // Add phash column to piece_photos if not exists
@@ -4058,12 +4092,12 @@ try {
 }
 
 // Endpoint: search pieces by photo
-app.post('/api/pieces/photo-search', auth, upload.single('photo'), (req, res) => {
+app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo provided' });
 
   try {
     const searchBuffer = fs.readFileSync(req.file.path);
-    const searchHash = computeAHash(searchBuffer);
+    const searchHash = await computeAHash(searchBuffer);
 
     // Get all piece photos for this user that have a stored hash
     const userPhotos = db.prepare(`
@@ -4077,45 +4111,33 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), (req, res) =>
       WHERE p.user_id = ?
     `).all(req.userId);
 
-    // Also compute hashes for any photos that don't have one yet (backfill)
-    const needsHash = userPhotos.filter(ph => !ph.phash);
+    // Backfill hashes for photos that don't have one yet
+    const needsHash = userPhotos.filter(ph => !ph.phash || ph.phash.length === 32);
     for (const ph of needsHash) {
       const filePath = path.join(UPLOADS_DIR, ph.filename);
       if (fs.existsSync(filePath)) {
         const buf = fs.readFileSync(filePath);
-        const hash = computeAHash(buf);
+        const hash = await computeAHash(buf);
         db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ?').run(hash, ph.id);
         ph.phash = hash;
       }
     }
 
-    // Compare hashes — for md5 approach, exact match = same file
-    // For proper perceptual hashing we'd use hamming distance
+    // Compare using hamming distance on perceptual hashes
     const matches = [];
     const seenPieces = new Set();
 
     for (const ph of userPhotos) {
-      if (!ph.phash || seenPieces.has(ph.piece_id)) continue;
+      if (!ph.phash || ph.phash.length === 32 || seenPieces.has(ph.piece_id)) continue;
 
-      // Exact hash match (same photo) or compare buffers for similarity
-      let score = 0;
-      if (ph.phash === searchHash) {
-        score = 1.0;
-      } else {
-        // Compute character-level similarity between hashes as a rough proxy
-        let matching = 0;
-        const len = Math.min(ph.phash.length, searchHash.length);
-        for (let i = 0; i < len; i++) {
-          if (ph.phash[i] === searchHash[i]) matching++;
-        }
-        score = matching / len;
-      }
+      const distance = hammingDistance(ph.phash, searchHash);
+      // Score: 0 distance = perfect match (1.0), 64 distance = no match (0.0)
+      const score = 1.0 - (distance / 64);
 
-      // Only include if score is above threshold (70% for free tier)
-      if (score >= 0.7) {
+      // Threshold: hamming distance <= 18 (~72% similarity) for free tier
+      if (distance <= 18) {
         seenPieces.add(ph.piece_id);
 
-        // Get full piece data
         const piecePhotos = db.prepare('SELECT * FROM piece_photos WHERE piece_id = ? ORDER BY sort_order').all(ph.piece_id);
         const pieceGlazes = db.prepare('SELECT pg.*, g.name as glaze_name, g.brand, g.glaze_type FROM piece_glazes pg JOIN glazes g ON pg.glaze_id = g.id WHERE pg.piece_id = ? ORDER BY pg.layer_order').all(ph.piece_id);
 
@@ -4141,13 +4163,12 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), (req, res) =>
     // Sort by score descending
     matches.sort((a, b) => b.matchScore - a.matchScore);
 
-    // Clean up uploaded search photo (we don't need to keep it)
+    // Clean up uploaded search photo
     fs.unlinkSync(req.file.path);
 
     res.json({ matches, total: matches.length });
   } catch (err) {
     console.error('[Photo Search] Error:', err.message);
-    // Clean up uploaded file on error
     if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     res.status(500).json({ error: 'Photo search failed. Please try again.' });
   }
