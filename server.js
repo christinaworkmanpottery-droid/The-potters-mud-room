@@ -4049,56 +4049,88 @@ async function computeAHash(buffer) {
   return hex;
 }
 
-// Compute average color (RGB) — catches blue vs green, warm vs cool
-async function computeAvgColor(buffer) {
-  // Sample center 50% as a 4x4 grid (16 pixels) for better color representation
+// Compute a small center color signature instead of one averaged color.
+// This is much better for glaze matching because it preserves dark/light/teal/navy differences.
+async function computeColorSignature(buffer) {
   const meta = await sharp(buffer).metadata();
   const w = meta.width || 100;
   const h = meta.height || 100;
-  const cropW = Math.round(w * 0.5);
-  const cropH = Math.round(h * 0.5);
-  const left = Math.round((w - cropW) / 2);
-  const top = Math.round((h - cropH) / 2);
+  const cropW = Math.max(1, Math.round(w * 0.35));
+  const cropH = Math.max(1, Math.round(h * 0.35));
+  const left = Math.max(0, Math.round((w - cropW) / 2));
+  const top = Math.max(0, Math.round((h - cropH) / 2));
 
   const pixels = await sharp(buffer)
     .extract({ left, top, width: cropW, height: cropH })
-    .resize(4, 4, { fit: 'fill' })
+    .resize(6, 6, { fit: 'fill' })
     .removeAlpha()
     .raw()
     .toBuffer();
 
-  // Find the dominant color (most common among 16 center pixels)
-  // Group by color bucket (round to nearest 32 to cluster similar shades)
   const buckets = {};
-  for (let i = 0; i < 48; i += 3) {
-    const r = Math.round(pixels[i] / 32) * 32;
-    const g = Math.round(pixels[i+1] / 32) * 32;
-    const b = Math.round(pixels[i+2] / 32) * 32;
-    const key = `${r},${g},${b}`;
+  for (let i = 0; i < pixels.length; i += 3) {
+    const r = pixels[i];
+    const g = pixels[i + 1];
+    const b = pixels[i + 2];
+    const bucketR = Math.min(255, Math.round(r / 24) * 24);
+    const bucketG = Math.min(255, Math.round(g / 24) * 24);
+    const bucketB = Math.min(255, Math.round(b / 24) * 24);
+    const key = `${bucketR},${bucketG},${bucketB}`;
     if (!buckets[key]) buckets[key] = { r: 0, g: 0, b: 0, count: 0 };
-    buckets[key].r += pixels[i];
-    buckets[key].g += pixels[i+1];
-    buckets[key].b += pixels[i+2];
+    buckets[key].r += r;
+    buckets[key].g += g;
+    buckets[key].b += b;
     buckets[key].count++;
   }
 
-  // Return the average of the largest bucket (dominant color)
-  let best = null;
-  for (const b of Object.values(buckets)) {
-    if (!best || b.count > best.count) best = b;
-  }
-  const r = Math.round(best.r / best.count);
-  const g = Math.round(best.g / best.count);
-  const b2 = Math.round(best.b / best.count);
-  return `${r},${g},${b2}`;
+  const topBuckets = Object.values(buckets)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 3)
+    .map((bucket) => ({
+      r: Math.round(bucket.r / bucket.count),
+      g: Math.round(bucket.g / bucket.count),
+      b: Math.round(bucket.b / bucket.count),
+      weight: bucket.count / 36,
+    }));
+
+  return JSON.stringify(topBuckets);
 }
 
-// Euclidean distance between two RGB color strings "r,g,b"
-function colorDistance(color1, color2) {
-  if (!color1 || !color2) return 999;
-  const [r1, g1, b1] = color1.split(',').map(Number);
-  const [r2, g2, b2] = color2.split(',').map(Number);
-  return Math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2);
+function parseColorSignature(signature) {
+  if (!signature) return [];
+  try {
+    const parsed = JSON.parse(signature);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    // Backward compatibility with old single RGB format: "r,g,b"
+    const parts = signature.split(',').map(Number);
+    if (parts.length === 3 && parts.every((n) => Number.isFinite(n))) {
+      return [{ r: parts[0], g: parts[1], b: parts[2], weight: 1 }];
+    }
+    return [];
+  }
+}
+
+function rgbDistance(a, b) {
+  return Math.sqrt((a.r - b.r) ** 2 + (a.g - b.g) ** 2 + (a.b - b.b) ** 2);
+}
+
+// Compare two color signatures. Lower is better.
+function colorSignatureDistance(sig1, sig2) {
+  const a = parseColorSignature(sig1);
+  const b = parseColorSignature(sig2);
+  if (!a.length || !b.length) return 999;
+
+  let total = 0;
+  for (const colorA of a) {
+    let best = 999;
+    for (const colorB of b) {
+      const dist = rgbDistance(colorA, colorB);
+      if (dist < best) best = dist;
+    }
+    total += best * (colorA.weight || 1);
+  }
+  return total;
 }
 
 function hammingDistance(hash1, hash2) {
@@ -4123,11 +4155,10 @@ try {
   console.log('[Photo Search] Added avg_color column to piece_photos');
 } catch(e) { /* Column already exists */ }
 
-// One-time: clear old avg_color values (computed with full-image, not center-crop)
-// They'll be recomputed on next search using the improved center-50% method
+// Clear legacy color data once on boot so photos recompute using the new signature format.
 try {
-  const cleared = db.prepare("UPDATE piece_photos SET avg_color = NULL WHERE avg_color IS NOT NULL").run();
-  if (cleared.changes > 0) console.log(`[Photo Search] Reset ${cleared.changes} avg_color values for center-crop recompute`);
+  const cleared = db.prepare("UPDATE piece_photos SET avg_color = NULL WHERE avg_color IS NOT NULL AND avg_color NOT LIKE '[%'").run();
+  if (cleared.changes > 0) console.log(`[Photo Search] Reset ${cleared.changes} legacy color values for signature recompute`);
 } catch(e) { /* fine */ }
 
 // Endpoint: search pieces by photo
@@ -4137,7 +4168,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
   try {
     const searchBuffer = fs.readFileSync(req.file.path);
     const searchHash = await computeAHash(searchBuffer);
-    const searchColor = await computeAvgColor(searchBuffer);
+    const searchColor = await computeColorSignature(searchBuffer);
 
     // Get all piece photos for this user
     const userPhotos = db.prepare(`
@@ -4164,7 +4195,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
             ph.phash = hash;
           }
           if (!ph.avg_color) {
-            const color = await computeAvgColor(buf);
+            const color = await computeColorSignature(buf);
             db.prepare('UPDATE piece_photos SET avg_color = ? WHERE id = ?').run(color, ph.id);
             ph.avg_color = color;
           }
@@ -4174,8 +4205,8 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       }
     }
 
-    // Compare using hamming distance + color similarity weighted into final score
-    // Paid tier: more relaxed shape threshold + color weighted heavily for accuracy
+    // Compare using shape + multi-color signature.
+    // For pottery, color should outrank shape because glaze is usually the stronger signal.
     const matches = [];
     const seenPieces = new Set();
 
@@ -4183,29 +4214,32 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       if (!ph.phash || ph.phash.length === 32 || seenPieces.has(ph.piece_id)) continue;
 
       const distance = hammingDistance(ph.phash, searchHash);
-      // Shape score: 0 distance = perfect (1.0), 64 = no match (0.0)
       const shapeScore = 1.0 - (distance / 64);
 
-      // Max hamming distance to even consider (paid gets more flexibility)
-      const maxDistance = (req.userTier === 'free') ? 22 : 30;
+      const maxDistance = (req.userTier === 'free') ? 24 : 34;
       if (distance > maxDistance) continue;
 
-      // Color score: closer color = higher score
-      const cDist = colorDistance(ph.avg_color, searchColor);
-      // Hard reject if color is wildly different (completely different color family)
-      if (cDist > 150) continue;
-      // Normalize: 0 distance = 1.0 (perfect), 150 = 0.0
-      const colorScore = Math.max(0, 1.0 - (cDist / 150));
+      const cDist = colorSignatureDistance(ph.avg_color, searchColor);
+      if (cDist > 95) continue;
+      const colorScore = Math.max(0, 1.0 - (cDist / 95));
 
-      // Weighted final score: color matters MORE for pottery (glazes define pieces)
-      // Paid tier: 35% shape + 65% color (prioritize color accuracy)
-      // Free tier: 45% shape + 55% color
-      const colorWeight = (req.userTier === 'free') ? 0.55 : 0.65;
+      // Penalize very different brightness so dark navy does not outrank light teal.
+      const searchSig = parseColorSignature(searchColor);
+      const photoSig = parseColorSignature(ph.avg_color);
+      const searchBrightness = searchSig.length
+        ? searchSig.reduce((sum, c) => sum + ((c.r + c.g + c.b) / 3) * (c.weight || 1), 0)
+        : 0;
+      const photoBrightness = photoSig.length
+        ? photoSig.reduce((sum, c) => sum + ((c.r + c.g + c.b) / 3) * (c.weight || 1), 0)
+        : 0;
+      const brightnessDiff = Math.abs(searchBrightness - photoBrightness);
+      const brightnessPenalty = Math.min(0.25, brightnessDiff / 255 * 0.35);
+
+      const colorWeight = (req.userTier === 'free') ? 0.70 : 0.82;
       const shapeWeight = 1.0 - colorWeight;
-      const score = (shapeScore * shapeWeight) + (colorScore * colorWeight);
+      const score = ((shapeScore * shapeWeight) + (colorScore * colorWeight)) - brightnessPenalty;
 
-      // Only show high-confidence results — no junk matches
-      if (score < 0.50) continue;
+      if (score < 0.58) continue;
 
       seenPieces.add(ph.piece_id);
 
