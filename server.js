@@ -4137,8 +4137,43 @@ function parseColorSignature(signature) {
   }
 }
 
-function rgbDistance(a, b) {
-  return Math.sqrt((a.r - b.r) ** 2 + (a.g - b.g) ** 2 + (a.b - b.b) ** 2);
+// Convert RGB to HSL
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+  if (max === min) { h = s = 0; }
+  else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+  return { h: h * 360, s, l };
+}
+
+// Perceptual color distance using HSL — hue differences dominate
+function perceptualColorDistance(a, b) {
+  const hslA = rgbToHsl(a.r, a.g, a.b);
+  const hslB = rgbToHsl(b.r, b.g, b.b);
+
+  // Hue is circular (0-360), find shortest arc
+  let hueDiff = Math.abs(hslA.h - hslB.h);
+  if (hueDiff > 180) hueDiff = 360 - hueDiff;
+
+  // If both are very desaturated (gray/white/black), hue doesn't matter
+  const avgSat = (hslA.s + hslB.s) / 2;
+  const hueWeight = avgSat > 0.15 ? 1.0 : 0.2;
+
+  // Weighted distance: hue matters most, then lightness, then saturation
+  const hueScore = (hueDiff / 180) * 100 * hueWeight;  // 0-100
+  const satScore = Math.abs(hslA.s - hslB.s) * 40;      // 0-40
+  const lightScore = Math.abs(hslA.l - hslB.l) * 50;    // 0-50
+
+  return hueScore + satScore + lightScore;
 }
 
 // Compare two color signatures. Lower is better.
@@ -4151,7 +4186,7 @@ function colorSignatureDistance(sig1, sig2) {
   for (const colorA of a) {
     let best = 999;
     for (const colorB of b) {
-      const dist = rgbDistance(colorA, colorB);
+      const dist = perceptualColorDistance(colorA, colorB);
       if (dist < best) best = dist;
     }
     total += best * (colorA.weight || 1);
@@ -4249,8 +4284,8 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       if (distance > maxDistance) continue;
 
       const cDist = colorSignatureDistance(ph.avg_color, searchColor);
-      if (cDist > 60) continue;
-      const colorScore = Math.max(0, 1.0 - (cDist / 60));
+      if (cDist > 45) continue;
+      const colorScore = Math.max(0, 1.0 - (cDist / 45));
 
       const photoSig = parseColorSignature(ph.avg_color);
       const photoBrightness = photoSig.length
