@@ -4216,11 +4216,16 @@ try {
   console.log('[Photo Search] Added avg_color column to piece_photos');
 } catch(e) { /* Column already exists */ }
 
-// Clear legacy color data once on boot so photos recompute using the new signature format.
+// One-time migration: clear ALL color data so photos recompute with HSL-based perceptual distance (v3).
 try {
-  const cleared = db.prepare("UPDATE piece_photos SET avg_color = NULL WHERE avg_color IS NOT NULL AND avg_color NOT LIKE '[%'").run();
-  if (cleared.changes > 0) console.log(`[Photo Search] Reset ${cleared.changes} legacy color values for signature recompute`);
-} catch(e) { /* fine */ }
+  db.exec(`CREATE TABLE IF NOT EXISTS migrations (name TEXT PRIMARY KEY, applied_at TEXT)`);
+  const done = db.prepare('SELECT 1 FROM migrations WHERE name=?').get('color_sig_hsl_v3');
+  if (!done) {
+    const cleared = db.prepare("UPDATE piece_photos SET avg_color = NULL WHERE avg_color IS NOT NULL").run();
+    db.prepare('INSERT INTO migrations (name, applied_at) VALUES (?, datetime("now"))').run('color_sig_hsl_v3');
+    console.log(`[Photo Search] Migration color_sig_hsl_v3: cleared ${cleared.changes} color signatures for recompute`);
+  }
+} catch(e) { console.warn('[Photo Search] Migration error:', e.message); }
 
 // Endpoint: search pieces by photo
 app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, res) => {
@@ -4243,8 +4248,8 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       WHERE p.user_id = ?
     `).all(req.userId);
 
-    // Backfill hashes AND colors for photos that need them (limit to 20 per request)
-    const needsHash = userPhotos.filter(ph => !ph.phash || ph.phash.length === 32 || !ph.avg_color).slice(0, 20);
+    // Backfill hashes AND colors for photos that need them (limit to 50 per request)
+    const needsHash = userPhotos.filter(ph => !ph.phash || ph.phash.length === 32 || !ph.avg_color).slice(0, 50);
     for (const ph of needsHash) {
       try {
         const filePath = path.join(UPLOADS_DIR, ph.filename);
