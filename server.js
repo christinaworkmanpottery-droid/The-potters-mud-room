@@ -4245,12 +4245,12 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       const distance = hammingDistance(ph.phash, searchHash);
       const shapeScore = 1.0 - (distance / 64);
 
-      const maxDistance = (req.userTier === 'free') ? 24 : 34;
+      const maxDistance = (req.userTier === 'free') ? 20 : 26;
       if (distance > maxDistance) continue;
 
       const cDist = colorSignatureDistance(ph.avg_color, searchColor);
-      if (cDist > 95) continue;
-      const colorScore = Math.max(0, 1.0 - (cDist / 95));
+      if (cDist > 60) continue;
+      const colorScore = Math.max(0, 1.0 - (cDist / 60));
 
       const photoSig = parseColorSignature(ph.avg_color);
       const photoBrightness = photoSig.length
@@ -4314,7 +4314,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
 
     const matches = [];
     for (const best of bestByPiece.values()) {
-      if (best.score < 0.58) continue;
+      if (best.score < 0.65) continue;
 
       const piecePhotos = db.prepare('SELECT * FROM piece_photos WHERE piece_id = ? ORDER BY sort_order').all(best.piece_id);
       const pieceGlazes = db.prepare('SELECT pg.*, g.name as glaze_name, g.brand, g.glaze_type FROM piece_glazes pg JOIN glazes g ON pg.glaze_id = g.id WHERE pg.piece_id = ? ORDER BY pg.layer_order').all(best.piece_id);
