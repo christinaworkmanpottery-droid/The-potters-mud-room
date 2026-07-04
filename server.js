@@ -5,7 +5,7 @@ const fs = require('fs');
 const multer = require('multer');
 
 // Deploy version tag — used to verify which code is actually running on Render
-const DEPLOY_VERSION = 'v8b-startup-backfill-2026-07-04-2032';
+const DEPLOY_VERSION = 'v8c-fix-crash-2026-07-04-2036';
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
@@ -4441,7 +4441,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         shapeScore,
         colorScore,
         hueDiff: (() => { let d = Math.abs(searchHsl.h - photoHsl.h); return d > 180 ? 360 - d : d; })(),
-        lightnessDiff: lightDiff,
+        lightnessDiff: Math.abs(searchHsl.l - photoHsl.l),
         score,
       });
     }
