@@ -4389,7 +4389,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         Math.pow(searchAvg.g - photoAvg.g, 2) +
         Math.pow(searchAvg.b - photoAvg.b, 2)
       );
-      if (rgbDist > 80) continue; // Hard reject if average colors are far apart
+      if (rgbDist > 45) continue; // Hard reject if average colors are far apart
 
       // === GATE 2: Hue gate on the averages ===
       // Only when both have real saturation
@@ -4404,7 +4404,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       if (lightDiff > 0.25) continue;
 
       // === SCORING ===
-      const colorScore = Math.max(0, 1.0 - (rgbDist / 80));
+      const colorScore = Math.max(0, 1.0 - (rgbDist / 45));
 
       let shapeScore = 0.5;
       if (ph.phash && ph.phash.length === 16) {
