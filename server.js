@@ -5,7 +5,7 @@ const fs = require('fs');
 const multer = require('multer');
 
 // Deploy version tag — used to verify which code is actually running on Render
-const DEPLOY_VERSION = 'v8c-fix-crash-2026-07-04-2036';
+const DEPLOY_VERSION = 'v8d-lower-threshold-2026-07-04-2110';
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
@@ -4469,7 +4469,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
 
     const matches = [];
     for (const best of bestByPiece.values()) {
-      if (best.score < 0.70) continue; // Raised threshold — only show genuinely good matches
+      if (best.score < 0.55) continue; // Show anything that passes the hue gate with reasonable color similarity
 
       const piecePhotos = db.prepare('SELECT * FROM piece_photos WHERE piece_id = ? ORDER BY sort_order').all(best.piece_id);
       const pieceGlazes = db.prepare('SELECT pg.*, g.name as glaze_name, g.brand, g.glaze_type FROM piece_glazes pg JOIN glazes g ON pg.glaze_id = g.id WHERE pg.piece_id = ? ORDER BY pg.layer_order').all(best.piece_id);
