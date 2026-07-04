@@ -42,6 +42,8 @@ try { db.exec("ALTER TABLE users ADD COLUMN potter_type TEXT DEFAULT NULL"); } c
 try { db.exec("ALTER TABLE users ADD COLUMN years_experience TEXT DEFAULT NULL"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN studio_type TEXT DEFAULT NULL"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN signup_source TEXT DEFAULT NULL"); } catch(e) {}
+// Photo search exclusion flag — lets users hide specific pieces from photo search results
+try { db.exec("ALTER TABLE pieces ADD COLUMN hide_from_photo_search INTEGER DEFAULT 0"); } catch(e) {}
 // Nodemailer setup for newsletter emails
 let transporter = null;
 function setupTransporter(user, pass, host, port) {
@@ -1460,8 +1462,51 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
   res.json({ id });
 });
 
+// Toggle hide_from_photo_search for a piece
+app.patch('/api/pieces/:id/photo-search-visibility', auth, (req, res) => {
+  const piece = db.prepare('SELECT id, user_id FROM pieces WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
+  if (!piece) return res.status(404).json({ error: 'Piece not found' });
+  const hide = req.body.hide ? 1 : 0;
+  db.prepare('UPDATE pieces SET hide_from_photo_search = ? WHERE id = ?').run(hide, piece.id);
+  res.json({ success: true, hide_from_photo_search: hide });
+});
+
+// Debug: return stored avg_color for all photos belonging to user (auth required)
+app.get('/api/debug/photo-colors', auth, (req, res) => {
+  const photos = db.prepare(`
+    SELECT pp.id, pp.filename, pp.avg_color, p.id as piece_id, p.title, p.hide_from_photo_search
+    FROM piece_photos pp
+    JOIN pieces p ON pp.piece_id = p.id
+    WHERE p.user_id = ?
+    ORDER BY p.title
+  `).all(req.userId);
+  const result = photos.map(ph => {
+    let avgRgb = null;
+    try {
+      const sig = JSON.parse(ph.avg_color || 'null');
+      if (Array.isArray(sig) && sig.length) {
+        const totalW = sig.reduce((s, c) => s + (c.weight || 1), 0);
+        avgRgb = {
+          r: Math.round(sig.reduce((s, c) => s + c.r * (c.weight || 1), 0) / totalW),
+          g: Math.round(sig.reduce((s, c) => s + c.g * (c.weight || 1), 0) / totalW),
+          b: Math.round(sig.reduce((s, c) => s + c.b * (c.weight || 1), 0) / totalW),
+        };
+      }
+    } catch(e) {}
+    return {
+      photo_id: ph.id,
+      piece_id: ph.piece_id,
+      title: ph.title,
+      filename: ph.filename,
+      hidden: !!ph.hide_from_photo_search,
+      avg_color_buckets: ph.avg_color ? JSON.parse(ph.avg_color) : null,
+      avg_rgb: avgRgb,
+    };
+  });
+  res.json(result);
+});
+
 app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
-  const body = req.body || {};
   const title = body.title || body.name || null;
   const description = body.description || null;
   const clayBodyId = body.clayBodyId || body.clay_body_id || null;
@@ -4267,7 +4312,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
     const searchHash = await computeAHash(searchBuffer);
     const searchColor = await computeColorSignature(searchBuffer);
 
-    // Get all piece photos for this user
+    // Get all piece photos for this user (excluding pieces hidden from photo search)
     const userPhotos = db.prepare(`
       SELECT pp.*, pp.phash, pp.avg_color, p.id as piece_id, p.title, p.status, p.notes,
              p.clay_body_id, p.description, p.technique, p.form,
@@ -4276,7 +4321,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       FROM piece_photos pp
       JOIN pieces p ON pp.piece_id = p.id
       LEFT JOIN clay_bodies cb ON p.clay_body_id = cb.id
-      WHERE p.user_id = ?
+      WHERE p.user_id = ? AND (p.hide_from_photo_search IS NULL OR p.hide_from_photo_search = 0)
     `).all(req.userId);
 
     // Backfill hashes AND colors for photos that need them (NO LIMIT — must compute all)
