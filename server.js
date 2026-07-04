@@ -4081,14 +4081,16 @@ async function computeColorSignature(buffer) {
   const meta = await sharp(buffer).metadata();
   const w = meta.width || 100;
   const h = meta.height || 100;
-  const cropW = Math.max(1, Math.round(w * 0.35));
-  const cropH = Math.max(1, Math.round(h * 0.35));
+  // Use larger center crop (60%) to capture the actual subject better
+  const cropW = Math.max(1, Math.round(w * 0.60));
+  const cropH = Math.max(1, Math.round(h * 0.60));
   const left = Math.max(0, Math.round((w - cropW) / 2));
   const top = Math.max(0, Math.round((h - cropH) / 2));
 
+  // Sample more pixels (8x8=64) for better color representation
   const pixels = await sharp(buffer)
     .extract({ left, top, width: cropW, height: cropH })
-    .resize(6, 6, { fit: 'fill' })
+    .resize(8, 8, { fit: 'fill' })
     .removeAlpha()
     .raw()
     .toBuffer();
@@ -4109,14 +4111,15 @@ async function computeColorSignature(buffer) {
     buckets[key].count++;
   }
 
+  const totalPixels = pixels.length / 3; // 64 for 8x8
   const topBuckets = Object.values(buckets)
     .sort((a, b) => b.count - a.count)
-    .slice(0, 3)
+    .slice(0, 4) // Keep top 4 buckets for better discrimination
     .map((bucket) => ({
       r: Math.round(bucket.r / bucket.count),
       g: Math.round(bucket.g / bucket.count),
       b: Math.round(bucket.b / bucket.count),
-      weight: bucket.count / 36,
+      weight: bucket.count / totalPixels,
     }));
 
   return JSON.stringify(topBuckets);
@@ -4227,6 +4230,16 @@ try {
   }
 } catch(e) { console.warn('[Photo Search] Migration error:', e.message); }
 
+// v4 migration: larger crop (60%), 4 buckets, hue gate — recompute all color signatures
+try {
+  const doneV4 = db.prepare('SELECT 1 FROM migrations WHERE name=?').get('color_sig_v4_hue_gate');
+  if (!doneV4) {
+    const cleared = db.prepare("UPDATE piece_photos SET avg_color = NULL WHERE avg_color IS NOT NULL").run();
+    db.prepare('INSERT INTO migrations (name, applied_at) VALUES (?, datetime("now"))').run('color_sig_v4_hue_gate');
+    console.log(`[Photo Search] Migration color_sig_v4_hue_gate: cleared ${cleared.changes} color signatures for recompute with improved algorithm`);
+  }
+} catch(e) { console.warn('[Photo Search] Migration v4 error:', e.message); }
+
 // Endpoint: search pieces by photo
 app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo provided' });
@@ -4288,11 +4301,26 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       const maxDistance = (req.userTier === 'free') ? 20 : 26;
       if (distance > maxDistance) continue;
 
-      const cDist = colorSignatureDistance(ph.avg_color, searchColor);
-      if (cDist > 45) continue;
-      const colorScore = Math.max(0, 1.0 - (cDist / 45));
-
+      // Hard hue gate: reject if dominant hues are in completely different color families
       const photoSig = parseColorSignature(ph.avg_color);
+      if (searchSig.length && photoSig.length) {
+        const searchDominant = searchSig[0]; // highest-weight color
+        const photoDominant = photoSig[0];
+        const searchHsl = rgbToHsl(searchDominant.r, searchDominant.g, searchDominant.b);
+        const photoHsl = rgbToHsl(photoDominant.r, photoDominant.g, photoDominant.b);
+        // Only apply hue gate when both have meaningful saturation (not gray/white/black)
+        if (searchHsl.s > 0.20 && photoHsl.s > 0.20) {
+          let hueDiff = Math.abs(searchHsl.h - photoHsl.h);
+          if (hueDiff > 180) hueDiff = 360 - hueDiff;
+          // If dominant hues are more than 60° apart, reject outright
+          if (hueDiff > 60) continue;
+        }
+      }
+
+      const cDist = colorSignatureDistance(ph.avg_color, searchColor);
+      if (cDist > 35) continue; // Tightened from 45 — be stricter about color mismatch
+      const colorScore = Math.max(0, 1.0 - (cDist / 35));
+
       const photoBrightness = photoSig.length
         ? photoSig.reduce((sum, c) => sum + ((c.r + c.g + c.b) / 3) * (c.weight || 1), 0)
         : 0;
@@ -4302,7 +4330,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       // Extra penalty when one piece is materially darker/lighter than the search photo.
       const valuePenalty = brightnessDiff > 28 ? Math.min(0.20, (brightnessDiff - 28) / 255 * 0.50) : 0;
 
-      const colorWeight = (req.userTier === 'free') ? 0.72 : 0.84;
+      const colorWeight = (req.userTier === 'free') ? 0.78 : 0.88; // Increased color weight
       const shapeWeight = 1.0 - colorWeight;
       const score = ((shapeScore * shapeWeight) + (colorScore * colorWeight)) - brightnessPenalty - valuePenalty;
 
