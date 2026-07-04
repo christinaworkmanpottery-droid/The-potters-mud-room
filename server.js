@@ -3,6 +3,9 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+
+// Deploy version tag — used to verify which code is actually running on Render
+const DEPLOY_VERSION = 'v6-rgb-euclidean-2026-07-04-1857';
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
@@ -206,6 +209,11 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(UPLOADS_DIR));
+
+// Version check endpoint — verify which code is actually deployed
+app.get('/api/version', (req, res) => {
+  res.json({ version: DEPLOY_VERSION, deployed: new Date().toISOString() });
+});
 
 const noCacheWebHeaders = (res, filePath) => {
   if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('.css')) {
