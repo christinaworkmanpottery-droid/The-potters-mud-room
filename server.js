@@ -4319,17 +4319,32 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       const photoSig = parseColorSignature(ph.avg_color);
       if (!photoSig.length || !searchSig.length) continue;
 
-      // Gate A: Dominant hue comparison (strictest gate)
+      // Compute weighted average color across all buckets (more stable than dominant alone)
+      const photoAvgHsl = (() => {
+        const totalW = photoSig.reduce((s, c) => s + (c.weight || 1), 0);
+        const avgR = photoSig.reduce((s, c) => s + c.r * (c.weight || 1), 0) / totalW;
+        const avgG = photoSig.reduce((s, c) => s + c.g * (c.weight || 1), 0) / totalW;
+        const avgB = photoSig.reduce((s, c) => s + c.b * (c.weight || 1), 0) / totalW;
+        return rgbToHsl(avgR, avgG, avgB);
+      })();
       const photoDominantHsl = rgbToHsl(photoSig[0].r, photoSig[0].g, photoSig[0].b);
 
-      // If both have meaningful color (not gray/white/black), hues MUST be close
-      if (searchDominantHsl.s > 0.15 && photoDominantHsl.s > 0.15) {
+      // Gate A: Hue gate — applies when EITHER the search OR photo has meaningful saturation.
+      // This prevents a colorful search (green) from matching a washed-out-looking stored photo
+      // whose dominant bucket got diluted by background.
+      // We check BOTH dominant and weighted-average hue.
+      if (searchDominantHsl.s > 0.15) {
+        // Search photo has real color — stored photo must be in the same hue family
+        // Check dominant bucket hue
         let hueDiff = Math.abs(searchDominantHsl.h - photoDominantHsl.h);
         if (hueDiff > 180) hueDiff = 360 - hueDiff;
-        // Hard reject: hues more than 45° apart = different color family
-        if (hueDiff > 45) {
-          continue;
-        }
+        // Also check weighted average hue
+        let avgHueDiff = Math.abs(searchDominantHsl.h - photoAvgHsl.h);
+        if (avgHueDiff > 180) avgHueDiff = 360 - avgHueDiff;
+        // BOTH dominant and average must be within 50° — or stored photo is too desaturated to matter
+        const storedHasColor = photoDominantHsl.s > 0.15 || photoAvgHsl.s > 0.15;
+        if (storedHasColor && hueDiff > 50) continue;
+        if (storedHasColor && avgHueDiff > 50) continue;
       }
 
       // Gate B: Overall color signature distance
@@ -4337,8 +4352,9 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       if (cDist > 30) continue; // Strict: must be genuinely similar colors
 
       // Gate C: Lightness check — don't match bright green to dark ox blood
-      const lightnessDiff = Math.abs(searchDominantHsl.l - photoDominantHsl.l);
-      if (lightnessDiff > 0.35) continue;
+      // Use weighted average lightness (more stable)
+      const lightnessDiff = Math.abs(searchDominantHsl.l - photoAvgHsl.l);
+      if (lightnessDiff > 0.30) continue; // Tightened from 0.35
 
       // STEP 2: Color score (primary scoring factor)
       const colorScore = Math.max(0, 1.0 - (cDist / 30));
