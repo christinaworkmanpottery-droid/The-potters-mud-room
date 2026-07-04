@@ -4294,81 +4294,73 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       }
     }
 
-    // === COLOR-FIRST MATCHING (v5) ===
-    // Color is the gatekeeper. If colors don't match, shape is irrelevant.
-    // A green piece must NEVER match a red/blue/purple piece regardless of shape.
+    // === COLOR-FIRST MATCHING (v6) ===
+    // SIMPLE APPROACH: Use raw RGB Euclidean distance on weighted-average color.
+    // No more complex HSL conversions or per-bucket matching that can be gamed by
+    // one lucky bucket match. Just: "is this photo's average color close to the search?"
     const candidateMatches = [];
     const searchSig = parseColorSignature(searchColor);
+    if (!searchSig.length) {
+      fs.unlinkSync(req.file.path);
+      return res.json({ matches: [], total: 0 });
+    }
 
-    // Compute search photo's dominant HSL
-    const searchDominantHsl = searchSig.length
-      ? rgbToHsl(searchSig[0].r, searchSig[0].g, searchSig[0].b)
-      : null;
-    // Compute weighted average HSL across all buckets for secondary check
-    const searchAvgRgb = searchSig.length ? {
-      r: searchSig.reduce((s, c) => s + c.r * (c.weight || 1), 0) / searchSig.reduce((s, c) => s + (c.weight || 1), 0),
-      g: searchSig.reduce((s, c) => s + c.g * (c.weight || 1), 0) / searchSig.reduce((s, c) => s + (c.weight || 1), 0),
-      b: searchSig.reduce((s, c) => s + c.b * (c.weight || 1), 0) / searchSig.reduce((s, c) => s + (c.weight || 1), 0),
-    } : null;
+    // Compute the single weighted-average RGB for the search photo
+    const searchTotalW = searchSig.reduce((s, c) => s + (c.weight || 1), 0);
+    const searchAvg = {
+      r: searchSig.reduce((s, c) => s + c.r * (c.weight || 1), 0) / searchTotalW,
+      g: searchSig.reduce((s, c) => s + c.g * (c.weight || 1), 0) / searchTotalW,
+      b: searchSig.reduce((s, c) => s + c.b * (c.weight || 1), 0) / searchTotalW,
+    };
+    const searchHsl = rgbToHsl(searchAvg.r, searchAvg.g, searchAvg.b);
 
-    console.log('[Photo Search] Search photo signature:', JSON.stringify(searchSig));
-    console.log('[Photo Search] Search dominant HSL:', searchDominantHsl);
+    console.log('[Photo Search] Search avg RGB:', searchAvg);
+    console.log('[Photo Search] Search avg HSL:', searchHsl);
 
     for (const ph of userPhotos) {
-      // STEP 1: Color gate — must pass before anything else
       const photoSig = parseColorSignature(ph.avg_color);
-      if (!photoSig.length || !searchSig.length) continue;
+      if (!photoSig.length) continue;
 
-      // Compute weighted average color across all buckets (more stable than dominant alone)
-      const photoAvgHsl = (() => {
-        const totalW = photoSig.reduce((s, c) => s + (c.weight || 1), 0);
-        const avgR = photoSig.reduce((s, c) => s + c.r * (c.weight || 1), 0) / totalW;
-        const avgG = photoSig.reduce((s, c) => s + c.g * (c.weight || 1), 0) / totalW;
-        const avgB = photoSig.reduce((s, c) => s + c.b * (c.weight || 1), 0) / totalW;
-        return rgbToHsl(avgR, avgG, avgB);
-      })();
-      const photoDominantHsl = rgbToHsl(photoSig[0].r, photoSig[0].g, photoSig[0].b);
+      // Compute single weighted-average RGB for stored photo
+      const photoTotalW = photoSig.reduce((s, c) => s + (c.weight || 1), 0);
+      const photoAvg = {
+        r: photoSig.reduce((s, c) => s + c.r * (c.weight || 1), 0) / photoTotalW,
+        g: photoSig.reduce((s, c) => s + c.g * (c.weight || 1), 0) / photoTotalW,
+        b: photoSig.reduce((s, c) => s + c.b * (c.weight || 1), 0) / photoTotalW,
+      };
+      const photoHsl = rgbToHsl(photoAvg.r, photoAvg.g, photoAvg.b);
 
-      // Gate A: Hue gate — applies when EITHER the search OR photo has meaningful saturation.
-      // This prevents a colorful search (green) from matching a washed-out-looking stored photo
-      // whose dominant bucket got diluted by background.
-      // We check BOTH dominant and weighted-average hue.
-      if (searchDominantHsl.s > 0.15) {
-        // Search photo has real color — stored photo must be in the same hue family
-        // Check dominant bucket hue
-        let hueDiff = Math.abs(searchDominantHsl.h - photoDominantHsl.h);
+      // === GATE 1: RGB Euclidean distance (max ~441 for black vs white) ===
+      const rgbDist = Math.sqrt(
+        Math.pow(searchAvg.r - photoAvg.r, 2) +
+        Math.pow(searchAvg.g - photoAvg.g, 2) +
+        Math.pow(searchAvg.b - photoAvg.b, 2)
+      );
+      if (rgbDist > 80) continue; // Hard reject if average colors are far apart
+
+      // === GATE 2: Hue gate on the averages ===
+      // Only when both have real saturation
+      if (searchHsl.s > 0.12 && photoHsl.s > 0.12) {
+        let hueDiff = Math.abs(searchHsl.h - photoHsl.h);
         if (hueDiff > 180) hueDiff = 360 - hueDiff;
-        // Also check weighted average hue
-        let avgHueDiff = Math.abs(searchDominantHsl.h - photoAvgHsl.h);
-        if (avgHueDiff > 180) avgHueDiff = 360 - avgHueDiff;
-        // BOTH dominant and average must be within 50° — or stored photo is too desaturated to matter
-        const storedHasColor = photoDominantHsl.s > 0.15 || photoAvgHsl.s > 0.15;
-        if (storedHasColor && hueDiff > 50) continue;
-        if (storedHasColor && avgHueDiff > 50) continue;
+        if (hueDiff > 40) continue; // Strict: average hues within 40 degrees
       }
 
-      // Gate B: Overall color signature distance
-      const cDist = colorSignatureDistance(ph.avg_color, searchColor);
-      if (cDist > 30) continue; // Strict: must be genuinely similar colors
+      // === GATE 3: Lightness gate ===
+      const lightDiff = Math.abs(searchHsl.l - photoHsl.l);
+      if (lightDiff > 0.25) continue;
 
-      // Gate C: Lightness check — don't match bright green to dark ox blood
-      // Use weighted average lightness (more stable)
-      const lightnessDiff = Math.abs(searchDominantHsl.l - photoAvgHsl.l);
-      if (lightnessDiff > 0.30) continue; // Tightened from 0.35
+      // === SCORING ===
+      const colorScore = Math.max(0, 1.0 - (rgbDist / 80));
 
-      // STEP 2: Color score (primary scoring factor)
-      const colorScore = Math.max(0, 1.0 - (cDist / 30));
-
-      // STEP 3: Shape score (secondary — only matters when color already matches)
-      let shapeScore = 0.5; // default neutral if no hash
+      let shapeScore = 0.5;
       if (ph.phash && ph.phash.length === 16) {
         const distance = hammingDistance(ph.phash, searchHash);
         shapeScore = 1.0 - (distance / 64);
-        // Don't hard-reject on shape — let color dominate
       }
 
-      // Final score: 85% color, 15% shape
-      const score = (colorScore * 0.85) + (shapeScore * 0.15);
+      // 90% color, 10% shape — color absolutely dominates
+      const score = (colorScore * 0.90) + (shapeScore * 0.10);
 
       candidateMatches.push({
         piece_id: ph.piece_id,
@@ -4382,26 +4374,24 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         form: ph.form,
         date_started: ph.date_started,
         date_completed: ph.date_completed,
-        cDist,
+        cDist: rgbDist,
         shapeScore,
         colorScore,
-        hueDiff: Math.abs(searchDominantHsl.h - photoDominantHsl.h) > 180
-          ? 360 - Math.abs(searchDominantHsl.h - photoDominantHsl.h)
-          : Math.abs(searchDominantHsl.h - photoDominantHsl.h),
-        lightnessDiff,
+        hueDiff: (() => { let d = Math.abs(searchHsl.h - photoHsl.h); return d > 180 ? 360 - d : d; })(),
+        lightnessDiff: lightDiff,
         score,
       });
     }
 
     candidateMatches.sort((a, b) => b.score - a.score);
-    console.log('[Photo Search] Candidates after color gate:', candidateMatches.length);
+    console.log('[Photo Search] Candidates passed all gates:', candidateMatches.length);
     console.log('[Photo Search] Top candidates:', candidateMatches.slice(0, 8).map((m) => ({
       piece: m.title,
       piece_id: m.piece_id,
       score: Number(m.score.toFixed(3)),
       color: Number(m.colorScore.toFixed(3)),
       shape: Number(m.shapeScore.toFixed(3)),
-      colorDist: Number(m.cDist.toFixed(1)),
+      rgbDist: Number(m.cDist.toFixed(1)),
       hueDiff: Number(m.hueDiff.toFixed(1)),
       lightDiff: Number(m.lightnessDiff.toFixed(3)),
     })));
