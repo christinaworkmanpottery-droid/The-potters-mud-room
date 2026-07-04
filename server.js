@@ -5,7 +5,7 @@ const fs = require('fs');
 const multer = require('multer');
 
 // Deploy version tag — used to verify which code is actually running on Render
-const DEPLOY_VERSION = 'v7-saturation-aware-2026-07-04-2022';
+const DEPLOY_VERSION = 'v8-hue-gate-only-2026-07-04-2030';
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
@@ -4362,10 +4362,10 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       }
     }
 
-    // === COLOR-FIRST MATCHING (v6) ===
-    // SIMPLE APPROACH: Use raw RGB Euclidean distance on weighted-average color.
-    // No more complex HSL conversions or per-bucket matching that can be gamed by
-    // one lucky bucket match. Just: "is this photo's average color close to the search?"
+    // === COLOR-FIRST MATCHING (v8) ===
+    // Gate on HUE only (stable across lighting), score on RGB distance.
+    // Hue is far more stable than RGB across lighting/reflections/angles.
+    // Green glazes stay ~70-150° hue even with bright spots. Red stays ~0-15°.
     const candidateMatches = [];
     const searchSig = parseColorSignature(searchColor);
     if (!searchSig.length) {
@@ -4373,7 +4373,6 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       return res.json({ matches: [], total: 0 });
     }
 
-    // Compute the single weighted-average RGB for the search photo
     const searchTotalW = searchSig.reduce((s, c) => s + (c.weight || 1), 0);
     const searchAvg = {
       r: searchSig.reduce((s, c) => s + c.r * (c.weight || 1), 0) / searchTotalW,
@@ -4382,14 +4381,13 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
     };
     const searchHsl = rgbToHsl(searchAvg.r, searchAvg.g, searchAvg.b);
 
-    console.log('[Photo Search] Search avg RGB:', searchAvg);
-    console.log('[Photo Search] Search avg HSL:', searchHsl);
+    console.log('[v8] Search avg RGB:', Math.round(searchAvg.r), Math.round(searchAvg.g), Math.round(searchAvg.b));
+    console.log('[v8] Search HSL: h=', searchHsl.h.toFixed(1), 's=', searchHsl.s.toFixed(2), 'l=', searchHsl.l.toFixed(2));
 
     for (const ph of userPhotos) {
       const photoSig = parseColorSignature(ph.avg_color);
       if (!photoSig.length) continue;
 
-      // Compute single weighted-average RGB for stored photo
       const photoTotalW = photoSig.reduce((s, c) => s + (c.weight || 1), 0);
       const photoAvg = {
         r: photoSig.reduce((s, c) => s + c.r * (c.weight || 1), 0) / photoTotalW,
@@ -4398,28 +4396,24 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       };
       const photoHsl = rgbToHsl(photoAvg.r, photoAvg.g, photoAvg.b);
 
-      // === GATE 1: RGB Euclidean distance (max ~441 for black vs white) ===
+      // === HUE GATE (only gate — hue is stable, RGB is not) ===
+      // Skip gate for near-neutral colors (grays, whites, blacks) — hue is meaningless there
+      if (searchHsl.s > 0.10 && photoHsl.s > 0.10) {
+        let hueDiff = Math.abs(searchHsl.h - photoHsl.h);
+        if (hueDiff > 180) hueDiff = 360 - hueDiff;
+        if (hueDiff > 60) {
+          console.log('[v8] REJECT:', ph.title, 'hueDiff=', hueDiff.toFixed(1));
+          continue;
+        }
+      }
+
+      // === SCORING: RGB distance (not a gate — used only for ranking) ===
       const rgbDist = Math.sqrt(
         Math.pow(searchAvg.r - photoAvg.r, 2) +
         Math.pow(searchAvg.g - photoAvg.g, 2) +
         Math.pow(searchAvg.b - photoAvg.b, 2)
       );
-      if (rgbDist > 65) continue; // Hard reject if colorful-region colors are far apart
-
-      // === GATE 2: Hue gate on the averages ===
-      // Only when both have real saturation
-      if (searchHsl.s > 0.12 && photoHsl.s > 0.12) {
-        let hueDiff = Math.abs(searchHsl.h - photoHsl.h);
-        if (hueDiff > 180) hueDiff = 360 - hueDiff;
-        if (hueDiff > 40) continue; // Strict: average hues within 40 degrees
-      }
-
-      // === GATE 3: Lightness gate ===
-      const lightDiff = Math.abs(searchHsl.l - photoHsl.l);
-      if (lightDiff > 0.25) continue;
-
-      // === SCORING ===
-      const colorScore = Math.max(0, 1.0 - (rgbDist / 65));
+      const colorScore = Math.max(0, 1.0 - (rgbDist / 200));
 
       let shapeScore = 0.5;
       if (ph.phash && ph.phash.length === 16) {
@@ -4427,8 +4421,9 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         shapeScore = 1.0 - (distance / 64);
       }
 
-      // 90% color, 10% shape — color absolutely dominates
-      const score = (colorScore * 0.90) + (shapeScore * 0.10);
+      // 80% color score, 20% shape
+      const score = (colorScore * 0.80) + (shapeScore * 0.20);
+      console.log('[v8] PASS:', ph.title, 'hue=', photoHsl.h.toFixed(1), 'rgbDist=', rgbDist.toFixed(1), 'score=', score.toFixed(3));
 
       candidateMatches.push({
         piece_id: ph.piece_id,
