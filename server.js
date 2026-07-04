@@ -5,7 +5,7 @@ const fs = require('fs');
 const multer = require('multer');
 
 // Deploy version tag — used to verify which code is actually running on Render
-const DEPLOY_VERSION = 'v8d-lower-threshold-2026-07-04-2110';
+const DEPLOY_VERSION = 'v8e-debug-extract-2026-07-04-2115';
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
@@ -1469,6 +1469,23 @@ app.patch('/api/pieces/:id/photo-search-visibility', auth, (req, res) => {
   const hide = req.body.hide ? 1 : 0;
   db.prepare('UPDATE pieces SET hide_from_photo_search = ? WHERE id = ?').run(hide, piece.id);
   res.json({ success: true, hide_from_photo_search: hide });
+});
+
+// Debug: extract color from an uploaded photo (no auth needed, temp debug)
+app.post('/api/debug/extract-color', upload.single('photo'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'No photo' });
+  try {
+    const buf = fs.readFileSync(req.file.path);
+    const sig = await computeColorSignature(buf);
+    const parsed = JSON.parse(sig);
+    const totalW = parsed.reduce((s, c) => s + (c.weight || 1), 0);
+    const avgR = parsed.reduce((s, c) => s + c.r * (c.weight || 1), 0) / totalW;
+    const avgG = parsed.reduce((s, c) => s + c.g * (c.weight || 1), 0) / totalW;
+    const avgB = parsed.reduce((s, c) => s + c.b * (c.weight || 1), 0) / totalW;
+    const hsl = rgbToHsl(avgR, avgG, avgB);
+    fs.unlinkSync(req.file.path);
+    res.json({ buckets: parsed, avgRgb: { r: Math.round(avgR), g: Math.round(avgG), b: Math.round(avgB) }, hsl: { h: hsl.h, s: hsl.s, l: hsl.l } });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // Debug: return stored avg_color for all photos belonging to user (auth required)
