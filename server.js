@@ -4128,54 +4128,60 @@ async function computeAHash(buffer) {
   return hex;
 }
 
-// Compute a small center color signature instead of one averaged color.
-// This is much better for glaze matching because it preserves dark/light/teal/navy differences.
+// Compute color signature that ignores neutral backgrounds and focuses on saturated/colorful pixels.
+// Key insight: pottery glaze photos have a colorful piece against a neutral background (table, hand, wall).
+// We want the GLAZE color, not the background. So we filter out near-neutral pixels before averaging.
 async function computeColorSignature(buffer) {
   const meta = await sharp(buffer).metadata();
   const w = meta.width || 100;
   const h = meta.height || 100;
-  // Use larger center crop (60%) to capture the actual subject better
+  // Center 60% crop
   const cropW = Math.max(1, Math.round(w * 0.60));
   const cropH = Math.max(1, Math.round(h * 0.60));
   const left = Math.max(0, Math.round((w - cropW) / 2));
   const top = Math.max(0, Math.round((h - cropH) / 2));
 
-  // Sample more pixels (8x8=64) for better color representation
+  // Sample 16x16 = 256 pixels for better coverage
   const pixels = await sharp(buffer)
     .extract({ left, top, width: cropW, height: cropH })
-    .resize(8, 8, { fit: 'fill' })
+    .resize(16, 16, { fit: 'fill' })
     .removeAlpha()
     .raw()
     .toBuffer();
 
-  const buckets = {};
+  // Separate pixels into colorful vs neutral
+  const colorfulPixels = [];
+  const neutralPixels = [];
+
   for (let i = 0; i < pixels.length; i += 3) {
-    const r = pixels[i];
-    const g = pixels[i + 1];
-    const b = pixels[i + 2];
-    const bucketR = Math.min(255, Math.round(r / 24) * 24);
-    const bucketG = Math.min(255, Math.round(g / 24) * 24);
-    const bucketB = Math.min(255, Math.round(b / 24) * 24);
-    const key = `${bucketR},${bucketG},${bucketB}`;
-    if (!buckets[key]) buckets[key] = { r: 0, g: 0, b: 0, count: 0 };
-    buckets[key].r += r;
-    buckets[key].g += g;
-    buckets[key].b += b;
-    buckets[key].count++;
+    const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    const l = (max + min) / 510; // lightness 0-1
+    const saturation = max === min ? 0 : (l > 0.5 ? (max - min) / (510 - max - min) : (max - min) / (max + min));
+    // A pixel is "colorful" if it has meaningful saturation AND isn't near-black or near-white
+    if (saturation > 0.12 && l > 0.08 && l < 0.92) {
+      colorfulPixels.push({ r, g, b });
+    } else {
+      neutralPixels.push({ r, g, b });
+    }
   }
 
-  const totalPixels = pixels.length / 3; // 64 for 8x8
-  const topBuckets = Object.values(buckets)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 4) // Keep top 4 buckets for better discrimination
-    .map((bucket) => ({
-      r: Math.round(bucket.r / bucket.count),
-      g: Math.round(bucket.g / bucket.count),
-      b: Math.round(bucket.b / bucket.count),
-      weight: bucket.count / totalPixels,
-    }));
+  // Use colorful pixels if we have enough; fall back to all pixels if the photo is mostly neutral
+  const usePixels = colorfulPixels.length >= 8 ? colorfulPixels : pixels.length / 3 > 0 ? (() => {
+    const all = [];
+    for (let i = 0; i < pixels.length; i += 3) all.push({ r: pixels[i], g: pixels[i+1], b: pixels[i+2] });
+    return all;
+  })() : [];
 
-  return JSON.stringify(topBuckets);
+  if (!usePixels.length) return JSON.stringify([]);
+
+  // Compute weighted average of the colorful region
+  const avgR = usePixels.reduce((s, p) => s + p.r, 0) / usePixels.length;
+  const avgG = usePixels.reduce((s, p) => s + p.g, 0) / usePixels.length;
+  const avgB = usePixels.reduce((s, p) => s + p.b, 0) / usePixels.length;
+
+  // Return as single-bucket signature for v6 RGB Euclidean matching
+  return JSON.stringify([{ r: Math.round(avgR), g: Math.round(avgG), b: Math.round(avgB), weight: 1 }]);
 }
 
 function parseColorSignature(signature) {
@@ -4303,7 +4309,16 @@ try {
   }
 } catch(e) { console.warn('[Photo Search] Migration v5 error:', e.message); }
 
-// Endpoint: search pieces by photo
+// v7 migration: recompute all color signatures with saturation-aware algorithm
+// (ignores neutral backgrounds, focuses on colorful/saturated pixels)
+try {
+  const doneV7 = db.prepare('SELECT 1 FROM migrations WHERE name=?').get('color_sig_v7_saturation_aware');
+  if (!doneV7) {
+    const cleared = db.prepare("UPDATE piece_photos SET avg_color = NULL WHERE avg_color IS NOT NULL").run();
+    db.prepare('INSERT INTO migrations (name, applied_at) VALUES (?, datetime("now"))').run('color_sig_v7_saturation_aware');
+    console.log(`[Photo Search] Migration color_sig_v7_saturation_aware: cleared ${cleared.changes} color signatures for recompute`);
+  }
+} catch(e) { console.warn('[Photo Search] Migration v7 error:', e.message); }
 app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo provided' });
 
@@ -4389,7 +4404,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         Math.pow(searchAvg.g - photoAvg.g, 2) +
         Math.pow(searchAvg.b - photoAvg.b, 2)
       );
-      if (rgbDist > 45) continue; // Hard reject if average colors are far apart
+      if (rgbDist > 65) continue; // Hard reject if colorful-region colors are far apart
 
       // === GATE 2: Hue gate on the averages ===
       // Only when both have real saturation
@@ -4404,7 +4419,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       if (lightDiff > 0.25) continue;
 
       // === SCORING ===
-      const colorScore = Math.max(0, 1.0 - (rgbDist / 45));
+      const colorScore = Math.max(0, 1.0 - (rgbDist / 65));
 
       let shapeScore = 0.5;
       if (ph.phash && ph.phash.length === 16) {
