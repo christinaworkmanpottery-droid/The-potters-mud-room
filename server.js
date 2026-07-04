@@ -5,7 +5,7 @@ const fs = require('fs');
 const multer = require('multer');
 
 // Deploy version tag — used to verify which code is actually running on Render
-const DEPLOY_VERSION = 'v8e-debug-extract-2026-07-04-2115';
+const DEPLOY_VERSION = 'v8f-hue-score-2026-07-04-2120';
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
@@ -4424,13 +4424,12 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         }
       }
 
-      // === SCORING: RGB distance (not a gate — used only for ranking) ===
-      const rgbDist = Math.sqrt(
-        Math.pow(searchAvg.r - photoAvg.r, 2) +
-        Math.pow(searchAvg.g - photoAvg.g, 2) +
-        Math.pow(searchAvg.b - photoAvg.b, 2)
-      );
-      const colorScore = Math.max(0, 1.0 - (rgbDist / 200));
+      // === SCORING: Hue proximity score (not RGB — too unstable across lighting) ===
+      // If hue matches, it's the right color family. Score by how close the hue is.
+      let hueDiff2 = Math.abs(searchHsl.h - photoHsl.h);
+      if (hueDiff2 > 180) hueDiff2 = 360 - hueDiff2;
+      // Within 60 degrees hue window: score from 1.0 (perfect) to 0.0 (60 degrees off)
+      const colorScore = Math.max(0, 1.0 - (hueDiff2 / 60));
 
       let shapeScore = 0.5;
       if (ph.phash && ph.phash.length === 16) {
@@ -4438,9 +4437,8 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         shapeScore = 1.0 - (distance / 64);
       }
 
-      // 80% color score, 20% shape
-      const score = (colorScore * 0.80) + (shapeScore * 0.20);
-      console.log('[v8] PASS:', ph.title, 'hue=', photoHsl.h.toFixed(1), 'rgbDist=', rgbDist.toFixed(1), 'score=', score.toFixed(3));
+      // 85% hue score, 15% shape
+      const score = (colorScore * 0.85) + (shapeScore * 0.15);
 
       candidateMatches.push({
         piece_id: ph.piece_id,
@@ -4454,7 +4452,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         form: ph.form,
         date_started: ph.date_started,
         date_completed: ph.date_completed,
-        cDist: rgbDist,
+        cDist: hueDiff2,
         shapeScore,
         colorScore,
         hueDiff: (() => { let d = Math.abs(searchHsl.h - photoHsl.h); return d > 180 ? 360 - d : d; })(),
