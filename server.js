@@ -5,7 +5,7 @@ const fs = require('fs');
 const multer = require('multer');
 
 // Deploy version tag — used to verify which code is actually running on Render
-const DEPLOY_VERSION = 'v8-hue-gate-only-2026-07-04-2030';
+const DEPLOY_VERSION = 'v8b-startup-backfill-2026-07-04-2032';
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
@@ -4536,4 +4536,41 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🏺 The Potter's Mud Room running on http://localhost:${PORT}`);
+  // Eagerly backfill color signatures at startup so they're ready before first search
+  setImmediate(async () => {
+    try {
+      const allPhotos = db.prepare(`
+        SELECT pp.id, pp.filename, pp.avg_color, pp.phash FROM piece_photos pp
+        JOIN pieces p ON pp.piece_id = p.id
+      `).all();
+      const needsWork = allPhotos.filter(ph => !ph.avg_color || !ph.phash || ph.phash.length === 32);
+      if (needsWork.length === 0) {
+        console.log('[Startup] All', allPhotos.length, 'photos already have color signatures');
+        return;
+      }
+      console.log('[Startup] Backfilling color signatures for', needsWork.length, 'photos...');
+      let done = 0;
+      for (const ph of needsWork) {
+        try {
+          const filePath = path.join(UPLOADS_DIR, ph.filename);
+          if (!fs.existsSync(filePath)) continue;
+          const buf = fs.readFileSync(filePath);
+          if (!ph.phash || ph.phash.length === 32) {
+            const hash = await computeAHash(buf);
+            db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ?').run(hash, ph.id);
+          }
+          if (!ph.avg_color) {
+            const color = await computeColorSignature(buf);
+            db.prepare('UPDATE piece_photos SET avg_color = ? WHERE id = ?').run(color, ph.id);
+          }
+          done++;
+        } catch(e) {
+          console.warn('[Startup] Failed to process', ph.filename, e.message);
+        }
+      }
+      console.log('[Startup] Backfill complete:', done, 'photos processed');
+    } catch(e) {
+      console.warn('[Startup] Backfill error:', e.message);
+    }
+  });
 });
