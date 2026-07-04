@@ -4240,6 +4240,16 @@ try {
   }
 } catch(e) { console.warn('[Photo Search] Migration v4 error:', e.message); }
 
+// v5 migration: force nuke ALL color sigs again — some survived v4 due to backfill race
+try {
+  const doneV5 = db.prepare('SELECT 1 FROM migrations WHERE name=?').get('color_sig_v5_force_nuke');
+  if (!doneV5) {
+    const cleared = db.prepare("UPDATE piece_photos SET avg_color = NULL WHERE avg_color IS NOT NULL").run();
+    db.prepare('INSERT INTO migrations (name, applied_at) VALUES (?, datetime("now"))').run('color_sig_v5_force_nuke');
+    console.log(`[Photo Search] Migration color_sig_v5_force_nuke: cleared ${cleared.changes} color signatures`);
+  }
+} catch(e) { console.warn('[Photo Search] Migration v5 error:', e.message); }
+
 // Endpoint: search pieces by photo
 app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo provided' });
@@ -4261,8 +4271,8 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       WHERE p.user_id = ?
     `).all(req.userId);
 
-    // Backfill hashes AND colors for photos that need them (limit to 50 per request)
-    const needsHash = userPhotos.filter(ph => !ph.phash || ph.phash.length === 32 || !ph.avg_color).slice(0, 50);
+    // Backfill hashes AND colors for photos that need them (NO LIMIT — must compute all)
+    const needsHash = userPhotos.filter(ph => !ph.phash || ph.phash.length === 32 || !ph.avg_color);
     for (const ph of needsHash) {
       try {
         const filePath = path.join(UPLOADS_DIR, ph.filename);
