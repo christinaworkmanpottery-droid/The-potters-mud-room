@@ -4284,55 +4284,65 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       }
     }
 
-    // Compare using shape + multi-color signature.
-    // Score every photo, then keep the best photo per piece.
+    // === COLOR-FIRST MATCHING (v5) ===
+    // Color is the gatekeeper. If colors don't match, shape is irrelevant.
+    // A green piece must NEVER match a red/blue/purple piece regardless of shape.
     const candidateMatches = [];
     const searchSig = parseColorSignature(searchColor);
-    const searchBrightness = searchSig.length
-      ? searchSig.reduce((sum, c) => sum + ((c.r + c.g + c.b) / 3) * (c.weight || 1), 0)
-      : 0;
+
+    // Compute search photo's dominant HSL
+    const searchDominantHsl = searchSig.length
+      ? rgbToHsl(searchSig[0].r, searchSig[0].g, searchSig[0].b)
+      : null;
+    // Compute weighted average HSL across all buckets for secondary check
+    const searchAvgRgb = searchSig.length ? {
+      r: searchSig.reduce((s, c) => s + c.r * (c.weight || 1), 0) / searchSig.reduce((s, c) => s + (c.weight || 1), 0),
+      g: searchSig.reduce((s, c) => s + c.g * (c.weight || 1), 0) / searchSig.reduce((s, c) => s + (c.weight || 1), 0),
+      b: searchSig.reduce((s, c) => s + c.b * (c.weight || 1), 0) / searchSig.reduce((s, c) => s + (c.weight || 1), 0),
+    } : null;
+
+    console.log('[Photo Search] Search photo signature:', JSON.stringify(searchSig));
+    console.log('[Photo Search] Search dominant HSL:', searchDominantHsl);
 
     for (const ph of userPhotos) {
-      if (!ph.phash || ph.phash.length === 32) continue;
-
-      const distance = hammingDistance(ph.phash, searchHash);
-      const shapeScore = 1.0 - (distance / 64);
-
-      const maxDistance = (req.userTier === 'free') ? 20 : 26;
-      if (distance > maxDistance) continue;
-
-      // Hard hue gate: reject if dominant hues are in completely different color families
+      // STEP 1: Color gate — must pass before anything else
       const photoSig = parseColorSignature(ph.avg_color);
-      if (searchSig.length && photoSig.length) {
-        const searchDominant = searchSig[0]; // highest-weight color
-        const photoDominant = photoSig[0];
-        const searchHsl = rgbToHsl(searchDominant.r, searchDominant.g, searchDominant.b);
-        const photoHsl = rgbToHsl(photoDominant.r, photoDominant.g, photoDominant.b);
-        // Only apply hue gate when both have meaningful saturation (not gray/white/black)
-        if (searchHsl.s > 0.20 && photoHsl.s > 0.20) {
-          let hueDiff = Math.abs(searchHsl.h - photoHsl.h);
-          if (hueDiff > 180) hueDiff = 360 - hueDiff;
-          // If dominant hues are more than 60° apart, reject outright
-          if (hueDiff > 60) continue;
+      if (!photoSig.length || !searchSig.length) continue;
+
+      // Gate A: Dominant hue comparison (strictest gate)
+      const photoDominantHsl = rgbToHsl(photoSig[0].r, photoSig[0].g, photoSig[0].b);
+
+      // If both have meaningful color (not gray/white/black), hues MUST be close
+      if (searchDominantHsl.s > 0.15 && photoDominantHsl.s > 0.15) {
+        let hueDiff = Math.abs(searchDominantHsl.h - photoDominantHsl.h);
+        if (hueDiff > 180) hueDiff = 360 - hueDiff;
+        // Hard reject: hues more than 45° apart = different color family
+        if (hueDiff > 45) {
+          continue;
         }
       }
 
+      // Gate B: Overall color signature distance
       const cDist = colorSignatureDistance(ph.avg_color, searchColor);
-      if (cDist > 35) continue; // Tightened from 45 — be stricter about color mismatch
-      const colorScore = Math.max(0, 1.0 - (cDist / 35));
+      if (cDist > 30) continue; // Strict: must be genuinely similar colors
 
-      const photoBrightness = photoSig.length
-        ? photoSig.reduce((sum, c) => sum + ((c.r + c.g + c.b) / 3) * (c.weight || 1), 0)
-        : 0;
-      const brightnessDiff = Math.abs(searchBrightness - photoBrightness);
-      const brightnessPenalty = Math.min(0.25, brightnessDiff / 255 * 0.35);
+      // Gate C: Lightness check — don't match bright green to dark ox blood
+      const lightnessDiff = Math.abs(searchDominantHsl.l - photoDominantHsl.l);
+      if (lightnessDiff > 0.35) continue;
 
-      // Extra penalty when one piece is materially darker/lighter than the search photo.
-      const valuePenalty = brightnessDiff > 28 ? Math.min(0.20, (brightnessDiff - 28) / 255 * 0.50) : 0;
+      // STEP 2: Color score (primary scoring factor)
+      const colorScore = Math.max(0, 1.0 - (cDist / 30));
 
-      const colorWeight = (req.userTier === 'free') ? 0.78 : 0.88; // Increased color weight
-      const shapeWeight = 1.0 - colorWeight;
-      const score = ((shapeScore * shapeWeight) + (colorScore * colorWeight)) - brightnessPenalty - valuePenalty;
+      // STEP 3: Shape score (secondary — only matters when color already matches)
+      let shapeScore = 0.5; // default neutral if no hash
+      if (ph.phash && ph.phash.length === 16) {
+        const distance = hammingDistance(ph.phash, searchHash);
+        shapeScore = 1.0 - (distance / 64);
+        // Don't hard-reject on shape — let color dominate
+      }
+
+      // Final score: 85% color, 15% shape
+      const score = (colorScore * 0.85) + (shapeScore * 0.15);
 
       candidateMatches.push({
         piece_id: ph.piece_id,
@@ -4346,30 +4356,28 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         form: ph.form,
         date_started: ph.date_started,
         date_completed: ph.date_completed,
-        distance,
         cDist,
         shapeScore,
         colorScore,
-        brightnessDiff,
-        brightnessPenalty,
-        valuePenalty,
+        hueDiff: Math.abs(searchDominantHsl.h - photoDominantHsl.h) > 180
+          ? 360 - Math.abs(searchDominantHsl.h - photoDominantHsl.h)
+          : Math.abs(searchDominantHsl.h - photoDominantHsl.h),
+        lightnessDiff,
         score,
       });
     }
 
     candidateMatches.sort((a, b) => b.score - a.score);
+    console.log('[Photo Search] Candidates after color gate:', candidateMatches.length);
     console.log('[Photo Search] Top candidates:', candidateMatches.slice(0, 8).map((m) => ({
       piece: m.title,
       piece_id: m.piece_id,
-      photo_id: m.photo_id,
       score: Number(m.score.toFixed(3)),
-      shape: Number(m.shapeScore.toFixed(3)),
       color: Number(m.colorScore.toFixed(3)),
-      hamming: m.distance,
-      colorDistance: Number(m.cDist.toFixed(1)),
-      brightnessDiff: Number(m.brightnessDiff.toFixed(1)),
-      brightnessPenalty: Number(m.brightnessPenalty.toFixed(3)),
-      valuePenalty: Number(m.valuePenalty.toFixed(3)),
+      shape: Number(m.shapeScore.toFixed(3)),
+      colorDist: Number(m.cDist.toFixed(1)),
+      hueDiff: Number(m.hueDiff.toFixed(1)),
+      lightDiff: Number(m.lightnessDiff.toFixed(3)),
     })));
 
     const bestByPiece = new Map();
@@ -4382,7 +4390,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
 
     const matches = [];
     for (const best of bestByPiece.values()) {
-      if (best.score < 0.65) continue;
+      if (best.score < 0.70) continue; // Raised threshold — only show genuinely good matches
 
       const piecePhotos = db.prepare('SELECT * FROM piece_photos WHERE piece_id = ? ORDER BY sort_order').all(best.piece_id);
       const pieceGlazes = db.prepare('SELECT pg.*, g.name as glaze_name, g.brand, g.glaze_type FROM piece_glazes pg JOIN glazes g ON pg.glaze_id = g.id WHERE pg.piece_id = ? ORDER BY pg.layer_order').all(best.piece_id);
