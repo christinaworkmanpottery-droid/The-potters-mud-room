@@ -3025,6 +3025,17 @@ app.put('/api/admin/blog/:id/publish', auth, (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Remote admin: upgrade a user's tier by email (password-protected)
+app.post('/api/admin/upgrade-tier/remote', (req, res) => {
+  const { password, email, tier } = req.body;
+  if (password !== (process.env.ADMIN_BLOG_PASSWORD || 'mudroom-blog-2026')) return res.status(401).json({ error: 'Unauthorized' });
+  if (!email) return res.status(400).json({ error: 'Email required' });
+  const targetTier = tier || 'starter';
+  const result = db.prepare('UPDATE users SET tier=? WHERE LOWER(email)=?').run(targetTier, email.toLowerCase());
+  if (result.changes === 0) return res.status(404).json({ error: 'User not found' });
+  res.json({ success: true, email, tier: targetTier });
+});
+
 // Admin blog via password (for remote management without JWT)
 app.post('/api/admin/blog/remote', (req, res) => {
   const { password, title, slug, content, excerpt, author, isPublished } = req.body;
