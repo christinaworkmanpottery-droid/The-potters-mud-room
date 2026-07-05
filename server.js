@@ -300,7 +300,7 @@ function refreshTier(req, res, next) {
   next();
 }
 function requireTier(min) {
-  const normalizeTier = (tier) => (tier === 'starter' ? 'starter' : 'free');
+  const normalizeTier = (tier) => (['starter', 'basic', 'mid', 'top'].includes(tier) ? 'starter' : 'free');
   const lv = { free: 0, starter: 1 };
   const minLv = min === 'starter' ? 1 : 0;
   return (req, res, next) => {
