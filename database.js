@@ -1081,6 +1081,44 @@ function initDB() {
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_push_tokens_user ON push_tokens(user_id)`);
 
+  // Test Tile Library (Unlimited members only)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS test_tiles (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT,
+      glaze_id TEXT,
+      glaze_name TEXT,
+      clay_body_id TEXT,
+      clay_name TEXT,
+      cone TEXT,
+      atmosphere TEXT CHECK(atmosphere IN ('oxidation', 'reduction', 'neutral', NULL)),
+      application_method TEXT CHECK(application_method IN ('dip', 'brush', 'spray', 'pour', 'other', NULL)),
+      coats INTEGER DEFAULT 1,
+      thickness TEXT CHECK(thickness IN ('thin', 'medium', 'thick', NULL)),
+      surface_result TEXT CHECK(surface_result IN ('gloss', 'satin', 'matte', 'crystal', 'metallic', 'other', NULL)),
+      color_result TEXT,
+      layered_over TEXT,
+      layered_under TEXT,
+      kiln_position TEXT,
+      firing_schedule TEXT,
+      photo_filename TEXT,
+      photo_filename2 TEXT,
+      photo_filename3 TEXT,
+      notes TEXT,
+      rating INTEGER CHECK(rating BETWEEN 1 AND 5 OR rating IS NULL),
+      tags TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (glaze_id) REFERENCES glazes(id) ON DELETE SET NULL,
+      FOREIGN KEY (clay_body_id) REFERENCES clay_bodies(id) ON DELETE SET NULL
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_test_tiles_user ON test_tiles(user_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_test_tiles_glaze ON test_tiles(glaze_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_test_tiles_clay ON test_tiles(clay_body_id)`);
+
 return db;
 }
 

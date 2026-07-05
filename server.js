@@ -712,7 +712,7 @@ app.get('/api/billing/plans', (req, res) => {
     foundingMember: true,
     plans: [
       { id: 'free', name: 'Free', price: 0, yearlyPrice: 0, features: ['10 pieces', '1 photo each', 'Personal clay & glaze library', 'Basic search', 'Community forum access', 'Ask a Potter (5 questions/month)'] },
-      { id: 'starter', name: 'Unlimited', price: 6.95, yearlyPrice: 69.50, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', 'Community glaze library', 'Sales tracking', 'Full forum access (read & post)', 'Unlimited Ask a Potter', 'Cancel anytime'] }
+      { id: 'starter', name: 'Unlimited', price: 6.95, yearlyPrice: 69.50, features: ['Unlimited pieces', '3 photos each', 'Firing logs', 'Glaze recipes', 'Cost tracking', 'Multi-studio', 'Export/print', 'Community glaze library', 'Test Tile Library', 'Sales tracking', 'Full forum access (read & post)', 'Unlimited Ask a Potter', 'Cancel anytime'] }
     ],
     stripeEnabled: !!stripe
   });
@@ -4532,6 +4532,159 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
 // Also generate hash when photos are uploaded to pieces (hook into existing upload)
 // We'll backfill existing photos on first search, but new uploads get hashed immediately
 const originalPhotoHandler = null; // handled inline above via backfill
+
+// ==================== TEST TILE LIBRARY (Unlimited only) ====================
+
+// GET all test tiles for the user
+app.get('/api/test-tiles', auth, requireTier('starter'), (req, res) => {
+  const tiles = db.prepare(`
+    SELECT tt.*, g.name as glaze_library_name, cb.name as clay_library_name
+    FROM test_tiles tt
+    LEFT JOIN glazes g ON tt.glaze_id = g.id
+    LEFT JOIN clay_bodies cb ON tt.clay_body_id = cb.id
+    WHERE tt.user_id = ?
+    ORDER BY tt.created_at DESC
+  `).all(req.userId);
+  res.json(tiles);
+});
+
+// GET single test tile
+app.get('/api/test-tiles/:id', auth, requireTier('starter'), (req, res) => {
+  const tile = db.prepare(`
+    SELECT tt.*, g.name as glaze_library_name, cb.name as clay_library_name
+    FROM test_tiles tt
+    LEFT JOIN glazes g ON tt.glaze_id = g.id
+    LEFT JOIN clay_bodies cb ON tt.clay_body_id = cb.id
+    WHERE tt.id = ? AND tt.user_id = ?
+  `).get(req.params.id, req.userId);
+  if (!tile) return res.status(404).json({ error: 'Test tile not found' });
+  res.json(tile);
+});
+
+// CREATE test tile
+app.post('/api/test-tiles', auth, requireTier('starter'), upload.array('photos', 3), (req, res) => {
+  const { name, glaze_id, glaze_name, clay_body_id, clay_name, cone, atmosphere, application_method, coats, thickness, surface_result, color_result, layered_over, layered_under, kiln_position, firing_schedule, notes, rating, tags } = req.body;
+  const id = uuidv4();
+  const photos = req.files || [];
+  const photo_filename = photos[0] ? photos[0].filename : null;
+  const photo_filename2 = photos[1] ? photos[1].filename : null;
+  const photo_filename3 = photos[2] ? photos[2].filename : null;
+  
+  // Resolve clay name from library if clay_body_id provided
+  let finalClayName = clay_name || null;
+  if (clay_body_id) {
+    const clay = db.prepare('SELECT name FROM clay_bodies WHERE id=? AND user_id=?').get(clay_body_id, req.userId);
+    if (clay) finalClayName = clay.name;
+  }
+  
+  // Resolve glaze name from library if glaze_id provided
+  let finalGlazeName = glaze_name || null;
+  if (glaze_id) {
+    const glaze = db.prepare('SELECT name FROM glazes WHERE id=? AND user_id=?').get(glaze_id, req.userId);
+    if (glaze) finalGlazeName = glaze.name;
+  }
+
+  db.prepare(`INSERT INTO test_tiles (id, user_id, name, glaze_id, glaze_name, clay_body_id, clay_name, cone, atmosphere, application_method, coats, thickness, surface_result, color_result, layered_over, layered_under, kiln_position, firing_schedule, photo_filename, photo_filename2, photo_filename3, notes, rating, tags)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(id, req.userId, name || null, glaze_id || null, finalGlazeName, clay_body_id || null, finalClayName, cone || null, atmosphere || null, application_method || null, coats ? parseInt(coats) : 1, thickness || null, surface_result || null, color_result || null, layered_over || null, layered_under || null, kiln_position || null, firing_schedule || null, photo_filename, photo_filename2, photo_filename3, notes || null, rating ? parseInt(rating) : null, tags || null);
+  
+  res.json({ id, name: name || null, glaze_name: finalGlazeName, clay_name: finalClayName });
+});
+
+// UPDATE test tile
+app.put('/api/test-tiles/:id', auth, requireTier('starter'), upload.array('photos', 3), (req, res) => {
+  const tile = db.prepare('SELECT * FROM test_tiles WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!tile) return res.status(404).json({ error: 'Test tile not found' });
+  
+  const { name, glaze_id, glaze_name, clay_body_id, clay_name, cone, atmosphere, application_method, coats, thickness, surface_result, color_result, layered_over, layered_under, kiln_position, firing_schedule, notes, rating, tags, remove_photo, remove_photo2, remove_photo3 } = req.body;
+  const photos = req.files || [];
+  
+  let photo_filename = tile.photo_filename;
+  let photo_filename2 = tile.photo_filename2;
+  let photo_filename3 = tile.photo_filename3;
+  
+  // Handle photo removals
+  if (remove_photo === 'true' && tile.photo_filename) {
+    const f = path.join(UPLOADS_DIR, tile.photo_filename);
+    if (fs.existsSync(f)) fs.unlinkSync(f);
+    photo_filename = null;
+  }
+  if (remove_photo2 === 'true' && tile.photo_filename2) {
+    const f = path.join(UPLOADS_DIR, tile.photo_filename2);
+    if (fs.existsSync(f)) fs.unlinkSync(f);
+    photo_filename2 = null;
+  }
+  if (remove_photo3 === 'true' && tile.photo_filename3) {
+    const f = path.join(UPLOADS_DIR, tile.photo_filename3);
+    if (fs.existsSync(f)) fs.unlinkSync(f);
+    photo_filename3 = null;
+  }
+  
+  // Handle new photo uploads (fill empty slots)
+  let photoIdx = 0;
+  if (photos.length > photoIdx && !photo_filename) { photo_filename = photos[photoIdx++].filename; }
+  else if (photos.length > photoIdx && remove_photo === 'true') { photo_filename = photos[photoIdx++].filename; }
+  if (photos.length > photoIdx && !photo_filename2) { photo_filename2 = photos[photoIdx++].filename; }
+  if (photos.length > photoIdx && !photo_filename3) { photo_filename3 = photos[photoIdx++].filename; }
+  
+  // Resolve names from library
+  let finalClayName = clay_name !== undefined ? clay_name : tile.clay_name;
+  if (clay_body_id) {
+    const clay = db.prepare('SELECT name FROM clay_bodies WHERE id=? AND user_id=?').get(clay_body_id, req.userId);
+    if (clay) finalClayName = clay.name;
+  }
+  let finalGlazeName = glaze_name !== undefined ? glaze_name : tile.glaze_name;
+  if (glaze_id) {
+    const glaze = db.prepare('SELECT name FROM glazes WHERE id=? AND user_id=?').get(glaze_id, req.userId);
+    if (glaze) finalGlazeName = glaze.name;
+  }
+
+  db.prepare(`UPDATE test_tiles SET name=?, glaze_id=?, glaze_name=?, clay_body_id=?, clay_name=?, cone=?, atmosphere=?, application_method=?, coats=?, thickness=?, surface_result=?, color_result=?, layered_over=?, layered_under=?, kiln_position=?, firing_schedule=?, photo_filename=?, photo_filename2=?, photo_filename3=?, notes=?, rating=?, tags=?, updated_at=datetime('now') WHERE id=? AND user_id=?`)
+    .run(name !== undefined ? name : tile.name, glaze_id || tile.glaze_id, finalGlazeName, clay_body_id || tile.clay_body_id, finalClayName, cone !== undefined ? cone : tile.cone, atmosphere !== undefined ? atmosphere : tile.atmosphere, application_method !== undefined ? application_method : tile.application_method, coats ? parseInt(coats) : tile.coats, thickness !== undefined ? thickness : tile.thickness, surface_result !== undefined ? surface_result : tile.surface_result, color_result !== undefined ? color_result : tile.color_result, layered_over !== undefined ? layered_over : tile.layered_over, layered_under !== undefined ? layered_under : tile.layered_under, kiln_position !== undefined ? kiln_position : tile.kiln_position, firing_schedule !== undefined ? firing_schedule : tile.firing_schedule, photo_filename, photo_filename2, photo_filename3, notes !== undefined ? notes : tile.notes, rating ? parseInt(rating) : tile.rating, tags !== undefined ? tags : tile.tags, req.params.id, req.userId);
+  
+  res.json({ success: true });
+});
+
+// DELETE test tile
+app.delete('/api/test-tiles/:id', auth, requireTier('starter'), (req, res) => {
+  const tile = db.prepare('SELECT * FROM test_tiles WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!tile) return res.status(404).json({ error: 'Test tile not found' });
+  
+  // Clean up photos
+  [tile.photo_filename, tile.photo_filename2, tile.photo_filename3].forEach(f => {
+    if (f) {
+      const fp = path.join(UPLOADS_DIR, f);
+      if (fs.existsSync(fp)) fs.unlinkSync(fp);
+    }
+  });
+  
+  db.prepare('DELETE FROM test_tiles WHERE id=?').run(req.params.id);
+  res.json({ success: true });
+});
+
+// GET test tiles filtered by glaze
+app.get('/api/glazes/:id/test-tiles', auth, requireTier('starter'), (req, res) => {
+  const tiles = db.prepare('SELECT * FROM test_tiles WHERE glaze_id=? AND user_id=? ORDER BY created_at DESC').all(req.params.id, req.userId);
+  res.json(tiles);
+});
+
+// GET test tiles filtered by clay body
+app.get('/api/clay-bodies/:id/test-tiles', auth, requireTier('starter'), (req, res) => {
+  const tiles = db.prepare('SELECT * FROM test_tiles WHERE clay_body_id=? AND user_id=? ORDER BY created_at DESC').all(req.params.id, req.userId);
+  res.json(tiles);
+});
+
+// Free tier: can see that the feature exists but gets upgrade prompt
+app.get('/api/test-tiles/preview', auth, (req, res) => {
+  res.json({
+    feature: 'Test Tile Library',
+    description: 'Track every test tile with glaze, clay body, firing details, thickness, layering, photos, and results. Build a searchable library of all your glaze experiments.',
+    available: req.userTier === 'starter',
+    upgradeMessage: 'Upgrade to Unlimited to access the Test Tile Library and organize all your glaze experiments in one place.'
+  });
+});
+
+// ===========================================================================
 
 // Catch-all for any method on /api/ that didn't match a route
 app.all('/api/*', (req, res) => {
