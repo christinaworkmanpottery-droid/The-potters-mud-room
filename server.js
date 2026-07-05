@@ -3431,6 +3431,14 @@ app.get('/blog/:slug', (req, res) => {
   <meta property="og:description" content="${(post.excerpt || '').replace(/"/g, '&quot;')}">
   <meta property="og:type" content="article">
   <meta property="og:url" content="https://thepottersmudroom.com/blog/${post.slug}">
+  <meta property="og:image" content="https://thepottersmudroom.com/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:site_name" content="The Potter's Mud Room">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${post.title}">
+  <meta name="twitter:description" content="${(post.excerpt || '').replace(/"/g, '&quot;')}">
+  <meta name="twitter:image" content="https://thepottersmudroom.com/og-image.png">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #FAF8F5; color: #333; line-height: 1.7; }
