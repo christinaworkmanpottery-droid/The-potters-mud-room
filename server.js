@@ -1524,6 +1524,7 @@ app.get('/api/debug/photo-colors', auth, (req, res) => {
 });
 
 app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
+  const body = req.body || {};
   const title = body.title || body.name || null;
   const description = body.description || null;
   const clayBodyId = body.clayBodyId || body.clay_body_id || null;
@@ -1593,7 +1594,7 @@ app.delete('/api/pieces/:id', auth, (req, res) => {
 app.post('/api/pieces/:id/photos', auth, upload.single('photo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo' });
   const u = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
-  const maxPhotos = (req.userTier === 'free') ? 1 : 3;
+  const maxPhotos = ((u?.tier || 'free') === 'free') ? 1 : 3;
   const count = db.prepare('SELECT COUNT(*) as c FROM piece_photos WHERE piece_id=?').get(req.params.id).c;
   if (count >= maxPhotos) return res.status(403).json({ error: req.userTier === 'free' ? 'Free tier allows 1 photo per piece. Upgrade to add up to 3!' : 'Max 3 photos per piece' });
   const id = uuidv4();
