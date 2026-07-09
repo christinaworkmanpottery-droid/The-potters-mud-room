@@ -833,14 +833,22 @@ app.get('/api/admin/members', auth, (req, res) => {
       FROM users ORDER BY created_at DESC`).all();
     const stats = {
       total: members.length,
-      byTier: { free: 0, starter: 0 },
+      byTier: { free: 0, paid: 0, gifted: 0 },
       recent7d: 0,
       recent30d: 0
     };
     const now = Date.now();
     members.forEach(m => {
-      const tier = m.tier === 'starter' ? 'starter' : 'free';
-      stats.byTier[tier]++;
+      const isUnlimited = m.tier === 'starter' || ['basic','mid','top'].includes(m.tier);
+      if (isUnlimited) {
+        if (m.billing_period === 'promo' || m.stripe_subscription_id === null) {
+          stats.byTier.gifted++;
+        } else {
+          stats.byTier.paid++;
+        }
+      } else {
+        stats.byTier.free++;
+      }
       const age = now - new Date(m.created_at).getTime();
       if (age < 7 * 86400000) stats.recent7d++;
       if (age < 30 * 86400000) stats.recent30d++;

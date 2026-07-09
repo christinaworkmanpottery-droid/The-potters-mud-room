@@ -1998,8 +1998,7 @@ async function loadAdmin() {
       return;
     }
     const m = data.members || [];
-    const s = data.stats || { total: 0, byTier: { free: 0, starter: 0 }, recent7d: 0, recent30d: 0 };
-    s.byTier.starter = (s.byTier.starter || 0) + (s.byTier.basic || 0) + (s.byTier.mid || 0) + (s.byTier.top || 0);
+    const s = data.stats || { total: 0, byTier: { free: 0, paid: 0, gifted: 0 }, recent7d: 0, recent30d: 0 };
     
     let html = '<div class="card mb-16" style="padding:14px"><h3 style="margin-bottom:10px">🔍 Search Members</h3>' +
       '<div style="display:flex;gap:8px"><input type="text" class="form-input" id="adminSearchInput" placeholder="Search by name or email..." onkeydown="if(event.key===\'Enter\')adminSearchMembers()">' +
@@ -2010,8 +2009,9 @@ async function loadAdmin() {
       '<div class="stat-box"><div class="stat-number">' + s.total + '</div><div class="stat-label">Total Members</div></div>' +
       '<div class="stat-box"><div class="stat-number">' + s.recent7d + '</div><div class="stat-label">Last 7 Days</div></div>' +
       '<div class="stat-box"><div class="stat-number">' + s.recent30d + '</div><div class="stat-label">Last 30 Days</div></div>' +
-      '<div class="stat-box"><div class="stat-number" style="color:var(--success)">' + s.byTier.starter + '</div><div class="stat-label">Unlimited</div></div>' +
-      '<div class="stat-box"><div class="stat-number">' + s.byTier.free + '</div><div class="stat-label">Free</div></div>' +
+      '<div class="stat-box"><div class="stat-number" style="color:var(--success)">' + (s.byTier.paid||0) + '</div><div class="stat-label">Paid Unlimited</div></div>' +
+      '<div class="stat-box"><div class="stat-number" style="color:var(--primary)">' + (s.byTier.gifted||0) + '</div><div class="stat-label">Gifted Unlimited</div></div>' +
+      '<div class="stat-box"><div class="stat-number">' + (s.byTier.free||0) + '</div><div class="stat-label">Free</div></div>' +
       '</div>';
 
     // Members table — collapsed by default
