@@ -1433,7 +1433,7 @@ async function loadForum() {
     loadForumPosts();
   } catch(e) {
     if (e.message.includes('Requires')) {
-      document.getElementById('forumPosts').innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔒</div><div class="empty-state-title">Forum requires a paid plan</div><p>Upgrade to Basic or above to browse the forum.</p><button class="btn btn-primary mt-16" onclick="navigate(\'upgrade\')">View Plans</button></div>';
+      document.getElementById('forumPosts').innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔒</div><div class="empty-state-title">Forum requires a paid plan</div><p>Upgrade to Unlimited to browse the forum.</p><button class="btn btn-primary mt-16" onclick="navigate(\'upgrade\')">View Plans</button></div>';
     } else { toast(e.message,'error'); }
   }
 }
@@ -1998,7 +1998,8 @@ async function loadAdmin() {
       return;
     }
     const m = data.members || [];
-    const s = data.stats || { total: 0, byTier: { free: 0, basic: 0, mid: 0, top: 0 }, recent7d: 0, recent30d: 0 };
+    const s = data.stats || { total: 0, byTier: { free: 0, starter: 0 }, recent7d: 0, recent30d: 0 };
+    s.byTier.starter = (s.byTier.starter || 0) + (s.byTier.basic || 0) + (s.byTier.mid || 0) + (s.byTier.top || 0);
     
     let html = '<div class="card mb-16" style="padding:14px"><h3 style="margin-bottom:10px">🔍 Search Members</h3>' +
       '<div style="display:flex;gap:8px"><input type="text" class="form-input" id="adminSearchInput" placeholder="Search by name or email..." onkeydown="if(event.key===\'Enter\')adminSearchMembers()">' +
@@ -2009,9 +2010,7 @@ async function loadAdmin() {
       '<div class="stat-box"><div class="stat-number">' + s.total + '</div><div class="stat-label">Total Members</div></div>' +
       '<div class="stat-box"><div class="stat-number">' + s.recent7d + '</div><div class="stat-label">Last 7 Days</div></div>' +
       '<div class="stat-box"><div class="stat-number">' + s.recent30d + '</div><div class="stat-label">Last 30 Days</div></div>' +
-      '<div class="stat-box"><div class="stat-number" style="color:var(--accent)">' + s.byTier.basic + '</div><div class="stat-label">Basic</div></div>' +
-      '<div class="stat-box"><div class="stat-number" style="color:var(--primary)">' + s.byTier.mid + '</div><div class="stat-label">Mid</div></div>' +
-      '<div class="stat-box"><div class="stat-number" style="color:var(--success)">' + s.byTier.top + '</div><div class="stat-label">Top</div></div>' +
+      '<div class="stat-box"><div class="stat-number" style="color:var(--success)">' + s.byTier.starter + '</div><div class="stat-label">Unlimited</div></div>' +
       '<div class="stat-box"><div class="stat-number">' + s.byTier.free + '</div><div class="stat-label">Free</div></div>' +
       '</div>';
 
@@ -2050,7 +2049,7 @@ async function loadAdmin() {
       '<div class="form-group"><label>Type</label><select class="form-select" id="newPromoType" onchange="togglePromoType()">' +
       '<option value="tier">Tier Upgrade</option></select></div>' +
       '<div class="form-row" style="gap:8px"><div class="form-group"><label>Code</label><input type="text" class="form-input" id="newPromoCode" placeholder="e.g., FRIENDS2026" style="text-transform:uppercase"></div>' +
-      '<div class="form-group" id="promoTierGroup"><label>Tier</label><select class="form-select" id="newPromoTier"><option value="basic">Basic</option><option value="mid">Mid</option><option value="top">Top</option></select></div></div>' +
+      '<div class="form-group" id="promoTierGroup"><label>Tier</label><select class="form-select" id="newPromoTier"><option value="starter">Unlimited</option></select></div></div>' +
       '<div class="form-row" style="gap:8px"><div class="form-group"><label>Days (tier duration)</label><input type="number" class="form-input" id="newPromoDays" value="30"></div>' +
       '<div class="form-group"><label>Max Uses (0=unlimited)</label><input type="number" class="form-input" id="newPromoUses" value="0"></div></div>' +
       '<button class="btn btn-primary btn-sm" onclick="createPromoCode()">Create Code</button>' +
@@ -2111,7 +2110,7 @@ async function loadAdmin() {
     try {
       el.innerHTML = html;
     } catch(renderErr) {
-      el.innerHTML = '<div class="card"><h3>Admin loaded but display error</h3><p>' + esc(String(renderErr)) + '</p><p>Members: ' + s.total + ' | Free: ' + s.byTier.free + ' | Basic: ' + s.byTier.basic + ' | Mid: ' + s.byTier.mid + ' | Top: ' + s.byTier.top + '</p></div>';
+      el.innerHTML = '<div class="card"><h3>Admin loaded but display error</h3><p>' + esc(String(renderErr)) + '</p><p>Members: ' + s.total + ' | Free: ' + s.byTier.free + ' | Unlimited: ' + s.byTier.starter + '</p></div>';
       return;
     }
     loadDiscountCodes();
