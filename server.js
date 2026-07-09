@@ -3559,7 +3559,7 @@ app.post('/api/beta-signup', (req, res) => {
     // If this email matches an existing user, upgrade them to lifetime unlimited (beta reward)
     const user = db.prepare('SELECT id FROM users WHERE LOWER(email)=?').get(email.trim().toLowerCase());
     if (user) {
-      db.prepare("UPDATE users SET tier='top', billing_period='promo', plan_expires_at=NULL, is_beta_tester=1 WHERE id=?").run(user.id);
+      db.prepare("UPDATE users SET tier='starter', billing_period='promo', plan_expires_at=NULL, is_beta_tester=1 WHERE id=?").run(user.id);
     }
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: 'Something went wrong' }); }
@@ -3571,7 +3571,7 @@ app.post('/api/admin/beta-signups/upgrade-all', auth, (req, res) => {
   const signups = db.prepare('SELECT email FROM beta_signups').all();
   let upgraded = 0;
   for (const s of signups) {
-    const result = db.prepare("UPDATE users SET tier='top', billing_period='promo', plan_expires_at=NULL, is_beta_tester=1 WHERE LOWER(email)=? AND is_beta_tester=0").run(s.email);
+    const result = db.prepare("UPDATE users SET tier='starter', billing_period='promo', plan_expires_at=NULL, is_beta_tester=1 WHERE LOWER(email)=? AND is_beta_tester=0").run(s.email);
     if (result.changes > 0) upgraded++;
   }
   // Also mark any already-top users who are beta signups
