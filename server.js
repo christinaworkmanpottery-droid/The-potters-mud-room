@@ -824,7 +824,9 @@ app.post('/api/billing/cancel', auth, async (req, res) => {
 
 // ============ ADMIN ============
 const ADMIN_EMAIL = 'christinaworkmanpottery@gmail.com';
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY || 'mudroom-admin-2026';
 function isAdmin(req) {
+  if (req.headers['x-admin-key'] === ADMIN_API_KEY) return true;
   const u = db.prepare('SELECT email FROM users WHERE id=?').get(req.userId);
   return u?.email === ADMIN_EMAIL;
 }
