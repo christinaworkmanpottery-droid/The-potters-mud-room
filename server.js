@@ -841,7 +841,9 @@ app.get('/api/admin/members', auth, (req, res) => {
     members.forEach(m => {
       const isUnlimited = m.tier === 'starter' || ['basic','mid','top'].includes(m.tier);
       if (isUnlimited) {
-        if (m.stripe_subscription_id) {
+        const hasStripe = m.stripe_subscription_id && m.stripe_subscription_id !== '';
+        const hasBillingPeriod = m.billing_period && ['month','year'].includes(m.billing_period);
+        if (hasStripe || hasBillingPeriod) {
           stats.byTier.paid++;
         } else {
           stats.byTier.gifted++;
