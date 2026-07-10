@@ -95,12 +95,12 @@ function closeModal(id) { document.getElementById(id).classList.remove('open'); 
 function showMemberGroup(filter) {
   const m = window._adminMembers || [];
   let filtered = m;
-  if (filter === 'paid') filtered = m.filter(x => (x.stripe_subscription_id && x.stripe_subscription_id !== '') || ['month','year','monthly','yearly'].includes(x.billing_period));
-  else if (filter === 'gifted') filtered = m.filter(x => (x.tier==='starter'||['basic','mid','top'].includes(x.tier)) && (!x.stripe_subscription_id || x.stripe_subscription_id === '') && !['month','year','monthly','yearly'].includes(x.billing_period));
-  else if (filter === 'free') filtered = m.filter(x => x.tier==='free');
+  if (filter === 'paid') filtered = m.filter(x => x.stripe_subscription_id && x.stripe_subscription_id !== '');
+  else if (filter === 'gifted') filtered = m.filter(x => (x.tier==='starter'||['basic','mid','top'].includes(x.tier)) && (!x.stripe_subscription_id || x.stripe_subscription_id === ''));
+  else if (filter === 'free') filtered = m.filter(x => x.tier === 'free' || (!x.tier));
   else if (filter === 'recent7') { const c=Date.now(); filtered=m.filter(x=>c-new Date(x.created_at).getTime()<7*86400000); }
   else if (filter === 'recent30') { const c=Date.now(); filtered=m.filter(x=>c-new Date(x.created_at).getTime()<30*86400000); }
-  let rows = filtered.map(x => '<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px">' + esc(x.display_name||'—') + '</td><td style="padding:8px;font-size:0.8rem">' + esc(x.email) + '</td><td style="padding:8px">' + ((x.stripe_subscription_id && x.stripe_subscription_id !== '') || ['month','year','monthly','yearly'].includes(x.billing_period) ? '💳 Paid' : (x.tier==='free' ? '🆓 Free' : '🎁 Gifted')) + '</td><td style="padding:8px;font-size:0.8rem">' + (x.created_at?new Date(x.created_at).toLocaleDateString():'') + '</td></tr>').join('');
+  let rows = filtered.map(x => '<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px">' + esc(x.display_name||'—') + '</td><td style="padding:8px;font-size:0.8rem">' + esc(x.email) + '</td><td style="padding:8px">' + ((x.stripe_subscription_id && x.stripe_subscription_id !== '') ? '💳 Paid' : (x.tier==='free' ? '🆓 Free' : '🎁 Gifted')) + '</td><td style="padding:8px;font-size:0.8rem">' + (x.created_at?new Date(x.created_at).toLocaleDateString():'') + '</td></tr>').join('');
   document.getElementById('adminMemberFilter').innerHTML = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem"><tr style="border-bottom:2px solid var(--border);text-align:left"><th style="padding:8px">Name</th><th style="padding:8px">Email</th><th style="padding:8px">Type</th><th style="padding:8px">Joined</th></tr>' + rows + '</table></div>';
   document.getElementById('adminMemberFilterTitle').innerText = filtered.length + ' member(s)';
   document.getElementById('adminMemberFilterBox').style.display = 'block';
