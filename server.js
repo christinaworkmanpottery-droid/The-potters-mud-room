@@ -35,6 +35,11 @@ try {
   db.prepare("UPDATE users SET tier='starter' WHERE tier IN ('basic','mid','top')").run();
 } catch(e) { /* already done or no rows */ }
 
+// Mark known paying Stripe members so they show correctly in admin stats
+try {
+  db.prepare("UPDATE users SET billing_period='stripe-monthly' WHERE LOWER(email) IN ('jgk1020@gmail.com','awhiteman96@gmail.com') AND tier='starter'").run();
+} catch(e) { /* skip */ }
+
 // AI tokens column
 try { db.exec("ALTER TABLE users ADD COLUMN ai_tokens INTEGER DEFAULT 0"); } catch(e) { /* already exists */ }
 // Potter demographics columns
@@ -842,7 +847,8 @@ app.get('/api/admin/members', auth, (req, res) => {
       const isUnlimited = m.tier === 'starter' || ['basic','mid','top'].includes(m.tier);
       if (isUnlimited) {
         const hasStripe = m.stripe_subscription_id && m.stripe_subscription_id !== '';
-        if (hasStripe) {
+        const isStripeMonthly = m.billing_period === 'stripe-monthly';
+        if (hasStripe || isStripeMonthly) {
           stats.byTier.paid++;
         } else {
           stats.byTier.gifted++;
