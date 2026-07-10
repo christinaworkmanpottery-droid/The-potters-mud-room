@@ -37,7 +37,7 @@ try {
 
 // Mark known paying Stripe members so they show correctly in admin stats
 try {
-  db.prepare("UPDATE users SET billing_period='stripe-monthly' WHERE LOWER(email) IN ('jgk1020@gmail.com','awhiteman96@gmail.com') AND tier='starter'").run();
+  db.prepare("UPDATE users SET tier='starter', billing_period='stripe-monthly' WHERE LOWER(email) IN ('jgk1020@gmail.com','awhiteman96@gmail.com')").run();
 } catch(e) { /* skip */ }
 
 // AI tokens column
