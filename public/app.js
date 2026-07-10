@@ -2005,14 +2005,31 @@ async function loadAdmin() {
       '<button class="btn btn-primary btn-sm" onclick="adminSearchMembers()">Search</button></div>' +
       '<div id="adminSearchResults" class="mt-8"></div></div>';
 
+    // Store members for filtering
+    window._adminMembers = m;
+
+    function showMemberGroup(filter) {
+      let filtered = m;
+      if (filter === 'paid') filtered = m.filter(x => x.stripe_subscription_id);
+      else if (filter === 'gifted') filtered = m.filter(x => (x.tier==='starter'||['basic','mid','top'].includes(x.tier)) && !x.stripe_subscription_id);
+      else if (filter === 'free') filtered = m.filter(x => x.tier==='free');
+      else if (filter === 'recent7') { const c=Date.now(); filtered=m.filter(x=>c-new Date(x.created_at).getTime()<7*86400000); }
+      else if (filter === 'recent30') { const c=Date.now(); filtered=m.filter(x=>c-new Date(x.created_at).getTime()<30*86400000); }
+      let rows = filtered.map(x => '<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px">' + esc(x.display_name||'—') + '</td><td style="padding:8px;font-size:0.8rem">' + esc(x.email) + '</td><td style="padding:8px">' + (x.stripe_subscription_id?'💳 Paid':'🎁 Gifted') + (x.tier==='free'?'🆓 Free':'') + '</td><td style="padding:8px;font-size:0.8rem">' + (x.created_at?new Date(x.created_at).toLocaleDateString():'') + '</td></tr>').join('');
+      document.getElementById('adminMemberFilter').innerHTML = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem"><tr style="border-bottom:2px solid var(--border);text-align:left"><th style="padding:8px">Name</th><th style="padding:8px">Email</th><th style="padding:8px">Type</th><th style="padding:8px">Joined</th></tr>' + rows + '</table></div>';
+      document.getElementById('adminMemberFilterTitle').innerText = filtered.length + ' members';
+      document.getElementById('adminMemberFilterBox').style.display='block';
+    }
+
     html += '<div class="stats-bar" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">' +
-      '<div class="stat-box"><div class="stat-number">' + s.total + '</div><div class="stat-label">Total Members</div></div>' +
-      '<div class="stat-box"><div class="stat-number">' + s.recent7d + '</div><div class="stat-label">Last 7 Days</div></div>' +
-      '<div class="stat-box"><div class="stat-number">' + s.recent30d + '</div><div class="stat-label">Last 30 Days</div></div>' +
-      '<div class="stat-box"><div class="stat-number" style="color:var(--success)">' + (s.byTier.paid||0) + '</div><div class="stat-label">Paid Unlimited</div></div>' +
-      '<div class="stat-box"><div class="stat-number" style="color:var(--primary)">' + (s.byTier.gifted||0) + '</div><div class="stat-label">Gifted Unlimited</div></div>' +
-      '<div class="stat-box"><div class="stat-number">' + (s.byTier.free||0) + '</div><div class="stat-label">Free</div></div>' +
+      '<div class="stat-box" style="cursor:pointer" onclick="showMemberGroup('all')"><div class="stat-number">' + s.total + '</div><div class="stat-label">Total Members</div></div>' +
+      '<div class="stat-box" style="cursor:pointer" onclick="showMemberGroup('recent7')"><div class="stat-number">' + s.recent7d + '</div><div class="stat-label">Last 7 Days</div></div>' +
+      '<div class="stat-box" style="cursor:pointer" onclick="showMemberGroup('recent30')"><div class="stat-number">' + s.recent30d + '</div><div class="stat-label">Last 30 Days</div></div>' +
+      '<div class="stat-box" style="cursor:pointer" onclick="showMemberGroup('paid')"><div class="stat-number" style="color:var(--success)">' + (s.byTier.paid||0) + '</div><div class="stat-label">Paid Unlimited</div></div>' +
+      '<div class="stat-box" style="cursor:pointer" onclick="showMemberGroup('gifted')"><div class="stat-number" style="color:var(--primary)">' + (s.byTier.gifted||0) + '</div><div class="stat-label">Gifted Unlimited</div></div>' +
+      '<div class="stat-box" style="cursor:pointer" onclick="showMemberGroup('free')"><div class="stat-number">' + (s.byTier.free||0) + '</div><div class="stat-label">Free</div></div>' +
       '</div>';
+    html += '<div id="adminMemberFilterBox" style="display:none;margin-bottom:16px" class="card"><h4 id="adminMemberFilterTitle" style="margin-bottom:8px"></h4><div id="adminMemberFilter"></div></div>';
 
     // Members table — collapsed by default
     html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(\'adminMembersTable\')">All Members (' + m.length + ') ▸ <span style=\'font-size:0.8rem;color:var(--text-light);font-weight:normal\'>tap to expand</span></h3>';

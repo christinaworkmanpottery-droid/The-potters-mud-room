@@ -841,10 +841,10 @@ app.get('/api/admin/members', auth, (req, res) => {
     members.forEach(m => {
       const isUnlimited = m.tier === 'starter' || ['basic','mid','top'].includes(m.tier);
       if (isUnlimited) {
-        if (m.billing_period === 'promo' || m.stripe_subscription_id === null) {
-          stats.byTier.gifted++;
-        } else {
+        if (m.stripe_subscription_id) {
           stats.byTier.paid++;
+        } else {
+          stats.byTier.gifted++;
         }
       } else {
         stats.byTier.free++;
