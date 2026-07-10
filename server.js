@@ -30,32 +30,13 @@ db.exec(`CREATE TABLE IF NOT EXISTS ai_usage (
 )`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_ai_usage_user_month ON ai_usage(user_id, created_at)`);
 
-// Fix live DB tier constraint to allow 'starter'
+// Migrate all tiers to free/unlimited (starter = unlimited internally)
 try {
-  // SQLite doesn't support ALTER COLUMN, so we use a workaround:
-  // Create a temp table, copy data, drop original, rename
-  const cols = db.prepare("PRAGMA table_info(users)").all();
-  const tierCol = cols.find(c => c.name === 'tier');
-  if (tierCol && !tierCol.type.includes('starter')) {
-    db.exec(`
-      BEGIN;
-      CREATE TABLE IF NOT EXISTS users_new AS SELECT * FROM users;
-      DROP TABLE users;
-      ALTER TABLE users_new RENAME TO users;
-      COMMIT;
-    `);
-  }
-} catch(e) { console.log('Tier constraint fix skipped:', e.message); }
-
-// Migrate all tiers to free/starter ("Unlimited")
-try {
+  db.pragma('ignore_check_constraints = ON');
   db.prepare("UPDATE users SET tier='starter' WHERE tier IN ('basic','mid','top')").run();
-} catch(e) { /* already done or no rows */ }
-
-// Mark known paying Stripe members so they show correctly in admin stats
-try {
   db.prepare("UPDATE users SET tier='starter', billing_period='stripe-monthly' WHERE LOWER(email) IN ('jgk1020@gmail.com','awhiteman96@gmail.com')").run();
-} catch(e) { /* skip */ }
+  db.pragma('ignore_check_constraints = OFF');
+} catch(e) { db.pragma('ignore_check_constraints = OFF'); }
 
 // AI tokens column
 try { db.exec("ALTER TABLE users ADD COLUMN ai_tokens INTEGER DEFAULT 0"); } catch(e) { /* already exists */ }
@@ -2614,8 +2595,10 @@ app.post('/api/admin/members/:id/upgrade', auth, (req, res) => {
   try {
     const { tier, billingPeriod, stripeCustomerId, stripeSubscriptionId } = req.body || {};
     if (!tier) return res.status(400).json({ error: 'tier required' });
+    db.pragma('ignore_check_constraints = ON');
     db.prepare(`UPDATE users SET tier=?, billing_period=?, stripe_customer_id=?, stripe_subscription_id=? WHERE id=?`)
-      .run(tier, billingPeriod || 'monthly', stripeCustomerId || null, stripeSubscriptionId || null, req.params.id);
+      .run(tier, billingPeriod || 'stripe-monthly', stripeCustomerId || null, stripeSubscriptionId || null, req.params.id);
+    db.pragma('ignore_check_constraints = OFF');
     const u = db.prepare('SELECT id,email,tier,billing_period,stripe_customer_id,stripe_subscription_id FROM users WHERE id=?').get(req.params.id);
     res.json({ success: true, user: u });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -3068,9 +3051,16 @@ app.post('/api/admin/upgrade-tier/remote', (req, res) => {
   if (password !== (process.env.ADMIN_BLOG_PASSWORD || 'mudroom-blog-2026')) return res.status(401).json({ error: 'Unauthorized' });
   if (!email) return res.status(400).json({ error: 'Email required' });
   const targetTier = tier || 'starter';
-  const result = db.prepare('UPDATE users SET tier=? WHERE LOWER(email)=?').run(targetTier, email.toLowerCase());
-  if (result.changes === 0) return res.status(404).json({ error: 'User not found' });
-  res.json({ success: true, email, tier: targetTier });
+  try {
+    db.pragma('ignore_check_constraints = ON');
+    const result = db.prepare('UPDATE users SET tier=?, billing_period=? WHERE LOWER(email)=?').run(targetTier, 'stripe-monthly', email.toLowerCase());
+    db.pragma('ignore_check_constraints = OFF');
+    if (result.changes === 0) return res.status(404).json({ error: 'User not found' });
+    res.json({ success: true, email, tier: targetTier });
+  } catch(e) {
+    db.pragma('ignore_check_constraints = OFF');
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // Admin blog via password (for remote management without JWT)
