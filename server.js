@@ -30,6 +30,23 @@ db.exec(`CREATE TABLE IF NOT EXISTS ai_usage (
 )`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_ai_usage_user_month ON ai_usage(user_id, created_at)`);
 
+// Fix live DB tier constraint to allow 'starter'
+try {
+  // SQLite doesn't support ALTER COLUMN, so we use a workaround:
+  // Create a temp table, copy data, drop original, rename
+  const cols = db.prepare("PRAGMA table_info(users)").all();
+  const tierCol = cols.find(c => c.name === 'tier');
+  if (tierCol && !tierCol.type.includes('starter')) {
+    db.exec(`
+      BEGIN;
+      CREATE TABLE IF NOT EXISTS users_new AS SELECT * FROM users;
+      DROP TABLE users;
+      ALTER TABLE users_new RENAME TO users;
+      COMMIT;
+    `);
+  }
+} catch(e) { console.log('Tier constraint fix skipped:', e.message); }
+
 // Migrate all tiers to free/starter ("Unlimited")
 try {
   db.prepare("UPDATE users SET tier='starter' WHERE tier IN ('basic','mid','top')").run();
