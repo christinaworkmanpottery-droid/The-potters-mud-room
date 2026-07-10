@@ -1698,7 +1698,7 @@ async function loadProfile() {
     if (d.user.billing_period && d.user.billing_period !== 'promo') {
       tierHtml += '<div class="text-sm" style="margin-bottom:8px;color:var(--text-light)">Billing: ' + d.user.billing_period + ' · Cancel anytime</div>';
     }
-    tierHtml += (tier === 'free' ? '<button class="btn btn-primary" onclick="navigate(\'upgrade\')">Upgrade to Starter</button>' :
+    tierHtml += (tier === 'free' ? '<button class="btn btn-primary" onclick="navigate(\'upgrade\')">Upgrade to Unlimited</button>' :
        '<div style="display:flex;gap:8px"><button class="btn btn-secondary btn-sm" onclick="navigate(\'upgrade\')">Change Plan</button><button class="btn btn-danger btn-sm" onclick="cancelSubscription()">Cancel Plan</button></div>');
     document.getElementById('profileTierInfo').innerHTML = tierHtml;
 
@@ -1710,7 +1710,7 @@ async function loadProfile() {
     document.getElementById('profileReferralInfo').innerHTML =
       '<div style="background:var(--primary-light);border-radius:var(--radius);padding:16px;margin-bottom:12px">' +
       '<h4 style="margin-bottom:8px;color:var(--primary)">🎁 Share & Earn — Free Months!</h4>' +
-      '<p class="text-sm" style="margin-bottom:12px;color:var(--text-light)">Share your link — when someone signs up, you BOTH get a <strong>free month</strong> of Starter!</p>' +
+      '<p class="text-sm" style="margin-bottom:12px;color:var(--text-light)">Share your link — when someone signs up, you BOTH get a <strong>free month</strong> of Unlimited!</p>' +
       '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">' +
       '<input type="text" class="form-input" value="' + esc(refLink) + '" readonly id="refLinkInput" style="font-size:0.85rem;flex:1" onclick="this.select()">' +
       '<button class="btn btn-primary btn-sm" onclick="copyReferralLink()">📋 Copy</button></div>' +
