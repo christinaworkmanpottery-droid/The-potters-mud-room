@@ -4755,7 +4755,7 @@ app.put('/api/studio/notes/:id', auth, (req, res) => {
   if (!body || !body.trim()) return res.status(400).json({ error: 'Body is required' });
   const existing = db.prepare('SELECT * FROM studio_notes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!existing) return res.status(404).json({ error: 'Note not found' });
-  db.prepare('UPDATE studio_notes SET title=?, body=?, updated_at=datetime("now") WHERE id=?').run(title || null, body, req.params.id);
+  db.prepare("UPDATE studio_notes SET title=?, body=?, updated_at=datetime('now') WHERE id=?").run(title || null, body, req.params.id);
   const updated = db.prepare('SELECT * FROM studio_notes WHERE id=?').get(req.params.id);
   res.json(updated);
 });
