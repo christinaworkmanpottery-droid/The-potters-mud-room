@@ -4722,6 +4722,52 @@ app.get('/api/test-tiles/preview', auth, (req, res) => {
   });
 });
 
+// =========================================================================== 
+// Studio Notes
+// ===========================================================================
+
+// GET all studio notes for current user
+app.get('/api/studio/notes', auth, (req, res) => {
+  const notes = db.prepare('SELECT * FROM studio_notes WHERE user_id=? ORDER BY updated_at DESC').all(req.userId);
+  res.json(notes);
+});
+
+// GET single studio note
+app.get('/api/studio/notes/:id', auth, (req, res) => {
+  const note = db.prepare('SELECT * FROM studio_notes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!note) return res.status(404).json({ error: 'Note not found' });
+  res.json(note);
+});
+
+// POST create studio note
+app.post('/api/studio/notes', auth, (req, res) => {
+  const { title, body } = req.body;
+  if (!body || !body.trim()) return res.status(400).json({ error: 'Body is required' });
+  const id = uuidv4();
+  db.prepare('INSERT INTO studio_notes (id, user_id, title, body) VALUES (?, ?, ?, ?)').run(id, req.userId, title || null, body);
+  const created = db.prepare('SELECT * FROM studio_notes WHERE id=?').get(id);
+  res.json(created);
+});
+
+// PUT update studio note
+app.put('/api/studio/notes/:id', auth, (req, res) => {
+  const { title, body } = req.body;
+  if (!body || !body.trim()) return res.status(400).json({ error: 'Body is required' });
+  const existing = db.prepare('SELECT * FROM studio_notes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!existing) return res.status(404).json({ error: 'Note not found' });
+  db.prepare('UPDATE studio_notes SET title=?, body=?, updated_at=datetime("now") WHERE id=?').run(title || null, body, req.params.id);
+  const updated = db.prepare('SELECT * FROM studio_notes WHERE id=?').get(req.params.id);
+  res.json(updated);
+});
+
+// DELETE studio note
+app.delete('/api/studio/notes/:id', auth, (req, res) => {
+  const existing = db.prepare('SELECT * FROM studio_notes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!existing) return res.status(404).json({ error: 'Note not found' });
+  db.prepare('DELETE FROM studio_notes WHERE id=?').run(req.params.id);
+  res.json({ success: true });
+});
+
 // ===========================================================================
 
 // Catch-all for any method on /api/ that didn't match a route

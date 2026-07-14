@@ -853,6 +853,20 @@ function initDB() {
   safeAdd('users', 'newsletter_subscribed', 'INTEGER DEFAULT 1');
   safeAdd('referral_rewards', 'reward_type', "TEXT DEFAULT 'free_month'");
 
+  // Studio Notes — freeform notes for Studio section
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS studio_notes (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      title TEXT,
+      body TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_studio_notes_user ON studio_notes(user_id)`);
+
   // Glaze clay body tests — track how glazes perform on different clay bodies
   db.exec(`
     CREATE TABLE IF NOT EXISTS glaze_clay_tests (
