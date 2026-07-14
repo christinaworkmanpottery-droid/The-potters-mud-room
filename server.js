@@ -5,7 +5,7 @@ const fs = require('fs');
 const multer = require('multer');
 
 // Deploy version tag — used to verify which code is actually running on Render
-const DEPLOY_VERSION = 'v9-fix-edit-photo-2026-07-06';
+const DEPLOY_VERSION = 'v10-studio-notes-2026-07-14';
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
