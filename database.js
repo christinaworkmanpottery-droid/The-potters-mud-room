@@ -958,6 +958,7 @@ function initDB() {
   // Add notified_at column if missing (table may already exist without it)
   try { db.exec('ALTER TABLE beta_signups ADD COLUMN notified_at TEXT'); } catch(e) { /* already exists */ }
   safeAdd('users', 'is_beta_tester', 'INTEGER DEFAULT 0');
+  safeAdd('users', 'last_login', 'TEXT DEFAULT NULL');
   safeAdd('blog_posts', 'view_count', 'INTEGER DEFAULT 0');
 
   // Sync beta signups to lifetime beta access on startup

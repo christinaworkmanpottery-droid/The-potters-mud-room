@@ -372,6 +372,7 @@ app.post('/api/auth/login', (req, res) => {
     const u = db.prepare('SELECT * FROM users WHERE email=?').get(email);
     if (!u || !bcrypt.compareSync(password, u.password_hash)) return res.status(401).json({ error: 'Invalid email or password' });
     const token = jwt.sign({ userId: u.id, tier: u.tier }, JWT_SECRET, { expiresIn: '30d' });
+    db.prepare("UPDATE users SET last_login=datetime('now') WHERE id=?").run(u.id);
     res.json({ token, user: { id: u.id, email: u.email, displayName: u.display_name, tier: u.tier } });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -3531,36 +3532,118 @@ app.post('/api/activity', auth, (req, res) => {
 app.get('/api/admin/activity-summary', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
-    // Feature usage counts (ranked most to least)
-    const featureUsage = db.prepare(`SELECT action, COUNT(*) as count FROM user_activity GROUP BY action ORDER BY count DESC`).all();
+    // Total users
+    const totalUsers = db.prepare("SELECT COUNT(*) as c FROM users").get().c;
 
-    // Daily active users (last 30 days)
-    const dailyActiveUsers = db.prepare(`SELECT date(created_at) as day, COUNT(DISTINCT user_id) as users FROM user_activity WHERE created_at >= datetime('now', '-30 day') GROUP BY day ORDER BY day`).all();
+    // Signed up this week / month
+    const newThisWeek = db.prepare("SELECT COUNT(*) as c FROM users WHERE created_at >= datetime('now', '-7 day')").get().c;
+    const newThisMonth = db.prepare("SELECT COUNT(*) as c FROM users WHERE created_at >= datetime('now', '-30 day')").get().c;
 
-    // Per-user activity summary
-    const perUser = db.prepare(`
-      SELECT u.email, u.display_name, 
-        COUNT(ua.id) as total_actions,
-        MAX(ua.created_at) as last_active,
-        (SELECT ua2.action FROM user_activity ua2 WHERE ua2.user_id = u.id GROUP BY ua2.action ORDER BY COUNT(*) DESC LIMIT 1) as top_feature
-      FROM users u
-      JOIN user_activity ua ON ua.user_id = u.id
-      GROUP BY u.id
-      ORDER BY total_actions DESC
-    `).all();
+    // Active users based on real content: pieces, firing logs, forum posts, forum replies, studio notes
+    // "active" = created any content within the window
+    const activeToday = db.prepare(`
+      SELECT COUNT(DISTINCT user_id) as c FROM (
+        SELECT user_id FROM pieces WHERE created_at >= datetime('now', '-1 day')
+        UNION SELECT user_id FROM firing_logs WHERE created_at >= datetime('now', '-1 day')
+        UNION SELECT user_id FROM forum_posts WHERE created_at >= datetime('now', '-1 day')
+        UNION SELECT user_id FROM forum_replies WHERE created_at >= datetime('now', '-1 day')
+        UNION SELECT user_id FROM studio_notes WHERE created_at >= datetime('now', '-1 day')
+      )
+    `).get().c;
 
-    // Activity over time (daily counts last 30 days)
-    const activityOverTime = db.prepare(`SELECT date(created_at) as day, COUNT(*) as count FROM user_activity WHERE created_at >= datetime('now', '-30 day') GROUP BY day ORDER BY day`).all();
+    const activeWeek = db.prepare(`
+      SELECT COUNT(DISTINCT user_id) as c FROM (
+        SELECT user_id FROM pieces WHERE created_at >= datetime('now', '-7 day')
+        UNION SELECT user_id FROM firing_logs WHERE created_at >= datetime('now', '-7 day')
+        UNION SELECT user_id FROM forum_posts WHERE created_at >= datetime('now', '-7 day')
+        UNION SELECT user_id FROM forum_replies WHERE created_at >= datetime('now', '-7 day')
+        UNION SELECT user_id FROM studio_notes WHERE created_at >= datetime('now', '-7 day')
+      )
+    `).get().c;
 
-    // Total count for percentage calc
+    const activeMonth = db.prepare(`
+      SELECT COUNT(DISTINCT user_id) as c FROM (
+        SELECT user_id FROM pieces WHERE created_at >= datetime('now', '-30 day')
+        UNION SELECT user_id FROM firing_logs WHERE created_at >= datetime('now', '-30 day')
+        UNION SELECT user_id FROM forum_posts WHERE created_at >= datetime('now', '-30 day')
+        UNION SELECT user_id FROM forum_replies WHERE created_at >= datetime('now', '-30 day')
+        UNION SELECT user_id FROM studio_notes WHERE created_at >= datetime('now', '-30 day')
+      )
+    `).get().c;
+
+    // Feature usage counts from real tables
+    const totalPieces = db.prepare("SELECT COUNT(*) as c FROM pieces").get().c;
+    const piecesThisMonth = db.prepare("SELECT COUNT(*) as c FROM pieces WHERE created_at >= datetime('now', '-30 day')").get().c;
+    const totalFiringLogs = db.prepare("SELECT COUNT(*) as c FROM firing_logs").get().c;
+    const totalForumPosts = db.prepare("SELECT COUNT(*) as c FROM forum_posts").get().c;
+    const totalForumReplies = db.prepare("SELECT COUNT(*) as c FROM forum_replies").get().c;
+    const totalStudioNotes = db.prepare("SELECT COUNT(*) as c FROM studio_notes").get().c;
+
+    const featureUsage = [
+      { action: 'pieces_logged', count: totalPieces },
+      { action: 'firing_logs', count: totalFiringLogs },
+      { action: 'forum_posts', count: totalForumPosts },
+      { action: 'forum_replies', count: totalForumReplies },
+      { action: 'studio_notes', count: totalStudioNotes },
+    ].sort((a, b) => b.count - a.count);
+
     const totalActions = featureUsage.reduce((s, f) => s + f.count, 0);
 
-    // Active users: today / this week / this month
-    const activeToday = db.prepare("SELECT COUNT(DISTINCT user_id) as c FROM user_activity WHERE created_at >= datetime('now', '-1 day')").get().c;
-    const activeWeek = db.prepare("SELECT COUNT(DISTINCT user_id) as c FROM user_activity WHERE created_at >= datetime('now', '-7 day')").get().c;
-    const activeMonth = db.prepare("SELECT COUNT(DISTINCT user_id) as c FROM user_activity WHERE created_at >= datetime('now', '-30 day')").get().c;
+    // Per-user summary based on real content
+    const perUser = db.prepare(`
+      SELECT u.email, u.display_name, u.tier, u.created_at,
+        (SELECT COUNT(*) FROM pieces WHERE user_id = u.id) as pieces,
+        (SELECT COUNT(*) FROM firing_logs WHERE user_id = u.id) as firing_logs,
+        (SELECT COUNT(*) FROM forum_posts WHERE user_id = u.id) as forum_posts,
+        (SELECT COUNT(*) FROM forum_replies WHERE user_id = u.id) as forum_replies,
+        (SELECT COUNT(*) FROM studio_notes WHERE user_id = u.id) as studio_notes,
+        (
+          SELECT MAX(latest) FROM (
+            SELECT MAX(created_at) as latest FROM pieces WHERE user_id = u.id
+            UNION SELECT MAX(created_at) FROM firing_logs WHERE user_id = u.id
+            UNION SELECT MAX(created_at) FROM forum_posts WHERE user_id = u.id
+            UNION SELECT MAX(created_at) FROM forum_replies WHERE user_id = u.id
+            UNION SELECT MAX(created_at) FROM studio_notes WHERE user_id = u.id
+          )
+        ) as last_active
+      FROM users u
+      ORDER BY last_active DESC NULLS LAST
+    `).all().map(u => ({
+      ...u,
+      total_actions: (u.pieces + u.firing_logs + u.forum_posts + u.forum_replies + u.studio_notes)
+    }));
+
+    // Daily new pieces (proxy for daily activity, last 30 days)
+    const dailyActiveUsers = db.prepare(`
+      SELECT date(created_at) as day, COUNT(DISTINCT user_id) as users
+      FROM (
+        SELECT user_id, created_at FROM pieces
+        UNION ALL SELECT user_id, created_at FROM firing_logs
+        UNION ALL SELECT user_id, created_at FROM forum_posts
+        UNION ALL SELECT user_id, created_at FROM forum_replies
+        UNION ALL SELECT user_id, created_at FROM studio_notes
+      )
+      WHERE created_at >= datetime('now', '-30 day')
+      GROUP BY day ORDER BY day
+    `).all();
+
+    const activityOverTime = db.prepare(`
+      SELECT date(created_at) as day, COUNT(*) as count
+      FROM (
+        SELECT created_at FROM pieces
+        UNION ALL SELECT created_at FROM firing_logs
+        UNION ALL SELECT created_at FROM forum_posts
+        UNION ALL SELECT created_at FROM forum_replies
+        UNION ALL SELECT created_at FROM studio_notes
+      )
+      WHERE created_at >= datetime('now', '-30 day')
+      GROUP BY day ORDER BY day
+    `).all();
 
     res.json({
+      totalUsers,
+      newThisWeek,
+      newThisMonth,
       featureUsage,
       dailyActiveUsers,
       perUser,
@@ -3568,7 +3651,8 @@ app.get('/api/admin/activity-summary', auth, (req, res) => {
       totalActions,
       activeToday,
       activeWeek,
-      activeMonth
+      activeMonth,
+      piecesThisMonth,
     });
   } catch(e) {
     console.error('Activity summary error:', e.message);
