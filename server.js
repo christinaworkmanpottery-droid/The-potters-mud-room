@@ -47,6 +47,10 @@ try { db.exec("ALTER TABLE users ADD COLUMN studio_type TEXT DEFAULT NULL"); } c
 try { db.exec("ALTER TABLE users ADD COLUMN signup_source TEXT DEFAULT NULL"); } catch(e) {}
 // Photo search exclusion flag — lets users hide specific pieces from photo search results
 try { db.exec("ALTER TABLE pieces ADD COLUMN hide_from_photo_search INTEGER DEFAULT 0"); } catch(e) {}
+// Public gallery — allow users to share finished pieces publicly
+try { db.exec("ALTER TABLE pieces ADD COLUMN is_public INTEGER DEFAULT 0"); } catch(e) {}
+try { db.exec("ALTER TABLE pieces ADD COLUMN public_display_name TEXT DEFAULT NULL"); } catch(e) {}
+try { db.exec("ALTER TABLE pieces ADD COLUMN allow_messages INTEGER DEFAULT 0"); } catch(e) {}
 // Nodemailer setup for newsletter emails
 let transporter = null;
 function setupTransporter(user, pass, host, port) {
@@ -4917,4 +4921,124 @@ app.listen(PORT, '0.0.0.0', () => {
       console.warn('[Startup] Backfill error:', e.message);
     }
   });
+});
+
+// ============ PUBLIC GALLERY ============
+
+// Share a piece publicly
+app.patch('/api/pieces/:id/public', auth, (req, res) => {
+  try {
+    const piece = db.prepare('SELECT user_id FROM pieces WHERE id=?').get(req.params.id);
+    if (!piece) return res.status(404).json({ error: 'Piece not found' });
+    if (piece.user_id !== req.userId) return res.status(403).json({ error: 'Not your piece' });
+
+    const { isPublic, displayName, allowMessages } = req.body;
+    db.prepare('UPDATE pieces SET is_public=?, public_display_name=?, allow_messages=?, updated_at=datetime(\'now\') WHERE id=?')
+      .run(isPublic ? 1 : 0, displayName || null, allowMessages ? 1 : 0, req.params.id);
+
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Get public gallery (no auth required)
+app.get('/api/gallery', (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+    const offset = (page - 1) * limit;
+
+    const pieces = db.prepare(`
+      SELECT p.id, p.title, p.status, p.form, p.technique, p.is_public, p.public_display_name, p.allow_messages, p.user_id,
+        p.created_at, u.display_name as creator_name, u.username as creator_username, u.avatar_filename as creator_avatar,
+        cb.name as clay_body_name,
+        (SELECT filename FROM piece_photos WHERE piece_id=p.id AND is_primary=1 LIMIT 1) as primary_photo,
+        (SELECT filename FROM piece_photos WHERE piece_id=p.id ORDER BY sort_order LIMIT 1) as first_photo
+      FROM pieces p
+      LEFT JOIN users u ON p.user_id = u.id
+      LEFT JOIN clay_bodies cb ON p.clay_body_id = cb.id
+      WHERE p.is_public = 1 AND p.status IN ('glaze-fired', 'done', 'sold')
+      ORDER BY p.updated_at DESC
+      LIMIT ? OFFSET ?
+    `).all(limit, offset);
+
+    const total = db.prepare('SELECT COUNT(*) as c FROM pieces WHERE is_public=1 AND status IN (\'glaze-fired\', \'done\', \'sold\')').get().c;
+
+    const results = pieces.map(p => ({
+      id: p.id,
+      title: p.title || 'Untitled',
+      form: p.form,
+      technique: p.technique,
+      clayBody: p.clay_body_name,
+      photo: p.primary_photo || p.first_photo,
+      displayName: p.public_display_name || p.creator_name || 'Anonymous Potter',
+      creatorUsername: p.creator_username,
+      creatorAvatar: p.creator_avatar,
+      allowMessages: !!p.allow_messages,
+      userId: p.user_id,
+      createdAt: p.created_at,
+      attribution: 'Created with The Potters Mud Room',
+    }));
+
+    res.json({ pieces: results, total, page, totalPages: Math.ceil(total / limit) });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Get single public piece detail
+app.get('/api/gallery/:id', (req, res) => {
+  try {
+    const piece = db.prepare(`
+      SELECT p.*, u.display_name as creator_name, u.username as creator_username, u.avatar_filename as creator_avatar,
+        cb.name as clay_body_name
+      FROM pieces p
+      LEFT JOIN users u ON p.user_id = u.id
+      LEFT JOIN clay_bodies cb ON p.clay_body_id = cb.id
+      WHERE p.id=? AND p.is_public=1
+    `).get(req.params.id);
+    if (!piece) return res.status(404).json({ error: 'Piece not found or not public' });
+
+    const photos = db.prepare('SELECT id, filename, stage FROM piece_photos WHERE piece_id=? ORDER BY sort_order').all(req.params.id);
+    const glazes = db.prepare(`
+      SELECT g.name as glaze_name FROM piece_glazes pg
+      JOIN glazes g ON pg.glaze_id = g.id
+      WHERE pg.piece_id=?
+    `).all(req.params.id);
+
+    res.json({
+      id: piece.id,
+      title: piece.title || 'Untitled',
+      form: piece.form,
+      technique: piece.technique,
+      status: piece.status,
+      clayBody: piece.clay_body_name,
+      glazes: glazes.map(g => g.glaze_name),
+      photos: photos.map(ph => ({ id: ph.id, filename: ph.filename, stage: ph.stage })),
+      displayName: piece.public_display_name || piece.creator_name || 'Anonymous Potter',
+      creatorUsername: piece.creator_username,
+      creatorAvatar: piece.creator_avatar,
+      allowMessages: !!piece.allow_messages,
+      userId: piece.user_id,
+      createdAt: piece.created_at,
+      attribution: 'Created with The Potters Mud Room',
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// Send message to a gallery piece creator (requires auth)
+app.post('/api/gallery/:id/message', auth, (req, res) => {
+  try {
+    const piece = db.prepare('SELECT user_id, allow_messages, title FROM pieces WHERE id=? AND is_public=1').get(req.params.id);
+    if (!piece) return res.status(404).json({ error: 'Piece not found' });
+    if (!piece.allow_messages) return res.status(403).json({ error: 'Creator is not accepting messages for this piece' });
+    if (piece.user_id === req.userId) return res.status(400).json({ error: 'Cannot message yourself' });
+
+    const { message } = req.body;
+    if (!message || !message.trim()) return res.status(400).json({ error: 'Message required' });
+
+    // Use existing messages system
+    const msgId = require('uuid').v4();
+    db.prepare('INSERT INTO messages (id, sender_id, recipient_id, content, created_at) VALUES (?,?,?,?,datetime(\'now\'))')
+      .run(msgId, req.userId, piece.user_id, `[About "${piece.title || 'your piece'}" in the gallery] ${message.trim()}`);
+
+    res.json({ success: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
