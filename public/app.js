@@ -1546,7 +1546,6 @@ async function viewForumPost(id) {
       (replies || '<div class="text-sm" style="color:var(--text-muted)">No replies yet — be the first!</div>') +
       '<div class="card mt-16"><h3 style="margin-bottom:12px">Reply</h3>' +
       '<textarea class="form-textarea" id="replyBody" placeholder="Write your reply..." style="min-height:80px"></textarea>' +
-      '<div class="form-group mt-8"><label class="text-sm" style="color:var(--text-muted);margin-bottom:4px;display:block">📸 Add photos or short videos (up to 3)</label><input type="file" id="replyPhotos" accept="image/*,video/mp4,video/mov,video/webm" multiple class="form-input" style="font-size:0.85rem"></div>' +
       '<div style="display:flex;justify-content:flex-end;margin-top:8px">' +
       '<button class="btn btn-primary" onclick="submitReply(\'' + post.id + '\')">Reply</button></div></div>';
   } catch(e) { toast(e.message,'error'); }
@@ -1628,13 +1627,11 @@ async function submitReply(postId) {
   if (!body.trim()) { toast('Write something first!','error'); return; }
   const fd = new FormData();
   fd.append('body', body);
-  const files = document.getElementById('replyPhotos').files;
-  for (let i = 0; i < Math.min(files.length, 3); i++) fd.append('photos', files[i]);
   try {
     const r = await fetch('/api/forum/posts/' + postId + '/reply', { method:'POST', headers:{Authorization:'Bearer '+token}, body:fd });
-    const d = await r.json(); if (!r.ok) throw new Error(d.error);
+    const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Could not post reply');
     toast('Reply posted!','success'); trackActivity('create_reply', 'forum'); viewForumPost(postId);
-  } catch(e) { toast(e.message,'error'); }
+  } catch(e) { toast(e.message || 'Could not post reply','error'); }
 }
 // ---- app3.js: final section ----
 // Forum post modal, save, shop, profile, upgrade, init
