@@ -1574,7 +1574,7 @@ async function saveForumPost(id) {
   const body = document.getElementById('editPostBody').value.trim();
   if (!title || !body) { toast('Title and content cannot be empty', 'error'); return; }
   try {
-    await api('/api/forum/posts/' + id, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ title, content: body }) });
+    await api('/api/forum/posts/' + id, { method: 'PUT', body: { title, body } });
     toast('Post updated!', 'success');
     viewForumPost(id);
   } catch(e) { toast(e.message || 'Could not save', 'error'); }
