@@ -2076,8 +2076,8 @@ app.post('/api/forum/posts/:id/reply', auth, upload.array('photos', 1), (req, re
   res.json({ reply: fullReply });
 });
 
-// Edit own forum post
-app.put('/api/forum/posts/:id', auth, (req, res) => {
+// Edit own forum post (supports multipart for photo/video uploads)
+app.put('/api/forum/posts/:id', auth, upload.array('photos', 5), (req, res) => {
   const post = db.prepare('SELECT user_id FROM forum_posts WHERE id=?').get(req.params.id);
   if (!post) return res.status(404).json({ error: 'Not found' });
   if (post.user_id !== req.userId) return res.status(403).json({ error: 'You can only edit your own posts' });
@@ -2085,7 +2085,13 @@ app.put('/api/forum/posts/:id', auth, (req, res) => {
   const postBody = content || body || '';
   db.prepare('UPDATE forum_posts SET title=?,body=?,category_id=COALESCE(?,category_id),updated_at=datetime(\'now\') WHERE id=?')
     .run(title, postBody, categoryId || null, req.params.id);
-  res.json({ id: req.params.id, title, body: postBody, content: postBody });
+  // Save any new uploaded photos/videos
+  if (req.files && req.files.length > 0) {
+    const ins = db.prepare('INSERT INTO forum_photos (id,post_id,filename,original_name) VALUES (?,?,?,?)');
+    req.files.forEach(f => ins.run(uuidv4(), req.params.id, f.filename, f.originalname));
+  }
+  const photos = db.prepare('SELECT * FROM forum_photos WHERE post_id=?').all(req.params.id);
+  res.json({ id: req.params.id, title, body: postBody, content: postBody, photos });
 });
 
 // Edit own forum reply
