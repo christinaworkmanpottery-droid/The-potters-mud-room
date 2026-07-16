@@ -121,11 +121,16 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOADS_DIR),
   filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`)
 });
-const upload = multer({ storage, limits: { fileSize: 500 * 1024 * 1024 },
+const MAX_IMAGE_SIZE = 20 * 1024 * 1024; // 20MB for images
+const MAX_VIDEO_SIZE = 25 * 1024 * 1024; // 25MB for videos
+const upload = multer({ storage, limits: { fileSize: MAX_VIDEO_SIZE },
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     const allowed = /jpeg|jpg|png|gif|webp|heic|mp4|mov|webm/;
-    cb(null, allowed.test(ext) || file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/'));
+    if (!allowed.test(ext) && !file.mimetype.startsWith('image/') && !file.mimetype.startsWith('video/')) {
+      return cb(null, false);
+    }
+    cb(null, true);
   }
 });
 
@@ -138,7 +143,7 @@ const safeUpload = (fieldName) => (req, res, next) => {
   upload.any()(req, res, (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(413).json({ error: 'File too large. Videos must be under 500MB.' });
+        return res.status(413).json({ error: 'File too large. Videos must be under 25MB.' });
       }
       console.warn('[MULTER] Parse error, continuing without file:', err.message);
     }
