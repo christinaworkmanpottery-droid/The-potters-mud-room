@@ -4229,7 +4229,14 @@ function exitPreviewToSignup() {
 }
 
 function showBlogFromLanding() {
-  showGuestPreview('blog');
+  guestMode = true;
+  document.getElementById('landingPage').style.display = 'none';
+  document.getElementById('previewPage').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('mainApp').classList.remove('hidden');
+  const badge = document.getElementById('navTier');
+  if (badge) { badge.textContent = 'PREVIEW'; badge.className = 'tier-badge tier-free'; }
+  navigate('blog');
 }
 function exitPreviewToLanding() {
   document.getElementById('previewPage').style.display = 'none';
