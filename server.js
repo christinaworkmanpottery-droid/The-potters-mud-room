@@ -86,6 +86,37 @@ if (STRIPE_SECRET) {
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const UPLOADS_DIR = path.join(__dirname, 'data', 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+// === STARTUP DISK CLEANUP ===
+// If disk is nearly full, auto-delete video files to free space so SQLite can operate
+try {
+  const { execSync } = require('child_process');
+  const dfOutput = execSync('df -B1 ' + UPLOADS_DIR).toString();
+  const lines = dfOutput.trim().split('\n');
+  if (lines.length >= 2) {
+    const parts = lines[1].split(/\s+/);
+    const available = parseInt(parts[3], 10);
+    const totalSize = parseInt(parts[1], 10);
+    const usedPct = totalSize > 0 ? (totalSize - available) / totalSize : 0;
+    console.log(`[DISK] Available: ${(available / 1024 / 1024).toFixed(1)}MB, Used: ${(usedPct * 100).toFixed(1)}%`);
+    if (usedPct > 0.85) {
+      console.log('[DISK] Over 85% full — cleaning up video files...');
+      const files = fs.readdirSync(UPLOADS_DIR)
+        .map(f => ({ name: f, size: fs.statSync(path.join(UPLOADS_DIR, f)).size }))
+        .sort((a, b) => b.size - a.size);
+      let freed = 0;
+      for (const f of files) {
+        const ext = path.extname(f.name).toLowerCase();
+        if (['.mp4', '.mov', '.webm', '.m4v', '.avi'].includes(ext) || f.size > 50 * 1024 * 1024) {
+          try { fs.unlinkSync(path.join(UPLOADS_DIR, f.name)); freed += f.size; } catch(e) {}
+          console.log(`[DISK] Deleted ${f.name} (${(f.size / 1024 / 1024).toFixed(1)}MB)`);
+        }
+        if (freed > 100 * 1024 * 1024) break; // free at least 100MB then stop
+      }
+      console.log(`[DISK] Freed ${(freed / 1024 / 1024).toFixed(1)}MB`);
+    }
+  }
+} catch(e) { console.warn('[DISK] Startup cleanup check failed:', e.message); }
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOADS_DIR),
   filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`)
