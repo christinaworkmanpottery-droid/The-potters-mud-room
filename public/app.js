@@ -1614,9 +1614,7 @@ function openForumPostModal() {
   openModal('forumPostModal');
 }
 
-async function saveForumPost(e) {
-  e.preventDefault();
-  const title = document.getElementById('forumPostTitle').value.trim();
+async function createForumPost(e) {
   const body = document.getElementById('forumPostBody').value.trim();
   const categoryId = document.getElementById('forumPostCategory').value;
   const files = document.getElementById('forumPostPhotos')?.files;
