@@ -2041,7 +2041,17 @@ app.post('/api/forum/posts', auth, upload.array('photos', 5), (req, res) => {
   res.json({ id });
 });
 
-app.post('/api/forum/posts/:id/reply', auth, upload.array('photos', 1), (req, res) => {
+// Add photos/videos to an existing forum post (separate upload endpoint for large files)
+app.post('/api/forum/posts/:id/photos', auth, upload.array('photos', 5), (req, res) => {
+  const post = db.prepare('SELECT user_id FROM forum_posts WHERE id=?').get(req.params.id);
+  if (!post) return res.status(404).json({ error: 'Post not found' });
+  if (post.user_id !== req.userId) return res.status(403).json({ error: 'Not your post' });
+  if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
+  const ins = db.prepare('INSERT INTO forum_photos (id,post_id,filename,original_name) VALUES (?,?,?,?)');
+  req.files.forEach(f => ins.run(uuidv4(), req.params.id, f.filename, f.originalname));
+  res.json({ uploaded: req.files.length });
+});
+
   const { body } = req.body;
   if (!body) return res.status(400).json({ error: 'Reply body required' });
 

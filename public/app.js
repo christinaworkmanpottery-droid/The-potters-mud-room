@@ -1616,17 +1616,47 @@ function openForumPostModal() {
 
 async function saveForumPost(e) {
   e.preventDefault();
-  const fd = new FormData();
-  fd.append('title', document.getElementById('forumPostTitle').value);
-  fd.append('body', document.getElementById('forumPostBody').value);
-  fd.append('categoryId', document.getElementById('forumPostCategory').value);
+  const title = document.getElementById('forumPostTitle').value.trim();
+  const body = document.getElementById('forumPostBody').value.trim();
+  const categoryId = document.getElementById('forumPostCategory').value;
   const files = document.getElementById('forumPostPhotos')?.files;
-  if (files) { for (let i = 0; i < Math.min(files.length, 5); i++) fd.append('photos', files[i]); }
+
+  // Step 1: post text first (fast, no timeout risk)
+  let postId;
   try {
+    const fd = new FormData();
+    fd.append('title', title);
+    fd.append('body', body);
+    fd.append('categoryId', categoryId);
     const r = await fetch('/api/forum/posts', { method:'POST', headers:{Authorization:'Bearer '+token}, body:fd });
     const d = await r.json(); if (!r.ok) throw new Error(d.error);
-    toast('Post published!','success'); trackActivity('create_post', 'forum'); closeModal('forumPostModal'); loadForumPosts();
-  } catch(e) { toast(e.message,'error'); }
+    postId = d.id;
+  } catch(err) { toast(err.message,'error'); return; }
+
+  // Step 2: upload files one at a time in background (videos can be large)
+  if (files && files.length > 0) {
+    toast('Post published! Uploading media...', 'success');
+    trackActivity('create_post', 'forum');
+    closeModal('forumPostModal');
+    loadForumPosts();
+    let uploaded = 0, failed = 0;
+    for (let i = 0; i < Math.min(files.length, 5); i++) {
+      try {
+        const ffd = new FormData();
+        ffd.append('photos', files[i]);
+        const r2 = await fetch('/api/forum/posts/' + postId + '/photos', { method:'POST', headers:{Authorization:'Bearer '+token}, body:ffd });
+        if (r2.ok) uploaded++; else failed++;
+      } catch(err) { failed++; }
+    }
+    if (failed > 0) toast(failed + ' file(s) failed to upload. Post is live without them.', 'error');
+    else toast('Media uploaded!', 'success');
+    loadForumPosts();
+  } else {
+    toast('Post published!','success');
+    trackActivity('create_post', 'forum');
+    closeModal('forumPostModal');
+    loadForumPosts();
+  }
 }
 
 // ---- Shop ----
