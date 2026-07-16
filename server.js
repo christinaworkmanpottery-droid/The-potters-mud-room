@@ -2143,6 +2143,63 @@ app.delete('/api/forum/photos/:id', auth, (req, res) => {
   res.json({ success: true });
 });
 
+// ============ ADMIN DISK MANAGEMENT ============
+app.get('/api/admin/disk', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const files = fs.readdirSync(UPLOADS_DIR).map(f => {
+      const stat = fs.statSync(path.join(UPLOADS_DIR, f));
+      return { name: f, size: stat.size, modified: stat.mtime };
+    }).sort((a, b) => b.size - a.size);
+    const totalBytes = files.reduce((sum, f) => sum + f.size, 0);
+    const dbStat = fs.statSync(path.join(__dirname, 'data', 'pottery.db'));
+    const walPath = path.join(__dirname, 'data', 'pottery.db-wal');
+    const walSize = fs.existsSync(walPath) ? fs.statSync(walPath).size : 0;
+    res.json({ totalBytes, totalMB: (totalBytes / 1024 / 1024).toFixed(2), fileCount: files.length, dbSizeMB: ((dbStat.size + walSize) / 1024 / 1024).toFixed(2), largestFiles: files.slice(0, 20).map(f => ({ name: f.name, sizeMB: (f.size / 1024 / 1024).toFixed(2), modified: f.modified })) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/disk/cleanup-videos', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const files = fs.readdirSync(UPLOADS_DIR);
+    let deleted = 0, freedBytes = 0;
+    files.forEach(f => {
+      const ext = path.extname(f).toLowerCase();
+      if (['.mp4', '.mov', '.webm', '.m4v', '.avi'].includes(ext)) {
+        const filePath = path.join(UPLOADS_DIR, f);
+        const stat = fs.statSync(filePath);
+        freedBytes += stat.size;
+        fs.unlinkSync(filePath);
+        // Remove from database too
+        db.prepare('DELETE FROM forum_photos WHERE filename=?').run(f);
+        deleted++;
+      }
+    });
+    res.json({ deleted, freedMB: (freedBytes / 1024 / 1024).toFixed(2) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/admin/disk/cleanup-large', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  const thresholdMB = parseFloat(req.query.above || '10');
+  try {
+    const files = fs.readdirSync(UPLOADS_DIR);
+    let deleted = 0, freedBytes = 0;
+    files.forEach(f => {
+      const filePath = path.join(UPLOADS_DIR, f);
+      const stat = fs.statSync(filePath);
+      if (stat.size > thresholdMB * 1024 * 1024) {
+        freedBytes += stat.size;
+        fs.unlinkSync(filePath);
+        db.prepare('DELETE FROM forum_photos WHERE filename=?').run(f);
+        deleted++;
+      }
+    });
+    res.json({ deleted, freedMB: (freedBytes / 1024 / 1024).toFixed(2), threshold: thresholdMB + 'MB' });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ============ MERCHANT SHOP ============
 app.get('/api/shop/products', (req, res) => {
   const products = db.prepare('SELECT id,name,description,price,product_type,image_filename,is_digital FROM merchant_products WHERE is_active=1 ORDER BY sort_order, created_at').all();
