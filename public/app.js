@@ -240,8 +240,8 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     token = data.token;
     localStorage.setItem('mudlog_token', token);
     currentUser = data.user;
-    showApp();
-  } catch (err) { errEl.textContent = err.message; errEl.classList.remove('hidden'); }
+  } catch (err) { errEl.textContent = err.message; errEl.classList.remove('hidden'); return; }
+  try { showApp(); } catch(e) { console.error('showApp error:', e); }
 });
 function logout() {
   token = null; currentUser = null;
@@ -254,7 +254,8 @@ async function checkAuth() {
   // Don't override reset-password view
   if (window.location.hash.startsWith('#reset-password')) return;
   if (!token) { document.getElementById('landingPage').style.display = ''; return; }
-  try { document.getElementById('landingPage').style.display = 'none'; const d = await api('/api/auth/me'); currentUser = d.user; showApp(); } catch { logout(); }
+  try { document.getElementById('landingPage').style.display = 'none'; const d = await api('/api/auth/me'); currentUser = d.user; } catch { logout(); return; }
+  try { showApp(); } catch(e) { console.error('showApp error:', e); }
 }
 function showApp() {
   guestMode = false;
@@ -1606,7 +1607,9 @@ async function deletePostPhoto(photoId, postId) {
   try {
     await api('/api/forum/photos/' + photoId, { method: 'DELETE' });
     // Remove from DOM
-    const el = document.querySelector('[onclick*="deletePostPhoto(\''+photoId+'\''  ]');
+    // Remove from DOM
+    const wrapper = document.getElementById('editPostExistingMedia');
+    if (wrapper) { wrapper.querySelectorAll('div').forEach(div => { const btn = div.querySelector('button'); if (btn && btn.getAttribute('onclick') && btn.getAttribute('onclick').indexOf(photoId) !== -1) div.remove(); }); }
     if (el) el.closest('div[style*="position:relative"]').remove();
   } catch(e) { toast(e.message || 'Could not remove photo', 'error'); }
 }
