@@ -2125,6 +2125,18 @@ app.delete('/api/forum/replies/:id', auth, (req, res) => {
   res.json({ success: true });
 });
 
+// Delete a single forum photo (owner or admin only)
+app.delete('/api/forum/photos/:id', auth, (req, res) => {
+  const photo = db.prepare('SELECT fp.*, fpo.user_id as post_owner FROM forum_photos fp LEFT JOIN forum_posts fpo ON fp.post_id=fpo.id WHERE fp.id=?').get(req.params.id);
+  if (!photo) return res.status(404).json({ error: 'Not found' });
+  const admin = db.prepare('SELECT email FROM users WHERE id=?').get(req.userId);
+  if (photo.post_owner !== req.userId && admin?.email !== ADMIN_EMAIL) return res.status(403).json({ error: 'Not your post' });
+  const filePath = path.join(UPLOADS_DIR, photo.filename);
+  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  db.prepare('DELETE FROM forum_photos WHERE id=?').run(req.params.id);
+  res.json({ success: true });
+});
+
 // ============ MERCHANT SHOP ============
 app.get('/api/shop/products', (req, res) => {
   const products = db.prepare('SELECT id,name,description,price,product_type,image_filename,is_digital FROM merchant_products WHERE is_active=1 ORDER BY sort_order, created_at').all();

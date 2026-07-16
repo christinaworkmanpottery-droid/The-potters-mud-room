@@ -1552,17 +1552,26 @@ async function viewForumPost(id) {
 }
 
 async function editForumPost(id) {
-  const post = document.querySelector('#forumPostContent');
-  // Get current post data from the displayed content
   try {
     const data = await api('/api/forum/posts/' + id);
     const p = data.post || data;
     const title = p.title || '';
     const body = p.body || p.content || '';
+    const photos = p.photos || [];
+    const existingMedia = photos.map(ph => {
+      const isVideo = /\.(mp4|mov|webm|m4v)$/i.test(ph.filename || '');
+      const src = '/uploads/' + ph.filename;
+      const xBtn = '<button onclick="deletePostPhoto(\'' + ph.id + '\',\'' + id + '\')" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;padding:0">&times;</button>';
+      return '<div style="position:relative;display:inline-block;margin:4px">' +
+        (isVideo ? '<video src="' + src + '" style="width:80px;height:80px;object-fit:cover;border-radius:8px" muted></video>' : '<img src="' + src + '" style="width:80px;height:80px;object-fit:cover;border-radius:8px">') +
+        xBtn + '</div>';
+    }).join('');
     document.getElementById('forumPostContent').querySelector('.card').innerHTML =
       '<h3 style="margin-bottom:12px">Edit Post</h3>' +
       '<input type="text" id="editPostTitle" class="form-input" value="' + esc(title).replace(/"/g,'&quot;') + '" style="margin-bottom:12px;font-size:1.1rem;font-weight:600">' +
       '<textarea class="form-textarea" id="editPostBody" style="min-height:150px">' + esc(body) + '</textarea>' +
+      (existingMedia ? '<div style="margin-top:10px"><div style="font-size:0.85rem;color:var(--text-light);margin-bottom:4px">Current media (click &times; to remove):</div><div id="editPostExistingMedia">' + existingMedia + '</div></div>' : '') +
+      '<div style="margin-top:10px"><label style="font-size:0.85rem;color:var(--text-light)">Add photos/videos:</label><input type="file" id="editPostNewFiles" multiple accept="image/*,video/*" style="display:block;margin-top:4px"></div>' +
       '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">' +
       '<button class="btn btn-secondary" onclick="viewForumPost(\'' + id + '\')">Cancel</button>' +
       '<button class="btn btn-primary" onclick="saveForumPost(\'' + id + '\')">Save</button></div>';
@@ -1575,11 +1584,32 @@ async function saveForumPost(id) {
   if (!title || !body) { toast('Title and content cannot be empty', 'error'); return; }
   try {
     await api('/api/forum/posts/' + id, { method: 'PUT', body: { title, body } });
+    // Upload any new files
+    const newFiles = document.getElementById('editPostNewFiles')?.files;
+    if (newFiles && newFiles.length > 0) {
+      toast('Saving... uploading media', 'success');
+      for (let i = 0; i < Math.min(newFiles.length, 5); i++) {
+        try {
+          const ffd = new FormData();
+          ffd.append('photos', newFiles[i]);
+          const r = await fetch('/api/forum/posts/' + id + '/photos', { method:'POST', headers:{Authorization:'Bearer '+token}, body:ffd });
+          if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
+        } catch(err) { toast('Media upload failed: ' + err.message, 'error'); }
+      }
+    }
     toast('Post updated!', 'success');
     viewForumPost(id);
   } catch(e) { toast(e.message || 'Could not save', 'error'); }
 }
 
+async function deletePostPhoto(photoId, postId) {
+  try {
+    await api('/api/forum/photos/' + photoId, { method: 'DELETE' });
+    // Remove from DOM
+    const el = document.querySelector('[onclick*="deletePostPhoto(\''+photoId+'\''  ]');
+    if (el) el.closest('div[style*="position:relative"]').remove();
+  } catch(e) { toast(e.message || 'Could not remove photo', 'error'); }
+}
 async function deleteForumPost(id) {
   if (!confirm('Delete this post and all its replies?')) return;
   try { await api('/api/forum/posts/' + id, { method: 'DELETE' }); toast('Post deleted', 'success'); navigate('forum'); } catch(e) { toast(e.message, 'error'); }
