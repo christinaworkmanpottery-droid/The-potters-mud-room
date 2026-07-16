@@ -2052,6 +2052,7 @@ app.post('/api/forum/posts/:id/photos', auth, upload.array('photos', 5), (req, r
   res.json({ uploaded: req.files.length });
 });
 
+app.post('/api/forum/posts/:id/reply', auth, upload.array('photos', 1), (req, res) => {
   const { body } = req.body;
   if (!body) return res.status(400).json({ error: 'Reply body required' });
 
