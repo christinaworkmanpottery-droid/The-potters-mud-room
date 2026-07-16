@@ -90,7 +90,7 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOADS_DIR),
   filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`)
 });
-const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 },
+const upload = multer({ storage, limits: { fileSize: 500 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     const allowed = /jpeg|jpg|png|gif|webp|heic|mp4|mov|webm/;
@@ -106,6 +106,9 @@ const safeUpload = (fieldName) => (req, res, next) => {
   // Try the primary field name, then fallbacks
   upload.any()(req, res, (err) => {
     if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ error: 'File too large. Videos must be under 500MB.' });
+      }
       console.warn('[MULTER] Parse error, continuing without file:', err.message);
     }
     // Map any uploaded file to req.file for consistency
