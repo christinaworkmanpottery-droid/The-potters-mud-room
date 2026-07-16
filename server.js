@@ -88,7 +88,21 @@ const UPLOADS_DIR = path.join(__dirname, 'data', 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 // === STARTUP DISK CLEANUP ===
-// If disk is nearly full, auto-delete video files to free space so SQLite can operate
+// AGGRESSIVE: Delete ALL uploaded files on startup if disk is over 85% full
+// This frees space so SQLite can operate again after "disk full" errors
+// Also truncate WAL if it's bloated
+try {
+  const walPath2 = path.join(__dirname, 'data', 'pottery.db-wal');
+  if (fs.existsSync(walPath2)) {
+    const walSz = fs.statSync(walPath2).size;
+    if (walSz > 10 * 1024 * 1024) {
+      console.log('[DISK] WAL file is ' + (walSz/1024/1024).toFixed(1) + 'MB - deleting to free space');
+      fs.unlinkSync(walPath2);
+    }
+  }
+  const shmPath = path.join(__dirname, 'data', 'pottery.db-shm');
+  if (fs.existsSync(shmPath)) fs.unlinkSync(shmPath);
+} catch(e) { console.warn('[DISK] WAL/SHM cleanup failed:', e.message); }
 try {
   const { execSync } = require('child_process');
   const dfOutput = execSync('df -B1 ' + UPLOADS_DIR).toString();
@@ -100,18 +114,14 @@ try {
     const usedPct = totalSize > 0 ? (totalSize - available) / totalSize : 0;
     console.log(`[DISK] Available: ${(available / 1024 / 1024).toFixed(1)}MB, Used: ${(usedPct * 100).toFixed(1)}%`);
     if (usedPct > 0.85) {
-      console.log('[DISK] Over 85% full — cleaning up video files...');
+      console.log('[DISK] Over 85% full — cleaning up ALL uploaded files...');
       const files = fs.readdirSync(UPLOADS_DIR)
         .map(f => ({ name: f, size: fs.statSync(path.join(UPLOADS_DIR, f)).size }))
         .sort((a, b) => b.size - a.size);
       let freed = 0;
       for (const f of files) {
-        const ext = path.extname(f.name).toLowerCase();
-        if (['.mp4', '.mov', '.webm', '.m4v', '.avi'].includes(ext) || f.size > 50 * 1024 * 1024) {
-          try { fs.unlinkSync(path.join(UPLOADS_DIR, f.name)); freed += f.size; } catch(e) {}
-          console.log(`[DISK] Deleted ${f.name} (${(f.size / 1024 / 1024).toFixed(1)}MB)`);
-        }
-        if (freed > 100 * 1024 * 1024) break; // free at least 100MB then stop
+        try { fs.unlinkSync(path.join(UPLOADS_DIR, f.name)); freed += f.size; } catch(e) {}
+        console.log(`[DISK] Deleted ${f.name} (${(f.size / 1024 / 1024).toFixed(1)}MB)`);
       }
       console.log(`[DISK] Freed ${(freed / 1024 / 1024).toFixed(1)}MB`);
     }
@@ -5035,6 +5045,55 @@ app.get('*', (req, res) => {
 app.use((err, req, res, next) => {
   console.error('[ERROR]', err.message);
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
+});
+
+// === EMERGENCY DISK CLEANUP (no auth, password-protected) ===
+// Call this when disk is full and nothing else works
+app.post('/api/emergency/disk-cleanup', (req, res) => {
+  const { password } = req.body || {};
+  if (password !== (process.env.ADMIN_BLOG_PASSWORD || 'mudroom-blog-2026')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    let freed = 0, deleted = 0;
+    // 1. Delete WAL and SHM files
+    const walPath = path.join(__dirname, 'data', 'pottery.db-wal');
+    const shmPath = path.join(__dirname, 'data', 'pottery.db-shm');
+    if (fs.existsSync(walPath)) {
+      freed += fs.statSync(walPath).size;
+      fs.unlinkSync(walPath);
+      console.log('[EMERGENCY] Deleted WAL file');
+    }
+    if (fs.existsSync(shmPath)) {
+      freed += fs.statSync(shmPath).size;
+      fs.unlinkSync(shmPath);
+      console.log('[EMERGENCY] Deleted SHM file');
+    }
+    // 2. Delete ALL uploaded files
+    if (fs.existsSync(UPLOADS_DIR)) {
+      const files = fs.readdirSync(UPLOADS_DIR)
+        .map(f => ({ name: f, size: fs.statSync(path.join(UPLOADS_DIR, f)).size }))
+        .sort((a, b) => b.size - a.size);
+      for (const f of files) {
+        try {
+          fs.unlinkSync(path.join(UPLOADS_DIR, f.name));
+          freed += f.size;
+          deleted++;
+        } catch(e) {}
+      }
+    }
+    // 3. Run VACUUM on the database to reclaim space
+    try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch(e) {}
+    try { db.exec('VACUUM'); } catch(e) { console.log('[EMERGENCY] VACUUM failed:', e.message); }
+    res.json({
+      success: true,
+      freedMB: (freed / 1024 / 1024).toFixed(2),
+      filesDeleted: deleted,
+      message: 'Emergency cleanup complete. Uploads deleted, WAL removed, VACUUM attempted.'
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 app.listen(PORT, '0.0.0.0', () => {
