@@ -107,6 +107,7 @@ function showMemberGroup(filter) {
 }
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function fixUrl(u) { if (!u) return null; u = u.trim(); if (!u) return null; u = u.replace(/^hrtp(s?):/, 'http$1:').replace(/^htp(s?):/, 'http$1:').replace(/^htps:/, 'https:'); if (!/^https?:\/\//i.test(u)) u = 'https://' + u; return u; }
 
 // Check URL params for post-checkout messages and referral codes
 function checkUrlParams() {
@@ -701,7 +702,7 @@ function openClayModal(c) {
 async function saveClay(e) {
   e.preventDefault();
   const id = document.getElementById('clayId').value;
-  const body = { name:document.getElementById('clayName').value, brand:document.getElementById('clayBrand').value||null, clayType:document.getElementById('clayType').value||null, colorWet:document.getElementById('clayColorWet').value||null, colorFired:document.getElementById('clayColorFired').value||null, coneRange:document.getElementById('clayConeRange').value||null, shrinkagePct:parseFloat(document.getElementById('clayShrinkage').value)||null, absorptionPct:parseFloat(document.getElementById('clayAbsorption').value)||null, costPerBag:parseFloat(document.getElementById('clayCost').value)||null, bagWeight:document.getElementById('clayWeight').value||null, source:document.getElementById('claySource').value||null, sourceUrl:document.getElementById('claySourceUrl').value||null, buyUrl:document.getElementById('clayBuyUrl').value||null, inStock:document.getElementById('clayInStock').checked, notes:document.getElementById('clayNotes').value||null };
+  const body = { name:document.getElementById('clayName').value, brand:document.getElementById('clayBrand').value||null, clayType:document.getElementById('clayType').value||null, colorWet:document.getElementById('clayColorWet').value||null, colorFired:document.getElementById('clayColorFired').value||null, coneRange:document.getElementById('clayConeRange').value||null, shrinkagePct:parseFloat(document.getElementById('clayShrinkage').value)||null, absorptionPct:parseFloat(document.getElementById('clayAbsorption').value)||null, costPerBag:parseFloat(document.getElementById('clayCost').value)||null, bagWeight:document.getElementById('clayWeight').value||null, source:document.getElementById('claySource').value||null, sourceUrl:fixUrl(document.getElementById('claySourceUrl').value), buyUrl:fixUrl(document.getElementById('clayBuyUrl').value), inStock:document.getElementById('clayInStock').checked, notes:document.getElementById('clayNotes').value||null };
   try {
     if (id) { await api('/api/clay-bodies/'+id, {method:'PUT',body}); toast('Clay updated!','success'); trackActivity('edit_clay', 'clayBodies'); }
     else { await api('/api/clay-bodies', {method:'POST',body}); toast('Clay added!','success'); trackActivity('create_clay', 'clayBodies'); }
@@ -871,7 +872,7 @@ async function saveGlaze(e) {
   const ings = []; document.querySelectorAll('.ingredient-row').forEach(r => {
     const n = r.querySelector('.ing-name').value; if(n) ings.push({name:n, percentage:parseFloat(r.querySelector('.ing-pct').value)||null});
   });
-  const body = { name:document.getElementById('glazeName').value, glazeType:document.getElementById('glazeType').value, brand:document.getElementById('glazeBrand').value||null, sku:document.getElementById('glazeSku').value||null, colorDescription:document.getElementById('glazeColor').value||null, coneRange:document.getElementById('glazeCone').value||null, atmosphere:document.getElementById('glazeAtmosphere').value||null, surface:document.getElementById('glazeSurface').value||null, opacity:document.getElementById('glazeOpacity').value||null, recipeStatus:document.getElementById('glazeRecipeStatus')?.value||null, recipeNotes:document.getElementById('glazeRecipeNotes')?.value||null, stockStatus:document.getElementById('glazeStockStatus').value||null, source:document.getElementById('glazeSource').value||null, sourceUrl:document.getElementById('glazeSourceUrl').value||null, buyUrl:document.getElementById('glazeBuyUrl').value||null, inStock:document.getElementById('glazeInStock').checked, notes:document.getElementById('glazeNotes').value||null, ingredients:ings };
+  const body = { name:document.getElementById('glazeName').value, glazeType:document.getElementById('glazeType').value, brand:document.getElementById('glazeBrand').value||null, sku:document.getElementById('glazeSku').value||null, colorDescription:document.getElementById('glazeColor').value||null, coneRange:document.getElementById('glazeCone').value||null, atmosphere:document.getElementById('glazeAtmosphere').value||null, surface:document.getElementById('glazeSurface').value||null, opacity:document.getElementById('glazeOpacity').value||null, recipeStatus:document.getElementById('glazeRecipeStatus')?.value||null, recipeNotes:document.getElementById('glazeRecipeNotes')?.value||null, stockStatus:document.getElementById('glazeStockStatus').value||null, source:document.getElementById('glazeSource').value||null, sourceUrl:fixUrl(document.getElementById('glazeSourceUrl').value), buyUrl:fixUrl(document.getElementById('glazeBuyUrl').value), inStock:document.getElementById('glazeInStock').checked, notes:document.getElementById('glazeNotes').value||null, ingredients:ings };
   try {
     if (id) { await api('/api/glazes/'+id, {method:'PUT',body}); toast('Glaze updated!','success'); trackActivity('edit_glaze', 'glazes'); }
     else { await api('/api/glazes', {method:'POST',body}); toast('Glaze added!','success'); trackActivity('create_glaze', 'glazes'); }
@@ -3290,7 +3291,7 @@ async function saveChemical(e) {
     quantity: parseFloat(document.getElementById('chemicalQty').value)||null,
     unit: document.getElementById('chemicalUnit').value,
     source: document.getElementById('chemicalSource').value||null,
-    sourceUrl: document.getElementById('chemicalSourceUrl').value||null,
+    sourceUrl: fixUrl(document.getElementById('chemicalSourceUrl').value),
     inStock: document.getElementById('chemicalInStock').checked,
     notes: document.getElementById('chemicalNotes').value||null
   };
