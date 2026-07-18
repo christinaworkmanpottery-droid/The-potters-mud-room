@@ -241,6 +241,7 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     token = data.token;
     localStorage.setItem('mudlog_token', token);
     currentUser = data.user;
+    _loggedInThisSession = true;
   } catch (err) { errEl.textContent = err.message; errEl.classList.remove('hidden'); return; }
   try { 
     showApp();
@@ -256,11 +257,16 @@ function logout() {
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('mainApp').classList.add('hidden');
 }
+let _loggedInThisSession = false;
+
 async function checkAuth() {
   // Don't override reset-password view
   if (window.location.hash.startsWith('#reset-password')) return;
+  // If user just logged in via the form, skip checkAuth entirely
+  if (_loggedInThisSession) return;
   if (!token) { document.getElementById('landingPage').style.display = ''; return; }
   try { document.getElementById('landingPage').style.display = 'none'; const d = await api('/api/auth/me'); currentUser = d.user; } catch { logout(); return; }
+  if (!currentUser) return;
   try { showApp(); } catch(e) { console.error('showApp error:', e); }
 }
 function showApp() {
