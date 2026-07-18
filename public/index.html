@@ -1245,6 +1245,14 @@
         <h2>Goals</h2>
         <button class="btn btn-primary" onclick="openGoalModal()">+ Add Goal</button>
       </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+        <span class="text-sm" style="color:var(--text-light)">Sort:</span>
+        <select class="form-select" id="goalSortSelect" style="width:auto;font-size:0.85rem;padding:4px 10px" onchange="loadGoals()">
+          <option value="priority">Priority</option>
+          <option value="due_date">Due Date</option>
+          <option value="created">Date Added</option>
+        </select>
+      </div>
       <div id="goalsList" class="card-grid"></div>
       <div id="goalsEmpty" class="empty-state hidden">
         <div class="empty-state-icon">🎯</div>

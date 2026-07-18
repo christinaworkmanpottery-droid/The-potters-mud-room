@@ -3705,10 +3705,24 @@ async function adminCancelMember(userId, email) {
 // ============ GOALS ============
 async function loadGoals() {
   try {
-    const goals = await api('/api/goals');
+    let goals = await api('/api/goals');
     const c = document.getElementById('goalsList'), em = document.getElementById('goalsEmpty');
     if (!goals.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
+    const sortBy = document.getElementById('goalSortSelect')?.value || 'priority';
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
+    if (sortBy === 'priority') {
+      goals = [...goals].sort((a, b) => (priorityOrder[a.priority||'medium']||1) - (priorityOrder[b.priority||'medium']||1));
+    } else if (sortBy === 'due_date') {
+      goals = [...goals].sort((a, b) => {
+        if (!a.due_date && !b.due_date) return 0;
+        if (!a.due_date) return 1;
+        if (!b.due_date) return -1;
+        return new Date(a.due_date) - new Date(b.due_date);
+      });
+    } else {
+      goals = [...goals].sort((a, b) => new Date(b.created_at||0) - new Date(a.created_at||0));
+    }
     c.innerHTML = goals.map(g =>
       '<div class="card" style="cursor:pointer" onclick="editGoal(\'' + g.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(g.title) + '</div>' +
       '<div class="text-sm" style="color:var(--text-light)">' + (g.due_date ? 'Due: ' + fmtDate(g.due_date) : '') + '</div></div>' +
