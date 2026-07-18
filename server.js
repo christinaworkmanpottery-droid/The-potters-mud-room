@@ -348,7 +348,7 @@ function auth(req, res, next) {
   if (req.headers['x-admin-key'] === ADMIN_API_KEY) { req.userId = 'admin-key'; return next(); }
   const t = req.headers.authorization?.replace('Bearer ', '');
   if (!t) return res.status(401).json({ error: 'Not authenticated' });
-  try { const d = jwt.verify(t, JWT_SECRET); req.userId = d.userId; req.userTier = d.tier; next(); }
+  try { const d = jwt.verify(t, JWT_SECRET); req.userId = d.userId; const u = db.prepare('SELECT tier FROM users WHERE id=?').get(d.userId); req.userTier = u?.tier || d.tier; next(); }
   catch { res.status(401).json({ error: 'Invalid token' }); }
 }
 // Refresh tier from DB (since Stripe might have updated it)
