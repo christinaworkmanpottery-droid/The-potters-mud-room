@@ -1150,6 +1150,7 @@ async function loadSales() {
     }
   } catch(e) { toast(e.message,'error'); }
 }
+let _salePieces = [];
 function openSaleModal() {
   document.getElementById('saleId').value = '';
   document.getElementById('salePrice').value = '';
@@ -1159,13 +1160,41 @@ function openSaleModal() {
   document.getElementById('saleQuantity').value = '1';
   document.getElementById('saleItemDescription').value = '';
   document.getElementById('saleEventName').value = '';
+  document.getElementById('salePhotoPreview').innerHTML = '';
   const buyerEl = document.getElementById('saleBuyerName');
   if (buyerEl) buyerEl.value = '';
   api('/api/pieces').then(pieces => {
+    _salePieces = pieces;
     const s = document.getElementById('salePiece');
     s.innerHTML = '<option value="">Select piece...</option>' + pieces.map(p => '<option value="' + p.id + '">' + esc(p.title||'Untitled') + '</option>').join('');
   });
   openModal('saleModal');
+}
+function onSalePieceSelect(id) {
+  if (!id) return;
+  const p = _salePieces.find(x => x.id === id);
+  if (!p) return;
+  // Auto-fill description if empty
+  const descEl = document.getElementById('saleItemDescription');
+  if (!descEl.value) descEl.value = p.title || '';
+  // Auto-fill price if empty and piece has a price
+  const priceEl = document.getElementById('salePrice');
+  if (!priceEl.value && p.price) priceEl.value = p.price;
+  // Show piece photo if available
+  const preview = document.getElementById('salePhotoPreview');
+  const photo = p.photos && p.photos[0];
+  if (photo) {
+    preview.innerHTML = '<div style="margin-bottom:8px"><img src="/uploads/' + photo.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);border:2px solid var(--border)" />' +
+      (p.clay_body_name ? '<div class="text-sm" style="color:var(--text-light);margin-top:4px">🪨 ' + esc(p.clay_body_name) + '</div>' : '') +
+      (p.glaze ? '<div class="text-sm" style="color:var(--text-light)">🎨 ' + esc(p.glaze) + '</div>' : '') +
+      '</div>';
+  } else {
+    preview.innerHTML = (p.clay_body_name || p.glaze) ?
+      '<div style="margin-bottom:8px">' +
+      (p.clay_body_name ? '<div class="text-sm" style="color:var(--text-light)">🪨 ' + esc(p.clay_body_name) + '</div>' : '') +
+      (p.glaze ? '<div class="text-sm" style="color:var(--text-light)">🎨 ' + esc(p.glaze) + '</div>' : '') +
+      '</div>' : '';
+  }
 }
 
 function openBulkSaleModal() {
