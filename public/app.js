@@ -241,16 +241,8 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     token = data.token;
     localStorage.setItem('mudlog_token', token);
     currentUser = data.user;
-    console.log('LOGIN OK, tier:', currentUser?.tier, 'token:', !!token);
   } catch (err) { errEl.textContent = err.message; errEl.classList.remove('hidden'); return; }
-  try { 
-    console.log('Calling showApp...');
-    showApp(); 
-    console.log('showApp done');
-  } catch(e) { 
-    console.error('showApp error:', e.message, e.stack); 
-    toast('App error: ' + e.message, 'error');
-  }
+  showApp();
 });
 function logout() {
   token = null; currentUser = null;
