@@ -1267,6 +1267,15 @@
         <h2>Projects</h2>
         <button class="btn btn-primary" onclick="openProjectModal()">+ New Project</button>
       </div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+        <span class="text-sm" style="color:var(--text-light)">Sort:</span>
+        <select class="form-select" id="projectSortSelect" style="width:auto;font-size:0.85rem;padding:4px 10px" onchange="loadProjects()">
+          <option value="priority">Priority</option>
+          <option value="status">Status</option>
+          <option value="due_date">Due Date</option>
+          <option value="created">Date Added</option>
+        </select>
+      </div>
       <div id="projectsList" class="card-grid"></div>
       <div id="projectsEmpty" class="empty-state hidden">
         <div class="empty-state-icon">📋</div>
@@ -2235,6 +2244,14 @@
           <label>Due Date</label>
           <input type="date" class="form-input" id="projectDueDate">
         </div>
+      </div>
+      <div class="form-group">
+        <label>Priority</label>
+        <select class="form-select" id="projectPriority">
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+        </select>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('projectModal')">Cancel</button>

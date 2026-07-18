@@ -3778,15 +3778,35 @@ async function deleteGoal(id) {
 // ============ PROJECTS ============
 async function loadProjects() {
   try {
-    const projects = await api('/api/projects');
+    let projects = await api('/api/projects');
     const c = document.getElementById('projectsList'), em = document.getElementById('projectsEmpty');
     if (!projects.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
+    const sortBy = document.getElementById('projectSortSelect')?.value || 'priority';
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
+    const statusOrder = { active: 0, completed: 1, archived: 2 };
+    if (sortBy === 'priority') {
+      projects = [...projects].sort((a, b) => (priorityOrder[a.priority||'medium']||1) - (priorityOrder[b.priority||'medium']||1));
+    } else if (sortBy === 'status') {
+      projects = [...projects].sort((a, b) => (statusOrder[a.status||'active']||0) - (statusOrder[b.status||'active']||0));
+    } else if (sortBy === 'due_date') {
+      projects = [...projects].sort((a, b) => {
+        if (!a.due_date && !b.due_date) return 0;
+        if (!a.due_date) return 1;
+        if (!b.due_date) return -1;
+        return new Date(a.due_date) - new Date(b.due_date);
+      });
+    } else {
+      projects = [...projects].sort((a, b) => new Date(b.created_at||0) - new Date(a.created_at||0));
+    }
+    const priorityColors = { high: 'var(--danger)', medium: '#F4A623', low: 'var(--success)' };
     const photosHtml = (photos) => photos && photos.length > 0 ? '<div style="display:flex;gap:6px;margin:8px 0;flex-wrap:wrap">' + photos.map(p => '<img src="/uploads/' + p.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')">').join('') + '</div>' : '';
     c.innerHTML = projects.map(p =>
       '<div class="card" style="cursor:pointer" onclick="editProject(\'' + p.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(p.title) + '</div>' +
       '<div class="text-sm" style="color:var(--text-light)">' + (p.due_date ? 'Due: ' + fmtDate(p.due_date) : '') + '</div></div>' +
-      '<span class="piece-meta-tag">' + (p.status||'active') + '</span></div>' +
+      '<div style="display:flex;gap:6px;align-items:center">' +
+      (p.priority && p.priority !== 'medium' ? '<span class="piece-meta-tag" style="color:' + priorityColors[p.priority] + ';background:' + priorityColors[p.priority] + '22">' + p.priority + '</span>' : '<span class="piece-meta-tag" style="color:' + priorityColors['medium'] + ';background:' + priorityColors['medium'] + '22">medium</span>') +
+      '<span class="piece-meta-tag">' + (p.status||'active') + '</span></div></div>' +
       photosHtml(p.photos) +
       (p.description ? '<div class="text-sm mt-8">' + esc(p.description) + '</div>' : '') +
       '<div style="display:flex;gap:4px;margin-top:10px"><button onclick="event.stopPropagation();openProjectPhotoUpload(\'' + p.id + '\')" class="btn-small" title="Add photos">📸</button><button onclick="event.stopPropagation();editProject(\'' + p.id + '\')" class="btn-small">✎</button><button onclick="event.stopPropagation();deleteProject(\'' + p.id + '\')" class="btn-small">✕</button></div>' +
@@ -3801,6 +3821,7 @@ function openProjectModal(p = null) {
   document.getElementById('projectDescription').value = p?.description || '';
   document.getElementById('projectStatus').value = p?.status || 'active';
   document.getElementById('projectDueDate').value = p?.due_date || '';
+  document.getElementById('projectPriority').value = p?.priority || 'medium';
   openModal('projectModal');
 }
 
@@ -3818,7 +3839,8 @@ async function saveProject(e) {
     title: document.getElementById('projectTitle').value,
     description: document.getElementById('projectDescription').value,
     status: document.getElementById('projectStatus').value,
-    dueDate: document.getElementById('projectDueDate').value || null
+    dueDate: document.getElementById('projectDueDate').value || null,
+    priority: document.getElementById('projectPriority').value || 'medium'
   };
   try {
     if (id) { await api('/api/projects/' + id, {method:'PUT',body}); toast('Project updated!','success'); trackActivity('edit_project', 'projects'); }
