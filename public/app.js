@@ -3892,18 +3892,50 @@ async function loadEvents() {
     const c = document.getElementById('eventsList'), em = document.getElementById('eventsEmpty');
     if (!events.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
-    c.innerHTML = events.map(e => {
+    const today = new Date().toISOString().split('T')[0];
+    const upcoming = events.filter(e => e.event_date >= today);
+    const past = events.filter(e => e.event_date < today).reverse();
+    const renderEvent = (e) => {
       const start = e.event_date + (e.start_time ? 'T' + e.start_time : 'T00:00');
       const end = e.event_date + (e.end_time ? 'T' + e.end_time : 'T23:59');
       const gCalUrl = 'https://calendar.google.com/calendar/r/eventedit?text=' + encodeURIComponent(e.title) + '&dates=' + start.replace(/[-:]/g,'') + '/' + end.replace(/[-:]/g,'') + (e.location ? '&location=' + encodeURIComponent(e.location) : '') + (e.description ? '&details=' + encodeURIComponent(e.description) : '');
-      return '<div class="card" style="cursor:pointer" onclick="editEvent(\'' + e.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(e.title) + '</div>' +
-      '<div class="text-sm" style="color:var(--text-light)">' + fmtDate(e.event_date) + (e.start_time ? ' at ' + e.start_time : '') + '</div></div></div>' +
-      (e.location ? '<div class="text-sm"><strong>Location:</strong> ' + esc(e.location) + '</div>' : '') +
+      const mapsQuery = encodeURIComponent(e.address || e.location || '');
+      const mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + mapsQuery;
+      const isPast = e.event_date < today;
+      return '<div class="card" style="cursor:pointer' + (isPast ? ';opacity:0.75' : '') + '" onclick="editEvent(\'' + e.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(e.title) + '</div>' +
+      '<div class="text-sm" style="color:var(--text-light)">' + fmtDate(e.event_date) + (e.start_time ? ' at ' + e.start_time : '') + (e.end_time ? ' – ' + e.end_time : '') + '</div></div></div>' +
+      (e.location ? '<div class="text-sm mt-4">📍 ' + esc(e.location) + '</div>' : '') +
+      (e.address ? '<div class="text-sm mt-2" style="color:var(--text-light)">' + esc(e.address) + '</div>' : '') +
+      (e.website ? '<div class="text-sm mt-4"><a href="' + esc(e.website) + '" target="_blank" onclick="event.stopPropagation()" style="color:var(--primary)">🌐 ' + esc(e.website.replace(/^https?:\/\//,'')) + '</a></div>' : '') +
       (e.description ? '<div class="text-sm mt-8">' + esc(e.description) + '</div>' : '') +
-      '<div style="display:flex;gap:4px;margin-top:10px"><a href="' + gCalUrl + '" target="_blank" class="btn btn-sm btn-secondary" style="text-decoration:none" onclick="event.stopPropagation()">📱 Add to Google Calendar</a><button onclick="event.stopPropagation();editEvent(\'' + e.id + '\')" class="btn-small">✎</button><button onclick="event.stopPropagation();deleteEvent(\'' + e.id + '\')" class="btn-small">✕</button></div>' +
-      '</div>';
-    }).join('');
+      '<div style="display:flex;gap:4px;margin-top:10px;flex-wrap:wrap">' +
+      (!isPast ? '<a href="' + gCalUrl + '" target="_blank" class="btn btn-sm btn-secondary" style="text-decoration:none" onclick="event.stopPropagation()">📅 Add to Google</a>' : '') +
+      ((e.address || e.location) ? '<a href="' + mapsUrl + '" target="_blank" class="btn btn-sm btn-secondary" style="text-decoration:none" onclick="event.stopPropagation()">🗺️ Directions</a>' : '') +
+      '<button onclick="event.stopPropagation();shareEvent(\'' + e.id + '\',' + JSON.stringify(e.title) + ',' + JSON.stringify(e.event_date) + ',' + JSON.stringify(e.location||'') + ',' + JSON.stringify(e.website||'') + ')" class="btn btn-sm btn-secondary">📤 Share</button>' +
+      '<button onclick="event.stopPropagation();editEvent(\'' + e.id + '\')" class="btn-small">✎</button>' +
+      '<button onclick="event.stopPropagation();deleteEvent(\'' + e.id + '\')" class="btn-small">✕</button>' +
+      '</div></div>';
+    };
+    let html = '';
+    if (upcoming.length) {
+      html += '<h3 style="margin:0 0 12px;font-size:1rem;color:var(--text-light);text-transform:uppercase;letter-spacing:0.05em">📅 Upcoming</h3>';
+      html += upcoming.map(renderEvent).join('');
+    }
+    if (past.length) {
+      html += '<h3 style="margin:' + (upcoming.length ? '24px' : '0') + ' 0 12px;font-size:1rem;color:var(--text-light);text-transform:uppercase;letter-spacing:0.05em">🗂 Past Events</h3>';
+      html += past.map(renderEvent).join('');
+    }
+    c.innerHTML = html;
   } catch(e) { toast(e.message,'error'); }
+}
+
+function shareEvent(id, title, date, location, website) {
+  const text = title + ' — ' + fmtDate(date) + (location ? ' · ' + location : '') + (website ? '\n' + website : '');
+  if (navigator.share) {
+    navigator.share({ title: title, text: text, url: website || window.location.href }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(text).then(() => toast('Event details copied!','success')).catch(() => toast('Could not copy','error'));
+  }
 }
 
 function openEventModal(e = null) {
@@ -3914,6 +3946,8 @@ function openEventModal(e = null) {
   document.getElementById('eventStartTime').value = e?.start_time || '';
   document.getElementById('eventEndTime').value = e?.end_time || '';
   document.getElementById('eventLocation').value = e?.location || '';
+  document.getElementById('eventAddress').value = e?.address || '';
+  document.getElementById('eventWebsite').value = e?.website || '';
   openModal('eventModal');
 }
 
@@ -3933,7 +3967,9 @@ async function saveEvent(e) {
     eventDate: document.getElementById('eventDate').value,
     startTime: document.getElementById('eventStartTime').value || null,
     endTime: document.getElementById('eventEndTime').value || null,
-    location: document.getElementById('eventLocation').value || null
+    location: document.getElementById('eventLocation').value || null,
+    address: document.getElementById('eventAddress').value || null,
+    website: document.getElementById('eventWebsite').value || null
   };
   try {
     if (id) { await api('/api/events/' + id, {method:'PUT',body}); toast('Event updated!','success'); trackActivity('edit_event', 'events'); }
@@ -3949,7 +3985,19 @@ async function deleteEvent(id) {
   try { await api('/api/events/' + id, {method:'DELETE'}); toast('Deleted','success'); loadEvents(); } catch(e) { toast(e.message,'error'); }
 }
 
-async function downloadEventsiCal() {
+function showICalSubscribeUrl() {
+  if (!currentUser?.id) return toast('Please log in first', 'error');
+  const url = (window.location.origin) + '/api/events/subscribe/' + currentUser.id;
+  const msg = 'Copy this URL and paste it into Google Calendar (Other Calendars → From URL) or Apple Calendar (File → New Calendar Subscription):\n\n' + url;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(() => {
+      toast('Subscription URL copied to clipboard!', 'success');
+      alert(msg);
+    }).catch(() => alert(msg));
+  } else {
+    alert(msg);
+  }
+}
   try {
     const res = await fetch('/api/events/export/ics', { headers: { 'Authorization': 'Bearer ' + token } });
     if (!res.ok) throw new Error('Download failed');

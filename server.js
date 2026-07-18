@@ -46,7 +46,8 @@ try { db.exec("ALTER TABLE users ADD COLUMN years_experience TEXT DEFAULT NULL")
 try { db.exec("ALTER TABLE users ADD COLUMN studio_type TEXT DEFAULT NULL"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN signup_source TEXT DEFAULT NULL"); } catch(e) {}
 // Photo search exclusion flag — lets users hide specific pieces from photo search results
-try { db.exec("ALTER TABLE pieces ADD COLUMN hide_from_photo_search INTEGER DEFAULT 0"); } catch(e) {}
+try { db.exec("ALTER TABLE events ADD COLUMN website TEXT DEFAULT NULL"); } catch(e) {}
+try { db.exec("ALTER TABLE events ADD COLUMN address TEXT DEFAULT NULL"); } catch(e) {}
 // Public gallery — allow users to share finished pieces publicly
 try { db.exec("ALTER TABLE pieces ADD COLUMN is_public INTEGER DEFAULT 0"); } catch(e) {}
 try { db.exec("ALTER TABLE pieces ADD COLUMN public_display_name TEXT DEFAULT NULL"); } catch(e) {}
@@ -2941,7 +2942,7 @@ app.get('/api/events', auth, (req, res) => {
 });
 
 app.post('/api/events', auth, (req, res) => {
-  const { title, description, eventDate, startTime, endTime, location } = req.body;
+  const { title, description, eventDate, startTime, endTime, location, address, website } = req.body;
   if (!eventDate) return res.status(400).json({ error: 'Event date is required' });
 
   const user = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
@@ -2954,8 +2955,8 @@ app.post('/api/events', auth, (req, res) => {
   }
 
   const id = uuidv4();
-  db.prepare('INSERT INTO events (id,user_id,title,description,event_date,start_time,end_time,location) VALUES (?,?,?,?,?,?,?,?)')
-    .run(id, req.userId, title, description, eventDate, startTime || null, endTime || null, location || null);
+  db.prepare('INSERT INTO events (id,user_id,title,description,event_date,start_time,end_time,location,address,website) VALUES (?,?,?,?,?,?,?,?,?,?)')
+    .run(id, req.userId, title, description, eventDate, startTime || null, endTime || null, location || null, address || null, website || null);
   res.json({ id });
 });
 
@@ -2973,9 +2974,9 @@ app.post('/api/events/:id/photo', auth, upload.single('photo'), (req, res) => {
 });
 
 app.put('/api/events/:id', auth, (req, res) => {
-  const { title, description, eventDate, startTime, endTime, location } = req.body;
-  db.prepare('UPDATE events SET title=?,description=?,event_date=?,start_time=?,end_time=?,location=?,updated_at=datetime(\'now\') WHERE id=? AND user_id=?')
-    .run(title, description, eventDate, startTime, endTime, location, req.params.id, req.userId);
+  const { title, description, eventDate, startTime, endTime, location, address, website } = req.body;
+  db.prepare('UPDATE events SET title=?,description=?,event_date=?,start_time=?,end_time=?,location=?,address=?,website=?,updated_at=datetime(\'now\') WHERE id=? AND user_id=?')
+    .run(title, description, eventDate, startTime, endTime, location, address || null, website || null, req.params.id, req.userId);
   res.json({ success: true });
 });
 
@@ -2987,31 +2988,35 @@ app.delete('/api/events/:id', auth, (req, res) => {
 // Events export as iCalendar (.ics)
 app.get('/api/events/export/ics', auth, (req, res) => {
   const events = db.prepare('SELECT * FROM events WHERE user_id=? ORDER BY event_date ASC').all(req.userId);
-  let ics = `BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//The Potter's Mud Room//EN
-CALSCALE:GREGORIAN
-METHOD:PUBLISH
-X-WR-CALNAME:Events
-X-WR-TIMEZONE:UTC
-`;
+  const icsContent = buildICS(events);
+  res.setHeader('Content-Type', 'text/calendar');
+  res.setHeader('Content-Disposition', 'attachment; filename=events.ics');
+  res.send(icsContent);
+});
+
+// iCal subscription feed — live URL for Google/Apple Calendar to poll
+app.get('/api/events/subscribe/:userId', (req, res) => {
+  const user = db.prepare('SELECT id FROM users WHERE id=?').get(req.params.userId);
+  if (!user) return res.status(404).send('Not found');
+  const events = db.prepare('SELECT * FROM events WHERE user_id=? ORDER BY event_date ASC').all(req.params.userId);
+  const icsContent = buildICS(events);
+  res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-store');
+  res.send(icsContent);
+});
+
+function buildICS(events) {
+  let ics = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//The Potter's Mud Room//EN\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\nX-WR-CALNAME:Potter's Mud Room Events\nX-WR-TIMEZONE:UTC\nREFRESH-INTERVAL;VALUE=DURATION:PT1H\n`;
   events.forEach(e => {
     const dtstart = (e.event_date + (e.start_time ? 'T' + e.start_time.replace(/:/g, '') : 'T000000')).replace(/-/g, '');
     const dtend = (e.event_date + (e.end_time ? 'T' + e.end_time.replace(/:/g, '') : 'T235959')).replace(/-/g, '');
-    ics += `BEGIN:VEVENT
-DTSTART:${dtstart}Z
-DTEND:${dtend}Z
-SUMMARY:${e.title.replace(/[,;\\]/g, '\\$&')}
-DESCRIPTION:${(e.description || '').replace(/[,;\\]/g, '\\$&')}
-LOCATION:${(e.location || '').replace(/[,;\\]/g, '\\$&')}
-END:VEVENT
-`;
+    const loc = [e.location, e.address].filter(Boolean).join(', ');
+    const desc = [e.description, e.website].filter(Boolean).join('\n');
+    ics += `BEGIN:VEVENT\nUID:${e.id}@pottersmudroom\nDTSTART:${dtstart}Z\nDTEND:${dtend}Z\nSUMMARY:${(e.title||'').replace(/[,;\\]/g, '\\$&')}\nDESCRIPTION:${desc.replace(/[,;\\]/g, '\\$&').replace(/\n/g, '\\n')}\nLOCATION:${loc.replace(/[,;\\]/g, '\\$&')}\n${e.website ? 'URL:' + e.website + '\n' : ''}END:VEVENT\n`;
   });
   ics += 'END:VCALENDAR';
-  res.setHeader('Content-Type', 'text/calendar');
-  res.setHeader('Content-Disposition', 'attachment; filename=events.ics');
-  res.send(ics);
-});
+  return ics;
+}
 
 // ============ CONTACTS ============
 app.get('/api/contacts', auth, (req, res) => {
