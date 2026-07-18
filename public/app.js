@@ -7,6 +7,7 @@ let clayBodies = [];
 let glazes = [];
 let debounceTimer = null;
 let forumCategories = [];
+let _loggedInThisSession = false;
 
 // ---- Helpers ----
 async function api(path, opts = {}) {
@@ -257,7 +258,6 @@ function logout() {
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('mainApp').classList.add('hidden');
 }
-let _loggedInThisSession = false;
 
 async function checkAuth() {
   // Don't override reset-password view
