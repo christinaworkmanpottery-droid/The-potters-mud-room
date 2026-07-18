@@ -242,7 +242,12 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     localStorage.setItem('mudlog_token', token);
     currentUser = data.user;
   } catch (err) { errEl.textContent = err.message; errEl.classList.remove('hidden'); return; }
-  try { showApp(); } catch(e) { console.error('showApp error:', e); }
+  try { 
+    showApp();
+  } catch(e) { 
+    document.getElementById('authError').textContent = 'showApp failed: ' + e.message;
+    document.getElementById('authError').classList.remove('hidden');
+  }
 });
 function logout() {
   token = null; currentUser = null;
