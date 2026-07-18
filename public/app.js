@@ -340,7 +340,7 @@ function navigate(page) {
   const loaders = {
     dashboard:loadDashboard, pieces:loadPieces, clayBodies:loadClayBodies,
     glazes:loadGlazes, firings:loadFirings, casualties:loadCasualties, sales:loadSales,
-    goals:loadGoals, projects:loadProjects, events:loadEvents, contacts:loadContacts,
+    goals:loadGoals, projects:loadProjects, events:loadEvents, contacts:loadContacts, studioNotes:loadStudioNotes,
     community:loadCombos, forum:loadForum, profile:loadProfile,
     shop:loadShop, upgrade:loadUpgrade, admin:loadAdmin,
     shoppingList:loadShoppingList, chemicals:loadChemicals,
@@ -4020,6 +4020,99 @@ function printEvents() {
 }
 
 // ============ CONTACTS ============
+// ===========================================================================
+// STUDIO NOTES
+// ===========================================================================
+async function loadStudioNotes() {
+  try {
+    const notes = await api('/api/studio/notes');
+    const c = document.getElementById('studioNotesList'), em = document.getElementById('studioNotesEmpty');
+    if (!notes.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
+    em.classList.add('hidden');
+    c.innerHTML = notes.map(n =>
+      '<div class="card"><div class="card-header"><div class="card-title">' + esc(n.title || 'Untitled Note') + '</div>' +
+      '<div style="display:flex;gap:4px">' +
+      '<button onclick="openStudioNoteModal(' + JSON.stringify(n) + ')" class="btn-small">✎</button>' +
+      '<button onclick="deleteStudioNote(\'' + n.id + '\')" class="btn-small">✕</button></div></div>' +
+      '<div class="text-sm" style="white-space:pre-wrap;margin-top:8px">' + esc(n.body) + '</div>' +
+      '<div class="text-sm" style="color:var(--text-light);margin-top:8px">' + fmtDate(n.updated_at?.split('T')[0] || n.created_at?.split('T')[0]) + '</div>' +
+      '</div>'
+    ).join('');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+function openStudioNoteModal(n = null) {
+  document.getElementById('studioNoteId').value = n?.id || '';
+  document.getElementById('studioNoteTitle').value = n?.title || '';
+  document.getElementById('studioNoteBody').value = n?.body || '';
+  document.getElementById('studioNoteModalTitle').textContent = n ? 'Edit Note' : 'New Note';
+  openModal('studioNoteModal');
+}
+
+async function saveStudioNote(e) {
+  e.preventDefault();
+  const btn = e.target.querySelector('button[type=submit]');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const id = document.getElementById('studioNoteId').value;
+  const body = { title: document.getElementById('studioNoteTitle').value || null, body: document.getElementById('studioNoteBody').value };
+  try {
+    if (id) { await api('/api/studio/notes/' + id, {method:'PUT', body}); toast('Note updated ✓','success'); }
+    else { await api('/api/studio/notes', {method:'POST', body}); toast('Note saved ✓','success'); }
+    closeModal('studioNoteModal'); loadStudioNotes();
+  } catch(err) { toast(err.message,'error'); btn.disabled = false; }
+}
+
+async function deleteStudioNote(id) {
+  if (!confirm('Delete this note?')) return;
+  try { await api('/api/studio/notes/' + id, {method:'DELETE'}); toast('Note deleted','success'); loadStudioNotes(); }
+  catch(e) { toast(e.message,'error'); }
+}
+
+// ===========================================================================
+// VISUAL SEARCH (Find by Photo)
+// ===========================================================================
+async function runVisualSearch(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const preview = document.getElementById('visualSearchPreview');
+  const img = document.getElementById('visualSearchImg');
+  const status = document.getElementById('visualSearchStatus');
+  const results = document.getElementById('visualSearchResults');
+  // Show preview
+  img.src = URL.createObjectURL(file);
+  preview.style.display = 'block';
+  status.textContent = 'Searching your library...';
+  results.innerHTML = '';
+  try {
+    const formData = new FormData();
+    formData.append('photo', file);
+    const token = localStorage.getItem('token');
+    const res = await fetch('/api/pieces/photo-search', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token },
+      body: formData
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Search failed');
+    if (!data.matches || !data.matches.length) {
+      status.textContent = 'No matches found in your library.';
+      return;
+    }
+    status.textContent = data.matches.length + ' match' + (data.matches.length > 1 ? 'es' : '') + ' found:';
+    results.innerHTML = data.matches.map(m => {
+      const photo = m.photos && m.photos[0];
+      return '<div class="card" style="cursor:pointer;display:flex;gap:12px;align-items:center" onclick="openPieceDetail(\'' + m.id + '\')">' +
+        (photo ? '<img src="/uploads/' + photo.filename + '" style="width:64px;height:64px;object-fit:cover;border-radius:var(--radius-sm);flex-shrink:0">' : '<div style="width:64px;height:64px;background:var(--bg-dark);border-radius:var(--radius-sm);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.5rem">🏺</div>') +
+        '<div><div class="card-title">' + esc(m.title || 'Untitled') + '</div>' +
+        (m.clay_body_name ? '<div class="text-sm" style="color:var(--text-light)">🪨 ' + esc(m.clay_body_name) + '</div>' : '') +
+        (m.status ? '<div class="text-sm" style="color:var(--text-light)">' + esc(m.status) + '</div>' : '') +
+        '<div class="text-sm" style="color:var(--accent);font-weight:600">' + Math.round((m.score||0)*100) + '% match</div>' +
+        '</div></div>';
+    }).join('');
+  } catch(err) { status.textContent = 'Error: ' + err.message; }
+}
+
 async function loadContacts() {
   try {
     const contacts = await api('/api/contacts');
