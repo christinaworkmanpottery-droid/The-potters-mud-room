@@ -262,12 +262,23 @@ function logout() {
 async function checkAuth() {
   // Don't override reset-password view
   if (window.location.hash.startsWith('#reset-password')) return;
-  // If user just logged in via the form, skip checkAuth entirely
-  if (_loggedInThisSession) return;
   if (!token) { document.getElementById('landingPage').style.display = ''; return; }
-  try { document.getElementById('landingPage').style.display = 'none'; const d = await api('/api/auth/me'); currentUser = d.user; } catch { logout(); return; }
-  if (!currentUser) return;
-  try { showApp(); } catch(e) { console.error('showApp error:', e); }
+  try {
+    document.getElementById('landingPage').style.display = 'none';
+    const d = await api('/api/auth/me');
+    currentUser = d.user;
+    showApp();
+  } catch(e) {
+    // Only clear session on explicit auth failure, not network errors
+    const msg = (e.message || '').toLowerCase();
+    if (msg.includes('invalid token') || msg.includes('unauthorized') || msg.includes('no token')) {
+      logout();
+    } else {
+      // Network/server error — if we have a token, try to show app anyway
+      document.getElementById('landingPage').style.display = 'none';
+      showApp();
+    }
+  }
 }
 function showApp() {
   guestMode = false;
