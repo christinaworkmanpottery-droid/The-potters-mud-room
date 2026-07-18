@@ -5063,6 +5063,21 @@ app.use((err, req, res, next) => {
 
 // === EMERGENCY DISK CLEANUP (no auth, password-protected) ===
 // Call this when disk is full and nothing else works
+
+// === EMERGENCY PASSWORD RESET (no auth, password-protected) ===
+app.post('/api/emergency/reset-password', (req, res) => {
+  const { password, email, newPassword } = req.body || {};
+  if (password !== (process.env.ADMIN_BLOG_PASSWORD || 'mudroom-blog-2026')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (!email || !newPassword) return res.status(400).json({ error: 'email and newPassword required' });
+  const user = db.prepare('SELECT id FROM users WHERE LOWER(email)=?').get(email.toLowerCase());
+  if (!user) return res.status(404).json({ error: 'User not found' });
+  const hash = bcrypt.hashSync(newPassword, 10);
+  db.prepare("UPDATE users SET password_hash=?, updated_at=datetime('now') WHERE id=?").run(hash, user.id);
+  res.json({ success: true, email });
+});
+
 app.post('/api/emergency/disk-cleanup', (req, res) => {
   const { password } = req.body || {};
   if (password !== (process.env.ADMIN_BLOG_PASSWORD || 'mudroom-blog-2026')) {
