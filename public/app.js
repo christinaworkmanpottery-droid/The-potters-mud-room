@@ -268,7 +268,7 @@ function showApp() {
   badge.textContent = t.toUpperCase(); badge.className = 'tier-badge tier-' + t;
   // Show/hide tier-gated nav items
   const tier = currentUser?.tier || 'free';
-  const tierLv = { free: 0, basic: 1, mid: 1, starter: 1, top: 1 };
+  const tierLv = { free: 0, basic: 1, mid: 1, starter: 1, top: 1, unlimited: 1 };
   document.querySelectorAll('[data-min-tier]').forEach(el => {
     const min = el.getAttribute('data-min-tier');
     el.style.display = tierLv[tier] >= tierLv[min] ? '' : 'none';
@@ -276,7 +276,7 @@ function showApp() {
   checkUrlParams();
   // Restore page from URL hash, or default to dashboard
   const hashPage = window.location.hash.replace('#', '');
-  const validPages = ['dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','projects','events','contacts','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog'];
+  const validPages = ['dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','projects','events','contacts','studioNotes','visualSearch','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog'];
   if (hashPage && hashPage.startsWith('blog/')) {
     const slug = hashPage.replace('blog/', '');
     if (slug) viewBlogPost(slug);
@@ -1859,7 +1859,7 @@ async function loadUpgrade() {
   try {
     const d = await api('/api/billing/plans');
     const tier = currentUser?.tier || 'free';
-    const tierLv = { free: 0, basic: 1, mid: 1, starter: 1, top: 1 };
+    const tierLv = { free: 0, basic: 1, mid: 1, starter: 1, top: 1, unlimited: 1 };
     const founding = d.foundingMember;
 
     let html = '';
