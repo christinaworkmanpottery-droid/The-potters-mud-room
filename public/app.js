@@ -252,6 +252,8 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
   }
 });
 function logout() {
+  const stack = new Error().stack;
+  document.body.insertAdjacentHTML('beforeend', '<div style="position:fixed;top:0;left:0;right:0;background:red;color:white;z-index:99999;padding:12px;font-size:12px;word-break:break-all">LOGOUT CALLED: ' + stack.split('\n').slice(1,4).join(' | ') + '</div>');
   token = null; currentUser = null;
   localStorage.removeItem('mudlog_token');
   document.getElementById('landingPage').style.display = '';
