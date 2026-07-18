@@ -224,10 +224,8 @@ function checkResetPasswordHash() {
   }
 }
 
-async function handleLogin() {
-  const btn = document.getElementById('authSubmit');
-  if (btn.disabled) return;
-  btn.disabled = true;
+document.getElementById('authForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
   const email = document.getElementById('authEmail').value.trim().toLowerCase();
   document.getElementById('authEmail').value = email;
   const password = document.getElementById('authPassword').value;
@@ -243,12 +241,8 @@ async function handleLogin() {
     token = data.token;
     localStorage.setItem('mudlog_token', token);
     currentUser = data.user;
-    showApp();
-  } catch (err) { errEl.textContent = err.message; errEl.classList.remove('hidden'); btn.disabled = false; }
-}
-document.getElementById('authForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  handleLogin();
+  } catch (err) { errEl.textContent = err.message; errEl.classList.remove('hidden'); return; }
+  try { showApp(); } catch(e) { console.error('showApp error:', e); }
 });
 function logout() {
   token = null; currentUser = null;
@@ -257,24 +251,11 @@ function logout() {
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('mainApp').classList.add('hidden');
 }
-let _authChecked = false;
 async function checkAuth() {
   // Don't override reset-password view
   if (window.location.hash.startsWith('#reset-password')) return;
   if (!token) { document.getElementById('landingPage').style.display = ''; return; }
-  try { 
-    document.getElementById('landingPage').style.display = 'none';
-    const d = await api('/api/auth/me'); 
-    currentUser = d.user;
-    _authChecked = true;
-  } catch(e) { 
-    // Only logout on 401, not network errors
-    if (e.message && (e.message.includes('401') || e.message.toLowerCase().includes('invalid token') || e.message.toLowerCase().includes('unauthorized'))) {
-      logout(); return;
-    }
-    // Network error — keep user logged in if token exists
-    document.getElementById('landingPage').style.display = 'none';
-  }
+  try { document.getElementById('landingPage').style.display = 'none'; const d = await api('/api/auth/me'); currentUser = d.user; } catch { logout(); return; }
   try { showApp(); } catch(e) { console.error('showApp error:', e); }
 }
 function showApp() {
@@ -295,7 +276,7 @@ function showApp() {
   checkUrlParams();
   // Restore page from URL hash, or default to dashboard
   const hashPage = window.location.hash.replace('#', '');
-  const validPages = ['dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','projects','events','contacts','studioNotes','visualSearch','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog'];
+  const validPages = ['dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','projects','events','contacts','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog'];
   if (hashPage && hashPage.startsWith('blog/')) {
     const slug = hashPage.replace('blog/', '');
     if (slug) viewBlogPost(slug);
@@ -344,7 +325,7 @@ function navigate(page) {
       clayBodies:'pageClayBodies', glazes:'pageGlazes', firings:'pageFirings',
       casualties:'pageCasualties',
       sales:'pageSales', goals:'pageGoals', projects:'pageProjects', events:'pageEvents',
-      contacts:'pageContacts', studioNotes:'pageStudioNotes', visualSearch:'pageVisualSearch', community:'pageCommunity', forum:'pageForum',
+      contacts:'pageContacts', community:'pageCommunity', forum:'pageForum',
       forumPost:'pageForumPost', profile:'pageProfile', shop:'pageShop',
       upgrade:'pageUpgrade', help:'pageHelp', admin:'pageAdmin',
       shoppingList:'pageShoppingList', chemicals:'pageChemicals',
