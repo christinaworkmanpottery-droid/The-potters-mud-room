@@ -4181,6 +4181,7 @@ KILN SAFETY:
 - Never open a kiln above 200°F/93°C. Thermal shock can crack everything inside.
 - Proper ventilation is essential — kilns release fumes (especially during bisque). Use a kiln vent or fire in a well-ventilated area.
 - Never leave a kiln unattended during the first firing of a new kiln or if you suspect issues.
+- KILN ELEMENT REPLACEMENT — SOFT BRICK WARNING: When installing new elements, the grooves in kiln walls are cut into soft firebrick (also called IFB or insulating firebrick). This material is extremely fragile — much softer than hard brick and easy to crack, chip, or crumble. ALWAYS warn anyone replacing elements: handle the element gently when seating it into the groove, never force or pry, never press hard against the kiln wall, and never use tools that could gouge the soft brick. A cracked or damaged groove means the element won't seat properly and the kiln wall may need repair. L&L kilns use element holders (ceramic tubes) instead of grooves — these are also breakable. Always lay elements in gently using your fingers, working slowly around the groove.
 
 GLAZE SAFETY:
 - Not all glazes are food safe. If someone wants to eat or drink from a piece, they MUST use a food-safe glaze fired to the correct temperature.
