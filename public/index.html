@@ -703,7 +703,7 @@
     <div class="auth-logo">🏺</div>
     <h2 class="auth-title">The Potter's Mud Room</h1>
     <p class="auth-subtitle">Your pottery journal — clay, glazes &amp; community</p>
-    <form id="authForm">
+    <form id="authForm" onsubmit="return false;">
       <div id="nameField" class="form-group hidden">
         <input type="text" id="authName" class="form-input" placeholder="Display name">
       </div>
@@ -713,7 +713,7 @@
       <div class="form-group">
         <input type="password" id="authPassword" class="form-input" placeholder="Password" required minlength="6">
       </div>
-      <button type="submit" class="btn btn-primary btn-lg" style="width:100%" id="authSubmit">Sign In</button>
+      <button type="button" class="btn btn-primary btn-lg" style="width:100%" id="authSubmit" onclick="handleLogin()">Sign In</button>
       <div id="authError" class="auth-error hidden"></div>
       <p id="forgotPasswordLink" class="auth-toggle" style="margin-top:8px;margin-bottom:0">
         <a onclick="showForgotPassword()" style="cursor:pointer;font-size:0.85rem;color:#6b4c3b">Forgot Password?</a>

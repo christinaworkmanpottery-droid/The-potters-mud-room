@@ -224,8 +224,10 @@ function checkResetPasswordHash() {
   }
 }
 
-document.getElementById('authForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
+async function handleLogin() {
+  const btn = document.getElementById('authSubmit');
+  if (btn.disabled) return;
+  btn.disabled = true;
   const email = document.getElementById('authEmail').value.trim().toLowerCase();
   document.getElementById('authEmail').value = email;
   const password = document.getElementById('authPassword').value;
@@ -241,8 +243,12 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     token = data.token;
     localStorage.setItem('mudlog_token', token);
     currentUser = data.user;
-  } catch (err) { errEl.textContent = err.message; errEl.classList.remove('hidden'); return; }
-  showApp();
+    showApp();
+  } catch (err) { errEl.textContent = err.message; errEl.classList.remove('hidden'); btn.disabled = false; }
+}
+document.getElementById('authForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  handleLogin();
 });
 function logout() {
   token = null; currentUser = null;
