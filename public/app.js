@@ -241,8 +241,16 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     token = data.token;
     localStorage.setItem('mudlog_token', token);
     currentUser = data.user;
+    console.log('LOGIN OK, tier:', currentUser?.tier, 'token:', !!token);
   } catch (err) { errEl.textContent = err.message; errEl.classList.remove('hidden'); return; }
-  try { showApp(); } catch(e) { console.error('showApp error:', e); }
+  try { 
+    console.log('Calling showApp...');
+    showApp(); 
+    console.log('showApp done');
+  } catch(e) { 
+    console.error('showApp error:', e.message, e.stack); 
+    toast('App error: ' + e.message, 'error');
+  }
 });
 function logout() {
   token = null; currentUser = null;
@@ -325,7 +333,7 @@ function navigate(page) {
       clayBodies:'pageClayBodies', glazes:'pageGlazes', firings:'pageFirings',
       casualties:'pageCasualties',
       sales:'pageSales', goals:'pageGoals', projects:'pageProjects', events:'pageEvents',
-      contacts:'pageContacts', community:'pageCommunity', forum:'pageForum',
+      contacts:'pageContacts', studioNotes:'pageStudioNotes', visualSearch:'pageVisualSearch', community:'pageCommunity', forum:'pageForum',
       forumPost:'pageForumPost', profile:'pageProfile', shop:'pageShop',
       upgrade:'pageUpgrade', help:'pageHelp', admin:'pageAdmin',
       shoppingList:'pageShoppingList', chemicals:'pageChemicals',
