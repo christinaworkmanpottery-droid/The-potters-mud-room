@@ -67,7 +67,7 @@ function toast(msg, type = '') {
   el.className = 'toast ' + type;
   el.textContent = msg;
   document.getElementById('toastContainer').appendChild(el);
-  setTimeout(() => el.remove(), 4000);
+  setTimeout(() => el.remove(), 5000);
 }
 function fmtDate(d) {
   if (!d) return '—';
@@ -868,16 +868,19 @@ function addIngredient(name, pct) {
 }
 async function saveGlaze(e) {
   e.preventDefault();
+  const btn = e.target.querySelector('button[type=submit]');
+  if (btn.disabled) return;
+  btn.disabled = true;
   const id = document.getElementById('glazeId').value;
   const ings = []; document.querySelectorAll('.ingredient-row').forEach(r => {
     const n = r.querySelector('.ing-name').value; if(n) ings.push({name:n, percentage:parseFloat(r.querySelector('.ing-pct').value)||null});
   });
   const body = { name:document.getElementById('glazeName').value, glazeType:document.getElementById('glazeType').value, brand:document.getElementById('glazeBrand').value||null, sku:document.getElementById('glazeSku').value||null, colorDescription:document.getElementById('glazeColor').value||null, coneRange:document.getElementById('glazeCone').value||null, atmosphere:document.getElementById('glazeAtmosphere').value||null, surface:document.getElementById('glazeSurface').value||null, opacity:document.getElementById('glazeOpacity').value||null, recipeStatus:document.getElementById('glazeRecipeStatus')?.value||null, recipeNotes:document.getElementById('glazeRecipeNotes')?.value||null, stockStatus:document.getElementById('glazeStockStatus').value||null, source:document.getElementById('glazeSource').value||null, sourceUrl:fixUrl(document.getElementById('glazeSourceUrl').value), buyUrl:fixUrl(document.getElementById('glazeBuyUrl').value), inStock:document.getElementById('glazeInStock').checked, notes:document.getElementById('glazeNotes').value||null, ingredients:ings };
   try {
-    if (id) { await api('/api/glazes/'+id, {method:'PUT',body}); toast('Glaze updated!','success'); trackActivity('edit_glaze', 'glazes'); }
-    else { await api('/api/glazes', {method:'POST',body}); toast('Glaze added!','success'); trackActivity('create_glaze', 'glazes'); }
+    if (id) { await api('/api/glazes/'+id, {method:'PUT',body}); toast('Glaze updated! ✓','success'); trackActivity('edit_glaze', 'glazes'); }
+    else { await api('/api/glazes', {method:'POST',body}); toast('Glaze added! ✓','success'); trackActivity('create_glaze', 'glazes'); }
     closeModal('glazeModal'); loadGlazes();
-  } catch(e) { toast(e.message,'error'); }
+  } catch(err) { toast(err.message,'error'); btn.disabled = false; }
 }
 async function deleteGlaze(id) {
   if (!confirm('Delete this glaze?')) return;
