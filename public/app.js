@@ -257,11 +257,24 @@ function logout() {
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('mainApp').classList.add('hidden');
 }
+let _authChecked = false;
 async function checkAuth() {
   // Don't override reset-password view
   if (window.location.hash.startsWith('#reset-password')) return;
   if (!token) { document.getElementById('landingPage').style.display = ''; return; }
-  try { document.getElementById('landingPage').style.display = 'none'; const d = await api('/api/auth/me'); currentUser = d.user; } catch { logout(); return; }
+  try { 
+    document.getElementById('landingPage').style.display = 'none';
+    const d = await api('/api/auth/me'); 
+    currentUser = d.user;
+    _authChecked = true;
+  } catch(e) { 
+    // Only logout on 401, not network errors
+    if (e.message && (e.message.includes('401') || e.message.toLowerCase().includes('invalid token') || e.message.toLowerCase().includes('unauthorized'))) {
+      logout(); return;
+    }
+    // Network error — keep user logged in if token exists
+    document.getElementById('landingPage').style.display = 'none';
+  }
   try { showApp(); } catch(e) { console.error('showApp error:', e); }
 }
 function showApp() {
