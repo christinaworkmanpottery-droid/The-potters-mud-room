@@ -2540,17 +2540,7 @@ async function previewBlogPost(id) {
   } catch(e) { toast(e.message, 'error'); }
 }
 
-async function publishBlogPost(id) {
-  if (!confirm('Publish this post? It will be visible to all users on the blog.')) return;
-  try {
-    await api('/api/admin/blog/' + id + '/publish', 'PUT');
-    toast('Post published!', 'success');
-    // Close any preview overlay
-    const overlay = document.getElementById('blogPreviewOverlay');
-    if (overlay) overlay.remove();
-    loadAdminBlogPosts();
-  } catch(e) { toast(e.message, 'error'); }
-}
+
 
 async function saveBlogPost() {
   const body = {
@@ -4022,6 +4012,7 @@ function showICalSubscribeUrl() {
     alert(msg);
   }
 }
+async function downloadEventsiCal() {
   try {
     const res = await fetch('/api/events/export/ics', { headers: { 'Authorization': 'Bearer ' + token } });
     if (!res.ok) throw new Error('Download failed');
