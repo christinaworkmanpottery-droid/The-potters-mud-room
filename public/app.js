@@ -4101,7 +4101,7 @@ async function runVisualSearch(input) {
   try {
     const formData = new FormData();
     formData.append('photo', file);
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('mudlog_token');
     const res = await fetch('/api/pieces/photo-search', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token },
