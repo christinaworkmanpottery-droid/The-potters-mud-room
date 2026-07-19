@@ -2708,12 +2708,11 @@
   </div>
 </div>
 
-<script src="app.js?v=20260719c"></script>
+<script src="app.js?v=20260719d"></script>
 
   <!-- Studio Note Modal -->
-  <div id="studioNoteModal" class="modal hidden">
-    <div class="modal-overlay" onclick="closeModal('studioNoteModal')"></div>
-    <div class="modal-content">
+  <div id="studioNoteModal" class="modal-overlay" onclick="if(event.target===this)closeModal('studioNoteModal')">
+    <div class="modal">
       <div class="modal-header">
         <h3 id="studioNoteModalTitle">New Note</h3>
         <button class="modal-close" onclick="closeModal('studioNoteModal')">&times;</button>
