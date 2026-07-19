@@ -2609,7 +2609,13 @@
         <input type="text" class="form-input" id="clayPhotoNotes" placeholder="e.g., Standard 266, cone 6 reduction">
       </div>
       <div class="form-group">
-        <input type="file" id="clayPhotoFile" accept="image/*" class="form-input">
+        <label>Photo</label>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <button type="button" class="btn btn-secondary" style="flex:1" onclick="document.getElementById('clayPhotoFile').removeAttribute('capture');document.getElementById('clayPhotoFile').click()">📁 Gallery</button>
+          <button type="button" class="btn btn-secondary" style="flex:1" onclick="document.getElementById('clayPhotoFile').setAttribute('capture','environment');document.getElementById('clayPhotoFile').click()">📷 Camera</button>
+        </div>
+        <input type="file" id="clayPhotoFile" accept="image/*" style="display:none">
+        <div id="clayPhotoFileName" class="text-sm" style="color:var(--text-light);margin-top:4px"></div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('clayPhotoModal')">Cancel</button>
@@ -2642,7 +2648,13 @@
         <input type="text" class="form-input" id="glazePhotoNotes" placeholder="e.g., Over Standard 266 at cone 6">
       </div>
       <div class="form-group">
-        <input type="file" id="glazePhotoFile" accept="image/*" class="form-input">
+        <label>Photo</label>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <button type="button" class="btn btn-secondary" style="flex:1" onclick="document.getElementById('glazePhotoFile').removeAttribute('capture');document.getElementById('glazePhotoFile').click()">📁 Gallery</button>
+          <button type="button" class="btn btn-secondary" style="flex:1" onclick="document.getElementById('glazePhotoFile').setAttribute('capture','environment');document.getElementById('glazePhotoFile').click()">📷 Camera</button>
+        </div>
+        <input type="file" id="glazePhotoFile" accept="image/*" style="display:none">
+        <div id="glazePhotoFileName" class="text-sm" style="color:var(--text-light);margin-top:4px"></div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('glazePhotoModal')">Cancel</button>

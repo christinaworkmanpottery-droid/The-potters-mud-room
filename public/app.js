@@ -3154,10 +3154,19 @@ async function deleteClayPhoto(photoId) {
 function openClayPhotoUpload(clayId) {
   document.getElementById('clayPhotoClayId').value = clayId;
   document.getElementById('clayPhotoFile').value = '';
+  document.getElementById('clayPhotoFileName').textContent = '';
   document.getElementById('clayPhotoLabel').value = 'raw';
   document.getElementById('clayPhotoNotes').value = '';
   openModal('clayPhotoModal');
 }
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('clayPhotoFile')?.addEventListener('change', function() {
+    document.getElementById('clayPhotoFileName').textContent = this.files[0]?.name || '';
+  });
+  document.getElementById('glazePhotoFile')?.addEventListener('change', function() {
+    document.getElementById('glazePhotoFileName').textContent = this.files[0]?.name || '';
+  });
+});
 async function uploadClayPhoto(e) {
   e.preventDefault();
   const clayId = document.getElementById('clayPhotoClayId').value;
@@ -3176,6 +3185,7 @@ async function uploadClayPhoto(e) {
 function openGlazePhotoUpload(glazeId) {
   document.getElementById('glazePhotoGlazeId').value = glazeId;
   document.getElementById('glazePhotoFile').value = '';
+  document.getElementById('glazePhotoFileName').textContent = '';
   document.getElementById('glazePhotoLabel').value = '';
   document.getElementById('glazePhotoNotes').value = '';
   openModal('glazePhotoModal');
