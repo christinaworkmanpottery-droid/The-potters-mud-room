@@ -298,7 +298,7 @@ function showApp() {
   checkUrlParams();
   // Restore page from URL hash, or default to dashboard
   const hashPage = window.location.hash.replace('#', '');
-  const validPages = ['dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','projects','events','contacts','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog'];
+  const validPages = ['dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','projects','events','contacts','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog','studioNotes','visualSearch'];
   if (hashPage && hashPage.startsWith('blog/')) {
     const slug = hashPage.replace('blog/', '');
     if (slug) viewBlogPost(slug);
@@ -355,7 +355,8 @@ function navigate(page) {
       memberProfile:'pageMemberProfile',
       notifications:'pageNotifications', messages:'pageMessages', messageThread:'pageMessageThread',
       blog:'pageBlog', blogPost:'pageBlogPost', publicCombo:'pagePublicCombo',
-      aiChat:'pageAiChat'
+      aiChat:'pageAiChat',
+      studioNotes:'pageStudioNotes', visualSearch:'pageVisualSearch'
     };
     const el = document.getElementById(map[page]); if (el) el.classList.add('active');
     try { const nb = document.querySelector('.nav-link[data-page="' + page + '"]'); if (nb) nb.classList.add('active'); } catch(e) {}
