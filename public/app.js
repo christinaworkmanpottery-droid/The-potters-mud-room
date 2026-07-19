@@ -4043,15 +4043,21 @@ async function loadStudioNotes() {
     const c = document.getElementById('studioNotesList'), em = document.getElementById('studioNotesEmpty');
     if (!notes.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
-    c.innerHTML = notes.map(n =>
-      '<div class="card"><div class="card-header"><div class="card-title">' + esc(n.title || 'Untitled Note') + '</div>' +
+    c.innerHTML = notes.map(n => {
+      const preview = n.body.length > 120 ? esc(n.body.slice(0,120)) + '…' : esc(n.body);
+      const shareText = encodeURIComponent((n.title ? n.title + '\n\n' : '') + n.body);
+      const shareUrl = 'mailto:?subject=' + encodeURIComponent(n.title || 'Studio Note') + '&body=' + shareText;
+      const smsUrl = 'sms:?body=' + shareText;
+      return '<div class="card"><div class="card-header"><div class="card-title">' + esc(n.title || 'Untitled Note') + '</div>' +
       '<div style="display:flex;gap:4px">' +
-      '<button onclick="openStudioNoteModal(' + JSON.stringify(n) + ')" class="btn-small">✎</button>' +
-      '<button onclick="deleteStudioNote(\'' + n.id + '\')" class="btn-small">✕</button></div></div>' +
-      '<div class="text-sm" style="white-space:pre-wrap;margin-top:8px">' + esc(n.body) + '</div>' +
+      '<a href="' + shareUrl + '" class="btn-small" title="Share via email">✉</a>' +
+      '<a href="' + smsUrl + '" class="btn-small" title="Share via text">💬</a>' +
+      '<button onclick="openStudioNoteModal(' + JSON.stringify(n).replace(/"/g,'&quot;') + ')" class="btn-small" title="Edit">✎</button>' +
+      '<button onclick="deleteStudioNote(\'' + n.id + '\')" class="btn-small" title="Delete">✕</button></div></div>' +
+      '<div class="text-sm" style="white-space:pre-wrap;margin-top:8px">' + preview + '</div>' +
       '<div class="text-sm" style="color:var(--text-light);margin-top:8px">' + fmtDate(n.updated_at?.split('T')[0] || n.created_at?.split('T')[0]) + '</div>' +
-      '</div>'
-    ).join('');
+      '</div>';
+    }).join('');
   } catch(e) { toast(e.message,'error'); }
 }
 
