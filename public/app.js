@@ -570,6 +570,7 @@ function openPieceModal(p) {
   document.getElementById('pieceCasualtyNotes').value = p?.casualty_notes||'';
   document.getElementById('pieceCasualtyLesson').value = p?.casualty_lesson||'';
   toggleCasualtyFields();
+  const ppf = document.getElementById('pieceInlinePhotoFile'); if (ppf) ppf.value = '';
   openModal('pieceModal');
 }
 async function editPiece(id) { try { openPieceModal(await api('/api/pieces/'+id)); } catch(e) { toast(e.message,'error'); } }
@@ -594,8 +595,16 @@ async function savePiece(e) {
     casualtyLesson: document.getElementById('pieceCasualtyLesson').value||null
   };
   try {
+    let savedId = id;
     if (id) { await api('/api/pieces/'+id, {method:'PUT',body}); toast('Piece updated!','success'); trackActivity('edit_piece', 'pieces'); }
-    else { await api('/api/pieces', {method:'POST',body}); toast('Piece added!','success'); trackActivity('create_piece', 'pieces'); }
+    else { const res = await api('/api/pieces', {method:'POST',body}); savedId = res.id; toast('Piece added!','success'); trackActivity('create_piece', 'pieces'); }
+    const photoFile = document.getElementById('pieceInlinePhotoFile');
+    if (photoFile && photoFile.files[0] && savedId) {
+      try {
+        const fd = new FormData(); fd.append('photo', photoFile.files[0]); fd.append('stage', 'finished');
+        await fetch('/api/pieces/' + savedId + '/photos', {method:'POST', headers:{Authorization:'Bearer '+token}, body:fd});
+      } catch(pe) { console.warn('Photo upload failed:', pe); }
+    }
     closeModal('pieceModal');
     if (currentPage==='dashboard') loadDashboard(); else if (currentPage==='pieces') loadPieces(); else if (currentPage==='pieceDetail'&&id) viewPiece(id);
   } catch(err) { toast(err.message,'error'); }
@@ -720,6 +729,7 @@ function openClayModal(c) {
   document.getElementById('clayBuyUrl').value = c?.buy_url||'';
   document.getElementById('clayInStock').checked = c?.in_stock !== 0;
   document.getElementById('clayNotes').value = c?.notes||'';
+  const cpf = document.getElementById('clayInlinePhotoFile'); if (cpf) cpf.value = '';
   openModal('clayModal');
 }
 async function saveClay(e) {
@@ -727,8 +737,16 @@ async function saveClay(e) {
   const id = document.getElementById('clayId').value;
   const body = { name:document.getElementById('clayName').value, brand:document.getElementById('clayBrand').value||null, clayType:document.getElementById('clayType').value||null, colorWet:document.getElementById('clayColorWet').value||null, colorFired:document.getElementById('clayColorFired').value||null, coneRange:document.getElementById('clayConeRange').value||null, shrinkagePct:parseFloat(document.getElementById('clayShrinkage').value)||null, absorptionPct:parseFloat(document.getElementById('clayAbsorption').value)||null, costPerBag:parseFloat(document.getElementById('clayCost').value)||null, bagWeight:document.getElementById('clayWeight').value||null, source:document.getElementById('claySource').value||null, sourceUrl:fixUrl(document.getElementById('claySourceUrl').value), buyUrl:fixUrl(document.getElementById('clayBuyUrl').value), inStock:document.getElementById('clayInStock').checked, notes:document.getElementById('clayNotes').value||null };
   try {
+    let savedId = id;
     if (id) { await api('/api/clay-bodies/'+id, {method:'PUT',body}); toast('Clay updated!','success'); trackActivity('edit_clay', 'clayBodies'); }
-    else { await api('/api/clay-bodies', {method:'POST',body}); toast('Clay added!','success'); trackActivity('create_clay', 'clayBodies'); }
+    else { const res = await api('/api/clay-bodies', {method:'POST',body}); savedId = res.id; toast('Clay added!','success'); trackActivity('create_clay', 'clayBodies'); }
+    const photoFile = document.getElementById('clayInlinePhotoFile');
+    if (photoFile && photoFile.files[0] && savedId) {
+      try {
+        const fd = new FormData(); fd.append('photo', photoFile.files[0]); fd.append('label', 'raw');
+        await fetch('/api/clay-bodies/' + savedId + '/photos', {method:'POST', headers:{Authorization:'Bearer '+token}, body:fd});
+      } catch(pe) { console.warn('Clay photo upload failed:', pe); }
+    }
     closeModal('clayModal'); loadClayBodies();
   } catch(e) { toast(e.message,'error'); }
 }
@@ -875,6 +893,7 @@ function openGlazeModal(g) {
   } else {
     claySection.classList.add('hidden');
   }
+  const gpf = document.getElementById('glazeInlinePhotoFile'); if (gpf) gpf.value = '';
   openModal('glazeModal');
 }
 function toggleRecipeFields() {
@@ -900,8 +919,16 @@ async function saveGlaze(e) {
   });
   const body = { name:document.getElementById('glazeName').value, glazeType:document.getElementById('glazeType').value, brand:document.getElementById('glazeBrand').value||null, sku:document.getElementById('glazeSku').value||null, colorDescription:document.getElementById('glazeColor').value||null, coneRange:document.getElementById('glazeCone').value||null, atmosphere:document.getElementById('glazeAtmosphere').value||null, surface:document.getElementById('glazeSurface').value||null, opacity:document.getElementById('glazeOpacity').value||null, recipeStatus:document.getElementById('glazeRecipeStatus')?.value||null, recipeNotes:document.getElementById('glazeRecipeNotes')?.value||null, stockStatus:document.getElementById('glazeStockStatus').value||null, source:document.getElementById('glazeSource').value||null, sourceUrl:fixUrl(document.getElementById('glazeSourceUrl').value), buyUrl:fixUrl(document.getElementById('glazeBuyUrl').value), inStock:document.getElementById('glazeInStock').checked, notes:document.getElementById('glazeNotes').value||null, ingredients:ings };
   try {
+    let savedId = id;
     if (id) { await api('/api/glazes/'+id, {method:'PUT',body}); toast('Glaze updated! ✓','success'); trackActivity('edit_glaze', 'glazes'); }
-    else { await api('/api/glazes', {method:'POST',body}); toast('Glaze added! ✓','success'); trackActivity('create_glaze', 'glazes'); }
+    else { const res = await api('/api/glazes', {method:'POST',body}); savedId = res.id; toast('Glaze added! ✓','success'); trackActivity('create_glaze', 'glazes'); }
+    const photoFile = document.getElementById('glazeInlinePhotoFile');
+    if (photoFile && photoFile.files[0] && savedId) {
+      try {
+        const fd = new FormData(); fd.append('photo', photoFile.files[0]); fd.append('label', '');
+        await fetch('/api/glazes/' + savedId + '/photos', {method:'POST', headers:{Authorization:'Bearer '+token}, body:fd});
+      } catch(pe) { console.warn('Glaze photo upload failed:', pe); }
+    }
     closeModal('glazeModal'); loadGlazes();
   } catch(err) { toast(err.message,'error'); btn.disabled = false; }
 }
