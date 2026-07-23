@@ -3186,26 +3186,36 @@ function openClayPhotoUpload(clayId) {
   document.getElementById('clayPhotoNotes').value = '';
   openModal('clayPhotoModal');
 }
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('clayPhotoFile')?.addEventListener('change', function() {
-    document.getElementById('clayPhotoFileName').textContent = this.files[0]?.name || '';
-  });
-  document.getElementById('glazePhotoFile')?.addEventListener('change', function() {
-    document.getElementById('glazePhotoFileName').textContent = this.files[0]?.name || '';
-  });
-});
+// showPhotoPreview — used by clay and glaze photo modals
+function showPhotoPreview(input, previewId, nameId) {
+  const f = input.files[0];
+  if (nameId) document.getElementById(nameId).textContent = f ? f.name : '';
+  const preview = document.getElementById(previewId);
+  if (!preview) return;
+  if (!f) { preview.innerHTML = ''; return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    preview.innerHTML = '<img src="' + e.target.result + '" style="max-width:100%;max-height:160px;border-radius:var(--radius-sm);object-fit:contain">';
+  };
+  reader.readAsDataURL(f);
+}
 async function uploadClayPhoto(e) {
   e.preventDefault();
   const clayId = document.getElementById('clayPhotoClayId').value;
-  const f = document.getElementById('clayPhotoFile').files[0]; if (!f) return;
+  const f = document.getElementById('clayPhotoFile').files[0]; if (!f) { toast('Please select a photo first','error'); return; }
+  const btn = e.target.querySelector('button[type=submit]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Uploading...'; }
   const fd = new FormData(); fd.append('photo', f);
   fd.append('label', document.getElementById('clayPhotoLabel').value);
   fd.append('notes', document.getElementById('clayPhotoNotes').value);
   try {
     const r = await fetch('/api/clay-bodies/' + clayId + '/photos', {method:'POST', headers:{Authorization:'Bearer '+token}, body:fd});
     const d = await r.json(); if (!r.ok) throw new Error(d.error);
+    document.getElementById('clayPhotoFile').value = '';
+    document.getElementById('clayPhotoFileName').textContent = '';
     toast('Photo uploaded!','success'); closeModal('clayPhotoModal'); loadClayBodies();
   } catch(e) { toast(e.message,'error'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'Upload Photo'; } }
 }
 
 // Glaze photo modal upload
@@ -3220,15 +3230,20 @@ function openGlazePhotoUpload(glazeId) {
 async function uploadGlazePhotoModal(e) {
   e.preventDefault();
   const glazeId = document.getElementById('glazePhotoGlazeId').value;
-  const f = document.getElementById('glazePhotoFile').files[0]; if (!f) return;
+  const f = document.getElementById('glazePhotoFile').files[0]; if (!f) { toast('Please select a photo first','error'); return; }
+  const btn = e.target.querySelector('button[type=submit]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Uploading...'; }
   const fd = new FormData(); fd.append('photo', f);
   fd.append('label', document.getElementById('glazePhotoLabel').value);
   fd.append('notes', document.getElementById('glazePhotoNotes').value);
   try {
     const r = await fetch('/api/glazes/' + glazeId + '/photos', {method:'POST', headers:{Authorization:'Bearer '+token}, body:fd});
     const d = await r.json(); if (!r.ok) throw new Error(d.error);
+    document.getElementById('glazePhotoFile').value = '';
+    document.getElementById('glazePhotoFileName').textContent = '';
     toast('Photo uploaded!','success'); closeModal('glazePhotoModal'); loadGlazes();
   } catch(e) { toast(e.message,'error'); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = 'Upload Photo'; } }
 }
 
 // Duplicate piece

@@ -2622,12 +2622,9 @@
       </div>
       <div class="form-group">
         <label>Photo</label>
-        <div style="display:flex;gap:8px;margin-bottom:8px">
-          <button type="button" class="btn btn-secondary" style="flex:1" onclick="document.getElementById('clayPhotoFile').removeAttribute('capture');document.getElementById('clayPhotoFile').click()">📁 Gallery</button>
-          <button type="button" class="btn btn-secondary" style="flex:1" onclick="document.getElementById('clayPhotoFile').setAttribute('capture','environment');document.getElementById('clayPhotoFile').click()">📷 Camera</button>
-        </div>
-        <input type="file" id="clayPhotoFile" accept="image/*" style="display:none">
+        <input type="file" id="clayPhotoFile" accept="image/*" class="form-input" style="font-size:0.85rem" onchange="showPhotoPreview(this,'clayPhotoPreview','clayPhotoFileName')">
         <div id="clayPhotoFileName" class="text-sm" style="color:var(--text-light);margin-top:4px"></div>
+        <div id="clayPhotoPreview" style="margin-top:8px"></div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('clayPhotoModal')">Cancel</button>
@@ -2661,12 +2658,9 @@
       </div>
       <div class="form-group">
         <label>Photo</label>
-        <div style="display:flex;gap:8px;margin-bottom:8px">
-          <button type="button" class="btn btn-secondary" style="flex:1" onclick="document.getElementById('glazePhotoFile').removeAttribute('capture');document.getElementById('glazePhotoFile').click()">📁 Gallery</button>
-          <button type="button" class="btn btn-secondary" style="flex:1" onclick="document.getElementById('glazePhotoFile').setAttribute('capture','environment');document.getElementById('glazePhotoFile').click()">📷 Camera</button>
-        </div>
-        <input type="file" id="glazePhotoFile" accept="image/*" style="display:none">
+        <input type="file" id="glazePhotoFile" accept="image/*" class="form-input" style="font-size:0.85rem" onchange="showPhotoPreview(this,'glazePhotoPreview','glazePhotoFileName')">
         <div id="glazePhotoFileName" class="text-sm" style="color:var(--text-light);margin-top:4px"></div>
+        <div id="glazePhotoPreview" style="margin-top:8px"></div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('glazePhotoModal')">Cancel</button>
