@@ -1918,7 +1918,8 @@
           </select>
           <input type="text" id="modalClayTestManualName" class="form-input hidden" placeholder="Clay name (e.g. Standard 266)" style="margin-bottom:6px">
           <textarea id="modalClayTestNotes" class="form-input" placeholder="Results / Notes" rows="2" style="margin-bottom:6px"></textarea>
-          <input type="file" id="modalClayTestPhoto" accept="image/*" style="margin-bottom:6px;font-size:0.85rem">
+          <input type="file" id="modalClayTestPhoto" accept="image/*" style="margin-bottom:6px;font-size:0.85rem" onchange="showPhotoPreview(this,'modalClayTestPhotoPreview',null)">
+          <div id="modalClayTestPhotoPreview" style="margin-bottom:6px"></div>
           <button type="button" class="btn btn-primary btn-sm" onclick="saveModalClayTest()">Save Clay Test</button>
         </div>
       </div>
@@ -2597,6 +2598,38 @@
         <button type="submit" class="btn btn-primary">Save Chemical</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- CLAY VIEW MODAL -->
+<div id="clayViewModal" class="modal-overlay" onclick="if(event.target===this)closeModal('clayViewModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="clayViewTitle"></h2>
+      <button class="modal-close" onclick="closeModal('clayViewModal')">&times;</button>
+    </div>
+    <div id="clayViewBody" style="padding:0 0 12px"></div>
+    <div class="modal-footer" style="gap:8px">
+      <button type="button" id="clayViewPhotoBtn" class="btn btn-secondary">📸 Add Photo</button>
+      <button type="button" class="btn btn-secondary" onclick="closeModal('clayViewModal')">Close</button>
+      <button type="button" id="clayViewEditBtn" class="btn btn-primary">✏️ Edit</button>
+    </div>
+  </div>
+</div>
+
+<!-- GLAZE VIEW MODAL -->
+<div id="glazeViewModal" class="modal-overlay" onclick="if(event.target===this)closeModal('glazeViewModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="glazeViewTitle"></h2>
+      <button class="modal-close" onclick="closeModal('glazeViewModal')">&times;</button>
+    </div>
+    <div id="glazeViewBody" style="padding:0 0 12px"></div>
+    <div class="modal-footer" style="gap:8px">
+      <button type="button" id="glazeViewPhotoBtn" class="btn btn-secondary">📸 Add Photo</button>
+      <button type="button" class="btn btn-secondary" onclick="closeModal('glazeViewModal')">Close</button>
+      <button type="button" id="glazeViewEditBtn" class="btn btn-primary">✏️ Edit</button>
+    </div>
   </div>
 </div>
 

@@ -662,7 +662,7 @@ function clayCardView(cl) {
     (p.notes ? '<div style="font-size:0.65rem;color:var(--text-light)">' + esc(p.notes) + '</div>' : '') +
     '<button class="btn-ghost btn-sm" style="position:absolute;top:0;right:0;font-size:0.7rem" onclick="event.stopPropagation();deleteClayPhoto(\'' + p.id + '\')">×</button></div>'
   ).join('');
-  return '<div class="card" style="cursor:pointer" onclick="editClayById(\'' + cl.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(cl.name) + ' ' + stockBadge + '</div>' +
+  return '<div class="card" style="cursor:pointer" onclick="viewClayById(\'' + cl.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(cl.name) + ' ' + stockBadge + '</div>' +
     '<div class="text-sm" style="color:var(--text-light)">' + esc(cl.brand||'') + (cl.clay_type ? ' · ' + esc(cl.clay_type) : '') + '</div></div>' +
     '<div style="display:flex;gap:4px">' +
     '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();openClayPhotoUpload(\'' + cl.id + '\')" title="Add photo">📸</button>' +
@@ -686,7 +686,7 @@ function clayCardView(cl) {
 }
 function clayListView(cl) {
   const stock = cl.in_stock ? '✅' : '❌';
-  return '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="editClayById(\'' + cl.id + '\')">' +
+  return '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="viewClayById(\'' + cl.id + '\')">' +
     '<span style="min-width:24px">' + stock + '</span>' +
     '<strong style="min-width:150px">' + esc(cl.name) + '</strong>' +
     '<span class="text-sm" style="color:var(--text-light);min-width:100px">' + esc(cl.brand||'') + '</span>' +
@@ -711,6 +711,34 @@ async function loadClayBodies() {
   } catch(e) { toast(e.message,'error'); }
 }
 function editClayById(id) { const c = clayBodies.find(x=>x.id===id); if(c) openClayModal(c); }
+function viewClayById(id) { const c = clayBodies.find(x=>x.id===id); if(c) openClayViewModal(c); }
+function openClayViewModal(cl) {
+  const photos = (cl.photos||[]).map(p =>
+    '<div style="display:inline-block;margin-right:8px;text-align:center">' +
+    '<img src="/uploads/' + p.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')"><br>' +
+    (p.photo_label ? '<span style="font-size:0.7rem;color:var(--text-muted)">' + esc(p.photo_label) + '</span>' : '') +
+    '</div>'
+  ).join('');
+  let html = '';
+  if (photos) html += '<div style="margin-bottom:12px">' + photos + '</div>';
+  if (cl.brand) html += '<div class="view-row"><span class="detail-label">Brand</span><span>' + esc(cl.brand) + '</span></div>';
+  if (cl.clay_type) html += '<div class="view-row"><span class="detail-label">Type</span><span>' + esc(cl.clay_type) + '</span></div>';
+  if (cl.cone_range) html += '<div class="view-row"><span class="detail-label">Cone</span><span>' + esc(cl.cone_range) + '</span></div>';
+  if (cl.color_wet) html += '<div class="view-row"><span class="detail-label">Color (Wet)</span><span>' + esc(cl.color_wet) + '</span></div>';
+  if (cl.color_fired) html += '<div class="view-row"><span class="detail-label">Color (Fired)</span><span>' + esc(cl.color_fired) + '</span></div>';
+  if (cl.shrinkage_pct) html += '<div class="view-row"><span class="detail-label">Shrinkage</span><span>' + cl.shrinkage_pct + '%</span></div>';
+  if (cl.absorption_pct) html += '<div class="view-row"><span class="detail-label">Absorption</span><span>' + cl.absorption_pct + '%</span></div>';
+  if (cl.cost_per_bag) html += '<div class="view-row"><span class="detail-label">Cost</span><span>$' + cl.cost_per_bag + (cl.bag_weight ? ' / ' + esc(cl.bag_weight) : '') + '</span></div>';
+  if (cl.source) html += '<div class="view-row"><span class="detail-label">Source</span><span>' + esc(cl.source) + (cl.source_url ? ' <a href="' + esc(cl.source_url) + '" target="_blank" style="color:var(--primary)">↗</a>' : '') + '</span></div>';
+  if (cl.buy_url) html += '<div class="view-row"><span class="detail-label">Buy</span><a href="' + esc(cl.buy_url) + '" target="_blank" class="btn btn-primary btn-sm" style="display:inline-block;margin-top:2px">🛒 Buy</a></div>';
+  if (cl.notes) html += '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);color:var(--text-light);font-size:0.9rem">' + esc(cl.notes) + '</div>';
+  html += '<div style="margin-top:4px"><span class="piece-meta-tag" style="background:' + (cl.in_stock ? 'rgba(40,167,69,0.1);color:var(--success)' : 'rgba(220,53,69,0.1);color:var(--danger)') + '">' + (cl.in_stock ? 'In Stock' : 'Out of Stock') + '</span></div>';
+  document.getElementById('clayViewTitle').textContent = cl.name;
+  document.getElementById('clayViewBody').innerHTML = html;
+  document.getElementById('clayViewEditBtn').onclick = () => { closeModal('clayViewModal'); editClayById(cl.id); };
+  document.getElementById('clayViewPhotoBtn').onclick = () => { closeModal('clayViewModal'); openClayPhotoUpload(cl.id); };
+  openModal('clayViewModal');
+}
 function openClayModal(c) {
   document.getElementById('clayId').value = c?.id||'';
   document.getElementById('clayModalTitle').textContent = c ? 'Edit Clay Body' : 'Add Clay Body';
@@ -775,7 +803,7 @@ function glazeCardView(g) {
     const color = Math.abs(total-100)<0.1 ? 'var(--success)' : (Math.abs(total-100)<5 ? '#F4A623' : 'var(--danger)');
     ingredientTotal = ' <span style="color:'+color+';font-weight:600;font-size:0.8rem">('+total.toFixed(1)+'%)</span>';
   }
-  return '<div class="card" style="cursor:pointer" onclick="editGlazeById(\'' + g.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(g.name) +
+  return '<div class="card" style="cursor:pointer" onclick="viewGlazeById(\'' + g.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(g.name) +
     ' <span class="glaze-tag' + (g.glaze_type==='recipe'?' recipe':'') + '">' + g.glaze_type + '</span> ' + stockBadge + ' ' + recipeStatusBadge + '</div>' +
     '<div class="text-sm" style="color:var(--text-light)">' + esc(g.brand||'') + (g.sku ? ' · SKU: ' + esc(g.sku) : '') + (g.color_description ? ' · ' + esc(g.color_description) : '') + '</div></div>' +
     '<div style="display:flex;gap:4px">' +
@@ -832,7 +860,7 @@ function glazeCardView(g) {
 }
 function glazeListView(g) {
   const stock = g.stock_status === 'need-to-buy' ? '🛒' : (g.stock_status === 'low-stock' ? '⚠️' : (g.stock_status === 'discontinued' ? '❌' : '✅'));
-  return '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="editGlazeById(\'' + g.id + '\')">' +
+  return '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="viewGlazeById(\'' + g.id + '\')">' +
     '<span style="min-width:24px">' + stock + '</span>' +
     '<strong style="min-width:150px">' + esc(g.name) + '</strong>' +
     '<span class="glaze-tag' + (g.glaze_type==='recipe'?' recipe':'') + '" style="font-size:0.7rem">' + g.glaze_type + '</span>' +
@@ -859,6 +887,50 @@ async function loadGlazes() {
 }
 
 function editGlazeById(id) { const g = glazes.find(x=>x.id===id); if(g) openGlazeModal(g); }
+function viewGlazeById(id) { const g = glazes.find(x=>x.id===id); if(g) openGlazeViewModal(g); }
+function openGlazeViewModal(g) {
+  const photos = (g.photos||[]).map(p =>
+    '<div style="display:inline-block;margin-right:8px;text-align:center">' +
+    '<img src="/uploads/' + p.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')"><br>' +
+    (p.photo_label ? '<span style="font-size:0.7rem;color:var(--text-muted)">' + esc(p.photo_label) + '</span>' : '') +
+    (p.notes ? '<br><span style="font-size:0.65rem;color:var(--text-light)">' + esc(p.notes) + '</span>' : '') +
+    '</div>'
+  ).join('');
+  let html = '';
+  if (photos) html += '<div style="margin-bottom:12px;display:flex;flex-wrap:wrap;gap:4px">' + photos + '</div>';
+  const typeBadge = '<span class="glaze-tag' + (g.glaze_type==='recipe'?' recipe':'') + '">' + esc(g.glaze_type) + '</span>';
+  html += '<div style="margin-bottom:8px">' + typeBadge + '</div>';
+  if (g.brand) html += '<div class="view-row"><span class="detail-label">Brand</span><span>' + esc(g.brand) + (g.sku ? ' · SKU: ' + esc(g.sku) : '') + '</span></div>';
+  if (g.color_description) html += '<div class="view-row"><span class="detail-label">Color</span><span>' + esc(g.color_description) + '</span></div>';
+  if (g.cone_range) html += '<div class="view-row"><span class="detail-label">Cone</span><span>' + esc(g.cone_range) + '</span></div>';
+  if (g.atmosphere) html += '<div class="view-row"><span class="detail-label">Atmosphere</span><span>' + esc(g.atmosphere) + '</span></div>';
+  if (g.surface) html += '<div class="view-row"><span class="detail-label">Surface</span><span>' + esc(g.surface) + '</span></div>';
+  if (g.opacity) html += '<div class="view-row"><span class="detail-label">Opacity</span><span>' + esc(g.opacity) + '</span></div>';
+  if (g.source) html += '<div class="view-row"><span class="detail-label">Source</span><span>' + esc(g.source) + (g.source_url ? ' <a href="' + esc(g.source_url) + '" target="_blank" style="color:var(--primary)">↗</a>' : '') + '</span></div>';
+  if (g.buy_url) html += '<div class="view-row"><span class="detail-label">Buy</span><a href="' + esc(g.buy_url) + '" target="_blank" class="btn btn-primary btn-sm" style="display:inline-block;margin-top:2px">🛒 Buy</a></div>';
+  if (g.ingredients?.length) {
+    const total = g.ingredients.reduce((s,i)=>s+(i.percentage||0),0);
+    html += '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"><span class="detail-label">Recipe</span><div class="text-sm" style="margin-top:4px">' + g.ingredients.map(i=>esc(i.ingredient_name)+(i.percentage?' '+i.percentage+'%':'')).join('<br>') + '</div><div style="font-size:0.8rem;margin-top:4px;color:' + (Math.abs(total-100)<0.1?'var(--success)':(Math.abs(total-100)<5?'#F4A623':'var(--danger)')) + '">Total: ' + total.toFixed(1) + '%</div></div>';
+  }
+  if (g.recipe_notes) html += '<div class="text-sm mt-4" style="color:var(--text-light)">📝 ' + esc(g.recipe_notes) + '</div>';
+  if (g.notes) html += '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);color:var(--text-light);font-size:0.9rem">' + esc(g.notes) + '</div>';
+  // Clay tests
+  if ((g.clay_tests||[]).length) {
+    html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"><div class="detail-label" style="margin-bottom:8px">🪨 Clay Bodies Tested</div>' +
+      g.clay_tests.map(t =>
+        '<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;background:var(--bg-light);padding:8px;border-radius:var(--radius-sm)">' +
+        (t.photo_filename ? '<img src="/uploads/' + t.photo_filename + '" style="width:48px;height:48px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in;flex-shrink:0" onclick="openLightbox(\'/uploads/' + t.photo_filename + '\')">': '') +
+        '<div><div style="font-weight:600;font-size:0.85rem">' + esc(t.clay_name) + '</div>' +
+        (t.result_notes ? '<div class="text-sm" style="color:var(--text-light)">' + esc(t.result_notes) + '</div>' : '') +
+        '</div></div>'
+      ).join('') + '</div>';
+  }
+  document.getElementById('glazeViewTitle').textContent = g.name;
+  document.getElementById('glazeViewBody').innerHTML = html;
+  document.getElementById('glazeViewEditBtn').onclick = () => { closeModal('glazeViewModal'); editGlazeById(g.id); };
+  document.getElementById('glazeViewPhotoBtn').onclick = () => { closeModal('glazeViewModal'); openGlazePhotoUpload(g.id); };
+  openModal('glazeViewModal');
+}
 function openGlazeModal(g) {
   document.getElementById('glazeId').value = g?.id||'';
   document.getElementById('glazeModalTitle').textContent = g ? 'Edit Glaze' : 'Add Glaze';
