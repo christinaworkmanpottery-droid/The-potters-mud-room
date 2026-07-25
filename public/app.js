@@ -4210,12 +4210,14 @@ async function loadEvents() {
       const appleMapsUrl = 'https://maps.apple.com/?q=' + mapsQuery;
       const mapsUrl = isIOS ? appleMapsUrl : googleMapsUrl;
       const isPast = e.event_date < today;
-      return '<div class="card" style="cursor:pointer' + (isPast ? ';opacity:0.75' : '') + '" onclick="if(!event.target.closest(\'a,button\'))editEvent(\'' + e.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(e.title) + '</div>' +
+      return '<div class="card" style="' + (isPast ? 'opacity:0.75;' : '') + '">' +
+      '<div style="cursor:pointer" onclick="editEvent(\'' + e.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(e.title) + '</div>' +
       '<div class="text-sm" style="color:var(--text-light)">' + fmtDate(e.event_date) + (e.start_time ? ' at ' + e.start_time : '') + (e.end_time ? ' – ' + e.end_time : '') + '</div></div></div>' +
       (e.location ? '<div class="text-sm mt-4">📍 ' + esc(e.location) + '</div>' : '') +
       (e.address ? '<div class="text-sm mt-2" style="color:var(--text-light)">' + esc(e.address) + '</div>' : '') +
       (e.website ? '<div class="text-sm mt-4"><a href="' + esc(e.website) + '" target="_blank" style="color:var(--primary)">🌐 ' + esc(e.website.replace(/^https?:\/\//,'')) + '</a></div>' : '') +
       (e.description ? '<div class="text-sm mt-8">' + esc(e.description) + '</div>' : '') +
+      '</div>' +
       '<div style="display:flex;gap:4px;margin-top:10px;flex-wrap:wrap">' +
       (!isPast ? '<a href="' + esc(gCalUrl) + '" target="_blank" class="btn btn-sm btn-secondary" style="text-decoration:none">📅 Add to Calendar</a>' : '') +
       ((e.address || e.location) ? '<a href="' + esc(mapsUrl) + '" target="_blank" class="btn btn-sm btn-secondary" style="text-decoration:none">🗺️ Directions</a>' : '') +
