@@ -3418,13 +3418,13 @@ async function loadShoppingList() {
         html += '<h3 style="margin-bottom:12px">📝 My List</h3>';
         html += unchecked.map(i =>
           '<div class="card" style="margin-bottom:8px"><div class="card-header"><div style="display:flex;align-items:center;gap:10px">' +
-          '<input type="checkbox" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary)" onchange="toggleShoppingItem('' + i.id + '',this)">' +
+          '<input type="checkbox" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary)" onchange="toggleShoppingItem(\'' + i.id + '\',this)">' +
           '<div><div class="card-title">' + esc(i.name) + (i.quantity ? ' <span class="text-sm" style="color:var(--text-light);font-weight:normal">× ' + esc(i.quantity) + '</span>' : '') + '</div>' +
           (i.category && i.category !== 'general' ? '<div class="text-sm" style="color:var(--text-light)">' + esc(i.category) + (i.source ? ' · ' + esc(i.source) : '') + '</div>' : (i.source ? '<div class="text-sm" style="color:var(--text-light)">' + esc(i.source) + '</div>' : '')) +
           '</div></div>' +
           '<div style="display:flex;gap:6px;align-items:center">' +
           (i.source_url ? '<a href="' + esc(i.source_url) + '" target="_blank" class="btn btn-primary btn-sm">Buy →</a>' : '') +
-          '<button onclick="deleteShoppingItem('' + i.id + '')" class="btn-ghost btn-sm" title="Remove">✕</button>' +
+          '<button onclick="deleteShoppingItem(\'' + i.id + '\')" class="btn-ghost btn-sm" title="Remove">✕</button>' +
           '</div></div>'
         ).join('');
       }
@@ -3432,10 +3432,10 @@ async function loadShoppingList() {
         html += '<h3 style="margin:20px 0 8px;color:var(--text-muted)">✅ Got it</h3>';
         html += checked.map(i =>
           '<div class="card" style="margin-bottom:8px;opacity:0.6"><div class="card-header"><div style="display:flex;align-items:center;gap:10px">' +
-          '<input type="checkbox" checked style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary)" onchange="toggleShoppingItem('' + i.id + '',this)">' +
+          '<input type="checkbox" checked style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary)" onchange="toggleShoppingItem(\'' + i.id + '\',this)">' +
           '<div class="card-title" style="text-decoration:line-through">' + esc(i.name) + '</div>' +
           '</div>' +
-          '<button onclick="deleteShoppingItem('' + i.id + '')" class="btn-ghost btn-sm" title="Remove">✕</button>' +
+          '<button onclick="deleteShoppingItem(\'' + i.id + '\')" class="btn-ghost btn-sm" title="Remove">✕</button>' +
           '</div></div>'
         ).join('');
         html += '<button onclick="clearCheckedShoppingItems()" class="btn btn-secondary btn-sm" style="margin-bottom:20px">Clear checked items</button>';
