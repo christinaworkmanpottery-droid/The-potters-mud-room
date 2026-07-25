@@ -4221,7 +4221,7 @@ async function loadEvents() {
       '<div style="display:flex;gap:4px;margin-top:10px;flex-wrap:wrap">' +
       (!isPast ? '<a href="' + esc(gCalUrl) + '" target="_blank" class="btn btn-sm btn-secondary" style="text-decoration:none">📅 Add to Calendar</a>' : '') +
       ((e.address || e.location) ? '<a href="' + esc(mapsUrl) + '" target="_blank" class="btn btn-sm btn-secondary" style="text-decoration:none">🗺️ Directions</a>' : '') +
-      '<button onclick="shareEvent(\'' + e.id + '\',' + JSON.stringify(e.title) + ',' + JSON.stringify(e.event_date) + ',' + JSON.stringify(e.location||'') + ',' + JSON.stringify(e.website||'') + ')" class="btn btn-sm btn-secondary">📤 Share</button>' +
+      '<button onclick="shareEvent(\'' + e.id + '\')" class="btn btn-sm btn-secondary">📤 Share</button>' +
       '<button onclick="editEvent(\'' + e.id + '\')" class="btn-small">✎</button>' +
       '<button onclick="deleteEvent(\'' + e.id + '\')" class="btn-small">✕</button>' +
       '</div></div>';
@@ -4239,13 +4239,17 @@ async function loadEvents() {
   } catch(e) { toast(e.message,'error'); }
 }
 
-function shareEvent(id, title, date, location, website) {
-  const text = title + ' — ' + fmtDate(date) + (location ? ' · ' + location : '') + (website ? '\n' + website : '');
-  if (navigator.share) {
-    navigator.share({ title: title, text: text, url: website || window.location.href }).catch(() => {});
-  } else {
-    navigator.clipboard.writeText(text).then(() => toast('Event details copied!','success')).catch(() => toast('Could not copy','error'));
-  }
+function shareEvent(id) {
+  api('/api/events').then(events => {
+    const e = events.find(x => x.id === id);
+    if (!e) return;
+    const text = e.title + ' — ' + fmtDate(e.event_date) + (e.start_time ? ' at ' + e.start_time : '') + (e.location ? ' · ' + e.location : '') + (e.address ? ' · ' + e.address : '') + (e.website ? '\n' + e.website : '');
+    if (navigator.share) {
+      navigator.share({ title: e.title, text: text, url: e.website || window.location.href }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(text).then(() => toast('Event details copied!','success')).catch(() => toast('Could not copy','error'));
+    }
+  });
 }
 
 function openEventModal(e = null) {
