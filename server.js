@@ -52,6 +52,9 @@ try { db.exec("ALTER TABLE events ADD COLUMN address TEXT DEFAULT NULL"); } catc
 try { db.exec("ALTER TABLE pieces ADD COLUMN is_public INTEGER DEFAULT 0"); } catch(e) {}
 try { db.exec("ALTER TABLE pieces ADD COLUMN public_display_name TEXT DEFAULT NULL"); } catch(e) {}
 try { db.exec("ALTER TABLE pieces ADD COLUMN allow_messages INTEGER DEFAULT 0"); } catch(e) {}
+try { db.exec("ALTER TABLE pieces ADD COLUMN labor_hours REAL DEFAULT NULL"); } catch(e) {}
+try { db.exec("ALTER TABLE pieces ADD COLUMN labor_rate REAL DEFAULT NULL"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN default_labor_rate REAL DEFAULT NULL"); } catch(e) {}
 // Nodemailer setup for newsletter emails
 let transporter = null;
 function setupTransporter(user, pass, host, port) {
@@ -1501,6 +1504,8 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
   const weight = body.weight || null;
   const materialCost = body.materialCost || body.material_cost || null;
   const firingCost = body.firingCost || body.firing_cost || null;
+  const laborHours = body.laborHours || body.labor_hours || null;
+  const laborRate = body.laborRate || body.labor_rate || null;
   const dateStarted = body.dateStarted || body.date_started || null;
   // Combine all text info into notes
   const firingTemp = String(body.firingTemp || body.firing_temp || '').trim();
@@ -1538,8 +1543,8 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
   const id = uuidv4();
   const isCasualty = (status === 'broken' || status === 'recycled');
   try {
-    db.prepare('INSERT INTO pieces (id,user_id,title,description,clay_body_id,studio,status,form,technique,dimensions,weight,material_cost,firing_cost,date_started,notes,casualty_type,casualty_notes,casualty_lesson) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-      .run(id, req.userId, title, description, clayBodyId, clayText, status || 'in-progress', form, technique, dimensions, weight, materialCost, firingCost, dateStarted, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null);
+    db.prepare('INSERT INTO pieces (id,user_id,title,description,clay_body_id,studio,status,form,technique,dimensions,weight,material_cost,firing_cost,labor_hours,labor_rate,date_started,notes,casualty_type,casualty_notes,casualty_lesson) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(id, req.userId, title, description, clayBodyId, clayText, status || 'in-progress', form, technique, dimensions, weight, materialCost, firingCost, laborHours, laborRate, dateStarted, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null);
   } catch (dbErr) {
     console.error('[DB ERROR] Insert piece failed:', dbErr.message, { title, status, body });
     return res.status(400).json({ error: 'Could not save piece: ' + dbErr.message });
@@ -1640,6 +1645,8 @@ app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
   const weight = body.weight || null;
   const materialCost = body.materialCost || body.material_cost || null;
   const firingCost = body.firingCost || body.firing_cost || null;
+  const laborHours = body.laborHours || body.labor_hours || null;
+  const laborRate = body.laborRate || body.labor_rate || null;
   const salePrice = body.salePrice || body.sale_price || null;
   const dateStarted = body.dateStarted || body.date_started || null;
   const dateCompleted = body.dateCompleted || body.date_completed || null;
@@ -1668,8 +1675,8 @@ app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
   let glazeIds = body.glazeIds || body.glaze_ids;
   if (typeof glazeIds === 'string') { try { glazeIds = JSON.parse(glazeIds); } catch(e) { glazeIds = undefined; } }
   const isCasualty = (status === 'broken' || status === 'recycled');
-  const r = db.prepare(`UPDATE pieces SET title=?,description=?,clay_body_id=?,studio=?,status=?,form=?,technique=?,dimensions=?,weight=?,material_cost=?,firing_cost=?,sale_price=?,date_started=?,date_completed=?,date_sold=?,notes=?,casualty_type=?,casualty_notes=?,casualty_lesson=?,updated_at=datetime('now') WHERE id=? AND user_id=?`)
-    .run(title, description, clayBodyId, studio, status, form, technique, dimensions, weight, materialCost, firingCost, salePrice, dateStarted, dateCompleted, dateSold, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null, req.params.id, req.userId);
+  const r = db.prepare(`UPDATE pieces SET title=?,description=?,clay_body_id=?,studio=?,status=?,form=?,technique=?,dimensions=?,weight=?,material_cost=?,firing_cost=?,labor_hours=?,labor_rate=?,sale_price=?,date_started=?,date_completed=?,date_sold=?,notes=?,casualty_type=?,casualty_notes=?,casualty_lesson=?,updated_at=datetime('now') WHERE id=? AND user_id=?`)
+    .run(title, description, clayBodyId, studio, status, form, technique, dimensions, weight, materialCost, firingCost, laborHours, laborRate, salePrice, dateStarted, dateCompleted, dateSold, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null, req.params.id, req.userId);
   if (r.changes === 0) return res.status(404).json({ error: 'Not found' });
   if (glazeIds !== undefined) {
     db.prepare('DELETE FROM piece_glazes WHERE piece_id=?').run(req.params.id);

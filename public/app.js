@@ -517,9 +517,12 @@ async function viewPiece(id) {
       df('Dimensions', p.dimensions) + df('Weight', p.weight) +
       df('Started', fmtDate(p.date_started)) +
       (p.date_completed ? df('Completed', fmtDate(p.date_completed)) : '') +
-      (p.material_cost ? df('Material Cost', '$' + p.material_cost) : '') +
-      (p.firing_cost ? df('Firing Cost', '$' + p.firing_cost) : '') +
-      (p.sale_price ? df('Sale Price', '$' + p.sale_price) : '') +
+      (p.material_cost || p.firing_cost || p.labor_hours ? '<div class="detail-section-title" style="margin-top:12px;font-weight:600;font-size:0.85rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Cost & Pricing</div>' : '') +
+      (p.material_cost ? df('Materials', '$' + parseFloat(p.material_cost).toFixed(2)) : '') +
+      (p.firing_cost ? df('Firing', '$' + parseFloat(p.firing_cost).toFixed(2)) : '') +
+      (p.labor_hours ? df('Labor', p.labor_hours + 'h' + (p.labor_rate ? ' × $' + parseFloat(p.labor_rate).toFixed(2) + '/h = $' + (p.labor_hours * p.labor_rate).toFixed(2) : '')) : '') +
+      ((p.material_cost || p.firing_cost || p.labor_hours) ? df('Total Cost', '$' + ((parseFloat(p.material_cost)||0) + (parseFloat(p.firing_cost)||0) + ((parseFloat(p.labor_hours)||0)*(parseFloat(p.labor_rate)||0))).toFixed(2)) : '') +
+      (p.sale_price ? df('Sale Price', '$' + parseFloat(p.sale_price).toFixed(2)) : '') +
       (p.cleanNotes ? df('Notes', p.cleanNotes) : (p.description ? df('Notes', p.description) : '')) + '</div>' +
       '<div><div class="card mb-16"><h3 style="margin-bottom:12px">Glazes</h3>' + glist + '</div>' +
       (firings ? '<div class="card mb-16"><h3 style="margin-bottom:12px">Firings</h3>' + firings + '</div>' : '') +
@@ -578,6 +581,12 @@ function openPieceModal(p) {
   document.getElementById('pieceCasualtyNotes').value = p?.casualty_notes||'';
   document.getElementById('pieceCasualtyLesson').value = p?.casualty_lesson||'';
   toggleCasualtyFields();
+  document.getElementById('pieceMaterialCost').value = p?.material_cost||'';
+  document.getElementById('pieceFiringCost').value = p?.firing_cost||'';
+  document.getElementById('pieceLaborHours').value = p?.labor_hours||'';
+  document.getElementById('pieceLaborRate').value = p?.labor_rate||'';
+  document.getElementById('pricingCalcPanel').style.display = 'none';
+  updatePricingCalc();
   const ppf = document.getElementById('pieceInlinePhotoFile'); if (ppf) ppf.value = '';
   openModal('pieceModal');
 }
@@ -597,6 +606,10 @@ async function savePiece(e) {
     studio: document.getElementById('pieceStudio').value||null,
     dateStarted: document.getElementById('pieceDateStarted').value||null,
     notes: document.getElementById('pieceNotes').value||null,
+    materialCost: document.getElementById('pieceMaterialCost').value||null,
+    firingCost: document.getElementById('pieceFiringCost').value||null,
+    laborHours: document.getElementById('pieceLaborHours').value||null,
+    laborRate: document.getElementById('pieceLaborRate').value||null,
     glazeIds: gIds,
     casualtyType: document.getElementById('pieceCasualtyType').value||null,
     casualtyNotes: document.getElementById('pieceCasualtyNotes').value||null,
@@ -617,6 +630,34 @@ async function savePiece(e) {
     if (currentPage==='dashboard') loadDashboard(); else if (currentPage==='pieces') loadPieces(); else if (currentPage==='pieceDetail'&&id) viewPiece(id);
   } catch(err) { toast(err.message,'error'); }
 }
+function togglePricingCalc() {
+  const panel = document.getElementById('pricingCalcPanel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  if (panel.style.display === 'block') updatePricingCalc();
+}
+
+function updatePricingCalc() {
+  const mat = parseFloat(document.getElementById('pieceMaterialCost').value) || 0;
+  const fire = parseFloat(document.getElementById('pieceFiringCost').value) || 0;
+  const hours = parseFloat(document.getElementById('pieceLaborHours').value) || 0;
+  const rate = parseFloat(document.getElementById('pieceLaborRate').value) || 0;
+  const labor = hours * rate;
+  const total = mat + fire + labor;
+
+  const fmt = (n) => '$' + n.toFixed(2);
+  let rows = '';
+  if (mat > 0) rows += '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Materials</span><span>' + fmt(mat) + '</span></div>';
+  if (fire > 0) rows += '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Firing</span><span>' + fmt(fire) + '</span></div>';
+  if (labor > 0) rows += '<div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>Labor (' + hours + 'h × ' + fmt(rate) + ')</span><span>' + fmt(labor) + '</span></div>';
+  if (!rows) rows = '<div style="color:var(--text-muted);font-size:0.85rem">Enter costs above to see breakdown.</div>';
+
+  document.getElementById('pricingCalcRows').innerHTML = rows;
+  document.getElementById('calcTotalCost').textContent = fmt(total);
+  document.getElementById('calcPrice2x').textContent = fmt(total * 2);
+  document.getElementById('calcPrice25x').textContent = fmt(total * 2.5);
+  document.getElementById('calcPrice3x').textContent = fmt(total * 3);
+}
+
 async function deletePiece(id) {
   if (!confirm('Delete this piece? This cannot be undone.')) return;
   try { await api('/api/pieces/'+id, {method:'DELETE'}); toast('Piece deleted','success'); navigate('pieces'); } catch(e) { toast(e.message,'error'); }
