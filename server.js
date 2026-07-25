@@ -3614,12 +3614,13 @@ app.get('/api/admin/newsletter/stats/:sendId', auth, (req, res) => {
 // Dynamic sitemap with blog posts
 app.get('/sitemap.xml', (req, res) => {
   try {
+    const BASE_URL = 'https://thepottersmudroom.com';
     const posts = db.prepare("SELECT slug, updated_at, published_at FROM blog_posts WHERE is_published=1 ORDER BY published_at DESC").all();
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
-    xml += '  <url><loc>https://thepottersmudroom.com/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>\n';
+    xml += `  <url><loc>${BASE_URL}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>\n`;
     posts.forEach(p => {
       const date = (p.updated_at || p.published_at || '').split(' ')[0];
-      xml += `  <url><loc>https://thepottersmudroom.com/blog/${p.slug}</loc>${date ? '<lastmod>' + date + '</lastmod>' : ''}<changefreq>weekly</changefreq><priority>0.8</priority></url>\n`;
+      xml += `  <url><loc>${BASE_URL}/blog/${p.slug}</loc>${date ? '<lastmod>' + date + '</lastmod>' : ''}<changefreq>weekly</changefreq><priority>0.8</priority></url>\n`;
     });
     xml += '</urlset>';
     res.set('Content-Type', 'application/xml');
@@ -3644,6 +3645,7 @@ app.get('/blog/:slug', (req, res) => {
   <meta property="og:description" content="${(post.excerpt || '').replace(/"/g, '&quot;')}">
   <meta property="og:type" content="article">
   <meta property="og:url" content="https://thepottersmudroom.com/blog/${post.slug}">
+  <link rel="canonical" href="https://thepottersmudroom.com/blog/${post.slug}">
   <meta property="og:image" content="https://thepottersmudroom.com/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -3652,6 +3654,30 @@ app.get('/blog/:slug', (req, res) => {
   <meta name="twitter:title" content="${post.title}">
   <meta name="twitter:description" content="${(post.excerpt || '').replace(/"/g, '&quot;')}">
   <meta name="twitter:image" content="https://thepottersmudroom.com/og-image.png">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": "${post.title}",
+    "description": "${(post.excerpt || post.title).replace(/"/g, '&quot;')}",
+    "image": "https://thepottersmudroom.com/og-image.png",
+    "author": {
+      "@type": "Person",
+      "name": "Christina Workman"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "The Potter's Mud Room",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://thepottersmudroom.com/og-image.png"
+      }
+    },
+    "datePublished": "${post.published_at}",
+    "dateModified": "${post.updated_at || post.published_at}",
+    "mainEntityOfPage": "https://thepottersmudroom.com/blog/${post.slug}"
+  }
+  </script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #FAF8F5; color: #333; line-height: 1.7; }
