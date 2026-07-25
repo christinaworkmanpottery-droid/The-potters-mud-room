@@ -1163,7 +1163,7 @@ function viewFiring(id) {
       const photos = await api('/api/firing-logs/' + f.id + '/photos');
       if (photos && photos.length) {
         photosHtml = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' +
-          photos.map(p => '<img src="/uploads/' + p.filename + '" style="width:90px;height:90px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(event,'/uploads/' + p.filename + '')">').join('') +
+          photos.map(p => '<img src="/uploads/' + p.filename + '" style="width:90px;height:90px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')">').join('') +
           '</div>';
       }
     } catch(e) {}
