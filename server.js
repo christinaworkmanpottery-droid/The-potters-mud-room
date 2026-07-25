@@ -48,6 +48,7 @@ try { db.exec("ALTER TABLE users ADD COLUMN signup_source TEXT DEFAULT NULL"); }
 // Photo search exclusion flag — lets users hide specific pieces from photo search results
 try { db.exec("ALTER TABLE events ADD COLUMN website TEXT DEFAULT NULL"); } catch(e) {}
 try { db.exec("ALTER TABLE events ADD COLUMN address TEXT DEFAULT NULL"); } catch(e) {}
+try { db.exec("ALTER TABLE events ADD COLUMN venue TEXT DEFAULT NULL"); } catch(e) {}
 // Public gallery — allow users to share finished pieces publicly
 try { db.exec("ALTER TABLE pieces ADD COLUMN is_public INTEGER DEFAULT 0"); } catch(e) {}
 try { db.exec("ALTER TABLE pieces ADD COLUMN public_display_name TEXT DEFAULT NULL"); } catch(e) {}
@@ -2949,7 +2950,7 @@ app.get('/api/events', auth, (req, res) => {
 });
 
 app.post('/api/events', auth, (req, res) => {
-  const { title, description, eventDate, startTime, endTime, location, address, website } = req.body;
+  const { title, description, eventDate, startTime, endTime, location, venue, address, website } = req.body;
   if (!eventDate) return res.status(400).json({ error: 'Event date is required' });
 
   const user = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
@@ -2962,8 +2963,8 @@ app.post('/api/events', auth, (req, res) => {
   }
 
   const id = uuidv4();
-  db.prepare('INSERT INTO events (id,user_id,title,description,event_date,start_time,end_time,location,address,website) VALUES (?,?,?,?,?,?,?,?,?,?)')
-    .run(id, req.userId, title, description, eventDate, startTime || null, endTime || null, location || null, address || null, website || null);
+  db.prepare('INSERT INTO events (id,user_id,title,description,event_date,start_time,end_time,location,venue,address,website) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
+    .run(id, req.userId, title, description, eventDate, startTime || null, endTime || null, location || null, venue || null, address || null, website || null);
   res.json({ id });
 });
 
@@ -2981,9 +2982,9 @@ app.post('/api/events/:id/photo', auth, upload.single('photo'), (req, res) => {
 });
 
 app.put('/api/events/:id', auth, (req, res) => {
-  const { title, description, eventDate, startTime, endTime, location, address, website } = req.body;
-  db.prepare('UPDATE events SET title=?,description=?,event_date=?,start_time=?,end_time=?,location=?,address=?,website=?,updated_at=datetime(\'now\') WHERE id=? AND user_id=?')
-    .run(title, description, eventDate, startTime, endTime, location, address || null, website || null, req.params.id, req.userId);
+  const { title, description, eventDate, startTime, endTime, location, venue, address, website } = req.body;
+  db.prepare('UPDATE events SET title=?,description=?,event_date=?,start_time=?,end_time=?,location=?,venue=?,address=?,website=?,updated_at=datetime(\'now\') WHERE id=? AND user_id=?')
+    .run(title, description, eventDate, startTime, endTime, location, venue || null, address || null, website || null, req.params.id, req.userId);
   res.json({ success: true });
 });
 
