@@ -4017,7 +4017,7 @@ async function loadGoals() {
     const sortBy = document.getElementById('goalSortSelect')?.value || 'priority';
     const priorityOrder = { high: 0, medium: 1, low: 2 };
     if (sortBy === 'priority') {
-      goals = [...goals].sort((a, b) => (priorityOrder[a.priority||'medium']||1) - (priorityOrder[b.priority||'medium']||1));
+      goals = [...goals].sort((a, b) => (priorityOrder[a.priority||'medium']??1) - (priorityOrder[b.priority||'medium']??1));
     } else if (sortBy === 'due_date') {
       goals = [...goals].sort((a, b) => {
         if (!a.due_date && !b.due_date) return 0;
@@ -4091,7 +4091,7 @@ async function loadProjects() {
     const priorityOrder = { high: 0, medium: 1, low: 2 };
     const statusOrder = { active: 0, completed: 1, archived: 2 };
     if (sortBy === 'priority') {
-      projects = [...projects].sort((a, b) => (priorityOrder[a.priority||'medium']||1) - (priorityOrder[b.priority||'medium']||1));
+      projects = [...projects].sort((a, b) => (priorityOrder[a.priority||'medium']??1) - (priorityOrder[b.priority||'medium']??1));
     } else if (sortBy === 'status') {
       projects = [...projects].sort((a, b) => (statusOrder[a.status||'active']||0) - (statusOrder[b.status||'active']||0));
     } else if (sortBy === 'due_date') {
@@ -4200,12 +4200,15 @@ async function loadEvents() {
     const today = new Date().toISOString().split('T')[0];
     const upcoming = events.filter(e => e.event_date >= today);
     const past = events.filter(e => e.event_date < today).reverse();
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     const renderEvent = (e) => {
-      const start = e.event_date + (e.start_time ? 'T' + e.start_time : 'T00:00');
-      const end = e.event_date + (e.end_time ? 'T' + e.end_time : 'T23:59');
-      const gCalUrl = 'https://calendar.google.com/calendar/r/eventedit?text=' + encodeURIComponent(e.title) + '&dates=' + start.replace(/[-:]/g,'') + '/' + end.replace(/[-:]/g,'') + (e.location ? '&location=' + encodeURIComponent(e.location) : '') + (e.description ? '&details=' + encodeURIComponent(e.description) : '');
+      const startFmt = e.event_date.replace(/-/g,'') + (e.start_time ? 'T' + e.start_time.replace(/:/g,'') + '00' : 'T000000');
+      const endFmt = e.event_date.replace(/-/g,'') + (e.end_time ? 'T' + e.end_time.replace(/:/g,'') + '00' : 'T235900');
+      const gCalUrl = 'https://calendar.google.com/calendar/r/eventedit?text=' + encodeURIComponent(e.title) + '&dates=' + startFmt + '/' + endFmt + ((e.address || e.location) ? '&location=' + encodeURIComponent(e.address || e.location) : '') + (e.description ? '&details=' + encodeURIComponent(e.description) : '');
       const mapsQuery = encodeURIComponent(e.address || e.location || '');
-      const mapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + mapsQuery;
+      const googleMapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + mapsQuery;
+      const appleMapsUrl = 'https://maps.apple.com/?q=' + mapsQuery;
+      const mapsUrl = isIOS ? appleMapsUrl : googleMapsUrl;
       const isPast = e.event_date < today;
       return '<div class="card" style="cursor:pointer' + (isPast ? ';opacity:0.75' : '') + '" onclick="editEvent(\'' + e.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(e.title) + '</div>' +
       '<div class="text-sm" style="color:var(--text-light)">' + fmtDate(e.event_date) + (e.start_time ? ' at ' + e.start_time : '') + (e.end_time ? ' – ' + e.end_time : '') + '</div></div></div>' +
@@ -4214,8 +4217,10 @@ async function loadEvents() {
       (e.website ? '<div class="text-sm mt-4"><a href="' + esc(e.website) + '" target="_blank" onclick="event.stopPropagation()" style="color:var(--primary)">🌐 ' + esc(e.website.replace(/^https?:\/\//,'')) + '</a></div>' : '') +
       (e.description ? '<div class="text-sm mt-8">' + esc(e.description) + '</div>' : '') +
       '<div style="display:flex;gap:4px;margin-top:10px;flex-wrap:wrap">' +
-      (!isPast ? '<a href="' + gCalUrl + '" target="_blank" class="btn btn-sm btn-secondary" style="text-decoration:none" onclick="event.stopPropagation()">📅 Add to Google</a>' : '') +
-      ((e.address || e.location) ? '<a href="' + mapsUrl + '" target="_blank" class="btn btn-sm btn-secondary" style="text-decoration:none" onclick="event.stopPropagation()">🗺️ Directions</a>' : '') +
+      (!isPast ? '<button onclick="event.stopPropagation();window.open(\'' + gCalUrl.replace(/\\/g,'\\\\').replace(/'/g,"\\'")
+       + '\',\'_blank\')" class="btn btn-sm btn-secondary">📅 Add to Calendar</button>' : '') +
+      ((e.address || e.location) ? '<button onclick="event.stopPropagation();window.open(\'' + mapsUrl.replace(/\\/g,'\\\\').replace(/'/g,"\\'")
+       + '\',\'_blank\')" class="btn btn-sm btn-secondary">🗺️ Directions</button>' : '') +
       '<button onclick="event.stopPropagation();shareEvent(\'' + e.id + '\',' + JSON.stringify(e.title) + ',' + JSON.stringify(e.event_date) + ',' + JSON.stringify(e.location||'') + ',' + JSON.stringify(e.website||'') + ')" class="btn btn-sm btn-secondary">📤 Share</button>' +
       '<button onclick="event.stopPropagation();editEvent(\'' + e.id + '\')" class="btn-small">✎</button>' +
       '<button onclick="event.stopPropagation();deleteEvent(\'' + e.id + '\')" class="btn-small">✕</button>' +
