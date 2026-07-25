@@ -1031,7 +1031,7 @@ async function loadFirings() {
     c.className = mode === 'list' ? '' : 'card-grid';
     if (mode === 'list') {
       c.innerHTML = firings.map(f =>
-        '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="editFiring(\'' + f.id + '\')">' +
+        '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="viewFiring(\'' + f.id + '\')">' +
         '<strong style="min-width:100px">' + esc(f.firing_type||'Firing') + '</strong>' +
         '<span class="text-sm" style="min-width:60px">Cone ' + esc(f.cone||'?') + '</span>' +
         '<span class="text-sm" style="min-width:80px;color:var(--text-light)">' + esc(f.atmosphere||'') + '</span>' +
@@ -1045,7 +1045,7 @@ async function loadFirings() {
     } else {
       const photosHtml = (photos) => photos && photos.length > 0 ? '<div style="display:flex;gap:6px;margin:8px 0">' + photos.map(p => '<img src="/uploads/' + p.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')">').join('') + '</div>' : '';
       c.innerHTML = firings.map(f =>
-        '<div class="card" style="cursor:pointer" onclick="editFiring(\'' + f.id + '\')">' +
+        '<div class="card" style="cursor:pointer" onclick="viewFiring(\'' + f.id + '\')">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
         '<div><div class="card-title">' + esc(f.firing_type||'Firing') + ' — Cone ' + esc(f.cone||'?') + '</div>' +
         '<div class="text-sm" style="color:var(--text-light)">' + (f.kiln_name ? esc(f.kiln_name) + ' · ' : '') + fmtDate(f.date) +
@@ -1141,7 +1141,41 @@ async function deleteFiringPhoto(photoId) {
 function editFiring(id) {
   api('/api/firing-logs').then(firings => {
     const f = firings.find(f => f.id === id);
-    if (f) openFiringModal(f);
+    if (f) { closeModal('firingViewModal'); openFiringModal(f); }
+  });
+}
+
+function viewFiring(id) {
+  api('/api/firing-logs').then(async firings => {
+    const f = firings.find(f => f.id === id);
+    if (!f) return;
+    const df = (label, val) => val ? '<div class="detail-row"><span class="detail-label">' + esc(label) + '</span><span class="detail-value">' + esc(String(val)) + '</span></div>' : '';
+    let photosHtml = '';
+    try {
+      const photos = await api('/api/firing-logs/' + f.id + '/photos');
+      if (photos && photos.length) {
+        photosHtml = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' +
+          photos.map(p => '<img src="/uploads/' + p.filename + '" style="width:90px;height:90px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(event,'/uploads/' + p.filename + '')">').join('') +
+          '</div>';
+      }
+    } catch(e) {}
+    document.getElementById('firingViewBody').innerHTML =
+      df('Type', f.firing_type) +
+      df('Date', fmtDate(f.date)) +
+      df('Cone', f.cone) +
+      df('Atmosphere', f.atmosphere) +
+      df('Kiln', f.kiln_name) +
+      df('Firing Speed', f.firing_speed ? (f.firing_speed + (f.custom_speed_detail ? ' — ' + f.custom_speed_detail : '')) : '') +
+      df('Duration', f.firing_time) +
+      df('Hold Used', f.hold_used ? ('Yes' + (f.hold_duration ? ' — ' + f.hold_duration : '')) : '') +
+      df('Load', f.load_description) +
+      df('Results', f.results) +
+      df('Notes', f.notes) +
+      (f.piece_title ? df('Piece', f.piece_title) : '') +
+      photosHtml;
+    document.getElementById('firingViewEditBtn').onclick = () => editFiring(f.id);
+    document.getElementById('firingViewDeleteBtn').onclick = () => { closeModal('firingViewModal'); deleteFiring(f.id); };
+    openModal('firingViewModal');
   });
 }
 
