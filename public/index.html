@@ -1537,12 +1537,59 @@
     <div id="pageShoppingList" class="page">
       <div class="page-header">
         <h2>🛒 Shopping List</h2>
+        <button class="btn btn-primary" onclick="openAddShoppingItemModal()">+ Add Item</button>
         <button class="btn btn-secondary" onclick="copyShoppingList()">📋 Copy to Clipboard</button>
         <button class="btn btn-secondary" onclick="printShoppingList()">🖨️ Print</button>
       </div>
-      <p style="color:var(--text-light);margin-bottom:16px">All your out-of-stock clays and glazes in one place.</p>
+      <p style="color:var(--text-light);margin-bottom:16px">Add items manually or mark clays/glazes as out of stock to see them here.</p>
       <div id="shoppingListContent"></div>
     </div>
+
+<!-- ADD SHOPPING ITEM MODAL -->
+<div id="addShoppingItemModal" class="modal-overlay" onclick="if(event.target===this)closeModal('addShoppingItemModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Add to Shopping List</h2>
+      <button class="modal-close" onclick="closeModal('addShoppingItemModal')">&times;</button>
+    </div>
+    <form onsubmit="saveShoppingItem(event)">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Item Name *</label>
+          <input type="text" class="form-input" id="shoppingItemName" placeholder="e.g. Sponge, Kiln wash, Wire tool" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Quantity</label>
+          <input type="text" class="form-input" id="shoppingItemQty" placeholder="e.g. 2 bags, 1 bottle">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select class="form-select" id="shoppingItemCategory">
+            <option value="general">General</option>
+            <option value="tools">Tools</option>
+            <option value="clay">Clay</option>
+            <option value="glaze">Glaze</option>
+            <option value="kiln">Kiln Supplies</option>
+            <option value="chemicals">Chemicals</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Store / Source</label>
+          <input type="text" class="form-input" id="shoppingItemSource" placeholder="e.g. Sheffield Pottery, Amazon">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Buy Link (optional)</label>
+          <input type="url" class="form-input" id="shoppingItemUrl" placeholder="https://...">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('addShoppingItemModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add to List</button>
+      </div>
+    </form>
+  </div>
+</div>
 
     <!-- GLAZE CHEMICALS -->
     <div id="pageChemicals" class="page">

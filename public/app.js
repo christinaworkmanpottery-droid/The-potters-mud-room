@@ -3409,6 +3409,39 @@ async function loadShoppingList() {
     const d = await api('/api/shopping-list');
     const el = document.getElementById('shoppingListContent');
     let html = '';
+
+    // Custom manually-added items
+    if (d.custom && d.custom.length) {
+      const unchecked = d.custom.filter(i => !i.is_checked);
+      const checked = d.custom.filter(i => i.is_checked);
+      if (unchecked.length) {
+        html += '<h3 style="margin-bottom:12px">📝 My List</h3>';
+        html += unchecked.map(i =>
+          '<div class="card" style="margin-bottom:8px"><div class="card-header"><div style="display:flex;align-items:center;gap:10px">' +
+          '<input type="checkbox" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary)" onchange="toggleShoppingItem('' + i.id + '',this)">' +
+          '<div><div class="card-title">' + esc(i.name) + (i.quantity ? ' <span class="text-sm" style="color:var(--text-light);font-weight:normal">× ' + esc(i.quantity) + '</span>' : '') + '</div>' +
+          (i.category && i.category !== 'general' ? '<div class="text-sm" style="color:var(--text-light)">' + esc(i.category) + (i.source ? ' · ' + esc(i.source) : '') + '</div>' : (i.source ? '<div class="text-sm" style="color:var(--text-light)">' + esc(i.source) + '</div>' : '')) +
+          '</div></div>' +
+          '<div style="display:flex;gap:6px;align-items:center">' +
+          (i.source_url ? '<a href="' + esc(i.source_url) + '" target="_blank" class="btn btn-primary btn-sm">Buy →</a>' : '') +
+          '<button onclick="deleteShoppingItem('' + i.id + '')" class="btn-ghost btn-sm" title="Remove">✕</button>' +
+          '</div></div>'
+        ).join('');
+      }
+      if (checked.length) {
+        html += '<h3 style="margin:20px 0 8px;color:var(--text-muted)">✅ Got it</h3>';
+        html += checked.map(i =>
+          '<div class="card" style="margin-bottom:8px;opacity:0.6"><div class="card-header"><div style="display:flex;align-items:center;gap:10px">' +
+          '<input type="checkbox" checked style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary)" onchange="toggleShoppingItem('' + i.id + '',this)">' +
+          '<div class="card-title" style="text-decoration:line-through">' + esc(i.name) + '</div>' +
+          '</div>' +
+          '<button onclick="deleteShoppingItem('' + i.id + '')" class="btn-ghost btn-sm" title="Remove">✕</button>' +
+          '</div></div>'
+        ).join('');
+        html += '<button onclick="clearCheckedShoppingItems()" class="btn btn-secondary btn-sm" style="margin-bottom:20px">Clear checked items</button>';
+      }
+    }
+
     if (d.clays.length) {
       html += '<h3 style="margin-bottom:12px">🪨 Clays to Buy</h3>';
       html += d.clays.map(c =>
@@ -3429,11 +3462,63 @@ async function loadShoppingList() {
         '</div></div>'
       ).join('');
     }
-    if (!d.clays.length && !d.glazes.length) {
-      html = '<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-title">All stocked up!</div><p>Mark items as out of stock or "need to buy" to see them here.</p></div>';
+    if (!d.clays.length && !d.glazes.length && !(d.custom && d.custom.length)) {
+      html = '<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-title">All stocked up!</div><p>Add items manually or mark clays/glazes as out of stock to see them here.</p></div>';
     }
     el.innerHTML = html;
   } catch(e) { toast(e.message,'error'); }
+}
+
+function openAddShoppingItemModal() {
+  document.getElementById('shoppingItemName').value = '';
+  document.getElementById('shoppingItemQty').value = '';
+  document.getElementById('shoppingItemCategory').value = 'general';
+  document.getElementById('shoppingItemSource').value = '';
+  document.getElementById('shoppingItemUrl').value = '';
+  openModal('addShoppingItemModal');
+}
+
+async function saveShoppingItem(e) {
+  e.preventDefault();
+  const name = document.getElementById('shoppingItemName').value.trim();
+  if (!name) return;
+  try {
+    await api('/api/shopping-list', {
+      method: 'POST',
+      body: {
+        name,
+        quantity: document.getElementById('shoppingItemQty').value.trim() || null,
+        category: document.getElementById('shoppingItemCategory').value || 'general',
+        source: document.getElementById('shoppingItemSource').value.trim() || null,
+        sourceUrl: document.getElementById('shoppingItemUrl').value.trim() || null,
+      }
+    });
+    closeModal('addShoppingItemModal');
+    loadShoppingList();
+    toast('Item added', 'success');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function toggleShoppingItem(id, checkbox) {
+  try {
+    await api('/api/shopping-list/' + id + '/toggle', { method: 'PATCH' });
+    loadShoppingList();
+  } catch(e) { checkbox.checked = !checkbox.checked; toast(e.message, 'error'); }
+}
+
+async function deleteShoppingItem(id) {
+  try {
+    await api('/api/shopping-list/' + id, { method: 'DELETE' });
+    loadShoppingList();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function clearCheckedShoppingItems() {
+  try {
+    await api('/api/shopping-list/checked/clear', { method: 'DELETE' });
+    loadShoppingList();
+    toast('Cleared', 'success');
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 function copyShoppingList() {
