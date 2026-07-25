@@ -233,22 +233,30 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
   const name = document.getElementById('authName').value;
   const errEl = document.getElementById('authError');
   errEl.classList.add('hidden');
+  errEl.style.color = '';
+  // Show debug step on screen for mobile testing
+  const dbg = (msg) => { errEl.textContent = msg; errEl.classList.remove('hidden'); errEl.style.color = '#888'; };
+  dbg('Connecting...');
   try {
     const referredBy = sessionStorage.getItem('referral_code') || null;
+    dbg('Sending login request...');
     const data = await api(isSignUp ? '/api/auth/register' : '/api/auth/login', {
       method: 'POST', body: isSignUp ? { email, password, displayName: name, referredBy, signupSource: 'web_app' } : { email, password }
     });
+    dbg('Got response, saving token...');
     if (isSignUp && referredBy) sessionStorage.removeItem('referral_code');
     token = data.token;
     localStorage.setItem('mudlog_token', token);
     currentUser = data.user;
     _loggedInThisSession = true;
-  } catch (err) { errEl.textContent = err.message; errEl.classList.remove('hidden'); return; }
+    dbg('Token saved. Loading app...');
+  } catch (err) { errEl.textContent = 'Login error: ' + err.message; errEl.classList.remove('hidden'); errEl.style.color = 'red'; return; }
   try { 
     showApp();
   } catch(e) { 
-    document.getElementById('authError').textContent = 'showApp failed: ' + e.message;
-    document.getElementById('authError').classList.remove('hidden');
+    errEl.textContent = 'showApp failed: ' + e.message;
+    errEl.classList.remove('hidden');
+    errEl.style.color = 'red';
   }
 });
 function logout() {
