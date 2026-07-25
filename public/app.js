@@ -305,7 +305,7 @@ function showApp() {
   });
   checkUrlParams();
   // Restore page from URL hash, or default to dashboard
-  const hashPage = window.location.hash.replace('#', '');
+  const hashPage = window.location.hash.replace('#', '').split('?')[0];
   const validPages = ['dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','projects','events','contacts','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog','studioNotes','visualSearch'];
   if (hashPage && hashPage.startsWith('blog/')) {
     const slug = hashPage.replace('blog/', '');
@@ -4765,7 +4765,7 @@ async function loadPublicCombo(shareId) {
 
 // Handle browser back/forward
 window.addEventListener('hashchange', () => {
-  const hashPage = window.location.hash.replace('#', '');
+  const hashPage = window.location.hash.replace('#', '').split('?')[0];
   if (hashPage && hashPage.startsWith('reset-password')) {
     checkResetPasswordHash();
   } else if (hashPage && hashPage.startsWith('blog/')) {
