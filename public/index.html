@@ -190,7 +190,7 @@
 <body>
 
 <!-- LANDING PAGE (visible to search engines) -->
-<div id="landingPage">
+<main id="landingPage">
   <!-- HERO — Clear pitch: who it's for and what it does -->
   <div style="background:var(--bg-dark);color:#fff;padding:60px 20px;text-align:center">
     <div style="max-width:800px;margin:0 auto">
@@ -451,7 +451,7 @@
     <h2 style="font-family:Georgia,serif;font-size:1.6rem;margin-bottom:12px">Built by a Potter, for Potters 🏺</h2>
     <p style="color:rgba(255,255,255,0.7);margin-bottom:20px;max-width:600px;margin-left:auto;margin-right:auto">Stop forgetting which glaze you used. Start tracking your pottery today.</p>
     <button class="btn btn-primary btn-lg" onclick="document.getElementById('landingPage').style.display='none';document.getElementById('authScreen').style.display='flex'" style="font-size:1.1rem;padding:16px 40px">Join The Mud Room — Free</button>
-    <p style="margin-top:20px;color:rgba(255,255,255,0.4);font-size:0.85rem">thepottersmudroom.com — The Potter's Mud Room — Potters Mudroom</p>
+    <p style="margin-top:20px;color:rgba(255,255,255,0.7);font-size:0.85rem">thepottersmudroom.com — The Potter's Mud Room — Potters Mudroom</p>
   </div>
 </div>
 
@@ -683,10 +683,10 @@
       <p style="color:rgba(255,255,255,0.8);margin-bottom:8px;font-size:1rem">Every piece you make tells a story — the clay, the glaze, the firing, the lesson.</p>
       <p style="color:rgba(255,255,255,0.6);margin-bottom:24px;font-size:0.9rem">Stop losing those stories. Start tracking for free.</p>
       <button class="btn btn-primary btn-lg" onclick="exitPreviewToSignup()" style="font-size:1.1rem;padding:16px 40px">Create My Free Account</button>
-      <p style="margin-top:12px;color:rgba(255,255,255,0.4);font-size:0.85rem">10 pieces, full glaze library, clay tracker — free forever. No credit card.</p>
+      <p style="margin-top:12px;color:rgba(255,255,255,0.7);font-size:0.85rem">10 pieces, full glaze library, clay tracker — free forever. No credit card.</p>
     </div>
   </div>
-</div>
+</main>
 
 <!-- AUTH SCREEN -->
 <div id="authScreen" class="auth-screen" style="display:none">
@@ -707,7 +707,7 @@
       <button type="submit" class="btn btn-primary btn-lg" style="width:100%" id="authSubmit">Sign In</button>
       <div id="authError" class="auth-error hidden"></div>
       <p id="forgotPasswordLink" class="auth-toggle" style="margin-top:8px;margin-bottom:0">
-        <a onclick="showForgotPassword()" style="cursor:pointer;font-size:0.85rem;color:#6b4c3b">Forgot Password?</a>
+        <a href="javascript:void(0)" onclick="showForgotPassword()" style="cursor:pointer;font-size:0.85rem;color:#6b4c3b">Forgot Password?</a>
       </p>
     </form>
     <!-- Forgot Password Form -->
@@ -720,7 +720,7 @@
       <div id="forgotError" class="auth-error hidden"></div>
       <div id="forgotSuccess" class="auth-error hidden" style="color:#2e7d32"></div>
       <p class="auth-toggle" style="margin-top:12px">
-        <a onclick="hideForgotPassword()" style="cursor:pointer">← Back to Sign In</a>
+        <a href="javascript:void(0)" onclick="hideForgotPassword()" style="cursor:pointer">← Back to Sign In</a>
       </p>
     </form>
     <!-- Reset Password Form (shown via hash) -->
@@ -738,7 +738,7 @@
     </form>
     <p class="auth-toggle" id="authToggleParagraph">
       <span id="authToggleText">Don't have an account?</span>
-      <a id="authToggleLink" onclick="toggleAuth()">Create one — it's free!</a>
+      <a id="authToggleLink" href="javascript:void(0)" onclick="toggleAuth()">Create one — it's free!</a>
     </p>
   </div>
 </div>

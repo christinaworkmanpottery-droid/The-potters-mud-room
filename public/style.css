@@ -1,8 +1,8 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
   --bg: #FAF7F2; --bg-card: #FFFFFF; --bg-dark: #3E2E24;
-  --text: #2C2420; --text-light: #7A6F66; --text-muted: #B5A99A;
-  --primary: #C67B4E; --primary-hover: #B56A3E; --primary-light: #F5E6D8;
+  --text: #2C2420; --text-light: #7A6F66; --text-muted: #7E7263;
+  --primary: #A85D30; --primary-hover: #96512A; --primary-light: #F5E6D8;
   --accent: #8B9E6B; --accent-light: #E8EFD9;
   --danger: #C45B4A; --danger-light: #FAE4E1;
   --border: #E8E0D6; --border-dark: #D4C8BB;
