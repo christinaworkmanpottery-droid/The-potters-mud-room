@@ -1134,6 +1134,31 @@ function initDB() {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_test_tiles_glaze ON test_tiles(glaze_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_test_tiles_clay ON test_tiles(clay_body_id)`);
 
+  // IAP purchases table (native Apple/Google subscriptions)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS iap_purchases (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      platform TEXT NOT NULL CHECK(platform IN ('ios', 'android')),
+      product_id TEXT NOT NULL,
+      transaction_id TEXT UNIQUE NOT NULL,
+      purchase_token TEXT,
+      expires_at INTEGER NOT NULL,
+      environment TEXT NOT NULL CHECK(environment IN ('sandbox', 'production')),
+      raw_notification TEXT,
+      created_at INTEGER DEFAULT (strftime('%s','now')),
+      updated_at INTEGER DEFAULT (strftime('%s','now')),
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    )
+  `);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_iap_user ON iap_purchases(user_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_iap_transaction ON iap_purchases(transaction_id)`);
+
+  // IAP columns on users table
+  safeAdd('users', 'iap_platform', 'TEXT');
+  safeAdd('users', 'iap_transaction_id', 'TEXT');
+  safeAdd('users', 'iap_expires_at', 'INTEGER');
+
 return db;
 }
 

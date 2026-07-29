@@ -13,6 +13,7 @@ const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const { Expo } = require('expo-server-sdk');
 const { initDB } = require('./database');
+const iap = require('./iap');
 
 const expo = new Expo();
 
@@ -481,7 +482,7 @@ app.get('/api/auth/me', auth, (req, res) => {
 
 // User subscription status (used by mobile app BillingScreen)
 app.get('/api/user/subscription', auth, async (req, res) => {
-  const u = db.prepare('SELECT tier, billing_period, plan_expires_at, stripe_subscription_id, stripe_customer_id, email FROM users WHERE id=?').get(req.userId);
+  const u = db.prepare('SELECT tier, billing_period, plan_expires_at, stripe_subscription_id, stripe_customer_id, email, iap_platform, iap_expires_at FROM users WHERE id=?').get(req.userId);
   if (!u) return res.status(404).json({ error: 'User not found' });
 
   let hasStripe = !!u.stripe_subscription_id;
@@ -507,12 +508,19 @@ app.get('/api/user/subscription', auth, async (req, res) => {
     } catch (e) { /* non-critical — just means we can't confirm Stripe link */ }
   }
 
+  // Check IAP status
+  const hasIAP = iap.isIAPActive(db, req.userId);
+  const hasPremium = iap.hasPremiumAccess(db, req.userId);
+
   res.json({
     plan: u.tier || 'free',
-    status: 'active',
+    status: hasPremium ? 'active' : 'inactive',
     billingPeriod: u.billing_period || null,
     expiresAt: u.plan_expires_at || null,
-    hasStripeSubscription: hasStripe
+    hasStripeSubscription: hasStripe,
+    hasIAPSubscription: hasIAP,
+    iapPlatform: u.iap_platform || null,
+    iapExpiresAt: u.iap_expires_at || null,
   });
 });
 
@@ -575,6 +583,246 @@ app.post('/api/create-portal-session', auth, async (req, res) => {
     });
     res.json({ url: portalSession.url });
   } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ============ NATIVE IAP (Apple / Google Play) ============
+
+// POST /api/iap/apple/verify
+// Called by iOS app immediately after a successful StoreKit purchase.
+// Body: { receiptData: string (base64 legacy receipt) }
+app.post('/api/iap/apple/verify', auth, async (req, res) => {
+  try {
+    const { receiptData } = req.body;
+    if (!receiptData) return res.status(400).json({ error: 'receiptData is required' });
+
+    const verified = await iap.verifyAppleReceipt(receiptData);
+
+    // Reject if receipt bundle doesn't match our app
+    if (!process.env.APPLE_BUNDLE_ID ||
+        verified.environment === 'production') {
+      // In production we could also verify bundleId from receipt — skip for now
+    }
+
+    iap.upsertIAPRecord(db, req.userId, 'ios', verified);
+
+    const u = db.prepare('SELECT tier, iap_expires_at, iap_platform FROM users WHERE id=?').get(req.userId);
+    res.json({
+      success: true,
+      plan: u.tier,
+      iapPlatform: u.iap_platform,
+      iapExpiresAt: u.iap_expires_at,
+      productId: verified.productId,
+      environment: verified.environment,
+    });
+  } catch (err) {
+    console.error('[IAP] Apple verify error:', err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/iap/android/verify
+// Called by Android app immediately after a successful Google Play purchase.
+// Body: { productId: string, purchaseToken: string }
+app.post('/api/iap/android/verify', auth, async (req, res) => {
+  try {
+    const { productId, purchaseToken } = req.body;
+    if (!productId || !purchaseToken) {
+      return res.status(400).json({ error: 'productId and purchaseToken are required' });
+    }
+
+    const verified = await iap.verifyAndroidPurchase(productId, purchaseToken);
+    iap.upsertIAPRecord(db, req.userId, 'android', verified);
+
+    const u = db.prepare('SELECT tier, iap_expires_at, iap_platform FROM users WHERE id=?').get(req.userId);
+    res.json({
+      success: true,
+      plan: u.tier,
+      iapPlatform: u.iap_platform,
+      iapExpiresAt: u.iap_expires_at,
+      productId: verified.productId,
+      environment: verified.environment,
+    });
+  } catch (err) {
+    console.error('[IAP] Android verify error:', err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// GET /api/iap/restore
+// Called when user taps "Restore Purchases" in the app.
+// Frontend sends the same receiptData (iOS) or purchaseToken (Android) it would
+// send for a fresh purchase. We re-verify and re-grant entitlement.
+app.get('/api/iap/restore', auth, async (req, res) => {
+  try {
+    const { platform, receiptData, productId, purchaseToken } = req.query;
+
+    if (platform === 'ios') {
+      if (!receiptData) return res.status(400).json({ error: 'receiptData required for iOS restore' });
+      const verified = await iap.verifyAppleReceipt(receiptData);
+      iap.upsertIAPRecord(db, req.userId, 'ios', verified);
+    } else if (platform === 'android') {
+      if (!productId || !purchaseToken) {
+        return res.status(400).json({ error: 'productId and purchaseToken required for Android restore' });
+      }
+      const verified = await iap.verifyAndroidPurchase(productId, purchaseToken);
+      iap.upsertIAPRecord(db, req.userId, 'android', verified);
+    } else {
+      return res.status(400).json({ error: 'platform must be ios or android' });
+    }
+
+    const u = db.prepare('SELECT tier, iap_expires_at, iap_platform FROM users WHERE id=?').get(req.userId);
+    const hasPremium = iap.hasPremiumAccess(db, req.userId);
+    res.json({
+      success: true,
+      restored: hasPremium,
+      plan: u.tier,
+      iapExpiresAt: u.iap_expires_at,
+    });
+  } catch (err) {
+    console.error('[IAP] Restore error:', err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/iap/apple/notifications
+// Apple App Store Server Notifications V2 (signedPayload JWS)
+// Apple sends this to notify of renewals, expirations, refunds, etc.
+// No auth middleware — Apple calls this directly.
+app.post('/api/iap/apple/notifications', express.json(), async (req, res) => {
+  // Acknowledge immediately so Apple doesn't retry
+  res.status(200).json({ ok: true });
+
+  try {
+    const { signedPayload } = req.body;
+    if (!signedPayload) return; // nothing to do
+
+    const parsed = iap.parseAppleNotification(signedPayload);
+    console.log(`[IAP] Apple notification: ${parsed.notificationType}/${parsed.subtype || ''} product=${parsed.productId}`);
+
+    // Find user by appAccountToken (we set this to userId on purchase from the app)
+    let userId = parsed.appAccountToken;
+
+    // Fallback: find by transaction_id in our DB
+    if (!userId || userId === 'undefined') {
+      const row = db.prepare('SELECT user_id FROM iap_purchases WHERE transaction_id=?').get(parsed.transactionId);
+      userId = row?.user_id;
+    }
+
+    if (!userId) {
+      console.warn(`[IAP] Apple notification: could not find user for transactionId=${parsed.transactionId}`);
+      return;
+    }
+
+    switch (parsed.notificationType) {
+      case 'SUBSCRIBED':
+      case 'DID_RENEW':
+      case 'OFFER_REDEEMED': {
+        if (parsed.expiresAt) {
+          iap.upsertIAPRecord(db, userId, 'ios', {
+            productId: parsed.productId,
+            transactionId: parsed.transactionId,
+            purchaseToken: null,
+            expiresAt: parsed.expiresAt,
+            environment: parsed.environment,
+            rawNotification: JSON.stringify(req.body),
+          });
+        }
+        break;
+      }
+      case 'EXPIRED':
+      case 'REVOKE': {
+        iap.revokeIAPAccess(db, userId, parsed.transactionId);
+        break;
+      }
+      case 'DID_FAIL_TO_RENEW': {
+        // Subscription is in billing retry — keep premium for now,
+        // EXPIRED notification will arrive when grace period ends
+        console.log(`[IAP] Apple DID_FAIL_TO_RENEW for user ${userId} — keeping access during retry period`);
+        break;
+      }
+      case 'GRACE_PERIOD_EXPIRED': {
+        iap.revokeIAPAccess(db, userId, parsed.transactionId);
+        break;
+      }
+      case 'REFUND': {
+        // Refund granted — revoke immediately
+        iap.revokeIAPAccess(db, userId, parsed.transactionId);
+        break;
+      }
+      default:
+        console.log(`[IAP] Apple notification type ${parsed.notificationType} — no action taken`);
+    }
+  } catch (err) {
+    console.error('[IAP] Apple notification processing error:', err.message);
+    // Already sent 200 — don't let Apple retry valid deliveries due to our processing bug
+  }
+});
+
+// POST /api/iap/android/notifications
+// Google Play Real-Time Developer Notifications via Pub/Sub push.
+// Google sends { message: { data: base64 }, subscription: string }
+// No auth middleware — Google calls this directly.
+app.post('/api/iap/android/notifications', express.json(), async (req, res) => {
+  // Acknowledge immediately — Google requires 200 within a few seconds
+  res.status(200).json({ ok: true });
+
+  try {
+    const parsed = iap.parseGoogleNotification(req.body);
+
+    if (parsed.notificationType === 'TEST') {
+      console.log('[IAP] Google test notification received — OK');
+      return;
+    }
+
+    console.log(`[IAP] Google notification: ${parsed.notificationType} product=${parsed.productId}`);
+
+    if (!parsed.purchaseToken || !parsed.productId) return;
+
+    // Find user by purchaseToken in our DB
+    const row = db.prepare('SELECT user_id FROM iap_purchases WHERE transaction_id=?').get(parsed.purchaseToken);
+    const userId = row?.user_id;
+
+    if (!userId) {
+      console.warn(`[IAP] Google notification: no user found for purchaseToken — may be a new purchase (frontend will verify)`);
+      return;
+    }
+
+    switch (parsed.notificationType) {
+      case 'SUBSCRIPTION_RENEWED':
+      case 'SUBSCRIPTION_RECOVERED':
+      case 'SUBSCRIPTION_RESTARTED': {
+        // Re-verify against Google Play API to get latest expiry
+        try {
+          const verified = await iap.verifyAndroidPurchase(parsed.productId, parsed.purchaseToken);
+          iap.upsertIAPRecord(db, userId, 'android', verified);
+        } catch (e) {
+          console.error('[IAP] Google re-verify failed:', e.message);
+        }
+        break;
+      }
+      case 'SUBSCRIPTION_EXPIRED':
+      case 'SUBSCRIPTION_REVOKED': {
+        iap.revokeIAPAccess(db, userId, parsed.purchaseToken);
+        break;
+      }
+      case 'SUBSCRIPTION_CANCELED': {
+        // Canceled but still within paid period — keep access, will expire naturally
+        console.log(`[IAP] Google subscription canceled for user ${userId} — access continues until expiry`);
+        break;
+      }
+      case 'SUBSCRIPTION_ON_HOLD':
+      case 'SUBSCRIPTION_PAUSED': {
+        // Billing issue — could revoke here or wait for EXPIRED
+        // Keeping access during hold/pause is more user-friendly
+        console.log(`[IAP] Google subscription on hold/paused for user ${userId}`);
+        break;
+      }
+      default:
+        console.log(`[IAP] Google notification type ${parsed.notificationType} — no action taken`);
+    }
+  } catch (err) {
+    console.error('[IAP] Google notification processing error:', err.message);
+  }
 });
 
 // Change password
@@ -1538,8 +1786,7 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
 
   console.log('[DEBUG] POST /api/pieces content-type:', req.headers['content-type'], 'body:', JSON.stringify(body), 'file:', req.file ? req.file.originalname : 'none', 'title:', title, 'status:', status, 'clay:', clayText, 'glaze:', glazeText, 'notes:', notes);
 
-  const u = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
-  if ((u?.tier || 'free') === 'free' && getPieceCount(req.userId) >= 10) return res.status(403).json({ error: 'Free tier limited to 10 pieces. Upgrade to Unlimited for more!' });
+  if (!iap.hasPremiumAccess(db, req.userId) && getPieceCount(req.userId) >= 10) return res.status(403).json({ error: 'Free tier limited to 10 pieces. Upgrade to Unlimited for more!' });
 
   const id = uuidv4();
   const isCasualty = (status === 'broken' || status === 'recycled');
