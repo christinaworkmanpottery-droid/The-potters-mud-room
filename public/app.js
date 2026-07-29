@@ -292,13 +292,14 @@ async function checkAuth() {
   }
 }
 function showApp() {
+  try {
   guestMode = false;
   document.getElementById('landingPage').style.display = 'none';
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('mainApp').classList.remove('hidden');
   const badge = document.getElementById('navTier');
   const t = currentUser?.tier || 'free';
-  badge.textContent = t.toUpperCase(); badge.className = 'tier-badge tier-' + t;
+  if (badge) { badge.textContent = t.toUpperCase(); badge.className = 'tier-badge tier-' + t; }
   // Show/hide tier-gated nav items
   const tier = currentUser?.tier || 'free';
   const tierLv = { free: 0, basic: 1, mid: 1, starter: 1, top: 1, unlimited: 1 };
@@ -326,6 +327,14 @@ function showApp() {
   if (adminNav && currentUser?.email === 'christinaworkmanpottery@gmail.com') adminNav.style.display = '';
   // Load profile photo in nav/profile
   loadProfilePhoto();
+  } catch(showAppErr) {
+    console.error('showApp error:', showAppErr);
+    // Show error on auth screen so user can see what went wrong
+    document.getElementById('landingPage').style.display = 'none';
+    document.getElementById('authScreen').style.display = 'flex';
+    const errEl = document.getElementById('authError');
+    if (errEl) { errEl.textContent = 'App load error: ' + showAppErr.message; errEl.classList.remove('hidden'); errEl.style.color = 'red'; }
+  }
 }
 
 // ---- Navigation ----
