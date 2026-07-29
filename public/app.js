@@ -4351,7 +4351,6 @@ async function loadStudioNotes() {
     if (!notes.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
     c.innerHTML = notes.map(n => {
-      const preview = n.body.length > 120 ? esc(n.body.slice(0,120)) + '…' : esc(n.body);
       const shareText = encodeURIComponent((n.title ? n.title + '\n\n' : '') + n.body);
       const shareUrl = 'mailto:?subject=' + encodeURIComponent(n.title || 'Studio Note') + '&body=' + shareText;
       const smsUrl = 'sms:?body=' + shareText;
@@ -4361,7 +4360,7 @@ async function loadStudioNotes() {
       '<a href="' + smsUrl + '" class="btn-small" title="Share via text">💬</a>' +
       '<button onclick="openStudioNoteModal(' + JSON.stringify(n).replace(/"/g,'&quot;') + ')" class="btn-small" title="Edit">✎</button>' +
       '<button onclick="deleteStudioNote(\'' + n.id + '\')" class="btn-small" title="Delete">✕</button></div></div>' +
-      '<div class="text-sm" style="white-space:pre-wrap;margin-top:8px">' + preview + '</div>' +
+      '<div class="text-sm studio-note-body" style="white-space:pre-wrap;margin-top:8px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;cursor:pointer" onclick="const exp=this.style.webkitLineClamp===\'\';this.style.webkitLineClamp=exp?\'2\':\'\';this.style.display=exp?\'-webkit-box\':\'block\'">' + esc(n.body) + '</div>' +
       '<div class="text-sm" style="color:var(--text-light);margin-top:8px">' + fmtDate(n.updated_at?.split('T')[0] || n.created_at?.split('T')[0]) + '</div>' +
       '</div>';
     }).join('');
