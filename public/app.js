@@ -4469,7 +4469,6 @@ async function loadContacts() {
 }
 
 
-}
 
 function openContactModal(ct = null) {
   document.getElementById('contactId').value = ct?.id || '';
