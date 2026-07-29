@@ -1,0 +1,131 @@
+PRIVACY POLICY
+The Potter's Mud Room
+Effective Date: May 9, 2025
+
+====================================
+
+THE SHORT VERSION
+
+We collect what we need to run the app. We don't sell your data. We don't track you across the internet. You can delete everything anytime.
+
+====================================
+
+WHO WE ARE
+
+The Potter's Mud Room is a pottery and ceramics community and tracking app, built by a potter for potters.
+
+Website: www.thepottersmudroom.com
+Contact: thepottersmudroom@gmail.com
+
+====================================
+
+WHAT WE COLLECT
+
+When you use The Potter's Mud Room, we collect:
+
+- Account info: Your name, email address, and profile photo
+- Pottery data: Pieces you log (photos, descriptions), clay bodies, glazes, firing logs, and projects
+- Community activity: Forum posts, direct messages between members, events
+- Sales & business: Sales records, contacts/buyers, shopping lists, goals
+- Photos: Images you upload of your work, stored on our servers
+
+====================================
+
+WHAT WE DON'T COLLECT
+
+- Location data: We do not collect or track your location
+- Payment card numbers: Payments are processed by Stripe — we never see or store your card details
+- Third-party tracking: No Google Analytics, no Facebook pixels, no ad trackers
+
+====================================
+
+HOW WE USE YOUR DATA
+
+Your data is used to:
+
+- Run the app and provide the features you signed up for
+- Let you track your pottery pieces, materials, firings, and sales
+- Enable community features (forums, messaging, events)
+- Send you emails related to your account (password resets, important updates)
+- Improve the app based on basic, anonymous page view analytics
+
+====================================
+
+ANALYTICS
+
+We collect basic page view data to understand how the app is used and where we can improve. This is simple, privacy-respecting analytics — no third-party trackers, no cross-site tracking, no advertising profiles.
+
+====================================
+
+COOKIES
+
+We use session cookies for authentication only — to keep you logged in while you use the app. We don't use advertising cookies, tracking cookies, or any third-party cookies.
+
+====================================
+
+NEWSLETTER
+
+Our newsletter is completely optional. You choose whether to sign up, and you can unsubscribe at any time with one click. We won't add you without your permission.
+
+====================================
+
+PAYMENTS
+
+Payments are handled by Stripe (https://stripe.com/privacy). When you subscribe or make a purchase, your payment information goes directly to Stripe. We receive confirmation of payment but never see or store your card number.
+
+====================================
+
+DATA SHARING
+
+We do not sell, rent, or share your personal data with third parties.
+
+The only exceptions:
+
+- Stripe: For payment processing (they have their own privacy policy)
+- Legal requirements: If required by law (court order, subpoena, etc.)
+
+====================================
+
+YOUR RIGHTS & CONTROL
+
+You have full control over your data:
+
+- Access: You can view all your data within the app at any time
+- Edit: You can update or correct any information
+- Delete: You can delete your account and all associated data — pieces, photos, messages, everything. Once deleted, it's gone.
+- Export: Contact us if you'd like a copy of your data
+
+To delete your account or request your data, email thepottersmudroom@gmail.com or use the account settings in the app.
+
+====================================
+
+DATA STORAGE & SECURITY
+
+Your data (including photos) is stored on our servers. We use industry-standard security practices to protect your information, including encrypted connections (HTTPS) and secure authentication.
+
+====================================
+
+AGE REQUIREMENT
+
+The Potter's Mud Room is intended for users aged 13 and older. We do not knowingly collect information from children under 13. If we learn that a child under 13 has created an account, we will delete it and all associated data immediately.
+
+If you believe a child under 13 is using our app, please contact us at thepottersmudroom@gmail.com.
+
+====================================
+
+CHANGES TO THIS POLICY
+
+If we make significant changes to this privacy policy, we'll notify you via email or an in-app notice. Minor wording updates won't trigger a notification, but the effective date at the top will always reflect the latest version.
+
+====================================
+
+CONTACT US
+
+Questions, concerns, or requests? Reach out:
+
+Email: thepottersmudroom@gmail.com
+Website: www.thepottersmudroom.com
+
+====================================
+
+© 2025 The Potter's Mud Room. All rights reserved.

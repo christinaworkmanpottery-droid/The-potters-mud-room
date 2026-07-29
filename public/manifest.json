@@ -1,0 +1,24 @@
+{
+  "name": "The Potter's Mud Room",
+  "short_name": "Mud Room",
+  "description": "Track every piece from wet clay to finished work. Log clay bodies, glazes, firings & sales.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fefae0",
+  "theme_color": "#606c38",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
