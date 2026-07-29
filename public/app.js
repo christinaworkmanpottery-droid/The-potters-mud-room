@@ -277,10 +277,13 @@ async function checkAuth() {
     currentUser = d.user;
     showApp();
   } catch(e) {
-    // Only clear session on explicit auth failure, not network errors
     const msg = (e.message || '').toLowerCase();
-    if (msg.includes('invalid token') || msg.includes('unauthorized') || msg.includes('no token')) {
-      logout();
+    if (msg.includes('invalid token') || msg.includes('unauthorized') || msg.includes('no token') || msg.includes('invalid') || msg.includes('expired')) {
+      // Token is bad — clear it and show auth screen (not landing page)
+      token = null;
+      localStorage.removeItem('mudlog_token');
+      document.getElementById('landingPage').style.display = 'none';
+      document.getElementById('authScreen').style.display = 'flex';
     } else {
       // Network/server error — if we have a token, try to show app anyway
       document.getElementById('landingPage').style.display = 'none';
