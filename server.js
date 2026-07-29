@@ -587,6 +587,41 @@ app.post('/api/create-portal-session', auth, async (req, res) => {
 
 // ============ NATIVE IAP (Apple / Google Play) ============
 
+// POST /api/iap/verify — unified route called by the mobile app (platform-aware)
+// Body: { platform: 'ios'|'android', receipt: string, productId: string }
+app.post('/api/iap/verify', auth, async (req, res) => {
+  try {
+    const { platform, receipt, productId } = req.body;
+    if (!platform || !receipt) return res.status(400).json({ error: 'platform and receipt are required' });
+
+    let verified;
+    if (platform === 'ios') {
+      verified = await iap.verifyAppleReceipt(receipt);
+      iap.upsertIAPRecord(db, req.userId, 'ios', verified);
+    } else if (platform === 'android') {
+      if (!productId) return res.status(400).json({ error: 'productId required for Android' });
+      // receipt is the purchaseToken for Android
+      verified = await iap.verifyAndroidPurchase(productId, receipt);
+      iap.upsertIAPRecord(db, req.userId, 'android', verified);
+    } else {
+      return res.status(400).json({ error: 'platform must be ios or android' });
+    }
+
+    const u = db.prepare('SELECT tier, iap_expires_at, iap_platform FROM users WHERE id=?').get(req.userId);
+    res.json({
+      success: true,
+      tier: u.tier,
+      iapPlatform: u.iap_platform,
+      iapExpiresAt: u.iap_expires_at,
+      productId: verified.productId,
+      environment: verified.environment,
+    });
+  } catch (err) {
+    console.error('[IAP] Unified verify error:', err.message);
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // POST /api/iap/apple/verify
 // Called by iOS app immediately after a successful StoreKit purchase.
 // Body: { receiptData: string (base64 legacy receipt) }
