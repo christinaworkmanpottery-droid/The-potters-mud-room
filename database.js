@@ -1159,6 +1159,15 @@ function initDB() {
   safeAdd('users', 'iap_transaction_id', 'TEXT');
   safeAdd('users', 'iap_expires_at', 'INTEGER');
 
+  // My Store + Find a Potter columns
+  safeAdd('users', 'shop_url', 'TEXT');
+  safeAdd('users', 'shop_url_2', 'TEXT');
+  safeAdd('users', 'shop_url_3', 'TEXT');
+  safeAdd('users', 'city', 'TEXT');
+  safeAdd('users', 'state_region', 'TEXT');
+  safeAdd('users', 'country', 'TEXT');
+  safeAdd('users', 'findable', 'INTEGER DEFAULT 0');
+
 return db;
 }
 

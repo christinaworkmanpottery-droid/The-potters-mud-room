@@ -308,7 +308,7 @@ function showApp() {
     });
     checkUrlParams();
     const hashPage = window.location.hash.replace('#', '').split('?')[0];
-    const validPages = ['dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','projects','events','contacts','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog','studioNotes','visualSearch','testTiles'];
+    const validPages = ['dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','projects','events','contacts','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog','studioNotes','visualSearch','testTiles','findPotter'];
     if (hashPage && hashPage.startsWith('blog/')) {
       const slug = hashPage.replace('blog/', '');
       if (slug) viewBlogPost(slug);
@@ -377,7 +377,7 @@ function navigate(page) {
     try { const nb = document.querySelector('.nav-link[data-page="' + page + '"]'); if (nb) nb.classList.add('active'); } catch(e) {}
   const loaders = {
     dashboard:loadDashboard, pieces:loadPieces, clayBodies:loadClayBodies,
-    glazes:loadGlazes, firings:loadFirings, casualties:loadCasualties, sales:loadSales, testTiles:loadTestTiles,
+    glazes:loadGlazes, firings:loadFirings, casualties:loadCasualties, sales:loadSales, testTiles:loadTestTiles, findPotter:loadFindPotter,
     goals:loadGoals, projects:loadProjects, events:loadEvents, contacts:loadContacts, studioNotes:loadStudioNotes,
     community:loadCombos, forum:loadForum, profile:loadProfile,
     shop:loadShop, upgrade:loadUpgrade, admin:loadAdmin,
@@ -398,7 +398,8 @@ function navigate(page) {
       chemicals:'view_chemicals', communityMembers:'view_community_members',
       notifications:'view_notifications', messages:'view_messages', blog:'view_blog',
       help:'view_help', admin:'view_admin', shop:'view_shop', upgrade:'view_upgrade',
-      testTiles:'view_test_tiles'
+      testTiles:'view_test_tiles',
+      findPotter:'view_find_potter'
     };
     if (activityMap[page]) trackActivity(activityMap[page], page);
   } catch(navErr) { console.error('Navigation error:', navErr); }
@@ -2135,6 +2136,15 @@ async function loadProfile() {
     document.getElementById('profilePrivate').checked = !!d.user.is_private;
     document.getElementById('profileUnits').value = d.user.unit_system || 'imperial';
     document.getElementById('profileTemp').value = d.user.temp_unit || 'fahrenheit';
+    // My Store fields
+    document.getElementById('profileShopUrl').value = d.user.shop_url || '';
+    document.getElementById('profileShopUrl2').value = d.user.shop_url_2 || '';
+    document.getElementById('profileShopUrl3').value = d.user.shop_url_3 || '';
+    // Find a Potter fields
+    document.getElementById('profileCity').value = d.user.city || '';
+    document.getElementById('profileState').value = d.user.state_region || '';
+    document.getElementById('profileCountry').value = d.user.country || '';
+    document.getElementById('profileFindable').checked = !!d.user.findable;
 
     // Profile photo
     const preview = document.getElementById('profilePhotoPreview');
@@ -2215,11 +2225,54 @@ async function saveProfile() {
       website: document.getElementById('profileWebsite').value || null,
       isPrivate: document.getElementById('profilePrivate').checked,
       unitSystem: document.getElementById('profileUnits').value,
-      tempUnit: document.getElementById('profileTemp').value
+      tempUnit: document.getElementById('profileTemp').value,
+      shopUrl: document.getElementById('profileShopUrl').value || null,
+      shopUrl2: document.getElementById('profileShopUrl2').value || null,
+      shopUrl3: document.getElementById('profileShopUrl3').value || null,
+      city: document.getElementById('profileCity').value || null,
+      stateRegion: document.getElementById('profileState').value || null,
+      country: document.getElementById('profileCountry').value || null,
+      findable: document.getElementById('profileFindable').checked
     }});
     toast('Profile saved!', 'success');
     trackActivity('edit_profile', 'profile');
   } catch(e) { toast(e.message,'error'); }
+}
+
+// ---- Find a Potter ----
+async function loadFindPotter() {
+  if (currentPage !== 'findPotter') return;
+  const q = document.getElementById('findPotterSearch')?.value || '';
+  const state = document.getElementById('findPotterState')?.value || '';
+  const country = document.getElementById('findPotterCountry')?.value || '';
+  const c = document.getElementById('findPotterList');
+  const em = document.getElementById('findPotterEmpty');
+  c.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-light)">Searching...</div>';
+  try {
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (state) params.set('state', state);
+    if (country) params.set('country', country);
+    const potters = await api('/api/potters/find?' + params.toString());
+    if (!potters.length) { c.innerHTML = ''; em.classList.remove('hidden'); return; }
+    em.classList.add('hidden');
+    c.innerHTML = potters.map(p => {
+      const avatar = p.avatarFilename
+        ? '<img src="/uploads/' + esc(p.avatarFilename) + '" style="width:48px;height:48px;object-fit:cover;border-radius:50%;flex-shrink:0">'
+        : '<div style="width:48px;height:48px;border-radius:50%;background:var(--bg-light);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">🏺</div>';
+      const loc = [p.city, p.stateRegion, p.country].filter(Boolean).join(', ');
+      const shops = [p.shopUrl, p.shopUrl2, p.shopUrl3].filter(Boolean);
+      const shopLinks = shops.map((u, i) => '<a href="' + esc(u) + '" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="font-size:0.8rem">🛒 Shop' + (shops.length > 1 ? ' ' + (i+1) : '') + '</a>').join('');
+      return '<div class="card" style="display:flex;gap:12px;align-items:flex-start;cursor:pointer" onclick="navigate(\'memberProfile\',\''+p.id+'\')">' +
+        avatar +
+        '<div style="flex:1;min-width:0">' +
+        '<div style="font-weight:600">' + esc(p.displayName || 'Potter') + '</div>' +
+        (loc ? '<div class="text-sm" style="color:var(--text-light)">📍 ' + esc(loc) + '</div>' : '') +
+        (p.bio ? '<div class="text-sm" style="color:var(--text-light);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(p.bio) + '</div>' : '') +
+        (shopLinks ? '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">' + shopLinks + '</div>' : '') +
+        '</div></div>';
+    }).join('');
+  } catch(e) { toast(e.message, 'error'); c.innerHTML = ''; }
 }
 
 // ---- Upgrade / Billing ----
@@ -4760,6 +4813,13 @@ async function deleteAccount() {
 }
 
 // ============ REFERRAL LINK COPY ============
+function openShop(inputId) {
+  let url = document.getElementById(inputId)?.value?.trim();
+  if (!url) { toast('Enter a shop URL first', 'error'); return; }
+  if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
+  window.open(url, '_blank', 'noopener');
+}
+
 function copyReferralLink() {
   const input = document.getElementById('refLinkInput');
   if (input) {

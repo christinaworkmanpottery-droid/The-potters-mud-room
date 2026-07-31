@@ -780,6 +780,7 @@
         <div class="nav-section-title">Community</div>
         <button class="nav-link" data-page="community" onclick="navigate('community'); closeNav()">Community Library</button>
         <button class="nav-link" data-page="communityMembers" onclick="navigate('communityMembers'); closeNav()">👥 Members</button>
+        <button class="nav-link" data-page="findPotter" onclick="navigate('findPotter'); closeNav()">📍 Find a Potter</button>
         <button class="nav-link" data-page="forum" onclick="navigate('forum'); closeNav()">Forum</button>
         <button class="nav-link" data-page="blog" onclick="navigate('blog'); closeNav()">📝 Blog</button>
         <button class="nav-link" data-page="shop" onclick="navigate('shop'); closeNav()">Shop</button>
@@ -1380,6 +1381,25 @@
       </div>
     </div>
 
+    <!-- FIND A POTTER -->
+    <div id="pageFindPotter" class="page">
+      <div class="page-header">
+        <h2>📍 Find a Potter</h2>
+      </div>
+      <p class="text-sm" style="color:var(--text-light);margin-bottom:16px">Browse potters who have opted in to be found. Search by name, city, or region.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+        <input type="text" class="form-input" id="findPotterSearch" placeholder="Search by name, bio, city..." style="flex:1;min-width:160px" oninput="loadFindPotter()">
+        <input type="text" class="form-input" id="findPotterState" placeholder="State / Region" style="width:150px" oninput="loadFindPotter()">
+        <input type="text" class="form-input" id="findPotterCountry" placeholder="Country" style="width:120px" oninput="loadFindPotter()">
+      </div>
+      <div id="findPotterList"></div>
+      <div id="findPotterEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">📍</div>
+        <div class="empty-state-title">No potters found</div>
+        <p>Try a different search, or be the first to opt in! Go to Profile → Find a Potter to add yourself.</p>
+      </div>
+    </div>
+
     <!-- COMMUNITY MEMBERS DIRECTORY -->
     <div id="pageCommunityMembers" class="page">
       <div class="page-header">
@@ -1446,6 +1466,60 @@
             <label><input type="checkbox" id="profilePrivate"> Make my profile private</label>
           </div>
           <button class="btn btn-primary" onclick="saveProfile()">Save Profile</button>
+        </div>
+
+        <div class="card">
+          <h3 style="margin-bottom:4px">🛒 My Shop</h3>
+          <p class="text-sm" style="color:var(--text-light);margin-bottom:16px">Save your shop link(s) — tap Open My Shop to go straight to your store. Shown on your public profile so other potters can find and buy your work.</p>
+          <div class="form-group">
+            <label>Shop URL 1 <span style="color:var(--text-muted);font-weight:normal">(Etsy, Shopify, website, etc.)</span></label>
+            <div style="display:flex;gap:8px">
+              <input type="text" class="form-input" id="profileShopUrl" placeholder="https://etsy.com/shop/yourshop" style="flex:1">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="openShop('profileShopUrl')">Open</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Shop URL 2 <span style="color:var(--text-muted);font-weight:normal">(optional)</span></label>
+            <div style="display:flex;gap:8px">
+              <input type="text" class="form-input" id="profileShopUrl2" placeholder="https://..." style="flex:1">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="openShop('profileShopUrl2')">Open</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Shop URL 3 <span style="color:var(--text-muted);font-weight:normal">(optional)</span></label>
+            <div style="display:flex;gap:8px">
+              <input type="text" class="form-input" id="profileShopUrl3" placeholder="https://..." style="flex:1">
+              <button type="button" class="btn btn-secondary btn-sm" onclick="openShop('profileShopUrl3')">Open</button>
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="saveProfile()">Save</button>
+        </div>
+
+        <div class="card">
+          <h3 style="margin-bottom:4px">📍 Find a Potter</h3>
+          <p class="text-sm" style="color:var(--text-light);margin-bottom:16px">Opt in to appear in the Find a Potter directory so other members can find you. You control this — it's off by default.</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="form-group">
+              <label>City</label>
+              <input type="text" class="form-input" id="profileCity" placeholder="e.g. Portland">
+            </div>
+            <div class="form-group">
+              <label>State / Region</label>
+              <input type="text" class="form-input" id="profileState" placeholder="e.g. Oregon">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Country</label>
+            <input type="text" class="form-input" id="profileCountry" placeholder="e.g. USA">
+          </div>
+          <div class="form-group">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+              <input type="checkbox" id="profileFindable">
+              <span>Show me in the Find a Potter directory</span>
+            </label>
+            <p class="text-sm" style="color:var(--text-muted);margin-top:4px">Only your name, city/state, bio, and shop links are shown. Your exact address is never shared.</p>
+          </div>
+          <button class="btn btn-primary" onclick="saveProfile()">Save</button>
         </div>
         <div class="card">
           <h3 style="margin-bottom:16px">Preferences</h3>

@@ -915,9 +915,9 @@ app.delete('/api/account', auth, (req, res) => {
 
 // ============ USER PROFILE ============
 app.put('/api/profile', auth, (req, res) => {
-  const { displayName, username, bio, location, website, isPrivate, unitSystem, tempUnit } = req.body;
-  db.prepare(`UPDATE users SET display_name=?,username=?,bio=?,location=?,website=?,is_private=?,unit_system=?,temp_unit=?,updated_at=datetime('now') WHERE id=?`)
-    .run(displayName, username || null, bio, location, website, isPrivate ? 1 : 0, unitSystem || 'imperial', tempUnit || 'fahrenheit', req.userId);
+  const { displayName, username, bio, location, website, isPrivate, unitSystem, tempUnit, shopUrl, shopUrl2, shopUrl3, city, stateRegion, country, findable } = req.body;
+  db.prepare(`UPDATE users SET display_name=?,username=?,bio=?,location=?,website=?,is_private=?,unit_system=?,temp_unit=?,shop_url=?,shop_url_2=?,shop_url_3=?,city=?,state_region=?,country=?,findable=?,updated_at=datetime('now') WHERE id=?`)
+    .run(displayName, username || null, bio, location, website, isPrivate ? 1 : 0, unitSystem || 'imperial', tempUnit || 'fahrenheit', shopUrl || null, shopUrl2 || null, shopUrl3 || null, city || null, stateRegion || null, country || null, findable ? 1 : 0, req.userId);
   const user = db.prepare('SELECT * FROM users WHERE id=?').get(req.userId);
   res.json({ success: true, user });
 });
@@ -932,11 +932,10 @@ app.get('/api/user/profile', auth, (req, res) => {
 
 // Alias: PUT /api/user/profile
 app.put('/api/user/profile', auth, (req, res) => {
-  const { displayName, username, bio, location, website, isPrivate, unitSystem, tempUnit } = req.body;
-  // Only update fields that are actually provided
+  const { displayName, username, bio, location, website, isPrivate, unitSystem, tempUnit, shopUrl, shopUrl2, shopUrl3, city, stateRegion, country, findable } = req.body;
   const current = db.prepare('SELECT * FROM users WHERE id=?').get(req.userId);
   if (!current) return res.status(404).json({ error: 'User not found' });
-  db.prepare(`UPDATE users SET display_name=?,username=?,bio=?,location=?,website=?,is_private=?,unit_system=?,temp_unit=?,updated_at=datetime('now') WHERE id=?`)
+  db.prepare(`UPDATE users SET display_name=?,username=?,bio=?,location=?,website=?,is_private=?,unit_system=?,temp_unit=?,shop_url=?,shop_url_2=?,shop_url_3=?,city=?,state_region=?,country=?,findable=?,updated_at=datetime('now') WHERE id=?`)
     .run(
       displayName !== undefined ? displayName : current.display_name,
       username !== undefined ? username : current.username,
@@ -946,6 +945,13 @@ app.put('/api/user/profile', auth, (req, res) => {
       isPrivate !== undefined ? (isPrivate ? 1 : 0) : current.is_private,
       unitSystem || current.unit_system || 'imperial',
       tempUnit || current.temp_unit || 'fahrenheit',
+      shopUrl !== undefined ? (shopUrl || null) : current.shop_url,
+      shopUrl2 !== undefined ? (shopUrl2 || null) : current.shop_url_2,
+      shopUrl3 !== undefined ? (shopUrl3 || null) : current.shop_url_3,
+      city !== undefined ? (city || null) : current.city,
+      stateRegion !== undefined ? (stateRegion || null) : current.state_region,
+      country !== undefined ? (country || null) : current.country,
+      findable !== undefined ? (findable ? 1 : 0) : current.findable,
       req.userId
     );
   const user = db.prepare('SELECT * FROM users WHERE id=?').get(req.userId);
@@ -1015,12 +1021,26 @@ app.post('/api/profile/avatar', auth, upload.single('avatar'), (req, res) => {
 });
 
 app.get('/api/profile/:id', auth, (req, res) => {
-  const u = db.prepare('SELECT id,display_name,bio,location,website,avatar_filename,is_private,tier,created_at FROM users WHERE id=?').get(req.params.id);
+  const u = db.prepare('SELECT id,display_name,bio,location,website,avatar_filename,is_private,tier,created_at,shop_url,shop_url_2,shop_url_3,city,state_region,country FROM users WHERE id=?').get(req.params.id);
   if (!u) return res.status(404).json({ error: 'Not found' });
   const blocked = db.prepare('SELECT id FROM blocked_users WHERE (user_id=? AND blocked_user_id=?) OR (user_id=? AND blocked_user_id=?)').get(req.userId, req.params.id, req.params.id, req.userId);
   if (blocked) return res.status(403).json({ error: 'Blocked' });
   if (u.is_private && u.id !== req.userId) return res.json({ user: { id: u.id, displayName: u.display_name, isPrivate: true } });
   res.json({ user: { ...u, displayName: u.display_name } });
+});
+
+// Find a Potter — search members who have opted in
+app.get('/api/potters/find', auth, (req, res) => {
+  const { city, state, country, q } = req.query;
+  let sql = `SELECT id, display_name, bio, avatar_filename, city, state_region, country, website, shop_url, shop_url_2, shop_url_3, tier, created_at FROM users WHERE findable=1 AND is_private=0`;
+  const params = [];
+  if (city) { sql += ` AND city LIKE ?`; params.push('%' + city + '%'); }
+  if (state) { sql += ` AND state_region LIKE ?`; params.push('%' + state + '%'); }
+  if (country) { sql += ` AND country LIKE ?`; params.push('%' + country + '%'); }
+  if (q) { sql += ` AND (display_name LIKE ? OR bio LIKE ? OR city LIKE ?)`; params.push('%'+q+'%','%'+q+'%','%'+q+'%'); }
+  sql += ` ORDER BY display_name ASC LIMIT 100`;
+  const potters = db.prepare(sql).all(...params);
+  res.json(potters.map(p => ({ id: p.id, displayName: p.display_name, bio: p.bio, avatarFilename: p.avatar_filename, city: p.city, stateRegion: p.state_region, country: p.country, website: p.website, shopUrl: p.shop_url, shopUrl2: p.shop_url_2, shopUrl3: p.shop_url_3 })));
 });
 
 app.post('/api/block/:userId', auth, (req, res) => {
