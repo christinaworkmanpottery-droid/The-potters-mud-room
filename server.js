@@ -1078,9 +1078,9 @@ app.get('/api/users/blocked', auth, (req, res) => {
 
 // ============ STRIPE BILLING ============
 const PRICE_CONFIG = {
-  starter: { amount: 695, name: "Starter Plan — $6.95/mo" },
-  'starter-yearly': { amount: 6950, name: "Starter Plan — $69.50/year (save $14!)", tier: 'starter' },
-  'starter-founding': { amount: 348, name: "Starter Plan — Founding Rate $3.48/mo", tier: 'starter' },
+  starter: { amount: 695, name: "Unlimited Plan — $6.95/mo" },
+  'starter-yearly': { amount: 6950, name: "Unlimited Plan — $69.50/year (save $14!)", tier: 'starter' },
+  'starter-founding': { amount: 348, name: "Unlimited Plan — Founding Rate $3.48/mo", tier: 'starter' },
   'starter-founding-yearly': { amount: 3475, name: "Unlimited Plan — Founding Rate $34.75/year", tier: 'starter' },
 };
 

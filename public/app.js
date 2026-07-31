@@ -1994,7 +1994,7 @@ async function loadProfile() {
 
     // Tier info
     const tier = d.user.tier || 'free';
-    const tierNames = { free: 'Free', starter: 'Starter ($6.95/mo)', basic: 'Starter (Legacy Basic)', mid: 'Starter (Legacy Mid)', top: 'Starter (Legacy Top)' };
+    const tierNames = { free: 'Free', starter: 'Unlimited ($6.95/mo)', basic: 'Unlimited (Legacy Basic)', mid: 'Unlimited (Legacy Mid)', top: 'Unlimited (Legacy Top)' };
     let tierHtml = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><span class="tier-badge tier-' + tier + '" style="font-size:0.9rem;padding:4px 12px">' + (tier === 'free' ? 'FREE' : 'STARTER') + '</span> ' + (tierNames[tier] || tier) + '</div>';
     if (d.user.plan_expires_at) {
       const exp = new Date(d.user.plan_expires_at);
