@@ -761,6 +761,7 @@
         <button class="nav-link" data-page="pieces" onclick="navigate('pieces'); closeNav()">Pieces</button>
         <button class="nav-link" data-page="clayBodies" onclick="navigate('clayBodies'); closeNav()">Clay</button>
         <button class="nav-link" data-page="glazes" onclick="navigate('glazes'); closeNav()">Glazes</button>
+        <button class="nav-link" data-page="testTiles" onclick="navigate('testTiles'); closeNav()">🧪 Test Tiles</button>
         <button class="nav-link" data-page="firings" onclick="navigate('firings'); closeNav()">Firings</button>
         <button class="nav-link" data-page="aiChat" onclick="navigate('aiChat'); closeNav()">Ask a Potter</button>
       </div>
@@ -900,6 +901,34 @@
         <div class="empty-state-icon">🎨</div>
         <div class="empty-state-title">No glazes yet</div>
         <p>Add your commercial glazes or recipes.</p>
+      </div>
+    </div>
+
+    <!-- TEST TILES -->
+    <div id="pageTestTiles" class="page">
+      <div class="page-header">
+        <h2>🧪 Test Tile Library</h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-primary" onclick="openTestTileModal()">+ Add Test Tile</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+        <input type="text" class="form-input" id="testTileSearch" placeholder="Search by name, glaze, clay, tag..." style="flex:1;min-width:160px" oninput="loadTestTiles()">
+        <select class="form-select" id="testTileSurfaceFilter" style="width:160px" onchange="loadTestTiles()">
+          <option value="">All surfaces</option>
+          <option value="gloss">Gloss</option>
+          <option value="satin">Satin</option>
+          <option value="matte">Matte</option>
+          <option value="crystal">Crystal</option>
+          <option value="metallic">Metallic</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div id="testTileList" class="card-grid"></div>
+      <div id="testTileEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">🧪</div>
+        <div class="empty-state-title">No test tiles yet</div>
+        <p>Track every glaze experiment — clay body, cone, surface result, photos, and ratings.</p>
       </div>
     </div>
 
@@ -2748,6 +2777,159 @@
       <button type="button" id="glazeViewPhotoBtn" class="btn btn-secondary">📸 Add Photo</button>
       <button type="button" class="btn btn-secondary" onclick="closeModal('glazeViewModal')">Close</button>
       <button type="button" id="glazeViewEditBtn" class="btn btn-primary">✏️ Edit</button>
+    </div>
+  </div>
+</div>
+
+<!-- TEST TILE MODALS -->
+<div id="testTileModal" class="modal-overlay" onclick="if(event.target===this)closeModal('testTileModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="testTileModalTitle">Add Test Tile</h2>
+      <button class="modal-close" onclick="closeModal('testTileModal')">&times;</button>
+    </div>
+    <form onsubmit="saveTestTile(event)" style="overflow-y:auto;max-height:70vh;padding-bottom:8px">
+      <input type="hidden" id="testTileId">
+      <input type="hidden" id="testTileRemovePhoto1" value="">
+      <input type="hidden" id="testTileRemovePhoto2" value="">
+      <input type="hidden" id="testTileRemovePhoto3" value="">
+      <div class="form-group">
+        <label>Name / Label</label>
+        <input type="text" class="form-input" id="testTileName" placeholder="e.g. Amaco Blue Rutile on B-Mix, Cone 6">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label>Glaze</label>
+          <input type="text" class="form-input" id="testTileGlazeName" placeholder="Glaze name">
+        </div>
+        <div class="form-group">
+          <label>Clay Body</label>
+          <input type="text" class="form-input" id="testTileClayName" placeholder="Clay name">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label>Cone</label>
+          <input type="text" class="form-input" id="testTileCone" placeholder="e.g. 6">
+        </div>
+        <div class="form-group">
+          <label>Atmosphere</label>
+          <select class="form-select" id="testTileAtmosphere">
+            <option value="">—</option>
+            <option value="oxidation">Oxidation</option>
+            <option value="reduction">Reduction</option>
+            <option value="neutral">Neutral</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label>Application Method</label>
+          <select class="form-select" id="testTileApplicationMethod">
+            <option value="">—</option>
+            <option value="dip">Dip</option>
+            <option value="brush">Brush</option>
+            <option value="spray">Spray</option>
+            <option value="pour">Pour</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Coats</label>
+          <input type="number" class="form-input" id="testTileCoats" min="1" max="10" value="1">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label>Thickness</label>
+          <select class="form-select" id="testTileThickness">
+            <option value="">—</option>
+            <option value="thin">Thin</option>
+            <option value="medium">Medium</option>
+            <option value="thick">Thick</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Surface Result</label>
+          <select class="form-select" id="testTileSurfaceResult">
+            <option value="">—</option>
+            <option value="gloss">Gloss</option>
+            <option value="satin">Satin</option>
+            <option value="matte">Matte</option>
+            <option value="crystal">Crystal</option>
+            <option value="metallic">Metallic</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Color Result</label>
+        <input type="text" class="form-input" id="testTileColorResult" placeholder="e.g. Deep teal with rust specks">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label>Layered Over</label>
+          <input type="text" class="form-input" id="testTileLayeredOver" placeholder="Glaze underneath">
+        </div>
+        <div class="form-group">
+          <label>Layered Under</label>
+          <input type="text" class="form-input" id="testTileLayeredUnder" placeholder="Glaze on top">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label>Kiln Position</label>
+          <input type="text" class="form-input" id="testTileKilnPosition" placeholder="e.g. Top shelf">
+        </div>
+        <div class="form-group">
+          <label>Firing Schedule</label>
+          <input type="text" class="form-input" id="testTileFiringSchedule" placeholder="e.g. Slow cool">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Rating</label>
+        <select class="form-select" id="testTileRating">
+          <option value="">—</option>
+          <option value="1">★ (1)</option>
+          <option value="2">★★ (2)</option>
+          <option value="3">★★★ (3)</option>
+          <option value="4">★★★★ (4)</option>
+          <option value="5">★★★★★ (5)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Tags</label>
+        <input type="text" class="form-input" id="testTileTags" placeholder="e.g. blue, rutile, favorite">
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea class="form-input" id="testTileNotes" rows="3" placeholder="Observations, what to try next..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Photos (up to 3)</label>
+        <div id="testTileExistingPhotos" style="margin-bottom:8px"></div>
+        <input type="file" class="form-input" id="testTilePhoto1" accept="image/*">
+        <input type="file" class="form-input" id="testTilePhoto2" accept="image/*" style="margin-top:6px">
+        <input type="file" class="form-input" id="testTilePhoto3" accept="image/*" style="margin-top:6px">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal('testTileModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="testTileViewModal" class="modal-overlay" onclick="if(event.target===this)closeModal('testTileViewModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="testTileViewTitle"></h2>
+      <button class="modal-close" onclick="closeModal('testTileViewModal')">&times;</button>
+    </div>
+    <div id="testTileViewBody" style="padding:0 0 12px"></div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeModal('testTileViewModal')">Close</button>
+      <button type="button" id="testTileViewEditBtn" class="btn btn-primary">✏️ Edit</button>
     </div>
   </div>
 </div>

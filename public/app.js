@@ -308,7 +308,7 @@ function showApp() {
     });
     checkUrlParams();
     const hashPage = window.location.hash.replace('#', '').split('?')[0];
-    const validPages = ['dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','projects','events','contacts','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog','studioNotes','visualSearch'];
+    const validPages = ['dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','projects','events','contacts','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog','studioNotes','visualSearch','testTiles'];
     if (hashPage && hashPage.startsWith('blog/')) {
       const slug = hashPage.replace('blog/', '');
       if (slug) viewBlogPost(slug);
@@ -370,13 +370,14 @@ function navigate(page) {
       notifications:'pageNotifications', messages:'pageMessages', messageThread:'pageMessageThread',
       blog:'pageBlog', blogPost:'pageBlogPost', publicCombo:'pagePublicCombo',
       aiChat:'pageAiChat',
-      studioNotes:'pageStudioNotes', visualSearch:'pageVisualSearch'
+      studioNotes:'pageStudioNotes', visualSearch:'pageVisualSearch',
+      testTiles:'pageTestTiles'
     };
     const el = document.getElementById(map[page]); if (el) el.classList.add('active');
     try { const nb = document.querySelector('.nav-link[data-page="' + page + '"]'); if (nb) nb.classList.add('active'); } catch(e) {}
   const loaders = {
     dashboard:loadDashboard, pieces:loadPieces, clayBodies:loadClayBodies,
-    glazes:loadGlazes, firings:loadFirings, casualties:loadCasualties, sales:loadSales,
+    glazes:loadGlazes, firings:loadFirings, casualties:loadCasualties, sales:loadSales, testTiles:loadTestTiles,
     goals:loadGoals, projects:loadProjects, events:loadEvents, contacts:loadContacts, studioNotes:loadStudioNotes,
     community:loadCombos, forum:loadForum, profile:loadProfile,
     shop:loadShop, upgrade:loadUpgrade, admin:loadAdmin,
@@ -396,7 +397,8 @@ function navigate(page) {
       forum:'view_forum', profile:'view_profile', shoppingList:'view_shopping_list',
       chemicals:'view_chemicals', communityMembers:'view_community_members',
       notifications:'view_notifications', messages:'view_messages', blog:'view_blog',
-      help:'view_help', admin:'view_admin', shop:'view_shop', upgrade:'view_upgrade'
+      help:'view_help', admin:'view_admin', shop:'view_shop', upgrade:'view_upgrade',
+      testTiles:'view_test_tiles'
     };
     if (activityMap[page]) trackActivity(activityMap[page], page);
   } catch(navErr) { console.error('Navigation error:', navErr); }
@@ -1062,6 +1064,158 @@ async function saveGlaze(e) {
 async function deleteGlaze(id) {
   if (!confirm('Delete this glaze?')) return;
   try { await api('/api/glazes/'+id, {method:'DELETE'}); toast('Deleted','success'); loadGlazes(); } catch(e) { toast(e.message,'error'); }
+}
+
+// ---- Test Tiles ----
+let testTiles = [];
+
+async function loadTestTiles() {
+  if (currentPage !== 'testTiles') return;
+  const c = document.getElementById('testTileList');
+  const em = document.getElementById('testTileEmpty');
+  try {
+    testTiles = await api('/api/test-tiles');
+    if (!testTiles.length) { c.innerHTML = ''; em.classList.remove('hidden'); return; }
+    em.classList.add('hidden');
+    const search = (document.getElementById('testTileSearch')?.value || '').toLowerCase();
+    const filterSurface = document.getElementById('testTileSurfaceFilter')?.value || '';
+    let filtered = testTiles;
+    if (search) filtered = filtered.filter(t => (t.name||'').toLowerCase().includes(search) || (t.glaze_name||'').toLowerCase().includes(search) || (t.clay_name||'').toLowerCase().includes(search) || (t.tags||'').toLowerCase().includes(search));
+    if (filterSurface) filtered = filtered.filter(t => t.surface_result === filterSurface);
+    if (!filtered.length) { c.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-title">No matches</div><p>Try a different search.</p></div>'; em.classList.add('hidden'); return; }
+    c.innerHTML = filtered.map(t => testTileCard(t)).join('');
+  } catch(e) {
+    if (e.message && e.message.includes('403')) {
+      c.innerHTML = '';
+      em.classList.remove('hidden');
+      document.getElementById('testTileEmpty').innerHTML = '<div class="empty-state-icon">🧪</div><div class="empty-state-title">Test Tile Library</div><p>Track every glaze test — clay body, cone, surface result, photos, and ratings. Available on the Unlimited plan.</p><button class="btn btn-primary" onclick="navigate(\'upgrade\')">Upgrade to Unlimited</button>';
+    } else { toast(e.message, 'error'); }
+  }
+}
+
+function testTileCard(t) {
+  const stars = t.rating ? '★'.repeat(t.rating) + '☆'.repeat(5 - t.rating) : '';
+  const surface = t.surface_result ? '<span style="font-size:0.7rem;background:var(--bg-light);padding:2px 7px;border-radius:10px;border:1px solid var(--border)">' + esc(t.surface_result) + '</span>' : '';
+  const atm = t.atmosphere ? '<span style="font-size:0.7rem;background:var(--bg-light);padding:2px 7px;border-radius:10px;border:1px solid var(--border)">' + esc(t.atmosphere) + '</span>' : '';
+  const photo = t.photo_filename ? '<img src="/uploads/' + esc(t.photo_filename) + '" style="width:100%;height:140px;object-fit:cover;border-radius:var(--radius-sm) var(--radius-sm) 0 0;display:block" onclick="event.stopPropagation();openLightbox(\'/uploads/' + esc(t.photo_filename) + '\')">' : '<div style="width:100%;height:80px;background:var(--bg-light);border-radius:var(--radius-sm) var(--radius-sm) 0 0;display:flex;align-items:center;justify-content:center;font-size:2rem">🧪</div>';
+  return '<div class="card" style="cursor:pointer;padding:0;overflow:hidden" onclick="viewTestTileById(\''+t.id+'\')">'+
+    photo +
+    '<div style="padding:12px">'+
+    '<div style="font-weight:600;font-size:0.95rem;margin-bottom:4px">' + esc(t.name || 'Untitled tile') + '</div>'+
+    (t.glaze_name ? '<div class="text-sm" style="color:var(--text-light);margin-bottom:2px">🎨 ' + esc(t.glaze_name) + '</div>' : '')+
+    (t.clay_name ? '<div class="text-sm" style="color:var(--text-light);margin-bottom:6px">🪨 ' + esc(t.clay_name) + '</div>' : '')+
+    (t.cone ? '<div class="text-sm" style="color:var(--text-light);margin-bottom:6px">Cone ' + esc(t.cone) + '</div>' : '')+
+    '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">' + surface + atm + '</div>'+
+    (stars ? '<div style="color:#f4a623;font-size:0.85rem">' + stars + '</div>' : '')+
+    '<div style="display:flex;gap:4px;margin-top:8px;justify-content:flex-end">'+
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();openTestTileModal(testTiles.find(x=>x.id===\''+t.id+'\'))">✏️</button>'+
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deleteTestTile(\''+t.id+'\')" >🗑️</button>'+
+    '</div></div></div>';
+}
+
+function viewTestTileById(id) {
+  const t = testTiles.find(x => x.id === id);
+  if (!t) return;
+  const stars = t.rating ? '★'.repeat(t.rating) + '☆'.repeat(5 - t.rating) : null;
+  let html = '';
+  const photos = [t.photo_filename, t.photo_filename2, t.photo_filename3].filter(Boolean);
+  if (photos.length) {
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">';
+    photos.forEach(f => { html += '<img src="/uploads/' + esc(f) + '" style="width:90px;height:90px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + esc(f) + '\')">'; });
+    html += '</div>';
+  }
+  if (t.glaze_name) html += '<div class="view-row"><span class="detail-label">Glaze</span><span>' + esc(t.glaze_name) + '</span></div>';
+  if (t.clay_name) html += '<div class="view-row"><span class="detail-label">Clay Body</span><span>' + esc(t.clay_name) + '</span></div>';
+  if (t.cone) html += '<div class="view-row"><span class="detail-label">Cone</span><span>' + esc(t.cone) + '</span></div>';
+  if (t.atmosphere) html += '<div class="view-row"><span class="detail-label">Atmosphere</span><span>' + esc(t.atmosphere) + '</span></div>';
+  if (t.application_method) html += '<div class="view-row"><span class="detail-label">Application</span><span>' + esc(t.application_method) + (t.coats > 1 ? ' · ' + t.coats + ' coats' : '') + '</span></div>';
+  if (t.thickness) html += '<div class="view-row"><span class="detail-label">Thickness</span><span>' + esc(t.thickness) + '</span></div>';
+  if (t.surface_result) html += '<div class="view-row"><span class="detail-label">Surface Result</span><span>' + esc(t.surface_result) + '</span></div>';
+  if (t.color_result) html += '<div class="view-row"><span class="detail-label">Color Result</span><span>' + esc(t.color_result) + '</span></div>';
+  if (t.layered_over) html += '<div class="view-row"><span class="detail-label">Layered Over</span><span>' + esc(t.layered_over) + '</span></div>';
+  if (t.layered_under) html += '<div class="view-row"><span class="detail-label">Layered Under</span><span>' + esc(t.layered_under) + '</span></div>';
+  if (t.kiln_position) html += '<div class="view-row"><span class="detail-label">Kiln Position</span><span>' + esc(t.kiln_position) + '</span></div>';
+  if (t.firing_schedule) html += '<div class="view-row"><span class="detail-label">Firing Schedule</span><span>' + esc(t.firing_schedule) + '</span></div>';
+  if (stars) html += '<div class="view-row"><span class="detail-label">Rating</span><span style="color:#f4a623">' + stars + '</span></div>';
+  if (t.tags) html += '<div class="view-row"><span class="detail-label">Tags</span><span>' + esc(t.tags) + '</span></div>';
+  if (t.notes) html += '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);color:var(--text-light);font-size:0.9rem">' + esc(t.notes) + '</div>';
+  document.getElementById('testTileViewTitle').textContent = t.name || 'Test Tile';
+  document.getElementById('testTileViewBody').innerHTML = html;
+  document.getElementById('testTileViewEditBtn').onclick = () => { closeModal('testTileViewModal'); openTestTileModal(t); };
+  openModal('testTileViewModal');
+}
+
+function openTestTileModal(t) {
+  document.getElementById('testTileId').value = t?.id || '';
+  document.getElementById('testTileModalTitle').textContent = t ? 'Edit Test Tile' : 'Add Test Tile';
+  document.getElementById('testTileName').value = t?.name || '';
+  document.getElementById('testTileGlazeName').value = t?.glaze_name || '';
+  document.getElementById('testTileClayName').value = t?.clay_name || '';
+  document.getElementById('testTileCone').value = t?.cone || '';
+  document.getElementById('testTileAtmosphere').value = t?.atmosphere || '';
+  document.getElementById('testTileApplicationMethod').value = t?.application_method || '';
+  document.getElementById('testTileCoats').value = t?.coats || 1;
+  document.getElementById('testTileThickness').value = t?.thickness || '';
+  document.getElementById('testTileSurfaceResult').value = t?.surface_result || '';
+  document.getElementById('testTileColorResult').value = t?.color_result || '';
+  document.getElementById('testTileLayeredOver').value = t?.layered_over || '';
+  document.getElementById('testTileLayeredUnder').value = t?.layered_under || '';
+  document.getElementById('testTileKilnPosition').value = t?.kiln_position || '';
+  document.getElementById('testTileFiringSchedule').value = t?.firing_schedule || '';
+  document.getElementById('testTileRating').value = t?.rating || '';
+  document.getElementById('testTileTags').value = t?.tags || '';
+  document.getElementById('testTileNotes').value = t?.notes || '';
+  document.getElementById('testTilePhoto1').value = '';
+  document.getElementById('testTilePhoto2').value = '';
+  document.getElementById('testTilePhoto3').value = '';
+  // Show existing photos
+  const existingDiv = document.getElementById('testTileExistingPhotos');
+  const photos = t ? [t.photo_filename, t.photo_filename2, t.photo_filename3].filter(Boolean) : [];
+  existingDiv.innerHTML = photos.map((f, i) =>
+    '<div style="display:inline-block;margin-right:8px;position:relative">'+
+    '<img src="/uploads/' + esc(f) + '" style="width:60px;height:60px;object-fit:cover;border-radius:6px">'+
+    '<button type="button" onclick="removeTestTilePhoto(this,\''+esc(f)+'\','+i+')" style="position:absolute;top:-6px;right:-6px;background:var(--danger);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:0.7rem;cursor:pointer;line-height:1">×</button>'+
+    '</div>'
+  ).join('');
+  openModal('testTileModal');
+}
+
+function removeTestTilePhoto(btn, filename, idx) {
+  btn.parentElement.remove();
+  // Store removals to send on save
+  const removeInputs = ['testTileRemovePhoto1','testTileRemovePhoto2','testTileRemovePhoto3'];
+  const el = document.getElementById(removeInputs[idx]);
+  if (el) el.value = filename;
+}
+
+async function saveTestTile(e) {
+  e.preventDefault();
+  const btn = e.target.querySelector('button[type=submit]');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const id = document.getElementById('testTileId').value;
+  const fd = new FormData();
+  const fields = ['testTileName','testTileGlazeName','testTileClayName','testTileCone','testTileAtmosphere',
+    'testTileApplicationMethod','testTileCoats','testTileThickness','testTileSurfaceResult','testTileColorResult',
+    'testTileLayeredOver','testTileLayeredUnder','testTileKilnPosition','testTileFiringSchedule',
+    'testTileRating','testTileTags','testTileNotes'];
+  const keys = ['name','glaze_name','clay_name','cone','atmosphere','application_method','coats','thickness',
+    'surface_result','color_result','layered_over','layered_under','kiln_position','firing_schedule','rating','tags','notes'];
+  fields.forEach((fid, i) => { const v = document.getElementById(fid).value; if (v) fd.append(keys[i], v); });
+  // Photos
+  ['testTilePhoto1','testTilePhoto2','testTilePhoto3'].forEach(fid => {
+    const f = document.getElementById(fid)?.files[0]; if (f) fd.append('photos', f);
+  });
+  try {
+    if (id) { await fetch('/api/test-tiles/' + id, {method:'PUT', headers:{Authorization:'Bearer '+token}, body:fd}); toast('Test tile updated! ✓','success'); }
+    else { await fetch('/api/test-tiles', {method:'POST', headers:{Authorization:'Bearer '+token}, body:fd}); toast('Test tile saved! ✓','success'); }
+    closeModal('testTileModal'); loadTestTiles();
+  } catch(err) { toast(err.message || 'Save failed','error'); btn.disabled = false; }
+}
+
+async function deleteTestTile(id) {
+  if (!confirm('Delete this test tile?')) return;
+  try { await api('/api/test-tiles/'+id, {method:'DELETE'}); toast('Deleted','success'); loadTestTiles(); } catch(e) { toast(e.message,'error'); }
 }
 
 // ---- Firings ----
