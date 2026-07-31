@@ -1998,7 +1998,7 @@ async function loadProfile() {
     const tierPriceMap = { starter: '$6.95/month', 'starter-yearly': '$69.50/year', 'starter-founding': '$3.48/month', free: null, basic: null, mid: null, top: null };
     const tierDisplayName = { free: 'Free', starter: 'Unlimited', basic: 'Unlimited', mid: 'Unlimited', top: 'Unlimited' };
     const tierPrice = tierPriceMap[d.user.billing_period] || tierPriceMap[tier] || null;
-    let tierHtml = '<div style="margin-bottom:12px"><div style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-light);margin-bottom:2px">Current Plan</div><div style="font-size:1.1rem;font-weight:600;color:var(--text)">' + (tierDisplayName[tier] || (tierNames[tier] || tier)) + '</div>' + (tierPrice ? '<div style="font-size:0.85rem;color:var(--text-light);margin-top:1px">' + tierPrice + '</div>' : '') + '</div>';
+    let tierHtml = '<div style="margin-bottom:12px"><div style="font-size:0.75rem;letter-spacing:0.04em;color:var(--text-light);margin-bottom:2px">Current Plan</div><div style="font-size:1.1rem;font-weight:600;color:var(--text)">' + (tierDisplayName[tier] || (tierNames[tier] || tier)) + '</div>' + (tierPrice ? '<div style="font-size:0.85rem;color:var(--text-light);margin-top:1px">' + tierPrice + '</div>' : '') + '</div>';
     if (d.user.plan_expires_at) {
       const exp = new Date(d.user.plan_expires_at);
       const daysLeft = Math.ceil((exp - Date.now()) / 86400000);
