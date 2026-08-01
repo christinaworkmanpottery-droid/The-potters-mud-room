@@ -1231,12 +1231,21 @@ app.delete('/api/admin/members/:id', auth, (req, res) => {
     const u = db.prepare('SELECT email FROM users WHERE id=?').get(uid);
     if (!u) return res.status(404).json({ error: 'User not found' });
     if (u.email === ADMIN_EMAIL) return res.status(403).json({ error: 'Cannot delete admin account' });
+    // Clean up all related data before deleting user
+    db.prepare('DELETE FROM push_tokens WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM password_reset_tokens WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM iap_purchases WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM token_purchases WHERE user_id=?').run(uid);
     db.prepare('DELETE FROM promo_redemptions WHERE user_id=?').run(uid);
     db.prepare('DELETE FROM referral_rewards WHERE referrer_id=? OR referred_id=?').run(uid, uid);
+    db.prepare('DELETE FROM studio_notes WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM user_activity WHERE user_id=?').run(uid);
     db.prepare('DELETE FROM combo_comments WHERE user_id=?').run(uid);
     db.prepare('DELETE FROM combo_likes WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM forum_photos WHERE post_id IN (SELECT id FROM forum_posts WHERE user_id=?)').run(uid);
     db.prepare('DELETE FROM forum_replies WHERE user_id=?').run(uid);
     db.prepare('DELETE FROM forum_posts WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM content_reports WHERE reporter_id=?').run(uid);
     db.prepare('DELETE FROM reviews WHERE user_id=?').run(uid);
     db.prepare('DELETE FROM messages WHERE from_user_id=? OR to_user_id=?').run(uid, uid);
     db.prepare('DELETE FROM notifications WHERE user_id=? OR from_user_id=?').run(uid, uid);
