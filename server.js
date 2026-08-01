@@ -1223,6 +1223,46 @@ function isAdmin(req) {
   return u?.email === ADMIN_EMAIL;
 }
 
+// Admin delete member
+app.delete('/api/admin/members/:id', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const uid = req.params.id;
+    const u = db.prepare('SELECT email FROM users WHERE id=?').get(uid);
+    if (!u) return res.status(404).json({ error: 'User not found' });
+    if (u.email === ADMIN_EMAIL) return res.status(403).json({ error: 'Cannot delete admin account' });
+    db.prepare('DELETE FROM promo_redemptions WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM referral_rewards WHERE referrer_id=? OR referred_id=?').run(uid, uid);
+    db.prepare('DELETE FROM combo_comments WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM combo_likes WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM forum_replies WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM forum_posts WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM reviews WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM messages WHERE from_user_id=? OR to_user_id=?').run(uid, uid);
+    db.prepare('DELETE FROM notifications WHERE user_id=? OR from_user_id=?').run(uid, uid);
+    db.prepare('DELETE FROM piece_photos WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
+    db.prepare('DELETE FROM piece_glazes WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
+    db.prepare('DELETE FROM sales WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM glaze_clay_tests WHERE glaze_id IN (SELECT id FROM glazes WHERE user_id=?)').run(uid);
+    db.prepare('DELETE FROM pieces WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM glaze_combos WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM firing_logs WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM glazes WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM glaze_chemicals WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM clay_bodies WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM goals WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM projects WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM events WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM contacts WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM blocked_users WHERE user_id=? OR blocked_user_id=?').run(uid, uid);
+    db.prepare('DELETE FROM merchant_orders WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM featured_potter WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM page_views WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM users WHERE id=?').run(uid);
+    res.json({ success: true, deleted: u.email });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Admin dashboard — see all members, signups, cancellations, tiers
 app.get('/api/admin/members', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
