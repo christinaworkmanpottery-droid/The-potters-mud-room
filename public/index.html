@@ -753,7 +753,7 @@
           <button class="btn-ghost" onclick="navigate('messages')" title="Messages" style="position:relative;font-size:1.1rem">✉️<span id="msgBadge" class="notif-badge hidden">0</span></button>
           <button class="btn-ghost" onclick="navigate('notifications')" title="Notifications" style="position:relative;font-size:1.1rem">🔔<span id="notifBadge" class="notif-badge hidden">0</span></button>
         </div>
-        <button class="nav-toggle" onclick="toggleNav()" title="Menu">☰</button>
+        <button class="nav-toggle" onclick="document.querySelector('.nav-dropdown').classList.toggle('open'); document.body.classList.toggle('nav-open')" title="Menu">☰</button>
       </div>
     </div>
     <div class="nav-dropdown">
