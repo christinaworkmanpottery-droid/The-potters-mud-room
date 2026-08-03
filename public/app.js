@@ -5330,3 +5330,12 @@ async function buyTokenPack(pack) {
     toast(e.message || 'Payment error', 'error');
   }
 }
+
+// Close nav when tapping outside the menu or hamburger button
+document.addEventListener('click', function(e) {
+  if (document.querySelector('.nav-dropdown')?.classList.contains('open') &&
+      !e.target.closest('.nav-dropdown') &&
+      !e.target.closest('.nav-toggle')) {
+    closeNav();
+  }
+});
