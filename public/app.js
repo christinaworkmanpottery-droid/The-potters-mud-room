@@ -404,6 +404,10 @@ function navigate(page) {
     if (activityMap[page]) trackActivity(activityMap[page], page);
   } catch(navErr) { console.error('Navigation error:', navErr); }
 }
+function toggleNav() {
+  const isOpen = document.querySelector('.nav-dropdown')?.classList.contains('open');
+  if (isOpen) { closeNav(); } else { document.querySelector('.nav-dropdown')?.classList.add('open'); document.body.classList.add('nav-open'); }
+}
 function closeNav() {
   document.querySelector('.nav-dropdown')?.classList.remove('open');
   document.body.classList.remove('nav-open');
