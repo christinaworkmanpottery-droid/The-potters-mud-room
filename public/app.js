@@ -522,7 +522,7 @@ async function viewPiece(id) {
       '<button class="btn btn-danger btn-sm" onclick="deletePiece(\'' + p.id + '\')">🗑️</button></div></div>' +
       (photos ? '<div class="detail-photos mb-16">' + photos + '</div>' : '') +
       '<div class="detail-grid"><div class="card"><h3 style="margin-bottom:16px">Details</h3>' +
-      df('Clay Body', p.clay_body_name||p.clay||p.studio) + df('Firing Temp', p.firingTemp) + df('Technique', p.technique) + df('Form', p.form) +
+      df('Clay Body', p.clay_body_name||p.clay||p.studio) + '<div class="detail-field"><div class="detail-label">Glaze</div><div class="detail-value">' + ((p.glazes&&p.glazes.length) ? p.glazes.map(g => esc(g.glaze_name) + (g.application_method ? ' — ' + esc(g.application_method) : '')).join('<br>') : (p.glaze ? esc(p.glaze) : '—')) + '</div></div>' + df('Firing Temp', p.firingTemp) + df('Technique', p.technique) + df('Form', p.form) +
       df('Dimensions', p.dimensions) + df('Weight', p.weight) +
       df('Started', fmtDate(p.date_started)) +
       (p.date_completed ? df('Completed', fmtDate(p.date_completed)) : '') +
@@ -533,7 +533,7 @@ async function viewPiece(id) {
       ((p.material_cost || p.firing_cost || p.labor_hours) ? df('Total Cost', '$' + ((parseFloat(p.material_cost)||0) + (parseFloat(p.firing_cost)||0) + ((parseFloat(p.labor_hours)||0)*(parseFloat(p.labor_rate)||0))).toFixed(2)) : '') +
       (p.sale_price ? df('Sale Price', '$' + parseFloat(p.sale_price).toFixed(2)) : '') +
       (p.cleanNotes ? df('Notes', p.cleanNotes) : (p.description ? df('Notes', p.description) : '')) + '</div>' +
-      '<div><div class="card mb-16"><h3 style="margin-bottom:12px">Glazes</h3>' + glist + '</div>' +
+      '<div>' +
       (firings ? '<div class="card mb-16"><h3 style="margin-bottom:12px">Firings</h3>' + firings + '</div>' : '') +
       ((p.status === 'broken' || p.status === 'recycled') ? '<div class="card" style="border:2px solid var(--danger);background:rgba(220,53,69,0.05)"><h3 style="margin-bottom:12px;color:var(--danger)">' + (p.status === 'recycled' ? 'Recycle Report' : 'Casualty Report') + '</h3>' +
         df('What Happened', p.casualty_type ? CASUALTY_LABELS[p.casualty_type] || p.casualty_type : 'Not specified') +
