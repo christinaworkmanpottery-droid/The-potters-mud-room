@@ -1868,7 +1868,7 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
   // If body.notes already has content (from app), use it as base; otherwise build from parts
   let existingNotes = String(body.notes || '').trim();
   // Strip auto-generated glaze text from existing notes (backward compatibility cleanup)
-  existingNotes = existingNotes.replace(/\s*\|?\s*Glaze:\s*[^|]+/g, '').replace(/^\s*\|\s*/, '').trim();
+  existingNotes = existingNotes.replace(/Glaze:\s*[^|]+(\|\s*)?/g, '').replace(/\s*\|\s*$/, '').replace(/^\s*\|\s*/, '').trim();
   let notes;
   if (existingNotes) {
     // App already combined notes — just ensure firing temp is included if needed
@@ -2010,7 +2010,7 @@ app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
   const userNotes = String(body.description || '').trim();
   let existingNotes = String(body.notes || '').trim();
   // Strip auto-generated glaze text from existing notes (backward compatibility cleanup)
-  existingNotes = existingNotes.replace(/\s*\|?\s*Glaze:\s*[^|]+/g, '').replace(/^\s*\|\s*/, '').trim();
+  existingNotes = existingNotes.replace(/Glaze:\s*[^|]+(\|\s*)?/g, '').replace(/\s*\|\s*$/, '').replace(/^\s*\|\s*/, '').trim();
   let notes;
   if (existingNotes) {
     const noteParts = [existingNotes];
