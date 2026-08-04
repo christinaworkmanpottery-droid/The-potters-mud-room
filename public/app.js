@@ -522,7 +522,7 @@ async function viewPiece(id) {
       '<button class="btn btn-danger btn-sm" onclick="deletePiece(\'' + p.id + '\')">🗑️</button></div></div>' +
       (photos ? '<div class="detail-photos mb-16">' + photos + '</div>' : '') +
       '<div class="detail-grid"><div class="card"><h3 style="margin-bottom:16px">Details</h3>' +
-      df('Clay Body', p.clay_body_name||p.clay||p.studio) + df('Glaze', p.glaze||((p.glazes&&p.glazes.length)?null:null)) + df('Firing Temp', p.firingTemp) + df('Technique', p.technique) + df('Form', p.form) +
+      df('Clay Body', p.clay_body_name||p.clay||p.studio) + df('Firing Temp', p.firingTemp) + df('Technique', p.technique) + df('Form', p.form) +
       df('Dimensions', p.dimensions) + df('Weight', p.weight) +
       df('Started', fmtDate(p.date_started)) +
       (p.date_completed ? df('Completed', fmtDate(p.date_completed)) : '') +
@@ -575,19 +575,17 @@ function populateGlazePicker(row, selectedId) {
 }
 function addGlazeSelector(gId, coats, method, glazeName) {
   const c = document.getElementById('pieceGlazeSelectors');
-  const r = document.createElement('div'); r.className = 'glaze-selector-row'; r.style.cssText = 'display:block;margin-bottom:12px;border:1px solid var(--border);border-radius:var(--radius);padding:10px;background:var(--bg)';
+  const r = document.createElement('div'); r.className = 'glaze-selector-row'; r.style.cssText = 'display:block;margin-bottom:16px';
   r.innerHTML =
-    '<div style="display:flex;align-items:center;gap:8px">' +
-      '<input type="text" class="form-input gtext" placeholder="Type glaze name" value="' + esc(glazeName||'') + '" autocomplete="off" style="flex:1;min-width:0">' +
-      '<input type="hidden" class="gid">' +
-      '<button type="button" class="remove-row" onclick="this.closest(\'.glaze-selector-row\').remove()" style="flex:none">×</button>' +
+    '<input type="text" class="form-input gtext" placeholder="Type glaze name or pick from library" value="' + esc(glazeName||'') + '" autocomplete="off">' +
+    '<input type="hidden" class="gid">' +
+    '<div class="gpick-wrap" style="margin-top:4px;display:none">' +
+      '<select class="form-select gpick" onchange="pickGlazeFromLibrary(this)" style="font-size:0.85rem"><option value="">— Pick from Glaze library —</option></select>' +
     '</div>' +
-    '<div class="gpick-wrap" style="margin-top:6px;display:none">' +
-      '<select class="form-select gpick" onchange="pickGlazeFromLibrary(this)" style="font-size:0.85rem;width:100%"><option value="">— Pick from Glaze library —</option></select>' +
-    '</div>' +
-    '<div style="display:flex;gap:8px;margin-top:8px">' +
-      '<input type="number" class="form-input gc" placeholder="Coats" min="1" value="' + (coats||1) + '" style="width:80px;flex:none">' +
+    '<div style="display:flex;gap:8px;margin-top:8px;align-items:center">' +
+      '<input type="number" class="form-input gc" placeholder="Coats" min="1" value="' + (coats||1) + '" style="width:80px">' +
       '<select class="form-select gm" style="flex:1"><option value="">Method (optional)</option><option value="dip"' + (method==='dip'?' selected':'') + '>Dip</option><option value="brush"' + (method==='brush'?' selected':'') + '>Brush</option><option value="spray"' + (method==='spray'?' selected':'') + '>Spray</option><option value="pour"' + (method==='pour'?' selected':'') + '>Pour</option><option value="wax-resist"' + (method==='wax-resist'?' selected':'') + '>Wax Resist</option></select>' +
+      '<button type="button" class="btn btn-sm btn-danger" onclick="this.closest(\'.glaze-selector-row\').remove()" style="flex:none">×</button>' +
     '</div>';
   populateGlazePicker(r, gId || null);
   if (gId) r.querySelector('.gid').value = gId;
@@ -664,7 +662,7 @@ async function savePiece(e) {
     title: document.getElementById('pieceTitle').value,
     clay: clayText || null,
     clayBodyId: clayId || null,
-    glaze: glazeNames.length > 0 ? glazeNames.join(', ') : null,
+    glaze: (gIds.length === 0 && glazeNames.length > 0) ? glazeNames.join(', ') : null,
     status: document.getElementById('pieceStatus').value,
     technique: document.getElementById('pieceTechnique').value||null,
     form: document.getElementById('pieceForm_').value||null,
