@@ -35,7 +35,7 @@ db.exec(`CREATE INDEX IF NOT EXISTS idx_ai_usage_user_month ON ai_usage(user_id,
 try {
   db.pragma('ignore_check_constraints = ON');
   db.prepare("UPDATE users SET tier='starter' WHERE tier IN ('basic','mid','top')").run();
-  db.prepare("UPDATE users SET tier='starter', billing_period='stripe-monthly' WHERE LOWER(email) IN ('jgk1020@gmail.com','awhiteman96@gmail.com')").run();
+  db.prepare("UPDATE users SET tier='starter', billing_period='stripe-monthly' WHERE LOWER(email) IN ('jgk1020@gmail.com','awhiteman96@gmail.com','christinaworkmanpottery@gmail.com')").run();
   db.pragma('ignore_check_constraints = OFF');
 } catch(e) { db.pragma('ignore_check_constraints = OFF'); }
 
