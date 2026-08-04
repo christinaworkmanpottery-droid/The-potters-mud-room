@@ -4847,57 +4847,134 @@ async function computeAHash(buffer) {
 // Compute color signature that ignores neutral backgrounds and focuses on saturated/colorful pixels.
 // Key insight: pottery glaze photos have a colorful piece against a neutral background (table, hand, wall).
 // We want the GLAZE color, not the background. So we filter out near-neutral pixels before averaging.
+// k-means clustering: group pixels into k clusters, return centroids
+function kMeansCluster(pixels, k = 3, iterations = 10) {
+  if (pixels.length <= k) return pixels.map(p => ({ ...p, weight: 1 }));
+  // Seed centroids by spreading through sorted hue values
+  const withHsl = pixels.map(p => {
+    const hsl = rgbToHslRaw(p.r, p.g, p.b);
+    return { ...p, h: hsl.h, s: hsl.s, l: hsl.l };
+  });
+  withHsl.sort((a, b) => a.h - b.h);
+  const step = Math.floor(withHsl.length / k);
+  let centroids = Array.from({ length: k }, (_, i) => ({ ...withHsl[i * step] }));
+
+  let assignments = new Array(pixels.length).fill(0);
+  for (let iter = 0; iter < iterations; iter++) {
+    // Assign each pixel to nearest centroid
+    let changed = false;
+    for (let i = 0; i < pixels.length; i++) {
+      const p = pixels[i];
+      let bestDist = Infinity, bestK = 0;
+      for (let c = 0; c < k; c++) {
+        const dr = p.r - centroids[c].r, dg = p.g - centroids[c].g, db = p.b - centroids[c].b;
+        const dist = dr*dr + dg*dg + db*db;
+        if (dist < bestDist) { bestDist = dist; bestK = c; }
+      }
+      if (assignments[i] !== bestK) { assignments[i] = bestK; changed = true; }
+    }
+    if (!changed) break;
+    // Recompute centroids
+    const sums = Array.from({ length: k }, () => ({ r: 0, g: 0, b: 0, count: 0 }));
+    for (let i = 0; i < pixels.length; i++) {
+      const c = assignments[i];
+      sums[c].r += pixels[i].r; sums[c].g += pixels[i].g; sums[c].b += pixels[i].b; sums[c].count++;
+    }
+    centroids = sums.map((s, ci) => s.count > 0
+      ? { r: s.r / s.count, g: s.g / s.count, b: s.b / s.count }
+      : centroids[ci]);
+  }
+  // Return clusters with weights (size * saturation — glazes are more saturated than backgrounds)
+  const clusterSizes = new Array(k).fill(0);
+  for (const a of assignments) clusterSizes[a]++;
+  return centroids.map((c, i) => {
+    const hsl = rgbToHslRaw(c.r, c.g, c.b);
+    // Weight = fraction of pixels × saturation boost (saturated clusters win over neutral backgrounds)
+    const sizeFrac = clusterSizes[i] / pixels.length;
+    const satBoost = 1.0 + hsl.s * 2.0; // saturated clusters weighted up to 3×
+    return { r: Math.round(c.r), g: Math.round(c.g), b: Math.round(c.b), weight: sizeFrac * satBoost, size: clusterSizes[i] };
+  }).filter(c => c.size > 0);
+}
+
+// Raw HSL (returns h 0-360, s 0-1, l 0-1) — used before rgbToHsl is defined
+function rgbToHslRaw(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
+      case g: h = ((b - r) / d + 2) / 6; break;
+      case b: h = ((r - g) / d + 4) / 6; break;
+    }
+  }
+  return { h: h * 360, s, l };
+}
+
 async function computeColorSignature(buffer) {
   const meta = await sharp(buffer).metadata();
   const w = meta.width || 100;
   const h = meta.height || 100;
-  // Center 60% crop
-  const cropW = Math.max(1, Math.round(w * 0.60));
-  const cropH = Math.max(1, Math.round(h * 0.60));
+
+  // === TIGHT CENTER CROP (40%) — avoids backgrounds, hands, props ===
+  // Pottery photos typically have the piece centered; 40% captures the glaze zone.
+  const cropW = Math.max(1, Math.round(w * 0.40));
+  const cropH = Math.max(1, Math.round(h * 0.40));
   const left = Math.max(0, Math.round((w - cropW) / 2));
   const top = Math.max(0, Math.round((h - cropH) / 2));
 
-  // Sample 16x16 = 256 pixels for better coverage
+  // 24x24 = 576 pixels — more samples for better k-means clustering
   const pixels = await sharp(buffer)
     .extract({ left, top, width: cropW, height: cropH })
-    .resize(16, 16, { fit: 'fill' })
+    .resize(24, 24, { fit: 'fill' })
     .removeAlpha()
     .raw()
     .toBuffer();
 
-  // Separate pixels into colorful vs neutral
-  const colorfulPixels = [];
-  const neutralPixels = [];
+  // Collect all pixels, compute saturation per pixel
+  const allPixels = [];
+  const saturatedPixels = [];
 
   for (let i = 0; i < pixels.length; i += 3) {
     const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
     const max = Math.max(r, g, b), min = Math.min(r, g, b);
-    const l = (max + min) / 510; // lightness 0-1
+    const l = (max + min) / 510;
     const saturation = max === min ? 0 : (l > 0.5 ? (max - min) / (510 - max - min) : (max - min) / (max + min));
-    // A pixel is "colorful" if it has meaningful saturation AND isn't near-black or near-white
-    if (saturation > 0.12 && l > 0.08 && l < 0.92) {
-      colorfulPixels.push({ r, g, b });
-    } else {
-      neutralPixels.push({ r, g, b });
+    const px = { r, g, b, s: saturation, l };
+    allPixels.push(px);
+    // Saturated = has real color, not white/black/gray background
+    if (saturation > 0.15 && l > 0.08 && l < 0.94) {
+      saturatedPixels.push(px);
     }
   }
 
-  // Use colorful pixels if we have enough; fall back to all pixels if the photo is mostly neutral
-  const usePixels = colorfulPixels.length >= 8 ? colorfulPixels : pixels.length / 3 > 0 ? (() => {
-    const all = [];
-    for (let i = 0; i < pixels.length; i += 3) all.push({ r: pixels[i], g: pixels[i+1], b: pixels[i+2] });
-    return all;
-  })() : [];
+  if (!allPixels.length) return JSON.stringify([]);
 
-  if (!usePixels.length) return JSON.stringify([]);
+  // Use saturated pixels if plentiful; otherwise fall back to all non-extreme pixels
+  const workingSet = saturatedPixels.length >= 12
+    ? saturatedPixels
+    : allPixels.filter(p => p.l > 0.05 && p.l < 0.95);
 
-  // Compute weighted average of the colorful region
-  const avgR = usePixels.reduce((s, p) => s + p.r, 0) / usePixels.length;
-  const avgG = usePixels.reduce((s, p) => s + p.g, 0) / usePixels.length;
-  const avgB = usePixels.reduce((s, p) => s + p.b, 0) / usePixels.length;
+  if (!workingSet.length) return JSON.stringify([]);
 
-  // Return as single-bucket signature for v6 RGB Euclidean matching
-  return JSON.stringify([{ r: Math.round(avgR), g: Math.round(avgG), b: Math.round(avgB), weight: 1 }]);
+  // === K-MEANS: find dominant color clusters ===
+  // k=3: typically glaze color, secondary glaze/detail, background remnant
+  const k = Math.min(3, Math.max(1, Math.floor(workingSet.length / 8)));
+  const clusters = kMeansCluster(workingSet, k);
+
+  // Normalize weights so they sum to 1
+  const totalW = clusters.reduce((s, c) => s + c.weight, 0);
+  const normalized = clusters.map(c => ({
+    r: c.r, g: c.g, b: c.b,
+    weight: totalW > 0 ? parseFloat((c.weight / totalW).toFixed(4)) : 1,
+  }));
+
+  // Sort by weight descending so dominant color is first
+  normalized.sort((a, b) => b.weight - a.weight);
+
+  return JSON.stringify(normalized);
 }
 
 function parseColorSignature(signature) {
@@ -5035,6 +5112,17 @@ try {
     console.log(`[Photo Search] Migration color_sig_v7_saturation_aware: cleared ${cleared.changes} color signatures for recompute`);
   }
 } catch(e) { console.warn('[Photo Search] Migration v7 error:', e.message); }
+
+// v9 migration: k-means dominant color clustering (40% crop, saturation-weighted clusters)
+// Replaces simple averaging — correctly identifies glaze color even with busy backgrounds
+try {
+  const doneV9 = db.prepare('SELECT 1 FROM migrations WHERE name=?').get('color_sig_v9_kmeans');
+  if (!doneV9) {
+    const cleared = db.prepare("UPDATE piece_photos SET avg_color = NULL WHERE avg_color IS NOT NULL").run();
+    db.prepare('INSERT INTO migrations (name, applied_at) VALUES (?, datetime("now"))').run('color_sig_v9_kmeans');
+    console.log(`[Photo Search] Migration color_sig_v9_kmeans: cleared ${cleared.changes} color signatures — recomputing with k-means clustering`);
+  }
+} catch(e) { console.warn('[Photo Search] Migration v9 error:', e.message); }
 app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo provided' });
 
@@ -5078,10 +5166,10 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       }
     }
 
-    // === COLOR-FIRST MATCHING (v8) ===
-    // Gate on HUE only (stable across lighting), score on RGB distance.
-    // Hue is far more stable than RGB across lighting/reflections/angles.
-    // Green glazes stay ~70-150° hue even with bright spots. Red stays ~0-15°.
+    // === CLUSTER-TO-CLUSTER MATCHING (v9) ===
+    // Compare dominant color clusters directly instead of averaging them into a single hue.
+    // Blue glaze + beige background should match blue glaze + white background because
+    // both have a dominant blue cluster, even if their averages differ.
     const candidateMatches = [];
     const searchSig = parseColorSignature(searchColor);
     if (!searchSig.length) {
@@ -5089,46 +5177,48 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       return res.json({ matches: [], total: 0 });
     }
 
-    const searchTotalW = searchSig.reduce((s, c) => s + (c.weight || 1), 0);
-    const searchAvg = {
-      r: searchSig.reduce((s, c) => s + c.r * (c.weight || 1), 0) / searchTotalW,
-      g: searchSig.reduce((s, c) => s + c.g * (c.weight || 1), 0) / searchTotalW,
-      b: searchSig.reduce((s, c) => s + c.b * (c.weight || 1), 0) / searchTotalW,
-    };
-    const searchHsl = rgbToHsl(searchAvg.r, searchAvg.g, searchAvg.b);
+    // Find dominant cluster (highest weight) from search photo
+    const dominantSearch = searchSig.reduce((best, c) => c.weight > best.weight ? c : best, searchSig[0]);
+    const dominantHsl = rgbToHsl(dominantSearch.r, dominantSearch.g, dominantSearch.b);
 
-    console.log('[v8] Search avg RGB:', Math.round(searchAvg.r), Math.round(searchAvg.g), Math.round(searchAvg.b));
-    console.log('[v8] Search HSL: h=', searchHsl.h.toFixed(1), 's=', searchHsl.s.toFixed(2), 'l=', searchHsl.l.toFixed(2));
+    console.log('[v9] Search dominant RGB:', dominantSearch.r, dominantSearch.g, dominantSearch.b, 'weight:', dominantSearch.weight.toFixed(3));
+    console.log('[v9] Search dominant HSL: h=', dominantHsl.h.toFixed(1), 's=', dominantHsl.s.toFixed(2), 'l=', dominantHsl.l.toFixed(2));
 
     for (const ph of userPhotos) {
       const photoSig = parseColorSignature(ph.avg_color);
       if (!photoSig.length) continue;
 
-      const photoTotalW = photoSig.reduce((s, c) => s + (c.weight || 1), 0);
-      const photoAvg = {
-        r: photoSig.reduce((s, c) => s + c.r * (c.weight || 1), 0) / photoTotalW,
-        g: photoSig.reduce((s, c) => s + c.g * (c.weight || 1), 0) / photoTotalW,
-        b: photoSig.reduce((s, c) => s + c.b * (c.weight || 1), 0) / photoTotalW,
-      };
-      const photoHsl = rgbToHsl(photoAvg.r, photoAvg.g, photoAvg.b);
+      // Find dominant cluster in stored photo
+      const dominantPhoto = photoSig.reduce((best, c) => c.weight > best.weight ? c : best, photoSig[0]);
+      const photoHsl = rgbToHsl(dominantPhoto.r, dominantPhoto.g, dominantPhoto.b);
 
-      // === HUE GATE (only gate — hue is stable, RGB is not) ===
-      // Skip gate for near-neutral colors (grays, whites, blacks) — hue is meaningless there
-      if (searchHsl.s > 0.10 && photoHsl.s > 0.10) {
-        let hueDiff = Math.abs(searchHsl.h - photoHsl.h);
+      // === HUE GATE: compare dominant clusters only ===
+      // If both dominant clusters are saturated, hue must be close.
+      // Skip neutrals (grays, whites, blacks) — hue is meaningless there.
+      if (dominantHsl.s > 0.12 && photoHsl.s > 0.12) {
+        let hueDiff = Math.abs(dominantHsl.h - photoHsl.h);
         if (hueDiff > 180) hueDiff = 360 - hueDiff;
-        if (hueDiff > 60) {
-          console.log('[v8] REJECT:', ph.title, 'hueDiff=', hueDiff.toFixed(1));
+        if (hueDiff > 50) {
+          console.log('[v9] REJECT:', ph.title, 'hueDiff=', hueDiff.toFixed(1), 'searchH=', dominantHsl.h.toFixed(1), 'photoH=', photoHsl.h.toFixed(1));
           continue;
         }
       }
 
-      // === SCORING: Hue proximity score (not RGB — too unstable across lighting) ===
-      // If hue matches, it's the right color family. Score by how close the hue is.
-      let hueDiff2 = Math.abs(searchHsl.h - photoHsl.h);
-      if (hueDiff2 > 180) hueDiff2 = 360 - hueDiff2;
-      // Within 60 degrees hue window: score from 1.0 (perfect) to 0.0 (60 degrees off)
-      const colorScore = Math.max(0, 1.0 - (hueDiff2 / 60));
+      // === SCORING: cluster-to-cluster distance ===
+      // Find best match between any search cluster and any photo cluster (weighted)
+      let totalDist = 0, totalWeight = 0;
+      for (const sCluster of searchSig) {
+        let bestDist = Infinity;
+        for (const pCluster of photoSig) {
+          const dist = perceptualColorDistance(sCluster, pCluster);
+          if (dist < bestDist) bestDist = dist;
+        }
+        totalDist += bestDist * sCluster.weight;
+        totalWeight += sCluster.weight;
+      }
+      const avgDist = totalWeight > 0 ? totalDist / totalWeight : 999;
+      // Convert distance (0-200 range) to score (1.0 = perfect, 0.0 = worst)
+      const colorScore = Math.max(0, 1.0 - (avgDist / 200));
 
       let shapeScore = 0.5;
       if (ph.phash && ph.phash.length === 16) {
@@ -5136,8 +5226,12 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         shapeScore = 1.0 - (distance / 64);
       }
 
-      // 85% hue score, 15% shape
-      const score = (colorScore * 0.85) + (shapeScore * 0.15);
+      // 80% cluster color match, 20% shape
+      const score = (colorScore * 0.80) + (shapeScore * 0.20);
+
+      // Hue diff for logging
+      let hueDiff2 = Math.abs(dominantHsl.h - photoHsl.h);
+      if (hueDiff2 > 180) hueDiff2 = 360 - hueDiff2;
 
       candidateMatches.push({
         piece_id: ph.piece_id,
@@ -5151,26 +5245,24 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         form: ph.form,
         date_started: ph.date_started,
         date_completed: ph.date_completed,
-        cDist: hueDiff2,
+        avgDist,
         shapeScore,
         colorScore,
-        hueDiff: (() => { let d = Math.abs(searchHsl.h - photoHsl.h); return d > 180 ? 360 - d : d; })(),
-        lightnessDiff: Math.abs(searchHsl.l - photoHsl.l),
+        hueDiff: hueDiff2,
+        lightnessDiff: Math.abs(dominantHsl.l - photoHsl.l),
         score,
       });
     }
 
     candidateMatches.sort((a, b) => b.score - a.score);
-    console.log('[Photo Search] Candidates passed all gates:', candidateMatches.length);
-    console.log('[Photo Search] Top candidates:', candidateMatches.slice(0, 8).map((m) => ({
+    console.log('[v9] Candidates passed hue gate:', candidateMatches.length);
+    console.log('[v9] Top candidates:', candidateMatches.slice(0, 8).map((m) => ({
       piece: m.title,
-      piece_id: m.piece_id,
       score: Number(m.score.toFixed(3)),
       color: Number(m.colorScore.toFixed(3)),
       shape: Number(m.shapeScore.toFixed(3)),
-      rgbDist: Number(m.cDist.toFixed(1)),
+      avgDist: Number(m.avgDist.toFixed(1)),
       hueDiff: Number(m.hueDiff.toFixed(1)),
-      lightDiff: Number(m.lightnessDiff.toFixed(3)),
     })));
 
     const bestByPiece = new Map();
@@ -5183,7 +5275,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
 
     const matches = [];
     for (const best of bestByPiece.values()) {
-      if (best.score < 0.55) continue; // Show anything that passes the hue gate with reasonable color similarity
+      if (best.score < 0.45) continue; // v9: cluster-based scoring, lower threshold
 
       const piecePhotos = db.prepare('SELECT * FROM piece_photos WHERE piece_id = ? ORDER BY sort_order').all(best.piece_id);
       const pieceGlazes = db.prepare('SELECT pg.*, g.name as glaze_name, g.brand, g.glaze_type FROM piece_glazes pg JOIN glazes g ON pg.glaze_id = g.id WHERE pg.piece_id = ? ORDER BY pg.layer_order').all(best.piece_id);
