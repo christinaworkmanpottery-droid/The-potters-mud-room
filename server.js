@@ -5171,11 +5171,35 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       WHERE p.user_id = ? AND (p.hide_from_photo_search IS NULL OR p.hide_from_photo_search = 0)
     `).all(req.userId);
 
-    // Search-time: never backfill. Signatures are computed at upload and at startup.
-    // Exclude photos that don't have signatures yet — they'll appear in the next search
-    // after the startup backfill completes.
+    // Minimal inline backfill: compute up to 10 photos inline (~50-100ms total)
+    // so the first search after cold start returns *something* without blocking for minutes.
+    // Remaining photos are handled by the async startup backfill.
+    const needsBackfill = userPhotos.filter(ph => !ph.phash || !ph.avg_color);
+    const INLINE_LIMIT = 10;
+    const inlineBatch = needsBackfill.slice(0, INLINE_LIMIT);
+    
+    for (const ph of inlineBatch) {
+      try {
+        const filePath = path.join(UPLOADS_DIR, ph.filename);
+        if (!fs.existsSync(filePath)) continue;
+        const buf = fs.readFileSync(filePath);
+        if (!ph.phash) {
+          const hash = await computePHash(buf);
+          db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ?').run(hash, ph.id);
+          ph.phash = hash;
+        }
+        if (!ph.avg_color) {
+          const color = await computeColorSignature(buf);
+          db.prepare('UPDATE piece_photos SET avg_color = ? WHERE id = ?').run(color, ph.id);
+          ph.avg_color = color;
+        }
+      } catch (e) {
+        console.warn('[v9] Inline backfill error:', ph.filename, e.message);
+      }
+    }
+
     userPhotos = userPhotos.filter(ph => ph.avg_color && ph.phash);
-    console.log('[v9] Searching against', userPhotos.length, 'of', userPhotos.length + (userPhotos.length - userPhotos.length), 'photos with complete signatures');
+    console.log('[v9] Searching against', userPhotos.length, 'photos (backfilled', inlineBatch.length, 'inline,', Math.max(0, needsBackfill.length - inlineBatch.length), 'remaining)');
 
     // === CLUSTER-TO-CLUSTER MATCHING (v9) ===
     // Compare dominant color clusters directly instead of averaging them into a single hue.
