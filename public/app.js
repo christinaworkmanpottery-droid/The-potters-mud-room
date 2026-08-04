@@ -552,18 +552,39 @@ function populateClaySelect(selId, selVal) {
   const s = document.getElementById(selId);
   s.innerHTML = '<option value="">Select clay...</option>' + clayBodies.map(c => '<option value="' + c.id + '"' + (c.id===selVal?' selected':'') + '>' + esc(c.name) + (c.brand?' ('+esc(c.brand)+')':'') + '</option>').join('');
 }
+function populateClayPicker(pickerVal) {
+  const picker = document.getElementById('pieceClayPicker');
+  if (!picker) return;
+  picker.innerHTML = '<option value="">— Pick from Clay library —</option>' + clayBodies.map(c => '<option value="' + c.id + '"' + (c.id===pickerVal?' selected':'') + '>' + esc(c.name) + (c.brand?' ('+esc(c.brand)+')':'') + '</option>').join('');
+  document.getElementById('pieceClayPickerWrap').style.display = clayBodies.length > 0 ? 'block' : 'none';
+}
+function pickClayFromLibrary(id, name) {
+  if (!id) return;
+  document.getElementById('pieceClayText').value = name;
+  document.getElementById('pieceClayId').value = id;
+}
 function glazeOpts() {
   return '<option value="">Select glaze...</option>' + glazes.map(g => '<option value="' + g.id + '">' + esc(g.name) + (g.brand?' ('+esc(g.brand)+')':'') + '</option>').join('');
 }
-function addGlazeSelector(gId, coats, method) {
+function addGlazeSelector(gId, coats, method, glazeName) {
   const c = document.getElementById('pieceGlazeSelectors');
   const r = document.createElement('div'); r.className = 'glaze-selector-row';
-  r.innerHTML = '<select class="form-select gs">' + glazeOpts() + '</select>' +
-    '<input type="number" class="form-input gc" placeholder="Coats" min="1" value="' + (coats||1) + '" style="width:80px;flex:none">' +
+  r.innerHTML = '<input type="text" class="form-input gtext" placeholder="Type glaze name" value="' + esc(glazeName||'') + '" autocomplete="off" style="flex:1">' +
+    '<input type="hidden" class="gid">' +
+    '<select class="form-select gpick" onchange="pickGlazeFromLibrary(this)" style="width:180px;flex:none;font-size:0.85rem"><option value="">— Pick from library —</option>' + glazes.map(g => '<option value="' + g.id + '">' + esc(g.name) + (g.brand?' ('+esc(g.brand)+')':'') + '</option>').join('') + '</select>' +
+    '<input type="number" class="form-input gc" placeholder="Coats" min="1" value="' + (coats||1) + '" style="width:70px;flex:none">' +
     '<select class="form-select gm" style="width:100px;flex:none"><option value="">Method</option><option value="dip"' + (method==='dip'?' selected':'') + '>Dip</option><option value="brush"' + (method==='brush'?' selected':'') + '>Brush</option><option value="spray"' + (method==='spray'?' selected':'') + '>Spray</option><option value="pour"' + (method==='pour'?' selected':'') + '>Pour</option><option value="wax-resist"' + (method==='wax-resist'?' selected':'') + '>Wax Resist</option></select>' +
     '<button type="button" class="remove-row" onclick="this.parentElement.remove()">×</button>';
-  if (gId) r.querySelector('.gs').value = gId;
+  if (gId) r.querySelector('.gid').value = gId;
   c.appendChild(r);
+}
+function pickGlazeFromLibrary(sel) {
+  const row = sel.parentElement;
+  const id = sel.value;
+  const name = sel.options[sel.selectedIndex].text;
+  if (!id) return;
+  row.querySelector('.gtext').value = name;
+  row.querySelector('.gid').value = id;
 }
 function toggleCasualtyFields() {
   const status = document.getElementById('pieceStatus').value;
@@ -582,9 +603,15 @@ function openPieceModal(p) {
   document.getElementById('pieceStudio').value = p?.studio||'';
   document.getElementById('pieceDateStarted').value = p?.date_started||'';
   document.getElementById('pieceNotes').value = p?.notes||'';
-  populateClaySelect('pieceClay', p?.clay_body_id);
+  document.getElementById('pieceClayText').value = p?.clay_body_name || p?.clay || '';
+  document.getElementById('pieceClayId').value = p?.clay_body_id || '';
+  populateClayPicker(p?.clay_body_id);
   document.getElementById('pieceGlazeSelectors').innerHTML = '';
-  (p?.glazes||[]).forEach(g => addGlazeSelector(g.glaze_id, g.coats, g.application_method));
+  if (p?.glazes?.length) {
+    p.glazes.forEach(g => addGlazeSelector(g.glaze_id, g.coats, g.application_method, g.glaze_name || g.name || ''));
+  } else if (p?.glaze) {
+    addGlazeSelector(null, 1, null, p.glaze);
+  }
   // Casualty fields
   document.getElementById('pieceCasualtyType').value = p?.casualty_type||'';
   document.getElementById('pieceCasualtyNotes').value = p?.casualty_notes||'';
@@ -605,10 +632,22 @@ async function savePiece(e) {
   const id = document.getElementById('pieceId').value;
   const gRows = document.querySelectorAll('.glaze-selector-row');
   const gIds = [];
-  gRows.forEach(r => { const v = r.querySelector('.gs').value; if (v) gIds.push({ glazeId:v, coats:parseInt(r.querySelector('.gc').value)||1, method:r.querySelector('.gm').value||null }); });
+  const glazeNames = [];
+  gRows.forEach(r => {
+    const gtext = r.querySelector('.gtext').value.trim();
+    const gid = r.querySelector('.gid').value;
+    if (gtext) {
+      glazeNames.push(gtext);
+      if (gid) gIds.push({ glazeId: gid, coats: parseInt(r.querySelector('.gc').value)||1, method: r.querySelector('.gm').value||null });
+    }
+  });
+  const clayText = document.getElementById('pieceClayText').value.trim();
+  const clayId = document.getElementById('pieceClayId').value;
   const body = {
     title: document.getElementById('pieceTitle').value,
-    clayBodyId: document.getElementById('pieceClay').value||null,
+    clay: clayText || null,
+    clayBodyId: clayId || null,
+    glaze: glazeNames.length > 0 ? glazeNames.join(', ') : null,
     status: document.getElementById('pieceStatus').value,
     technique: document.getElementById('pieceTechnique').value||null,
     form: document.getElementById('pieceForm_').value||null,

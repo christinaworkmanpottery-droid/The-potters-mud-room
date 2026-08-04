@@ -1728,7 +1728,13 @@
       <div class="form-row">
         <div class="form-group">
           <label>Clay Body</label>
-          <select class="form-select" id="pieceClay"><option value="">Select clay...</option></select>
+          <input type="text" class="form-input" id="pieceClayText" placeholder="Type clay name or pick from library" autocomplete="off">
+          <input type="hidden" id="pieceClayId">
+          <div id="pieceClayPickerWrap" style="margin-top:4px;display:none">
+            <select class="form-select" id="pieceClayPicker" onchange="pickClayFromLibrary(this.value,this.options[this.selectedIndex].text)" style="font-size:0.85rem">
+              <option value="">— Pick from Clay library —</option>
+            </select>
+          </div>
         </div>
         <div class="form-group">
           <label>Status</label>
@@ -1813,6 +1819,7 @@
         <label>Glazes Used</label>
         <div id="pieceGlazeSelectors"></div>
         <button type="button" class="btn btn-secondary btn-sm mt-8" onclick="addGlazeSelector()">+ Add Glaze</button>
+        <p style="font-size:0.78rem;color:var(--text-muted);margin-top:4px">Type any glaze name — or pick from your library using the dropdown in each row.</p>
       </div>
       <div class="form-group">
         <label>Notes</label>
