@@ -1340,6 +1340,8 @@ async function loadFirings() {
     }
   } catch(e) { toast(e.message,'error'); }
 }
+let pendingFiringPhotos = [];
+
 function openFiringModal(f = null) {
   document.getElementById('firingId').value = f?.id || '';
   document.getElementById('firingType').value = f?.firing_type || 'bisque';
@@ -1365,6 +1367,8 @@ function openFiringModal(f = null) {
     const s = document.getElementById('firingPiece');
     s.innerHTML = '<option value="">Select piece (optional)...</option>' + pieces.map(p => '<option value="' + p.id + '"' + (f?.piece_id === p.id ? ' selected' : '') + '>' + esc(p.title||'Untitled') + '</option>').join('');
   });
+  pendingFiringPhotos = [];
+  document.getElementById('firingPhotoInput').value = '';
   if (f?.id) {
     loadFiringPhotos(f.id);
   } else {
@@ -1392,17 +1396,39 @@ async function loadFiringPhotos(firingId) {
 
 async function uploadFiringPhotos(event) {
   const firingId = document.getElementById('firingId').value;
-  if (!firingId) { toast('Save firing first before adding photos', 'error'); return; }
-  const files = event.target.files;
+  const files = Array.from(event.target.files);
   if (!files.length) return;
-  const formData = new FormData();
-  for (let f of files) formData.append('photos', f);
-  try {
-    await api('/api/firing-logs/' + firingId + '/photos', { method: 'POST', body: formData });
-    toast('Photos uploaded', 'success');
-    await loadFiringPhotos(firingId);
+  if (firingId) {
+    // Editing an existing firing — upload immediately as before
+    const formData = new FormData();
+    for (let f of files) formData.append('photos', f);
+    try {
+      await api('/api/firing-logs/' + firingId + '/photos', { method: 'POST', body: formData });
+      toast('Photos uploaded', 'success');
+      await loadFiringPhotos(firingId);
+      event.target.value = '';
+    } catch(e) { toast(e.message, 'error'); }
+  } else {
+    // New firing — stage locally, show previews, upload on save
+    const cont = document.getElementById('firingPhotosContainer');
+    files.forEach(file => {
+      pendingFiringPhotos.push(file);
+      const idx = pendingFiringPhotos.length - 1;
+      const url = URL.createObjectURL(file);
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:relative;display:inline-block;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden';
+      wrap.dataset.pendingIdx = idx;
+      wrap.innerHTML = '<img src="' + url + '" style="width:100px;height:100px;object-fit:cover;cursor:zoom-in" onclick="openLightbox(\'' + url + '\')">'
+        + '<button type="button" class="btn-ghost btn-sm" style="position:absolute;top:0;right:0;font-size:0.8rem;background:rgba(0,0,0,0.5);color:white" onclick="removePendingFiringPhoto(' + idx + ',this.closest(\'[data-pending-idx]\'))">×</button>';
+      cont.appendChild(wrap);
+    });
     event.target.value = '';
-  } catch(e) { toast(e.message, 'error'); }
+  }
+}
+
+function removePendingFiringPhoto(idx, el) {
+  pendingFiringPhotos[idx] = null;
+  if (el) el.remove();
 }
 
 async function deleteFiringPhoto(photoId) {
@@ -1489,9 +1515,22 @@ async function saveFiring(e) {
   try {
     const method = firingId ? 'PUT' : 'POST';
     const url = firingId ? '/api/firing-logs/' + firingId : '/api/firing-logs';
-    await api(url, { method, body });
+    const result = await api(url, { method, body });
+    const savedId = firingId || result.id;
+    // Upload pending photos if any
+    const photosToUpload = pendingFiringPhotos.filter(f => f);
+    if (photosToUpload.length > 0 && savedId) {
+      const formData = new FormData();
+      for (let f of photosToUpload) formData.append('photos', f);
+      try {
+        await api('/api/firing-logs/' + savedId + '/photos', { method: 'POST', body: formData });
+      } catch(photoErr) {
+        toast('Firing saved, but photo upload failed: ' + photoErr.message, 'warning');
+      }
+    }
     toast(firingId ? 'Firing updated!' : 'Firing logged!', 'success');
     trackActivity(firingId ? 'edit_firing' : 'log_firing', 'firings');
+    pendingFiringPhotos = [];
     closeModal('firingModal');
     document.getElementById('firingId').value = '';
     loadFirings();
