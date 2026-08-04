@@ -4772,7 +4772,7 @@ async function runVisualSearch(input) {
         '<div><div class="card-title">' + esc(m.title || 'Untitled') + '</div>' +
         (m.clay_body_name ? '<div class="text-sm" style="color:var(--text-light)">🪨 ' + esc(m.clay_body_name) + '</div>' : '') +
         (m.status ? '<div class="text-sm" style="color:var(--text-light)">' + esc(m.status) + '</div>' : '') +
-        '<div class="text-sm" style="color:var(--accent);font-weight:600">' + Math.round((m.score||0)*100) + '% match</div>' +
+        '<div class="text-sm" style="color:var(--accent);font-weight:600">' + Math.round((m.matchScore||0)*100) + '% match</div>' +
         '</div></div>';
     }).join('');
   } catch(err) { status.textContent = 'Error: ' + err.message; }
