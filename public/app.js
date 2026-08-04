@@ -1418,8 +1418,18 @@ async function uploadFiringPhotos(event) {
       const wrap = document.createElement('div');
       wrap.style.cssText = 'position:relative;display:inline-block;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden';
       wrap.dataset.pendingIdx = idx;
-      wrap.innerHTML = '<img src="' + url + '" style="width:100px;height:100px;object-fit:cover;cursor:zoom-in" onclick="openLightbox(\'' + url + '\')">'
-        + '<button type="button" class="btn-ghost btn-sm" style="position:absolute;top:0;right:0;font-size:0.8rem;background:rgba(0,0,0,0.5);color:white" onclick="removePendingFiringPhoto(' + idx + ',this.closest(\'[data-pending-idx]\'))">×</button>';
+      const img = document.createElement('img');
+      img.src = url;
+      img.style.cssText = 'width:100px;height:100px;object-fit:cover;cursor:zoom-in';
+      img.onclick = () => openLightbox(url);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn-ghost btn-sm';
+      btn.style.cssText = 'position:absolute;top:0;right:0;font-size:0.8rem;background:rgba(0,0,0,0.5);color:white';
+      btn.textContent = '×';
+      btn.onclick = () => { pendingFiringPhotos[idx] = null; wrap.remove(); };
+      wrap.appendChild(img);
+      wrap.appendChild(btn);
       cont.appendChild(wrap);
     });
     event.target.value = '';
