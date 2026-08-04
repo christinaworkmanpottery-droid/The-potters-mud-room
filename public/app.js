@@ -653,7 +653,12 @@ async function savePiece(e) {
     const gid = r.querySelector('.gid').value;
     if (gtext) {
       glazeNames.push(gtext);
-      if (gid) gIds.push({ glazeId: gid, coats: parseInt(r.querySelector('.gc').value)||1, method: r.querySelector('.gm').value||null });
+      gIds.push({
+        glazeId: gid || null,
+        customName: gid ? null : gtext,
+        coats: parseInt(r.querySelector('.gc').value)||1,
+        method: r.querySelector('.gm').value||null
+      });
     }
   });
   const clayText = document.getElementById('pieceClayText').value.trim();
@@ -662,7 +667,7 @@ async function savePiece(e) {
     title: document.getElementById('pieceTitle').value,
     clay: clayText || null,
     clayBodyId: clayId || null,
-    glaze: (gIds.length === 0 && glazeNames.length > 0) ? glazeNames.join(', ') : null,
+    glaze: glazeNames.length > 0 ? glazeNames.join(', ') : null,
     status: document.getElementById('pieceStatus').value,
     technique: document.getElementById('pieceTechnique').value||null,
     form: document.getElementById('pieceForm_').value||null,

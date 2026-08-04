@@ -57,6 +57,7 @@ try { db.exec("ALTER TABLE pieces ADD COLUMN allow_messages INTEGER DEFAULT 0");
 try { db.exec("ALTER TABLE pieces ADD COLUMN labor_hours REAL DEFAULT NULL"); } catch(e) {}
 try { db.exec("ALTER TABLE pieces ADD COLUMN labor_rate REAL DEFAULT NULL"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN default_labor_rate REAL DEFAULT NULL"); } catch(e) {}
+try { db.exec("ALTER TABLE piece_glazes ADD COLUMN custom_name TEXT DEFAULT NULL"); } catch(e) {}
 // Nodemailer setup for newsletter emails
 let transporter = null;
 function setupTransporter(user, pass, host, port) {
@@ -1765,7 +1766,7 @@ app.get('/api/pieces', auth, (req, res) => {
   if (limit) { sql += ' LIMIT ?'; params.push(parseInt(limit)); }
   if (offset) { sql += ' OFFSET ?'; params.push(parseInt(offset)); }
   const pieces = db.prepare(sql).all(...params);
-  const getGl = db.prepare('SELECT pg.*,g.name as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order');
+  const getGl = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order');
   const getPh = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order');
   const statusLabels = {'in-progress':'In Progress','bisque-fired':'Bisque Fired','glazed':'Glazed','glaze-fired':'Final Fired','done':'Complete','sold':'Sold','broken':'Broken','recycled':'Recycled'};
   pieces.forEach(p => {
@@ -1803,7 +1804,7 @@ app.get('/api/pieces', auth, (req, res) => {
 app.get('/api/pieces/:id', auth, (req, res) => {
   const p = db.prepare('SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id WHERE p.id=? AND p.user_id=?').get(req.params.id, req.userId);
   if (!p) return res.status(404).json({ error: 'Not found' });
-  p.glazes = db.prepare('SELECT pg.*,g.name as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order').all(p.id);
+  p.glazes = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order').all(p.id);
   p.photos = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order').all(p.id);
   p.firings = db.prepare('SELECT * FROM firing_logs WHERE piece_id=? ORDER BY date DESC').all(p.id);
   // Clean up legacy data: if studio was used to store clay body text, suppress it
@@ -1866,18 +1867,18 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
   const userNotes = String(body.description || '').trim();
   // If body.notes already has content (from app), use it as base; otherwise build from parts
   let existingNotes = String(body.notes || '').trim();
+  // Strip auto-generated glaze text from existing notes (backward compatibility cleanup)
+  existingNotes = existingNotes.replace(/\s*\|?\s*Glaze:\s*[^|]+/g, '').replace(/^\s*\|\s*/, '').trim();
   let notes;
   if (existingNotes) {
-    // App already combined notes — just ensure glaze is included
+    // App already combined notes — just ensure firing temp is included if needed
     const noteParts = [existingNotes];
-    if (glazeText && !existingNotes.includes('Glaze:')) noteParts.push(`Glaze: ${glazeText}`);
     if (firingTemp && !existingNotes.includes('Firing temp:')) noteParts.push(`Firing temp: ${firingTemp}`);
     notes = noteParts.join(' | ');
   } else {
     // Legacy/web creation — build notes from scratch
     const noteParts = [];
     if (userNotes) noteParts.push(userNotes);
-    if (glazeText) noteParts.push(`Glaze: ${glazeText}`);
     if (firingTemp) noteParts.push(`Firing temp: ${firingTemp}`);
     notes = noteParts.length ? noteParts.join(' | ') : null;
   }
@@ -1915,8 +1916,8 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
   }
 
   if (glazeIds?.length) {
-    const ins = db.prepare('INSERT INTO piece_glazes (id,piece_id,glaze_id,coats,application_method,layer_order) VALUES (?,?,?,?,?,?)');
-    glazeIds.forEach((g, i) => ins.run(uuidv4(), id, g.glazeId || g, g.coats || 1, g.method || null, i));
+    const ins = db.prepare('INSERT INTO piece_glazes (id,piece_id,glaze_id,custom_name,coats,application_method,layer_order) VALUES (?,?,?,?,?,?,?)');
+    glazeIds.forEach((g, i) => ins.run(uuidv4(), id, g.glazeId || null, g.customName || null, g.coats || 1, g.method || null, i));
   }
   res.json({ id });
 });
@@ -2008,16 +2009,16 @@ app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
   // Same logic as POST — app may send pre-combined notes
   const userNotes = String(body.description || '').trim();
   let existingNotes = String(body.notes || '').trim();
+  // Strip auto-generated glaze text from existing notes (backward compatibility cleanup)
+  existingNotes = existingNotes.replace(/\s*\|?\s*Glaze:\s*[^|]+/g, '').replace(/^\s*\|\s*/, '').trim();
   let notes;
   if (existingNotes) {
     const noteParts = [existingNotes];
-    if (glazeText && !existingNotes.includes('Glaze:')) noteParts.push(`Glaze: ${glazeText}`);
     if (firingTemp && !existingNotes.includes('Firing temp:')) noteParts.push(`Firing temp: ${firingTemp}`);
     notes = noteParts.join(' | ');
   } else {
     const noteParts = [];
     if (userNotes) noteParts.push(userNotes);
-    if (glazeText) noteParts.push(`Glaze: ${glazeText}`);
     if (firingTemp) noteParts.push(`Firing temp: ${firingTemp}`);
     notes = noteParts.length ? noteParts.join(' | ') : null;
   }
@@ -2033,8 +2034,8 @@ app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
   if (glazeIds !== undefined) {
     db.prepare('DELETE FROM piece_glazes WHERE piece_id=?').run(req.params.id);
     if (glazeIds?.length) {
-      const ins = db.prepare('INSERT INTO piece_glazes (id,piece_id,glaze_id,coats,application_method,layer_order) VALUES (?,?,?,?,?,?)');
-      glazeIds.forEach((g, i) => ins.run(uuidv4(), req.params.id, g.glazeId, g.coats || 1, g.method, i));
+      const ins = db.prepare('INSERT INTO piece_glazes (id,piece_id,glaze_id,custom_name,coats,application_method,layer_order) VALUES (?,?,?,?,?,?,?)');
+      glazeIds.forEach((g, i) => ins.run(uuidv4(), req.params.id, g.glazeId || null, g.customName || null, g.coats || 1, g.method || null, i));
     }
   }
   res.json({ success: true });
@@ -2732,7 +2733,7 @@ app.get('/api/dashboard', auth, (req, res) => {
   const totalGlazes = db.prepare('SELECT COUNT(*) as c FROM glazes WHERE user_id=?').get(req.userId).c;
 
   const getPh = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order LIMIT 1');
-  const getGl = db.prepare('SELECT pg.*,g.name as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order');
+  const getGl = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order');
   recentPieces.forEach(p => { p.primaryPhoto = getPh.get(p.id) || null; p.glazes = getGl.all(p.id); });
 
   const stats = { totalPieces, byStatus, recentPieces, totalClays, totalGlazes, tier };
@@ -2753,7 +2754,7 @@ app.get('/api/casualties', auth, (req, res) => {
     FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id 
     WHERE p.user_id=? AND p.status IN ('broken','recycled') 
     ORDER BY p.updated_at DESC`).all(req.userId);
-  const getGl = db.prepare('SELECT pg.*,g.name as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order');
+  const getGl = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order');
   const getPh = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order LIMIT 1');
   pieces.forEach(p => { p.glazes = getGl.all(p.id); p.primaryPhoto = getPh.get(p.id) || null; });
   res.json(pieces);
