@@ -1500,6 +1500,10 @@ async function deleteFiring(id) {
 
 async function saveFiring(e) {
   e.preventDefault();
+  const saveBtn = document.getElementById('saveFiringBtn');
+  if (saveBtn.disabled) return; // prevent double-tap
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving...';
   const firingId = document.getElementById('firingId').value;
   const body = {
     pieceId: document.getElementById('firingPiece').value || null,
@@ -1527,7 +1531,9 @@ async function saveFiring(e) {
     const url = firingId ? '/api/firing-logs/' + firingId : '/api/firing-logs';
     const result = await api(url, { method, body });
     const savedId = firingId || result.id;
-    // Upload pending photos if any
+    // Lock the hidden id immediately so any late tap cannot re-POST
+    document.getElementById('firingId').value = savedId;
+    // Upload pending photos
     const photosToUpload = pendingFiringPhotos.filter(f => f);
     if (photosToUpload.length > 0 && savedId) {
       const formData = new FormData();
@@ -1544,7 +1550,11 @@ async function saveFiring(e) {
     closeModal('firingModal');
     document.getElementById('firingId').value = '';
     loadFirings();
-  } catch(e) { toast(e.message, 'error'); }
+  } catch(e) {
+    toast(e.message, 'error');
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Firing';
+  }
 }
 
 // ---- Sales ----
