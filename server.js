@@ -5171,63 +5171,11 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       WHERE p.user_id = ? AND (p.hide_from_photo_search IS NULL OR p.hide_from_photo_search = 0)
     `).all(req.userId);
 
-    // Inline backfill: compute signatures for photos that need them.
-    // pHash (32x32 DCT) takes ~5ms per photo, so 30 photos = ~150ms — acceptable inline.
-    // Any remaining are kicked to async background.
-    const INLINE_LIMIT = 30;
-    const needsBackfill = userPhotos.filter(ph => !ph.phash || !ph.avg_color);
-    const inlineBatch = needsBackfill.slice(0, INLINE_LIMIT);
-    const asyncBatch  = needsBackfill.slice(INLINE_LIMIT);
-
-    for (const ph of inlineBatch) {
-      try {
-        const filePath = path.join(UPLOADS_DIR, ph.filename);
-        if (fs.existsSync(filePath)) {
-          const buf = fs.readFileSync(filePath);
-          if (!ph.phash) {
-            const hash = await computePHash(buf);
-            db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ?').run(hash, ph.id);
-            ph.phash = hash;
-          }
-          if (!ph.avg_color) {
-            const color = await computeColorSignature(buf);
-            db.prepare('UPDATE piece_photos SET avg_color = ? WHERE id = ?').run(color, ph.id);
-            ph.avg_color = color;
-          }
-        }
-      } catch (e) {
-        console.warn('[v9] Inline backfill error:', ph.filename, e.message);
-      }
-    }
-
-    if (asyncBatch.length > 0) {
-      console.log('[v9] Backfilling remaining', asyncBatch.length, 'photos async (non-blocking)');
-      setImmediate(async () => {
-        for (const ph of asyncBatch) {
-          try {
-            const filePath = path.join(UPLOADS_DIR, ph.filename);
-            if (fs.existsSync(filePath)) {
-              const buf = fs.readFileSync(filePath);
-              if (!ph.phash) {
-                const hash = await computePHash(buf);
-                db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ?').run(hash, ph.id);
-              }
-              if (!ph.avg_color) {
-                const color = await computeColorSignature(buf);
-                db.prepare('UPDATE piece_photos SET avg_color = ? WHERE id = ?').run(color, ph.id);
-              }
-            }
-          } catch (e) {
-            console.warn('[v9] Async backfill error:', ph.filename, e.message);
-          }
-        }
-        console.log('[v9] Async backfill complete:', asyncBatch.length, 'photos');
-      });
-    }
-
-    // Only search photos that have both signatures ready
+    // Search-time: never backfill. Signatures are computed at upload and at startup.
+    // Exclude photos that don't have signatures yet — they'll appear in the next search
+    // after the startup backfill completes.
     userPhotos = userPhotos.filter(ph => ph.avg_color && ph.phash);
-    console.log('[v9] Searching against', userPhotos.length, 'photos with complete signatures');
+    console.log('[v9] Searching against', userPhotos.length, 'of', userPhotos.length + (userPhotos.length - userPhotos.length), 'photos with complete signatures');
 
     // === CLUSTER-TO-CLUSTER MATCHING (v9) ===
     // Compare dominant color clusters directly instead of averaging them into a single hue.
@@ -5284,9 +5232,16 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       const colorScore = Math.max(0, 1.0 - (avgDist / 200));
 
       let shapeScore = 0.5;
+      let nearDuplicateBonus = 0;
       if (ph.phash && ph.phash.length === 16) {
         const distance = hammingDistance(ph.phash, searchHash);
         shapeScore = 1.0 - (distance / 64);
+        // Near-duplicate bonus: if pHash is very close (≤8 bits different out of 64),
+        // this is very likely the same photo or same piece from nearly the same angle.
+        // Boost it enough to guarantee it ranks above similar-colored pieces.
+        if (distance <= 4) nearDuplicateBonus = 0.20;       // near-identical photo
+        else if (distance <= 8) nearDuplicateBonus = 0.12;  // same piece, slight angle diff
+        else if (distance <= 12) nearDuplicateBonus = 0.05; // probably same piece
       }
 
       // ADAPTIVE WEIGHTING: For neutral-colored pieces (white/gray/black), shape matters more.
@@ -5296,16 +5251,16 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       let colorWeight, shapeWeight;
       if (avgSaturation < 0.15) {
         // Neutral colors (white, gray, black) — shape dominant
-        colorWeight = 0.40; shapeWeight = 0.60;
+        colorWeight = 0.35; shapeWeight = 0.65;
       } else if (avgSaturation < 0.30) {
         // Low saturation (off-white, beige, muted) — balanced
-        colorWeight = 0.55; shapeWeight = 0.45;
+        colorWeight = 0.50; shapeWeight = 0.50;
       } else {
         // Saturated glazes (bright colors) — color dominant
-        colorWeight = 0.75; shapeWeight = 0.25;
+        colorWeight = 0.70; shapeWeight = 0.30;
       }
 
-      const score = (colorScore * colorWeight) + (shapeScore * shapeWeight);
+      const score = Math.min(1.0, (colorScore * colorWeight) + (shapeScore * shapeWeight) + nearDuplicateBonus);
 
       // Hue diff for logging
       let hueDiff2 = Math.abs(dominantHsl.h - photoHsl.h);
