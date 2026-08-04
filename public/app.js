@@ -371,7 +371,7 @@ function navigate(page) {
       blog:'pageBlog', blogPost:'pageBlogPost', publicCombo:'pagePublicCombo',
       aiChat:'pageAiChat',
       studioNotes:'pageStudioNotes', visualSearch:'pageVisualSearch',
-      testTiles:'pageTestTiles'
+      testTiles:'pageTestTiles', findPotter:'pageFindPotter'
     };
     const el = document.getElementById(map[page]); if (el) el.classList.add('active');
     try { const nb = document.querySelector('.nav-link[data-page="' + page + '"]'); if (nb) nb.classList.add('active'); } catch(e) {}
