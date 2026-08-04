@@ -1305,15 +1305,15 @@ async function loadFirings() {
     c.className = mode === 'list' ? '' : 'card-grid';
     if (mode === 'list') {
       c.innerHTML = firings.map(f =>
-        '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="viewFiring(\'' + f.id + '\')">' +
-        '<strong style="min-width:100px">' + esc(f.firing_type||'Firing') + '</strong>' +
-        '<span class="text-sm" style="min-width:60px">Cone ' + esc(f.cone||'?') + '</span>' +
-        '<span class="text-sm" style="min-width:80px;color:var(--text-light)">' + esc(f.atmosphere||'') + '</span>' +
-        '<span class="text-sm" style="min-width:80px">' + fmtDate(f.date) + '</span>' +
+        '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer;word-break:break-word;min-width:0" onclick="viewFiring(\'' + f.id + '\')">' +
+        '<strong style="flex:1 1 auto;min-width:0">' + esc(f.firing_type||'Firing') + '</strong>' +
+        '<span class="text-sm">Cone ' + esc(f.cone||'?') + '</span>' +
+        '<span class="text-sm" style="color:var(--text-light)">' + esc(f.atmosphere||'') + '</span>' +
+        '<span class="text-sm">' + fmtDate(f.date) + '</span>' +
         (f.firing_time ? '<span class="text-sm" style="color:var(--text-muted)">⏱️ ' + esc(f.firing_time) + '</span>' : '') +
         (f.piece_title ? '<span class="piece-meta-tag">' + esc(f.piece_title) + '</span>' : '') +
         (f.kiln_name ? '<span class="text-sm" style="color:var(--text-muted)">' + esc(f.kiln_name) + '</span>' : '') +
-        '<div style="margin-left:auto;display:flex;gap:6px;flex-shrink:0"><button onclick="event.stopPropagation();editFiring(\'' + f.id + '\')" class="btn btn-sm btn-secondary" style="padding:2px 10px;font-size:0.8rem" title="Edit">✎ Edit</button><button onclick="event.stopPropagation();deleteFiring(\'' + f.id + '\')" class="btn btn-sm btn-secondary" style="padding:2px 10px;font-size:0.8rem;color:var(--danger)" title="Delete">✕ Delete</button></div>' +
+        '<div style="display:flex;gap:6px;flex-shrink:0"><button onclick="event.stopPropagation();editFiring(\'' + f.id + '\')" class="btn btn-sm btn-secondary" style="padding:2px 10px;font-size:0.8rem" title="Edit">✎ Edit</button><button onclick="event.stopPropagation();deleteFiring(\'' + f.id + '\')" class="btn btn-sm btn-secondary" style="padding:2px 10px;font-size:0.8rem;color:var(--danger)" title="Delete">✕ Delete</button></div>' +
         '</div>'
       ).join('');
     } else {

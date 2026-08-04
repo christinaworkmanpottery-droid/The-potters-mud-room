@@ -939,8 +939,8 @@
     <div id="pageFirings" class="page">
       <div class="page-header">
         <h2>Firing Logs</h2>
-        <div style="display:flex;gap:8px;align-items:center">
-          <select class="form-select" id="firingSort" style="width:200px" onchange="loadFirings()">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select class="form-select" id="firingSort" style="width:200px;max-width:100%" onchange="loadFirings()">
             <option value="firing_date">Sort by Firing Date</option>
             <option value="created_date">Sort by Created Date</option>
             <option value="firing_type">Sort by Firing Type</option>
