@@ -566,23 +566,30 @@ function pickClayFromLibrary(id, name) {
 function glazeOpts() {
   return '<option value="">Select glaze...</option>' + glazes.map(g => '<option value="' + g.id + '">' + esc(g.name) + (g.brand?' ('+esc(g.brand)+')':'') + '</option>').join('');
 }
+function populateGlazePicker(row, selectedId) {
+  const wrap = row.querySelector('.gpick-wrap');
+  const sel = row.querySelector('.gpick');
+  if (!wrap || !sel) return;
+  sel.innerHTML = '<option value="">— Pick from Glaze library —</option>' + glazes.map(g => '<option value="' + g.id + '"' + (g.id===selectedId?' selected':'') + '>' + esc(g.name) + (g.brand?' ('+esc(g.brand)+')':'') + '</option>').join('');
+  wrap.style.display = glazes.length > 0 ? 'block' : 'none';
+}
 function addGlazeSelector(gId, coats, method, glazeName) {
   const c = document.getElementById('pieceGlazeSelectors');
   const r = document.createElement('div'); r.className = 'glaze-selector-row'; r.style.cssText = 'display:block;margin-bottom:12px;border:1px solid var(--border);border-radius:var(--radius);padding:10px;background:var(--bg)';
-  const pickerOpts = glazes.length > 0
-    ? '<div style="margin-top:6px"><select class="form-select gpick" onchange="pickGlazeFromLibrary(this)" style="font-size:0.85rem;width:100%"><option value="">— Pick from Glaze library —</option>' + glazes.map(g => '<option value="' + g.id + '">' + esc(g.name) + (g.brand?' ('+esc(g.brand)+')':'') + '</option>').join('') + '</select></div>'
-    : '';
   r.innerHTML =
     '<div style="display:flex;align-items:center;gap:8px">' +
       '<input type="text" class="form-input gtext" placeholder="Type glaze name" value="' + esc(glazeName||'') + '" autocomplete="off" style="flex:1;min-width:0">' +
       '<input type="hidden" class="gid">' +
       '<button type="button" class="remove-row" onclick="this.closest(\'.glaze-selector-row\').remove()" style="flex:none">×</button>' +
     '</div>' +
-    pickerOpts +
+    '<div class="gpick-wrap" style="margin-top:6px;display:none">' +
+      '<select class="form-select gpick" onchange="pickGlazeFromLibrary(this)" style="font-size:0.85rem;width:100%"><option value="">— Pick from Glaze library —</option></select>' +
+    '</div>' +
     '<div style="display:flex;gap:8px;margin-top:8px">' +
       '<input type="number" class="form-input gc" placeholder="Coats" min="1" value="' + (coats||1) + '" style="width:80px;flex:none">' +
       '<select class="form-select gm" style="flex:1"><option value="">Method (optional)</option><option value="dip"' + (method==='dip'?' selected':'') + '>Dip</option><option value="brush"' + (method==='brush'?' selected':'') + '>Brush</option><option value="spray"' + (method==='spray'?' selected':'') + '>Spray</option><option value="pour"' + (method==='pour'?' selected':'') + '>Pour</option><option value="wax-resist"' + (method==='wax-resist'?' selected':'') + '>Wax Resist</option></select>' +
     '</div>';
+  populateGlazePicker(r, gId || null);
   if (gId) r.querySelector('.gid').value = gId;
   c.appendChild(r);
 }
@@ -620,6 +627,8 @@ function openPieceModal(p) {
   } else if (p?.glaze) {
     addGlazeSelector(null, 1, null, p.glaze);
   }
+  // Refresh all glaze pickers in case glazes array loaded late
+  document.querySelectorAll('.glaze-selector-row').forEach(r => populateGlazePicker(r, r.querySelector('.gid').value || null));
   // Casualty fields
   document.getElementById('pieceCasualtyType').value = p?.casualty_type||'';
   document.getElementById('pieceCasualtyNotes').value = p?.casualty_notes||'';
