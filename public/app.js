@@ -568,18 +568,26 @@ function glazeOpts() {
 }
 function addGlazeSelector(gId, coats, method, glazeName) {
   const c = document.getElementById('pieceGlazeSelectors');
-  const r = document.createElement('div'); r.className = 'glaze-selector-row';
-  r.innerHTML = '<input type="text" class="form-input gtext" placeholder="Type glaze name" value="' + esc(glazeName||'') + '" autocomplete="off" style="flex:1">' +
-    '<input type="hidden" class="gid">' +
-    '<select class="form-select gpick" onchange="pickGlazeFromLibrary(this)" style="width:180px;flex:none;font-size:0.85rem"><option value="">— Pick from library —</option>' + glazes.map(g => '<option value="' + g.id + '">' + esc(g.name) + (g.brand?' ('+esc(g.brand)+')':'') + '</option>').join('') + '</select>' +
-    '<input type="number" class="form-input gc" placeholder="Coats" min="1" value="' + (coats||1) + '" style="width:70px;flex:none">' +
-    '<select class="form-select gm" style="width:100px;flex:none"><option value="">Method</option><option value="dip"' + (method==='dip'?' selected':'') + '>Dip</option><option value="brush"' + (method==='brush'?' selected':'') + '>Brush</option><option value="spray"' + (method==='spray'?' selected':'') + '>Spray</option><option value="pour"' + (method==='pour'?' selected':'') + '>Pour</option><option value="wax-resist"' + (method==='wax-resist'?' selected':'') + '>Wax Resist</option></select>' +
-    '<button type="button" class="remove-row" onclick="this.parentElement.remove()">×</button>';
+  const r = document.createElement('div'); r.className = 'glaze-selector-row'; r.style.cssText = 'display:block;margin-bottom:12px;border:1px solid var(--border);border-radius:var(--radius);padding:10px;background:var(--bg)';
+  const pickerOpts = glazes.length > 0
+    ? '<div style="margin-top:6px"><select class="form-select gpick" onchange="pickGlazeFromLibrary(this)" style="font-size:0.85rem;width:100%"><option value="">— Pick from Glaze library —</option>' + glazes.map(g => '<option value="' + g.id + '">' + esc(g.name) + (g.brand?' ('+esc(g.brand)+')':'') + '</option>').join('') + '</select></div>'
+    : '';
+  r.innerHTML =
+    '<div style="display:flex;align-items:center;gap:8px">' +
+      '<input type="text" class="form-input gtext" placeholder="Type glaze name" value="' + esc(glazeName||'') + '" autocomplete="off" style="flex:1;min-width:0">' +
+      '<input type="hidden" class="gid">' +
+      '<button type="button" class="remove-row" onclick="this.closest(\'.glaze-selector-row\').remove()" style="flex:none">×</button>' +
+    '</div>' +
+    pickerOpts +
+    '<div style="display:flex;gap:8px;margin-top:8px">' +
+      '<input type="number" class="form-input gc" placeholder="Coats" min="1" value="' + (coats||1) + '" style="width:80px;flex:none">' +
+      '<select class="form-select gm" style="flex:1"><option value="">Method (optional)</option><option value="dip"' + (method==='dip'?' selected':'') + '>Dip</option><option value="brush"' + (method==='brush'?' selected':'') + '>Brush</option><option value="spray"' + (method==='spray'?' selected':'') + '>Spray</option><option value="pour"' + (method==='pour'?' selected':'') + '>Pour</option><option value="wax-resist"' + (method==='wax-resist'?' selected':'') + '>Wax Resist</option></select>' +
+    '</div>';
   if (gId) r.querySelector('.gid').value = gId;
   c.appendChild(r);
 }
 function pickGlazeFromLibrary(sel) {
-  const row = sel.parentElement;
+  const row = sel.closest('.glaze-selector-row');
   const id = sel.value;
   const name = sel.options[sel.selectedIndex].text;
   if (!id) return;
