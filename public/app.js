@@ -1411,9 +1411,11 @@ async function uploadFiringPhotos(event) {
   } else {
     // New firing — stage locally, show previews, upload on save
     const cont = document.getElementById('firingPhotosContainer');
+    console.log('[uploadFiringPhotos] Staging', files.length, 'files for new firing');
     files.forEach(file => {
       pendingFiringPhotos.push(file);
       const idx = pendingFiringPhotos.length - 1;
+      console.log('[uploadFiringPhotos] Added file to pending:', file.name, 'idx:', idx);
       const url = URL.createObjectURL(file);
       const wrap = document.createElement('div');
       wrap.style.cssText = 'position:relative;display:inline-block;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden';
@@ -1535,12 +1537,16 @@ async function saveFiring(e) {
     document.getElementById('firingId').value = savedId;
     // Upload pending photos
     const photosToUpload = pendingFiringPhotos.filter(f => f);
+    console.log('[saveFiring] Photos to upload:', photosToUpload.length, 'savedId:', savedId);
     if (photosToUpload.length > 0 && savedId) {
       const formData = new FormData();
       for (let f of photosToUpload) formData.append('photos', f);
+      console.log('[saveFiring] FormData created with', photosToUpload.length, 'files');
       try {
-        await api('/api/firing-logs/' + savedId + '/photos', { method: 'POST', body: formData });
+        const photoResult = await api('/api/firing-logs/' + savedId + '/photos', { method: 'POST', body: formData });
+        console.log('[saveFiring] Photo upload success:', photoResult);
       } catch(photoErr) {
+        console.error('[saveFiring] Photo upload error:', photoErr);
         toast('Firing saved, but photo upload failed: ' + photoErr.message, 'warning');
       }
     }
