@@ -1910,7 +1910,7 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
     let phash = null;
     try {
       const buf = fs.readFileSync(req.file.path);
-      phash = await computeAHash(buf);
+      phash = await computePHash(buf);
     } catch(e) { /* hash generation failed, not critical */ }
     db.prepare('INSERT INTO piece_photos (id, piece_id, filename, original_name, sort_order, phash) VALUES (?,?,?,?,0,?)').run(photoId, id, req.file.filename, req.file.originalname, phash);
   }
@@ -2064,7 +2064,7 @@ app.post('/api/pieces/:id/photos', auth, upload.single('photo'), async (req, res
   let phash = null;
   try {
     const buf = fs.readFileSync(req.file.path);
-    phash = await computeAHash(buf);
+    phash = await computePHash(buf);
   } catch(e) { /* hash generation failed, not critical */ }
   db.prepare('INSERT INTO piece_photos (id,piece_id,filename,original_name,stage,sort_order,phash) VALUES (?,?,?,?,?,?,?)')
     .run(id, req.params.id, req.file.filename, req.file.originalname, req.body.stage || 'other', count, phash);
@@ -4821,26 +4821,43 @@ try { const { seedBlogDrafts } = require('./seed-blog-drafts'); seedBlogDrafts(d
 const sharp = require('sharp');
 
 // Compute perceptual hash (shape/structure)
-async function computeAHash(buffer) {
+// pHash: DCT-based perceptual hash — captures structural/frequency information.
+// Far better than aHash at distinguishing plates from bowls, mugs from vases, etc.
+// Uses 32x32 resize, 8x8 DCT coefficients, median threshold → 16 hex chars (64 bits).
+async function computePHash(buffer) {
+  const size = 32;
   const pixels = await sharp(buffer)
-    .resize(8, 8, { fit: 'fill' })
+    .resize(size, size, { fit: 'fill' })
     .grayscale()
     .raw()
     .toBuffer();
 
-  let sum = 0;
-  for (let i = 0; i < 64; i++) sum += pixels[i];
-  const mean = sum / 64;
-
-  let hashBits = '';
-  for (let i = 0; i < 64; i++) {
-    hashBits += pixels[i] >= mean ? '1' : '0';
+  // 2D DCT: compute 8x8 top-left DCT coefficients of the 32x32 grayscale image
+  const dct = [];
+  for (let u = 0; u < 8; u++) {
+    for (let v = 0; v < 8; v++) {
+      let sum = 0;
+      const cu = u === 0 ? 1 / Math.sqrt(2) : 1;
+      const cv = v === 0 ? 1 / Math.sqrt(2) : 1;
+      for (let x = 0; x < size; x++) {
+        for (let y = 0; y < size; y++) {
+          sum += pixels[x * size + y] *
+            Math.cos((2 * x + 1) * u * Math.PI / (2 * size)) *
+            Math.cos((2 * y + 1) * v * Math.PI / (2 * size));
+        }
+      }
+      dct.push((cu * cv * sum * 2) / size);
+    }
   }
 
+  // Threshold against median (skip DC component at index 0 for median, include for bits)
+  const vals = dct.slice(1);
+  const sorted = [...vals].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  let bits = '';
+  for (const v of dct) bits += v > median ? '1' : '0';
   let hex = '';
-  for (let i = 0; i < 64; i += 4) {
-    hex += parseInt(hashBits.slice(i, i + 4), 2).toString(16);
-  }
+  for (let i = 0; i < 64; i += 4) hex += parseInt(bits.slice(i, i + 4), 2).toString(16);
   return hex;
 }
 
@@ -5123,16 +5140,27 @@ try {
     console.log(`[Photo Search] Migration color_sig_v9_kmeans: cleared ${cleared.changes} color signatures — recomputing with k-means clustering`);
   }
 } catch(e) { console.warn('[Photo Search] Migration v9 error:', e.message); }
+
+// v9b migration: switch from aHash to pHash (DCT-based) for better form discrimination
+// aHash cannot distinguish plates from bowls — pHash captures structural frequency differences
+try {
+  const doneV9b = db.prepare('SELECT 1 FROM migrations WHERE name=?').get('phash_v9b_dct');
+  if (!doneV9b) {
+    const cleared = db.prepare("UPDATE piece_photos SET phash = NULL WHERE phash IS NOT NULL").run();
+    db.prepare('INSERT INTO migrations (name, applied_at) VALUES (?, datetime("now"))').run('phash_v9b_dct');
+    console.log(`[Photo Search] Migration phash_v9b_dct: cleared ${cleared.changes} phashes — recomputing with pHash (DCT)`);
+  }
+} catch(e) { console.warn('[Photo Search] Migration v9b error:', e.message); }
 app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo provided' });
 
   try {
     const searchBuffer = fs.readFileSync(req.file.path);
-    const searchHash = await computeAHash(searchBuffer);
+    const searchHash = await computePHash(searchBuffer);
     const searchColor = await computeColorSignature(searchBuffer);
 
     // Get all piece photos for this user (excluding pieces hidden from photo search)
-    const userPhotos = db.prepare(`
+    let userPhotos = db.prepare(`
       SELECT pp.*, pp.phash, pp.avg_color, p.id as piece_id, p.title, p.status, p.notes,
              p.clay_body_id, p.description, p.technique, p.form,
              p.date_started, p.date_completed,
@@ -5143,15 +5171,21 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       WHERE p.user_id = ? AND (p.hide_from_photo_search IS NULL OR p.hide_from_photo_search = 0)
     `).all(req.userId);
 
-    // Backfill hashes AND colors for photos that need them (NO LIMIT — must compute all)
-    const needsHash = userPhotos.filter(ph => !ph.phash || ph.phash.length === 32 || !ph.avg_color);
-    for (const ph of needsHash) {
+    // Inline backfill: compute signatures for photos that need them.
+    // pHash (32x32 DCT) takes ~5ms per photo, so 30 photos = ~150ms — acceptable inline.
+    // Any remaining are kicked to async background.
+    const INLINE_LIMIT = 30;
+    const needsBackfill = userPhotos.filter(ph => !ph.phash || !ph.avg_color);
+    const inlineBatch = needsBackfill.slice(0, INLINE_LIMIT);
+    const asyncBatch  = needsBackfill.slice(INLINE_LIMIT);
+
+    for (const ph of inlineBatch) {
       try {
         const filePath = path.join(UPLOADS_DIR, ph.filename);
         if (fs.existsSync(filePath)) {
           const buf = fs.readFileSync(filePath);
-          if (!ph.phash || ph.phash.length === 32) {
-            const hash = await computeAHash(buf);
+          if (!ph.phash) {
+            const hash = await computePHash(buf);
             db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ?').run(hash, ph.id);
             ph.phash = hash;
           }
@@ -5161,10 +5195,39 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
             ph.avg_color = color;
           }
         }
-      } catch (hashErr) {
-        console.warn('[Photo Search] Failed to hash', ph.filename, hashErr.message);
+      } catch (e) {
+        console.warn('[v9] Inline backfill error:', ph.filename, e.message);
       }
     }
+
+    if (asyncBatch.length > 0) {
+      console.log('[v9] Backfilling remaining', asyncBatch.length, 'photos async (non-blocking)');
+      setImmediate(async () => {
+        for (const ph of asyncBatch) {
+          try {
+            const filePath = path.join(UPLOADS_DIR, ph.filename);
+            if (fs.existsSync(filePath)) {
+              const buf = fs.readFileSync(filePath);
+              if (!ph.phash) {
+                const hash = await computePHash(buf);
+                db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ?').run(hash, ph.id);
+              }
+              if (!ph.avg_color) {
+                const color = await computeColorSignature(buf);
+                db.prepare('UPDATE piece_photos SET avg_color = ? WHERE id = ?').run(color, ph.id);
+              }
+            }
+          } catch (e) {
+            console.warn('[v9] Async backfill error:', ph.filename, e.message);
+          }
+        }
+        console.log('[v9] Async backfill complete:', asyncBatch.length, 'photos');
+      });
+    }
+
+    // Only search photos that have both signatures ready
+    userPhotos = userPhotos.filter(ph => ph.avg_color && ph.phash);
+    console.log('[v9] Searching against', userPhotos.length, 'photos with complete signatures');
 
     // === CLUSTER-TO-CLUSTER MATCHING (v9) ===
     // Compare dominant color clusters directly instead of averaging them into a single hue.
@@ -5226,8 +5289,23 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         shapeScore = 1.0 - (distance / 64);
       }
 
-      // 80% cluster color match, 20% shape
-      const score = (colorScore * 0.80) + (shapeScore * 0.20);
+      // ADAPTIVE WEIGHTING: For neutral-colored pieces (white/gray/black), shape matters more.
+      // White plates vs white bowls have identical color — shape must distinguish them.
+      // For saturated glazes (blue, green, red), color is more reliable.
+      const avgSaturation = (dominantHsl.s + photoHsl.s) / 2;
+      let colorWeight, shapeWeight;
+      if (avgSaturation < 0.15) {
+        // Neutral colors (white, gray, black) — shape dominant
+        colorWeight = 0.40; shapeWeight = 0.60;
+      } else if (avgSaturation < 0.30) {
+        // Low saturation (off-white, beige, muted) — balanced
+        colorWeight = 0.55; shapeWeight = 0.45;
+      } else {
+        // Saturated glazes (bright colors) — color dominant
+        colorWeight = 0.75; shapeWeight = 0.25;
+      }
+
+      const score = (colorScore * colorWeight) + (shapeScore * shapeWeight);
 
       // Hue diff for logging
       let hueDiff2 = Math.abs(dominantHsl.h - photoHsl.h);
@@ -5248,6 +5326,9 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         avgDist,
         shapeScore,
         colorScore,
+        colorWeight,
+        shapeWeight,
+        avgSaturation,
         hueDiff: hueDiff2,
         lightnessDiff: Math.abs(dominantHsl.l - photoHsl.l),
         score,
@@ -5261,7 +5342,9 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       score: Number(m.score.toFixed(3)),
       color: Number(m.colorScore.toFixed(3)),
       shape: Number(m.shapeScore.toFixed(3)),
-      avgDist: Number(m.avgDist.toFixed(1)),
+      cW: Number(m.colorWeight.toFixed(2)),
+      sW: Number(m.shapeWeight.toFixed(2)),
+      sat: Number(m.avgSaturation.toFixed(2)),
       hueDiff: Number(m.hueDiff.toFixed(1)),
     })));
 
@@ -5625,7 +5708,7 @@ app.listen(PORT, '0.0.0.0', () => {
           if (!fs.existsSync(filePath)) continue;
           const buf = fs.readFileSync(filePath);
           if (!ph.phash || ph.phash.length === 32) {
-            const hash = await computeAHash(buf);
+            const hash = await computePHash(buf);
             db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ?').run(hash, ph.id);
           }
           if (!ph.avg_color) {
