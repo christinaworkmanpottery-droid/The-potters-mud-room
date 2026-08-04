@@ -522,7 +522,12 @@ async function viewPiece(id) {
       '<button class="btn btn-danger btn-sm" onclick="deletePiece(\'' + p.id + '\')">🗑️</button></div></div>' +
       (photos ? '<div class="detail-photos mb-16">' + photos + '</div>' : '') +
       '<div class="detail-grid"><div class="card"><h3 style="margin-bottom:16px">Details</h3>' +
-      df('Clay Body', p.clay_body_name||p.clay||p.studio) + '<div class="detail-field"><div class="detail-label">Glaze</div><div class="detail-value">' + ((p.glazes&&p.glazes.length) ? p.glazes.map(g => esc(g.glaze_name) + (g.application_method ? ' — ' + esc(g.application_method) : '')).join('<br>') : (p.glaze ? esc(p.glaze) : '—')) + '</div></div>' + df('Firing Temp', p.firingTemp) + df('Technique', p.technique) + df('Form', p.form) +
+      df('Clay Body', p.clay_body_name||p.clay||p.studio) + '<div class="detail-field"><div class="detail-label">Glaze</div><div class="detail-value">' + ((p.glazes&&p.glazes.length) ? p.glazes.map(g => {
+        let parts = [esc(g.glaze_name)];
+        if (g.coats && g.coats > 0) parts.push((g.coats === 1 ? '1 coat' : g.coats + ' coats'));
+        if (g.application_method) parts.push(esc(g.application_method));
+        return parts.join(' — ');
+      }).join('<br>') : (p.glaze ? esc(p.glaze) : '—')) + '</div></div>' + df('Firing Temp', p.firingTemp) + df('Technique', p.technique) + df('Form', p.form) +
       df('Dimensions', p.dimensions) + df('Weight', p.weight) +
       df('Started', fmtDate(p.date_started)) +
       (p.date_completed ? df('Completed', fmtDate(p.date_completed)) : '') +
