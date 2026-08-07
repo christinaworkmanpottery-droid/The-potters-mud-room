@@ -822,6 +822,7 @@
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('pieces','card')" title="Card view">▦</button>
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('pieces','list')" title="List view">☰</button>
           <button class="btn btn-primary" onclick="openPieceModal()">+ New Piece</button>
+          <span id="bulkControlsPieces"></span>
         </div>
       </div>
       <div class="filter-bar">
@@ -864,6 +865,7 @@
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('clay','list')" title="List view">☰</button>
           <button class="btn btn-sm btn-secondary" onclick="navigate('shoppingList')">🛒 Shopping List</button>
           <button class="btn btn-primary" onclick="openClayModal()">+ Add Clay</button>
+          <span id="bulkControlsClayBodies"></span>
         </div>
       </div>
       <div id="clayList" class="card-grid"></div>
@@ -884,6 +886,7 @@
           <button class="btn btn-sm btn-secondary" onclick="navigate('chemicals')">🧪 Chemicals</button>
           <button class="btn btn-sm btn-secondary" onclick="navigate('shoppingList')">🛒 Shopping List</button>
           <button class="btn btn-primary" onclick="openGlazeModal()">+ Add Glaze</button>
+          <span id="bulkControlsGlazes"></span>
         </div>
       </div>
       <div id="glazeList" class="card-grid"></div>
@@ -900,6 +903,7 @@
         <h2>🧪 Test Tile Library</h2>
         <div style="display:flex;gap:8px;align-items:center">
           <button class="btn btn-primary" onclick="openTestTileModal()">+ Add Test Tile</button>
+          <span id="bulkControlsTestTiles"></span>
         </div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
@@ -938,6 +942,7 @@
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('firings','card')" title="Card view">▦</button>
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('firings','list')" title="List view">☰</button>
           <button class="btn btn-primary" onclick="openFiringModal()">+ Log Firing</button>
+          <span id="bulkControlsFirings"></span>
         </div>
       </div>
       <div id="firingList" class="card-grid"></div>
@@ -952,6 +957,7 @@
     <div id="pageCasualties" class="page">
       <div class="page-header">
         <h2>Pottery Casualties</h2>
+        <span id="bulkControlsCasualties"></span>
       </div>
       <p style="color:var(--text-light);margin-bottom:16px">RIP to the pieces that didn't make it. Track what went wrong and what you learned — so you don't make the same mistake twice.</p>
       <div id="casualtyStats" class="stats-row" style="margin-bottom:20px"></div>
@@ -973,6 +979,7 @@
           <button class="btn btn-sm btn-secondary" onclick="exportData('/api/sales/export?dateFrom='+document.getElementById('salesDateFrom').value+'&dateTo='+document.getElementById('salesDateTo').value)">📥 Download</button>
           <button class="btn btn-primary" onclick="openBulkSaleModal()">+ Quick Sale</button>
           <button class="btn btn-primary" onclick="openSaleModal()">+ Log Sale</button>
+          <span id="bulkControlsSales"></span>
         </div>
       </div>
       <div class="filter-bar">
@@ -1266,7 +1273,10 @@
     <div id="pageGoals" class="page">
       <div class="page-header">
         <h2>Goals</h2>
-        <button class="btn btn-primary" onclick="openGoalModal()">+ Add Goal</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-primary" onclick="openGoalModal()">+ Add Goal</button>
+          <span id="bulkControlsGoals"></span>
+        </div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
         <span class="text-sm" style="color:var(--text-light)">Sort:</span>
@@ -1288,7 +1298,10 @@
     <div id="pageProjects" class="page">
       <div class="page-header">
         <h2>Projects</h2>
-        <button class="btn btn-primary" onclick="openProjectModal()">+ New Project</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-primary" onclick="openProjectModal()">+ New Project</button>
+          <span id="bulkControlsProjects"></span>
+        </div>
       </div>
       <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
         <span class="text-sm" style="color:var(--text-light)">Sort:</span>
@@ -1316,6 +1329,7 @@
           <span style="font-size:0.8rem;color:var(--text-light)">Works with Google Calendar, Outlook, Apple Calendar & more</span>
           <button class="btn btn-sm btn-secondary" onclick="printEvents()">🖨️ Print</button>
           <button class="btn btn-primary" onclick="openEventModal()">+ New Event</button>
+          <span id="bulkControlsEvents"></span>
         </div>
       </div>
       <div id="eventsList" class="card-grid"></div>
@@ -1360,6 +1374,7 @@
         <div style="display:flex;gap:8px;align-items:center">
           <button class="btn btn-sm btn-secondary" onclick="exportData('/api/export/contacts')">📥 Download</button>
           <button class="btn btn-primary" onclick="openContactModal()">+ Add Contact</button>
+          <span id="bulkControlsContacts"></span>
         </div>
       </div>
       <div id="contactsList" class="card-grid"></div>

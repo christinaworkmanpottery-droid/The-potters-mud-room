@@ -9,6 +9,113 @@ let debounceTimer = null;
 let forumCategories = [];
 let _loggedInThisSession = false;
 
+// ---- Bulk Selection State ----
+let bulkSelectionMode = {}; // { sectionName: { active: bool, selected: Set() } }
+function initBulkSelection(section) {
+  if (!bulkSelectionMode[section]) bulkSelectionMode[section] = { active: false, selected: new Set() };
+}
+function enterBulkSelection(section) {
+  initBulkSelection(section);
+  bulkSelectionMode[section].active = true;
+  bulkSelectionMode[section].selected.clear();
+  // Reload the current section to show checkboxes
+  const loaders = { pieces:loadPieces, clayBodies:loadClayBodies, glazes:loadGlazes, firings:loadFirings, casualties:loadCasualties, sales:loadSales, testTiles:loadTestTiles, goals:loadGoals, projects:loadProjects, events:loadEvents, contacts:loadContacts };
+  if (loaders[section]) loaders[section]();
+}
+function exitBulkSelection(section) {
+  initBulkSelection(section);
+  bulkSelectionMode[section].active = false;
+  bulkSelectionMode[section].selected.clear();
+  // Reload to hide checkboxes
+  const loaders = { pieces:loadPieces, clayBodies:loadClayBodies, glazes:loadGlazes, firings:loadFirings, casualties:loadCasualties, sales:loadSales, testTiles:loadTestTiles, goals:loadGoals, projects:loadProjects, events:loadEvents, contacts:loadContacts };
+  if (loaders[section]) loaders[section]();
+}
+function toggleBulkSelect(section, id, event) {
+  if (event) event.stopPropagation();
+  initBulkSelection(section);
+  if (bulkSelectionMode[section].selected.has(id)) bulkSelectionMode[section].selected.delete(id);
+  else bulkSelectionMode[section].selected.add(id);
+  updateBulkSelectionUI(section);
+}
+function updateBulkSelectionUI(section) {
+  initBulkSelection(section);
+  const count = bulkSelectionMode[section].selected.size;
+  const deleteBtn = document.getElementById('bulkDeleteBtn_' + section);
+  if (deleteBtn) {
+    deleteBtn.textContent = count > 0 ? `Delete Selected (${count})` : 'Delete Selected';
+    deleteBtn.disabled = count === 0;
+  }
+  // Update checkbox states
+  bulkSelectionMode[section].selected.forEach(id => {
+    const cb = document.getElementById('bulkCheck_' + id);
+    if (cb) cb.checked = true;
+  });
+}
+function isBulkSelectionActive(section) {
+  initBulkSelection(section);
+  return bulkSelectionMode[section].active;
+}
+function getBulkSelected(section) {
+  initBulkSelection(section);
+  return Array.from(bulkSelectionMode[section].selected);
+}
+async function bulkDeleteSelected(section, apiPath, itemName, reloadFn) {
+  const selected = getBulkSelected(section);
+  if (selected.length === 0) return;
+  const plural = selected.length === 1 ? itemName : itemName + 's';
+  if (!confirm(`Delete ${selected.length} selected ${plural}? This cannot be undone.`)) return;
+  
+  let successCount = 0;
+  let failCount = 0;
+  
+  for (const id of selected) {
+    try {
+      await api(apiPath + '/' + id, { method: 'DELETE' });
+      successCount++;
+    } catch(e) {
+      console.error('Bulk delete failed for', id, e);
+      failCount++;
+    }
+  }
+  
+  exitBulkSelection(section);
+  
+  if (failCount === 0) {
+    toast(`Deleted ${successCount} ${plural}`, 'success');
+  } else {
+    toast(`Deleted ${successCount}, failed ${failCount}`, 'error');
+  }
+  
+  if (reloadFn) reloadFn();
+}
+function renderBulkSelectionControls(section, itemName) {
+  initBulkSelection(section);
+  if (!bulkSelectionMode[section].active) {
+    return '<button class="btn btn-secondary btn-sm" onclick="enterBulkSelection(\''+section+'\')" style="margin-left:8px">Select</button>';
+  } else {
+    const count = bulkSelectionMode[section].selected.size;
+    return '<div style="display:flex;gap:8px;align-items:center;margin-left:8px">' +
+      '<span style="font-size:0.9rem;color:var(--text-light)">' + count + ' selected</span>' +
+      '<button class="btn btn-secondary btn-sm" onclick="exitBulkSelection(\''+section+'\')" style="min-width:70px">Cancel</button>' +
+      '<button id="bulkDeleteBtn_'+section+'" class="btn btn-danger btn-sm" onclick="bulkDeleteSelected(\''+section+'\',\'' + 
+      (section==='pieces'?'/api/pieces':section==='clayBodies'?'/api/clay-bodies':section==='glazes'?'/api/glazes':section==='firings'?'/api/firing-logs':section==='casualties'?'/api/pieces':section==='sales'?'/api/sales':section==='testTiles'?'/api/test-tiles':section==='goals'?'/api/goals':section==='projects'?'/api/projects':section==='events'?'/api/events':section==='contacts'?'/api/contacts':'') + 
+      '\',\''+itemName+'\', '+
+      (section==='pieces'?'loadPieces':section==='clayBodies'?'loadClayBodies':section==='glazes'?'loadGlazes':section==='firings'?'loadFirings':section==='casualties'?'loadCasualties':section==='sales'?'loadSales':section==='testTiles'?'loadTestTiles':section==='goals'?'loadGoals':section==='projects'?'loadProjects':section==='events'?'loadEvents':section==='contacts'?'loadContacts':'null') +
+      ')" style="min-width:140px" disabled>Delete Selected</button>' +
+      '</div>';
+  }
+}
+function renderBulkCheckbox(section, id) {
+  initBulkSelection(section);
+  if (!bulkSelectionMode[section].active) return '';
+  const checked = bulkSelectionMode[section].selected.has(id);
+  return '<div style="position:absolute;top:8px;left:8px;z-index:10" onclick="event.stopPropagation()">' +
+    '<input type="checkbox" id="bulkCheck_'+id+'" '+
+    'style="width:24px;height:24px;cursor:pointer;accent-color:var(--primary)" '+
+    (checked?'checked ':'')+
+    'onchange="toggleBulkSelect(\''+section+'\',\''+id+'\', event)"></div>';
+}
+
 // ---- Helpers ----
 async function api(path, opts = {}) {
   const h = {};
@@ -431,7 +538,8 @@ function pieceCard(p) {
   const ph = p.primaryPhoto || (p.photos && p.photos[0]);
   const img = ph ? '<img class="piece-photo" src="/uploads/' + ph.filename + '" loading="lazy">' : '<div class="piece-photo-placeholder">🏺</div>';
   const gl = (p.glazes||[]).map(g => '<span class="glaze-tag">' + esc(g.glaze_name) + '</span>').join('');
-  return '<div class="card piece-card" onclick="viewPiece(\'' + p.id + '\')">' + img +
+  const checkbox = renderBulkCheckbox('pieces', p.id);
+  return '<div class="card piece-card" style="position:relative" onclick="' + (isBulkSelectionActive('pieces') ? 'toggleBulkSelect(\'pieces\',\''+p.id+'\',event)' : 'viewPiece(\''+p.id+'\')') + '">' + checkbox + img +
     '<div class="card-header"><div><div class="card-title">' + esc(p.title||'Untitled') + '</div>' +
     '<div class="text-sm" style="color:var(--text-light)">' + esc(p.clay_body_name||p.clay||p.studio||'No clay specified') + '</div></div>' +
     fmtStatus(p.statusSlug||p.status) + '</div>' +
@@ -457,24 +565,31 @@ async function loadPieces() {
     if (!st) u += 'excludeCasualties=1&';
     const pieces = await api(u);
     const c = document.getElementById('piecesList'), em = document.getElementById('piecesEmpty');
+    
+    // Render bulk controls
+    const bulkControls = document.getElementById('bulkControlsPieces');
+    if (bulkControls) bulkControls.innerHTML = renderBulkSelectionControls('pieces', 'piece');
+    
     if (!pieces.length) { c.innerHTML = ''; em.classList.remove('hidden'); }
     else {
       em.classList.add('hidden');
       const mode = getViewMode('pieces');
       c.className = mode === 'list' ? '' : 'card-grid';
       c.innerHTML = pieces.map(p => mode === 'list' ? pieceListRow(p) : pieceCard(p)).join('');
+      updateBulkSelectionUI('pieces');
     }
   } catch (err) { toast(err.message, 'error'); }
 }
 function pieceListRow(p) {
-  return '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="viewPiece(\'' + p.id + '\')">' +
+  const checkbox = isBulkSelectionActive('pieces') ? '<input type="checkbox" id="bulkCheck_'+p.id+'" style="width:20px;height:20px;cursor:pointer;margin-right:8px;accent-color:var(--primary)" '+(bulkSelectionMode.pieces.selected.has(p.id)?'checked ':'')+' onchange="toggleBulkSelect(\'pieces\',\''+p.id+'\', event)">' : '';
+  return '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer;position:relative" onclick="' + (isBulkSelectionActive('pieces') ? 'toggleBulkSelect(\'pieces\',\''+p.id+'\',event)' : 'viewPiece(\''+p.id+'\')') + '">' +
+    checkbox +
     '<strong style="min-width:150px">' + esc(p.title||'Untitled') + '</strong>' +
     '<span class="text-sm" style="color:var(--text-light);min-width:100px">' + esc(p.clay_body_name||p.clay||p.studio||'') + '</span>' +
     fmtStatus(p.statusSlug||p.status) +
     '<span class="text-sm" style="min-width:80px">' + esc(p.technique||'') + '</span>' +
     '<span class="text-sm" style="min-width:80px;color:var(--text-muted)">' + fmtDate(p.date_started) + '</span>' +
-    '<span style="margin-left:auto;display:flex;gap:4px">' +
-    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();duplicatePiece(\'' + p.id + '\')">📋</button></span></div>';
+    (isBulkSelectionActive('pieces') ? '' : '<span style="margin-left:auto;display:flex;gap:4px"><button class="btn-ghost btn-sm" onclick="event.stopPropagation();duplicatePiece(\'' + p.id + '\')">📋</button></span>') + '</div>';
 }
 function debounceLoadPieces() { clearTimeout(debounceTimer); debounceTimer = setTimeout(loadPieces, 300); }
 
@@ -790,13 +905,15 @@ function clayCardView(cl) {
     (p.notes ? '<div style="font-size:0.65rem;color:var(--text-light)">' + esc(p.notes) + '</div>' : '') +
     '<button class="btn-ghost btn-sm" style="position:absolute;top:0;right:0;font-size:0.7rem" onclick="event.stopPropagation();deleteClayPhoto(\'' + p.id + '\')">×</button></div>'
   ).join('');
-  return '<div class="card" style="cursor:pointer" onclick="viewClayById(\'' + cl.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(cl.name) + ' ' + stockBadge + '</div>' +
-    '<div class="text-sm" style="color:var(--text-light)">' + esc(cl.brand||'') + (cl.clay_type ? ' · ' + esc(cl.clay_type) : '') + '</div></div>' +
+  const checkbox = renderBulkCheckbox('clayBodies', cl.id);
+  const actions = isBulkSelectionActive('clayBodies') ? '' :
     '<div style="display:flex;gap:4px">' +
     '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();openClayPhotoUpload(\'' + cl.id + '\')" title="Add photo">📸</button>' +
     '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();duplicateClay(\'' + cl.id + '\')" title="Duplicate">📋</button>' +
     '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();editClayById(\'' + cl.id + '\')">✏️</button>' +
-    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deleteClay(\'' + cl.id + '\')">🗑️</button></div></div>' +
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deleteClay(\'' + cl.id + '\')">🗑️</button></div>';
+  return '<div class="card" style="position:relative;cursor:pointer" onclick="' + (isBulkSelectionActive('clayBodies') ? 'toggleBulkSelect(\'clayBodies\',\''+cl.id+'\',event)' : 'viewClayById(\''+cl.id+'\')') + '">' + checkbox + '<div class="card-header"><div><div class="card-title">' + esc(cl.name) + ' ' + stockBadge + '</div>' +
+    '<div class="text-sm" style="color:var(--text-light)">' + esc(cl.brand||'') + (cl.clay_type ? ' · ' + esc(cl.clay_type) : '') + '</div></div>' + actions + '</div>' +
     (photos ? '<div style="display:flex;gap:6px;margin-bottom:10px">' + photos + '</div>' : '') +
     '<div style="display:flex;gap:16px;flex-wrap:wrap">' +
     (cl.color_wet ? '<div><span class="detail-label">Wet</span><div>' + esc(cl.color_wet) + '</div></div>' : '') +
@@ -809,33 +926,43 @@ function clayCardView(cl) {
     (cl.source ? '<div class="text-sm mt-8">📍 ' + esc(cl.source) + (cl.source_url ? ' — <a href="' + esc(cl.source_url) + '" target="_blank" style="color:var(--primary)">visit</a>' : '') + '</div>' : '') +
     (cl.buy_url ? '<div class="text-sm mt-4"><a href="' + esc(cl.buy_url) + '" target="_blank" class="btn btn-primary btn-sm">🛒 Buy</a></div>' : '') +
     (cl.notes ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(cl.notes) + '</div>' : '') +
-    '<div class="mt-8" style="display:flex;gap:4px"><button class="btn-ghost btn-sm" onclick="toggleClayStock(\'' + cl.id + '\',' + (cl.in_stock ? 'false' : 'true') + ')" style="font-size:0.75rem">' + (cl.in_stock ? '📦 Mark Out of Stock' : '✅ Mark In Stock') + '</button></div>' +
+    (isBulkSelectionActive('clayBodies') ? '' : '<div class="mt-8" style="display:flex;gap:4px"><button class="btn-ghost btn-sm" onclick="toggleClayStock(\'' + cl.id + '\',' + (cl.in_stock ? 'false' : 'true') + ')" style="font-size:0.75rem">' + (cl.in_stock ? '📦 Mark Out of Stock' : '✅ Mark In Stock') + '</button></div>') +
     '</div>';
 }
 function clayListView(cl) {
+  const checkbox = isBulkSelectionActive('clayBodies') ? '<input type="checkbox" id="bulkCheck_'+cl.id+'" style="width:20px;height:20px;cursor:pointer;margin-right:8px;accent-color:var(--primary)" '+(bulkSelectionMode.clayBodies.selected.has(cl.id)?'checked ':'')+' onchange="toggleBulkSelect(\'clayBodies\',\''+cl.id+'\', event)">' : '';
   const stock = cl.in_stock ? '✅' : '❌';
-  return '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="viewClayById(\'' + cl.id + '\')">' +
+  const actions = isBulkSelectionActive('clayBodies') ? '' :
+    '<span style="margin-left:auto;display:flex;gap:4px">' +
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();duplicateClay(\'' + cl.id + '\')">📋</button>' +
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();editClayById(\'' + cl.id + '\')">✏️</button>' +
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deleteClay(\'' + cl.id + '\')">🗑️</button></span>';
+  return '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="' + (isBulkSelectionActive('clayBodies') ? 'toggleBulkSelect(\'clayBodies\',\''+cl.id+'\',event)' : 'viewClayById(\''+cl.id+'\')') + '">' +
+    checkbox +
     '<span style="min-width:24px">' + stock + '</span>' +
     '<strong style="min-width:150px">' + esc(cl.name) + '</strong>' +
     '<span class="text-sm" style="color:var(--text-light);min-width:100px">' + esc(cl.brand||'') + '</span>' +
     '<span class="text-sm" style="min-width:80px">' + esc(cl.clay_type||'') + '</span>' +
     '<span class="text-sm" style="min-width:60px">' + (cl.cone_range ? 'Cone ' + esc(cl.cone_range) : '') + '</span>' +
     '<span class="text-sm" style="min-width:70px">' + (cl.shrinkage_pct ? cl.shrinkage_pct + '% shrink' : '') + '</span>' +
-    '<span style="margin-left:auto;display:flex;gap:4px">' +
-    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();duplicateClay(\'' + cl.id + '\')">📋</button>' +
-    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();editClayById(\'' + cl.id + '\')">✏️</button>' +
-    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deleteClay(\'' + cl.id + '\')">🗑️</button></span></div>';
+    actions + '</div>';
 }
 async function loadClayBodies() {
   try {
     clayBodies = await api('/api/clay-bodies');
     if (currentPage !== 'clayBodies') return;
     const c = document.getElementById('clayList'), em = document.getElementById('clayEmpty');
+    
+    // Render bulk controls
+    const bulkControls = document.getElementById('bulkControlsClayBodies');
+    if (bulkControls) bulkControls.innerHTML = renderBulkSelectionControls('clayBodies', 'clay body');
+    
     if (!clayBodies.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
     const mode = getViewMode('clay');
     c.className = mode === 'list' ? '' : 'card-grid';
     c.innerHTML = clayBodies.map(cl => mode === 'list' ? clayListView(cl) : clayCardView(cl)).join('');
+    updateBulkSelectionUI('clayBodies');
   } catch(e) { toast(e.message,'error'); }
 }
 function editClayById(id) { const c = clayBodies.find(x=>x.id===id); if(c) openClayModal(c); }
@@ -931,14 +1058,16 @@ function glazeCardView(g) {
     const color = Math.abs(total-100)<0.1 ? 'var(--success)' : (Math.abs(total-100)<5 ? '#F4A623' : 'var(--danger)');
     ingredientTotal = ' <span style="color:'+color+';font-weight:600;font-size:0.8rem">('+total.toFixed(1)+'%)</span>';
   }
-  return '<div class="card" style="cursor:pointer" onclick="viewGlazeById(\'' + g.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(g.name) +
-    ' <span class="glaze-tag' + (g.glaze_type==='recipe'?' recipe':'') + '">' + g.glaze_type + '</span> ' + stockBadge + ' ' + recipeStatusBadge + '</div>' +
-    '<div class="text-sm" style="color:var(--text-light)">' + esc(g.brand||'') + (g.sku ? ' · SKU: ' + esc(g.sku) : '') + (g.color_description ? ' · ' + esc(g.color_description) : '') + '</div></div>' +
+  const checkbox = renderBulkCheckbox('glazes', g.id);
+  const actions = isBulkSelectionActive('glazes') ? '' :
     '<div style="display:flex;gap:4px">' +
     '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();openGlazePhotoUpload(\'' + g.id + '\')" title="Add photo">📸</button>' +
     '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();duplicateGlaze(\'' + g.id + '\')" title="Duplicate">📋</button>' +
     '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();editGlazeById(\'' + g.id + '\')">✏️</button>' +
-    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deleteGlaze(\'' + g.id + '\')">🗑️</button></div></div>' +
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deleteGlaze(\'' + g.id + '\')">🗑️</button></div>';
+  return '<div class="card" style="position:relative;cursor:pointer" onclick="' + (isBulkSelectionActive('glazes') ? 'toggleBulkSelect(\'glazes\',\''+g.id+'\',event)' : 'viewGlazeById(\''+g.id+'\')') + '">' + checkbox + '<div class="card-header"><div><div class="card-title">' + esc(g.name) +
+    ' <span class="glaze-tag' + (g.glaze_type==='recipe'?' recipe':'') + '">' + g.glaze_type + '</span> ' + stockBadge + ' ' + recipeStatusBadge + '</div>' +
+    '<div class="text-sm" style="color:var(--text-light)">' + esc(g.brand||'') + (g.sku ? ' · SKU: ' + esc(g.sku) : '') + (g.color_description ? ' · ' + esc(g.color_description) : '') + '</div></div>' + actions + '</div>' +
     (photos ? '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">' + photos + '</div>' : '') +
     '<div style="display:flex;gap:16px;flex-wrap:wrap">' +
     (g.cone_range ? '<div><span class="detail-label">Cone</span><div>' + esc(g.cone_range) + '</div></div>' : '') +
@@ -951,15 +1080,15 @@ function glazeCardView(g) {
     (g.ingredients?.length ? '<div class="mt-8"><span class="detail-label">Recipe' + ingredientTotal + '</span><div class="text-sm">' + g.ingredients.map(i=>esc(i.ingredient_name) + (i.percentage ? ' '+i.percentage+'%' : '')).join(', ') + '</div></div>' : '') +
     (g.recipe_notes ? '<div class="text-sm mt-4" style="color:var(--text-light)">📝 ' + esc(g.recipe_notes) + '</div>' : '') +
     (g.notes ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(g.notes) + '</div>' : '') +
-    '<div class="mt-8" style="display:flex;gap:4px;flex-wrap:wrap">' +
+    (isBulkSelectionActive('glazes') ? '' : '<div class="mt-8" style="display:flex;gap:4px;flex-wrap:wrap">' +
     '<select class="form-select" style="width:auto;font-size:0.75rem;padding:2px 6px" onclick="event.stopPropagation()" onchange="event.stopPropagation();toggleGlazeStock(\'' + g.id + '\',this.value)">' +
     '<option value=""' + (!g.stock_status?' selected':'') + '>Stock…</option>' +
     '<option value="in-stock"' + (g.stock_status==='in-stock'?' selected':'') + '>In Stock</option>' +
     '<option value="need-to-buy"' + (g.stock_status==='need-to-buy'?' selected':'') + '>Need to Buy</option>' +
     '<option value="low-stock"' + (g.stock_status==='low-stock'?' selected':'') + '>Low Stock</option>' +
-    '<option value="discontinued"' + (g.stock_status==='discontinued'?' selected':'') + '>Discontinued</option></select></div>' +
+    '<option value="discontinued"' + (g.stock_status==='discontinued'?' selected':'') + '>Discontinued</option></select></div>') +
     // Clay Bodies Tested section
-    '<div class="mt-8" style="border-top:1px solid var(--border);padding-top:12px">' +
+    (isBulkSelectionActive('glazes') ? '' : '<div class="mt-8" style="border-top:1px solid var(--border);padding-top:12px">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
     '<span class="detail-label" style="margin:0">🪨 Clay Bodies Tested</span>' +
     '<button class="btn-ghost btn-sm" onclick="toggleClayTestForm(\'' + g.id + '\')" style="font-size:0.8rem">+ Add</button></div>' +
@@ -984,11 +1113,18 @@ function glazeCardView(g) {
     '<textarea id="clayTestNotes_' + g.id + '" class="form-input" placeholder="Results / Notes (e.g. Beautiful amber, no crawling)" rows="2" style="margin-bottom:6px"></textarea>' +
     '<input type="file" id="clayTestPhoto_' + g.id + '" accept="image/*" style="margin-bottom:6px;font-size:0.85rem">' +
     '<button class="btn btn-primary btn-sm" onclick="event.stopPropagation();saveClayTest(\'' + g.id + '\')">Save Clay Test</button>' +
-    '</div></div></div>';
+    '</div></div>') + '</div>';
 }
 function glazeListView(g) {
+  const checkbox = isBulkSelectionActive('glazes') ? '<input type="checkbox" id="bulkCheck_'+g.id+'" style="width:20px;height:20px;cursor:pointer;margin-right:8px;accent-color:var(--primary)" '+(bulkSelectionMode.glazes.selected.has(g.id)?'checked ':'')+' onchange="toggleBulkSelect(\'glazes\',\''+g.id+'\', event)">' : '';
   const stock = g.stock_status === 'need-to-buy' ? '🛒' : (g.stock_status === 'low-stock' ? '⚠️' : (g.stock_status === 'discontinued' ? '❌' : '✅'));
-  return '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="viewGlazeById(\'' + g.id + '\')">' +
+  const actions = isBulkSelectionActive('glazes') ? '' :
+    '<span style="margin-left:auto;display:flex;gap:4px">' +
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();duplicateGlaze(\'' + g.id + '\')">📋</button>' +
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();editGlazeById(\'' + g.id + '\')">✏️</button>' +
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deleteGlaze(\'' + g.id + '\')">🗑️</button></span>';
+  return '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="' + (isBulkSelectionActive('glazes') ? 'toggleBulkSelect(\'glazes\',\''+g.id+'\',event)' : 'viewGlazeById(\''+g.id+'\')') + '">' +
+    checkbox +
     '<span style="min-width:24px">' + stock + '</span>' +
     '<strong style="min-width:150px">' + esc(g.name) + '</strong>' +
     '<span class="glaze-tag' + (g.glaze_type==='recipe'?' recipe':'') + '" style="font-size:0.7rem">' + g.glaze_type + '</span>' +
@@ -996,21 +1132,24 @@ function glazeListView(g) {
     '<span class="text-sm" style="min-width:60px">' + (g.cone_range ? 'Cone ' + esc(g.cone_range) : '') + '</span>' +
     '<span class="text-sm" style="min-width:60px">' + esc(g.surface||'') + '</span>' +
     '<span class="text-sm" style="min-width:70px">' + esc(g.opacity||'') + '</span>' +
-    '<span style="margin-left:auto;display:flex;gap:4px">' +
-    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();duplicateGlaze(\'' + g.id + '\')">📋</button>' +
-    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();editGlazeById(\'' + g.id + '\')">✏️</button>' +
-    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deleteGlaze(\'' + g.id + '\')">🗑️</button></span></div>';
+    actions + '</div>';
 }
 async function loadGlazes() {
   try {
     glazes = await api('/api/glazes');
     if (currentPage !== 'glazes') return;
     const c = document.getElementById('glazeList'), em = document.getElementById('glazeEmpty');
+    
+    // Render bulk controls
+    const bulkControls = document.getElementById('bulkControlsGlazes');
+    if (bulkControls) bulkControls.innerHTML = renderBulkSelectionControls('glazes', 'glaze');
+    
     if (!glazes.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
     const mode = getViewMode('glazes');
     c.className = mode === 'list' ? '' : 'card-grid';
     c.innerHTML = glazes.map(g => mode === 'list' ? glazeListView(g) : glazeCardView(g)).join('');
+    updateBulkSelectionUI('glazes');
   } catch(e) { toast(e.message,'error'); }
 }
 
@@ -1146,6 +1285,11 @@ async function loadTestTiles() {
   const em = document.getElementById('testTileEmpty');
   try {
     testTiles = await api('/api/test-tiles');
+    
+    // Render bulk controls
+    const bulkControls = document.getElementById('bulkControlsTestTiles');
+    if (bulkControls) bulkControls.innerHTML = renderBulkSelectionControls('testTiles', 'test tile');
+    
     if (!testTiles.length) { c.innerHTML = ''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
     const search = (document.getElementById('testTileSearch')?.value || '').toLowerCase();
@@ -1155,6 +1299,7 @@ async function loadTestTiles() {
     if (filterSurface) filtered = filtered.filter(t => t.surface_result === filterSurface);
     if (!filtered.length) { c.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-title">No matches</div><p>Try a different search.</p></div>'; em.classList.add('hidden'); return; }
     c.innerHTML = filtered.map(t => testTileCard(t)).join('');
+    updateBulkSelectionUI('testTiles');
   } catch(e) {
     if (e.message && e.message.includes('403')) {
       c.innerHTML = '';
@@ -1169,7 +1314,14 @@ function testTileCard(t) {
   const surface = t.surface_result ? '<span style="font-size:0.7rem;background:var(--bg-light);padding:2px 7px;border-radius:10px;border:1px solid var(--border)">' + esc(t.surface_result) + '</span>' : '';
   const atm = t.atmosphere ? '<span style="font-size:0.7rem;background:var(--bg-light);padding:2px 7px;border-radius:10px;border:1px solid var(--border)">' + esc(t.atmosphere) + '</span>' : '';
   const photo = t.photo_filename ? '<img src="/uploads/' + esc(t.photo_filename) + '" style="width:100%;height:140px;object-fit:cover;border-radius:var(--radius-sm) var(--radius-sm) 0 0;display:block" onclick="event.stopPropagation();openLightbox(\'/uploads/' + esc(t.photo_filename) + '\')">' : '<div style="width:100%;height:80px;background:var(--bg-light);border-radius:var(--radius-sm) var(--radius-sm) 0 0;display:flex;align-items:center;justify-content:center;font-size:2rem">🧪</div>';
-  return '<div class="card" style="cursor:pointer;padding:0;overflow:hidden" onclick="viewTestTileById(\''+t.id+'\')">'+
+  const checkbox = renderBulkCheckbox('testTiles', t.id);
+  const actions = isBulkSelectionActive('testTiles') ? '' :
+    '<div style="display:flex;gap:4px;margin-top:8px;justify-content:flex-end">'+
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();openTestTileModal(testTiles.find(x=>x.id===\''+t.id+'\'))">✏️</button>'+
+    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deleteTestTile(\''+t.id+'\')" >🗑️</button>'+
+    '</div>';
+  return '<div class="card" style="position:relative;cursor:pointer;padding:0;overflow:hidden" onclick="' + (isBulkSelectionActive('testTiles') ? 'toggleBulkSelect(\'testTiles\',\''+t.id+'\',event)' : 'viewTestTileById(\''+t.id+'\')') + '">'+
+    checkbox +
     photo +
     '<div style="padding:12px">'+
     '<div style="font-weight:600;font-size:0.95rem;margin-bottom:4px">' + esc(t.name || 'Untitled tile') + '</div>'+
@@ -1178,10 +1330,8 @@ function testTileCard(t) {
     (t.cone ? '<div class="text-sm" style="color:var(--text-light);margin-bottom:6px">Cone ' + esc(t.cone) + '</div>' : '')+
     '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">' + surface + atm + '</div>'+
     (stars ? '<div style="color:#f4a623;font-size:0.85rem">' + stars + '</div>' : '')+
-    '<div style="display:flex;gap:4px;margin-top:8px;justify-content:flex-end">'+
-    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();openTestTileModal(testTiles.find(x=>x.id===\''+t.id+'\'))">✏️</button>'+
-    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deleteTestTile(\''+t.id+'\')" >🗑️</button>'+
-    '</div></div></div>';
+    actions +
+    '</div></div>';
 }
 
 function viewTestTileById(id) {
@@ -1300,50 +1450,68 @@ function printFiringLog() {
   w.document.close();
   w.print();
 }
+function firingListView(f) {
+  const checkbox = isBulkSelectionActive('firings') ? '<input type="checkbox" id="bulkCheck_'+f.id+'" style="width:20px;height:20px;cursor:pointer;margin-right:8px;accent-color:var(--primary)" '+(bulkSelectionMode.firings.selected.has(f.id)?'checked ':'')+' onchange="toggleBulkSelect(\'firings\',\''+f.id+'\', event)">' : '';
+  const actions = isBulkSelectionActive('firings') ? '' :
+    '<div style="display:flex;gap:6px;flex-shrink:0"><button onclick="event.stopPropagation();editFiring(\'' + f.id + '\')" class="btn btn-sm btn-secondary" style="padding:2px 10px;font-size:0.8rem" title="Edit">✎ Edit</button><button onclick="event.stopPropagation();deleteFiring(\'' + f.id + '\')" class="btn btn-sm btn-secondary" style="padding:2px 10px;font-size:0.8rem;color:var(--danger)" title="Delete">✕ Delete</button></div>';
+  return '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer;word-break:break-word;min-width:0" onclick="' + (isBulkSelectionActive('firings') ? 'toggleBulkSelect(\'firings\',\''+f.id+'\',event)' : 'viewFiring(\''+f.id+'\')') + '">' +
+    checkbox +
+    '<strong style="flex:1 1 auto;min-width:0">' + esc(f.firing_type||'Firing') + '</strong>' +
+    '<span class="text-sm">Cone ' + esc(f.cone||'?') + '</span>' +
+    '<span class="text-sm" style="color:var(--text-light)">' + esc(f.atmosphere||'') + '</span>' +
+    '<span class="text-sm">' + fmtDate(f.date) + '</span>' +
+    (f.firing_time ? '<span class="text-sm" style="color:var(--text-muted)">⏱️ ' + esc(f.firing_time) + '</span>' : '') +
+    (f.piece_title ? '<span class="piece-meta-tag">' + esc(f.piece_title) + '</span>' : '') +
+    (f.kiln_name ? '<span class="text-sm" style="color:var(--text-muted)">' + esc(f.kiln_name) + '</span>' : '') +
+    actions +
+    '</div>';
+}
+
+function firingCardView(f) {
+  const photosHtml = (f.photos && f.photos.length > 0) ? '<div style="display:flex;gap:6px;margin:8px 0">' + f.photos.map(p => '<img src="/uploads/' + p.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')">').join('') + '</div>' : '';
+  const checkbox = renderBulkCheckbox('firings', f.id);
+  const actions = isBulkSelectionActive('firings') ? '' :
+    '<div style="display:flex;gap:4px;flex-shrink:0"><button onclick="event.stopPropagation();editFiring(\'' + f.id + '\')" class="btn-small" title="Edit">✎</button><button onclick="event.stopPropagation();deleteFiring(\'' + f.id + '\')" class="btn-small" title="Delete">✕</button></div>';
+  return '<div class="card" style="position:relative;cursor:pointer" onclick="' + (isBulkSelectionActive('firings') ? 'toggleBulkSelect(\'firings\',\''+f.id+'\',event)' : 'viewFiring(\''+f.id+'\')') + '">' +
+    checkbox +
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
+    '<div><div class="card-title">' + esc(f.firing_type||'Firing') + ' — Cone ' + esc(f.cone||'?') + '</div>' +
+    '<div class="text-sm" style="color:var(--text-light)">' + (f.kiln_name ? esc(f.kiln_name) + ' · ' : '') + fmtDate(f.date) +
+    (f.atmosphere ? ' · ' + esc(f.atmosphere) : '') +
+    (f.firing_speed ? ' · ' + esc(f.firing_speed) : '') +
+    (f.firing_time ? ' · ⏱️ ' + esc(f.firing_time) : '') +
+    '</div></div>' +
+    actions +
+    '</div>' +
+    photosHtml +
+    (f.piece_title ? '<div class="text-sm" style="margin-bottom:4px"><span class="piece-meta-tag">' + esc(f.piece_title) + '</span></div>' : '') +
+    (f.hold_used ? '<div class="text-sm"><strong>Hold:</strong> Yes' + (f.hold_duration ? ' — ' + esc(f.hold_duration) : '') + '</div>' : '') +
+    (f.load_description ? '<div class="text-sm mt-8"><strong>Load:</strong> ' + esc(f.load_description) + '</div>' : '') +
+    (f.results ? '<div class="text-sm mt-8">' + esc(f.results) + '</div>' : '') +
+    (f.notes ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(f.notes) + '</div>' : '') +
+    '</div>';
+}
+
 async function loadFirings() {
   try {
     const sort = document.getElementById('firingSort')?.value || 'firing_date';
     const firings = await api('/api/firing-logs?sort=' + encodeURIComponent(sort));
     const c = document.getElementById('firingList'), em = document.getElementById('firingEmpty');
+    
+    // Render bulk controls
+    const bulkControls = document.getElementById('bulkControlsFirings');
+    if (bulkControls) bulkControls.innerHTML = renderBulkSelectionControls('firings', 'firing log');
+    
     if (!firings.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
     const mode = getViewMode('firings');
     c.className = mode === 'list' ? '' : 'card-grid';
     if (mode === 'list') {
-      c.innerHTML = firings.map(f =>
-        '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer;word-break:break-word;min-width:0" onclick="viewFiring(\'' + f.id + '\')">' +
-        '<strong style="flex:1 1 auto;min-width:0">' + esc(f.firing_type||'Firing') + '</strong>' +
-        '<span class="text-sm">Cone ' + esc(f.cone||'?') + '</span>' +
-        '<span class="text-sm" style="color:var(--text-light)">' + esc(f.atmosphere||'') + '</span>' +
-        '<span class="text-sm">' + fmtDate(f.date) + '</span>' +
-        (f.firing_time ? '<span class="text-sm" style="color:var(--text-muted)">⏱️ ' + esc(f.firing_time) + '</span>' : '') +
-        (f.piece_title ? '<span class="piece-meta-tag">' + esc(f.piece_title) + '</span>' : '') +
-        (f.kiln_name ? '<span class="text-sm" style="color:var(--text-muted)">' + esc(f.kiln_name) + '</span>' : '') +
-        '<div style="display:flex;gap:6px;flex-shrink:0"><button onclick="event.stopPropagation();editFiring(\'' + f.id + '\')" class="btn btn-sm btn-secondary" style="padding:2px 10px;font-size:0.8rem" title="Edit">✎ Edit</button><button onclick="event.stopPropagation();deleteFiring(\'' + f.id + '\')" class="btn btn-sm btn-secondary" style="padding:2px 10px;font-size:0.8rem;color:var(--danger)" title="Delete">✕ Delete</button></div>' +
-        '</div>'
-      ).join('');
+      c.innerHTML = firings.map(f => firingListView(f)).join('');
     } else {
-      const photosHtml = (photos) => photos && photos.length > 0 ? '<div style="display:flex;gap:6px;margin:8px 0">' + photos.map(p => '<img src="/uploads/' + p.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')">').join('') + '</div>' : '';
-      c.innerHTML = firings.map(f =>
-        '<div class="card" style="cursor:pointer" onclick="viewFiring(\'' + f.id + '\')">' +
-        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">' +
-        '<div><div class="card-title">' + esc(f.firing_type||'Firing') + ' — Cone ' + esc(f.cone||'?') + '</div>' +
-        '<div class="text-sm" style="color:var(--text-light)">' + (f.kiln_name ? esc(f.kiln_name) + ' · ' : '') + fmtDate(f.date) +
-        (f.atmosphere ? ' · ' + esc(f.atmosphere) : '') +
-        (f.firing_speed ? ' · ' + esc(f.firing_speed) : '') +
-        (f.firing_time ? ' · ⏱️ ' + esc(f.firing_time) : '') +
-        '</div></div>' +
-        '<div style="display:flex;gap:4px;flex-shrink:0"><button onclick="event.stopPropagation();editFiring(\'' + f.id + '\')" class="btn-small" title="Edit">✎</button><button onclick="event.stopPropagation();deleteFiring(\'' + f.id + '\')" class="btn-small" title="Delete">✕</button></div>' +
-        '</div>' +
-        photosHtml(f.photos) +
-        (f.piece_title ? '<div class="text-sm" style="margin-bottom:4px"><span class="piece-meta-tag">' + esc(f.piece_title) + '</span></div>' : '') +
-        (f.hold_used ? '<div class="text-sm"><strong>Hold:</strong> Yes' + (f.hold_duration ? ' — ' + esc(f.hold_duration) : '') + '</div>' : '') +
-        (f.load_description ? '<div class="text-sm mt-8"><strong>Load:</strong> ' + esc(f.load_description) + '</div>' : '') +
-        (f.results ? '<div class="text-sm mt-8">' + esc(f.results) + '</div>' : '') +
-        (f.notes ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(f.notes) + '</div>' : '') +
-        '</div>'
-      ).join('');
+      c.innerHTML = firings.map(f => firingCardView(f)).join('');
     }
+    updateBulkSelectionUI('firings');
   } catch(e) { toast(e.message,'error'); }
 }
 let pendingFiringPhotos = [];
@@ -1570,11 +1738,34 @@ async function saveFiring(e) {
 }
 
 // ---- Sales ----
+function casualtyCard(p) {
+  const ph = p.primaryPhoto;
+  const img = ph ? '<img class="piece-photo" src="/uploads/' + ph.filename + '" loading="lazy">' : '<div class="piece-photo-placeholder">🏺</div>';
+  const gl = (p.glazes||[]).map(g => '<span class="glaze-tag">' + esc(g.glaze_name) + '</span>').join('');
+  const typeLabel = p.casualty_type ? '<span class="piece-meta-tag" style="background:rgba(220,53,69,0.1);color:var(--danger)">⚠️ ' + esc(CASUALTY_LABELS[p.casualty_type]||p.casualty_type) + '</span>' : '';
+  const checkbox = renderBulkCheckbox('casualties', p.id);
+  return '<div class="card piece-card" style="position:relative" onclick="' + (isBulkSelectionActive('casualties') ? 'toggleBulkSelect(\'casualties\',\''+p.id+'\',event)' : 'viewPiece(\''+p.id+'\')') + '">' + 
+    checkbox +
+    img +
+    '<div class="card-header"><div><div class="card-title">' + esc(p.title||'Untitled') + '</div>' +
+    '<div class="text-sm" style="color:var(--text-light)">' + esc(p.clay_body_name||p.clay||p.studio||'No clay specified') + '</div></div>' +
+    fmtStatus(p.statusSlug||p.status) + '</div>' +
+    (typeLabel ? '<div class="piece-meta">' + typeLabel + '</div>' : '') +
+    (gl ? '<div class="piece-meta">' + gl + '</div>' : '') +
+    (p.casualty_lesson ? '<div class="text-sm" style="color:var(--success);padding:8px 0;border-top:1px solid var(--border);margin-top:8px"><strong>🎓 Lesson:</strong> ' + esc(p.casualty_lesson.substring(0,120)) + (p.casualty_lesson.length > 120 ? '...' : '') + '</div>' : '') +
+    '</div>';
+}
+
 async function loadCasualties() {
   try {
     const casualties = await api('/api/casualties');
     const c = document.getElementById('casualtyList'), em = document.getElementById('casualtyEmpty');
     const stats = document.getElementById('casualtyStats');
+    
+    // Render bulk controls
+    const bulkControls = document.getElementById('bulkControlsCasualties');
+    if (bulkControls) bulkControls.innerHTML = renderBulkSelectionControls('casualties', 'casualty');
+    
     if (!casualties.length) { c.innerHTML=''; stats.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
 
@@ -1589,20 +1780,8 @@ async function loadCasualties() {
       '<div class="stat-box"><div class="stat-number">' + recycled + '</div><div class="stat-label">Recycled</div></div>' +
       (topIssue ? '<div class="stat-box"><div class="stat-number">⚠️</div><div class="stat-label">Top Issue: ' + esc(CASUALTY_LABELS[topIssue[0]]||topIssue[0]) + ' (' + topIssue[1] + ')</div></div>' : '');
 
-    c.innerHTML = casualties.map(p => {
-      const ph = p.primaryPhoto;
-      const img = ph ? '<img class="piece-photo" src="/uploads/' + ph.filename + '" loading="lazy">' : '<div class="piece-photo-placeholder">🏺</div>';
-      const gl = (p.glazes||[]).map(g => '<span class="glaze-tag">' + esc(g.glaze_name) + '</span>').join('');
-      const typeLabel = p.casualty_type ? '<span class="piece-meta-tag" style="background:rgba(220,53,69,0.1);color:var(--danger)">⚠️ ' + esc(CASUALTY_LABELS[p.casualty_type]||p.casualty_type) + '</span>' : '';
-      return '<div class="card piece-card" onclick="viewPiece(\'' + p.id + '\')">' + img +
-        '<div class="card-header"><div><div class="card-title">' + esc(p.title||'Untitled') + '</div>' +
-        '<div class="text-sm" style="color:var(--text-light)">' + esc(p.clay_body_name||p.clay||p.studio||'No clay specified') + '</div></div>' +
-        fmtStatus(p.statusSlug||p.status) + '</div>' +
-        (typeLabel ? '<div class="piece-meta">' + typeLabel + '</div>' : '') +
-        (gl ? '<div class="piece-meta">' + gl + '</div>' : '') +
-        (p.casualty_lesson ? '<div class="text-sm" style="color:var(--success);padding:8px 0;border-top:1px solid var(--border);margin-top:8px"><strong>🎓 Lesson:</strong> ' + esc(p.casualty_lesson.substring(0,120)) + (p.casualty_lesson.length > 120 ? '...' : '') + '</div>' : '') +
-        '</div>';
-    }).join('');
+    c.innerHTML = casualties.map(p => casualtyCard(p)).join('');
+    updateBulkSelectionUI('casualties');
   } catch(e) { toast(e.message,'error'); }
 }
 

@@ -2071,6 +2071,95 @@ app.delete('/api/pieces/:id', auth, (req, res) => {
   res.json({ success: true });
 });
 
+// Bulk delete endpoint - reuses existing deletion logic for each type
+app.post('/api/bulk-delete', auth, (req, res) => {
+  const { type, ids } = req.body;
+  if (!type || !Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'Invalid request' });
+  }
+
+  let deleted = 0;
+  let errors = [];
+
+  try {
+    ids.forEach(id => {
+      try {
+        switch(type) {
+          case 'pieces':
+            // Reuse pieces deletion logic
+            const photos = db.prepare('SELECT filename FROM piece_photos WHERE piece_id=?').all(id);
+            photos.forEach(p => { const f = path.join(UPLOADS_DIR, p.filename); if (fs.existsSync(f)) fs.unlinkSync(f); });
+            db.prepare('DELETE FROM piece_photos WHERE piece_id=?').run(id);
+            db.prepare('DELETE FROM piece_glazes WHERE piece_id=?').run(id);
+            db.prepare('DELETE FROM firing_logs WHERE piece_id=?').run(id);
+            const pr = db.prepare('DELETE FROM pieces WHERE id=? AND user_id=?').run(id, req.userId);
+            if (pr.changes > 0) deleted++;
+            break;
+
+          case 'clay-bodies':
+            // Reuse clay deletion logic
+            const clayPhotos = db.prepare('SELECT filename FROM clay_photos WHERE clay_id=?').all(id);
+            clayPhotos.forEach(p => { const f = path.join(UPLOADS_DIR, p.filename); if (fs.existsSync(f)) fs.unlinkSync(f); });
+            db.prepare('DELETE FROM clay_photos WHERE clay_id=?').run(id);
+            const cr = db.prepare('DELETE FROM clay_bodies WHERE id=? AND user_id=?').run(id, req.userId);
+            if (cr.changes > 0) deleted++;
+            break;
+
+          case 'glazes':
+            // Reuse glaze deletion logic
+            db.prepare('DELETE FROM glaze_ingredients WHERE glaze_id=?').run(id);
+            db.prepare('DELETE FROM glaze_photos WHERE glaze_id=?').run(id);
+            const gr = db.prepare('DELETE FROM glazes WHERE id=? AND user_id=?').run(id, req.userId);
+            if (gr.changes > 0) deleted++;
+            break;
+
+          case 'test-tiles':
+            // Reuse test tile deletion logic (requires tier check)
+            const tile = db.prepare('SELECT * FROM test_tiles WHERE id=? AND user_id=?').get(id, req.userId);
+            if (tile) {
+              [tile.photo_filename, tile.photo_filename2, tile.photo_filename3].forEach(f => {
+                if (f) {
+                  const fp = path.join(UPLOADS_DIR, f);
+                  if (fs.existsSync(fp)) fs.unlinkSync(fp);
+                }
+              });
+              db.prepare('DELETE FROM test_tiles WHERE id=?').run(id);
+              deleted++;
+            }
+            break;
+
+          case 'firing-logs':
+            // Reuse firing deletion logic
+            const fr = db.prepare('DELETE FROM firing_logs WHERE id=? AND user_id=?').run(id, req.userId);
+            if (fr.changes > 0) deleted++;
+            break;
+
+          case 'casualties':
+            // Casualties are just pieces with status='broken' or 'recycled'
+            // Use same deletion logic as pieces
+            const casualtyPhotos = db.prepare('SELECT filename FROM piece_photos WHERE piece_id=?').all(id);
+            casualtyPhotos.forEach(p => { const f = path.join(UPLOADS_DIR, p.filename); if (fs.existsSync(f)) fs.unlinkSync(f); });
+            db.prepare('DELETE FROM piece_photos WHERE piece_id=?').run(id);
+            db.prepare('DELETE FROM piece_glazes WHERE piece_id=?').run(id);
+            db.prepare('DELETE FROM firing_logs WHERE piece_id=?').run(id);
+            const casr = db.prepare('DELETE FROM pieces WHERE id=? AND user_id=?').run(id, req.userId);
+            if (casr.changes > 0) deleted++;
+            break;
+
+          default:
+            errors.push({ id, error: 'Unknown type' });
+        }
+      } catch(err) {
+        errors.push({ id, error: err.message });
+      }
+    });
+
+    res.json({ success: true, deleted, errors });
+  } catch(err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Piece photos
 app.post('/api/pieces/:id/photos', auth, upload.single('photo'), async (req, res) => {
   console.log('[PHOTO-DIAG] Request received, file present:', !!req.file);
