@@ -529,7 +529,7 @@ async function viewPiece(id) {
         return parts.join(' — ');
       }).join('<br>') : (p.glaze ? esc(p.glaze) : '—')) + '</div></div>' + df('Firing Temp', p.firingTemp) + df('Technique', p.technique) + df('Form', p.form) +
       df('Dimensions', p.dimensions) + df('Weight', p.weight) +
-      df('Started', fmtDate(p.date_started)) +
+      df('Date', fmtDate(p.date_started)) +
       (p.date_completed ? df('Completed', fmtDate(p.date_completed)) : '') +
       (p.material_cost || p.firing_cost || p.labor_hours ? '<div class="detail-section-title" style="margin-top:12px;font-weight:600;font-size:0.85rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Cost & Pricing</div>' : '') +
       (p.material_cost ? df('Materials', '$' + parseFloat(p.material_cost).toFixed(2)) : '') +
@@ -620,6 +620,9 @@ function openPieceModal(p) {
   document.getElementById('pieceForm_').value = p?.form||'';
   document.getElementById('pieceStudio').value = p?.studio||'';
   document.getElementById('pieceDateStarted').value = p?.date_started||'';
+  document.getElementById('pieceFiringTemp').value = p?.firingTemp||'';
+  document.getElementById('pieceDimensions').value = p?.dimensions||'';
+  document.getElementById('pieceWeight').value = p?.weight||'';
   document.getElementById('pieceNotes').value = p?.notes||'';
   document.getElementById('pieceClayText').value = p?.clay_body_name || p?.clay || '';
   document.getElementById('pieceClayId').value = p?.clay_body_id || '';
@@ -678,6 +681,9 @@ async function savePiece(e) {
     form: document.getElementById('pieceForm_').value||null,
     studio: document.getElementById('pieceStudio').value||null,
     dateStarted: document.getElementById('pieceDateStarted').value||null,
+    firingTemp: document.getElementById('pieceFiringTemp').value||null,
+    dimensions: document.getElementById('pieceDimensions').value||null,
+    weight: document.getElementById('pieceWeight').value||null,
     notes: document.getElementById('pieceNotes').value||null,
     materialCost: document.getElementById('pieceMaterialCost').value||null,
     firingCost: document.getElementById('pieceFiringCost').value||null,
