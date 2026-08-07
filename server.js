@@ -2054,20 +2054,35 @@ app.delete('/api/pieces/:id', auth, (req, res) => {
 
 // Piece photos
 app.post('/api/pieces/:id/photos', auth, upload.single('photo'), async (req, res) => {
+  console.log('[PHOTO-DIAG] Request received, file present:', !!req.file);
   if (!req.file) return res.status(400).json({ error: 'No photo' });
+  
+  console.log('[PHOTO-DIAG] File size:', req.file.size, 'mime:', req.file.mimetype);
+  
   const u = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
   const maxPhotos = ((u?.tier || 'free') === 'free') ? 1 : 3;
   const count = db.prepare('SELECT COUNT(*) as c FROM piece_photos WHERE piece_id=?').get(req.params.id).c;
+  
+  console.log('[PHOTO-DIAG] Tier:', u?.tier, 'count:', count, 'max:', maxPhotos);
+  
   if (count >= maxPhotos) return res.status(403).json({ error: req.userTier === 'free' ? 'Free tier allows 1 photo per piece. Upgrade to add up to 3!' : 'Max 3 photos per piece' });
+  
   const id = uuidv4();
   // Generate perceptual hash on upload
   let phash = null;
+  console.log('[PHOTO-DIAG] Computing pHash...');
   try {
     const buf = fs.readFileSync(req.file.path);
     phash = await computePHash(buf);
-  } catch(e) { /* hash generation failed, not critical */ }
+  } catch(e) { 
+    console.log('[PHOTO-DIAG] PHash error (non-critical):', e.message);
+  }
+  
+  console.log('[PHOTO-DIAG] Inserting to DB...');
   db.prepare('INSERT INTO piece_photos (id,piece_id,filename,original_name,stage,sort_order,phash) VALUES (?,?,?,?,?,?,?)')
     .run(id, req.params.id, req.file.filename, req.file.originalname, req.body.stage || 'other', count, phash);
+  
+  console.log('[PHOTO-DIAG] Success, returning response');
   res.json({ id, filename: req.file.filename });
 });
 
