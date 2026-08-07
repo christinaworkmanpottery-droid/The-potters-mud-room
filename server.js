@@ -1895,9 +1895,19 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
 
   const id = uuidv4();
   const isCasualty = (status === 'broken' || status === 'recycled');
-  try {
+  // Piece insert + glaze insert loop run in one transaction so a glaze failure
+  // (e.g. NOT NULL on glaze_id) rolls back the piece insert too, instead of
+  // leaving an orphaned Piece row behind.
+  const insertPieceAndGlazes = db.transaction(() => {
     db.prepare('INSERT INTO pieces (id,user_id,title,description,clay_body_id,studio,status,form,technique,dimensions,weight,material_cost,firing_cost,labor_hours,labor_rate,date_started,notes,casualty_type,casualty_notes,casualty_lesson) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
       .run(id, req.userId, title, description, clayBodyId, clayText, status || 'in-progress', form, technique, dimensions, weight, materialCost, firingCost, laborHours, laborRate, dateStarted, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null);
+    if (glazeIds?.length) {
+      const ins = db.prepare('INSERT INTO piece_glazes (id,piece_id,glaze_id,custom_name,coats,application_method,layer_order) VALUES (?,?,?,?,?,?,?)');
+      glazeIds.forEach((g, i) => ins.run(uuidv4(), id, g.glazeId || null, g.customName || null, g.coats || 1, g.method || null, i));
+    }
+  });
+  try {
+    insertPieceAndGlazes();
   } catch (dbErr) {
     console.error('[DB ERROR] Insert piece failed:', dbErr.message, { title, status, body });
     return res.status(400).json({ error: 'Could not save piece: ' + dbErr.message });
@@ -1915,10 +1925,6 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
     db.prepare('INSERT INTO piece_photos (id, piece_id, filename, original_name, sort_order, phash) VALUES (?,?,?,?,0,?)').run(photoId, id, req.file.filename, req.file.originalname, phash);
   }
 
-  if (glazeIds?.length) {
-    const ins = db.prepare('INSERT INTO piece_glazes (id,piece_id,glaze_id,custom_name,coats,application_method,layer_order) VALUES (?,?,?,?,?,?,?)');
-    glazeIds.forEach((g, i) => ins.run(uuidv4(), id, g.glazeId || null, g.customName || null, g.coats || 1, g.method || null, i));
-  }
   res.json({ id });
 });
 
@@ -2028,16 +2034,29 @@ app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
   let glazeIds = body.glazeIds || body.glaze_ids;
   if (typeof glazeIds === 'string') { try { glazeIds = JSON.parse(glazeIds); } catch(e) { glazeIds = undefined; } }
   const isCasualty = (status === 'broken' || status === 'recycled');
-  const r = db.prepare(`UPDATE pieces SET title=?,description=?,clay_body_id=?,studio=?,status=?,form=?,technique=?,dimensions=?,weight=?,material_cost=?,firing_cost=?,labor_hours=?,labor_rate=?,sale_price=?,date_started=?,date_completed=?,date_sold=?,notes=?,casualty_type=?,casualty_notes=?,casualty_lesson=?,updated_at=datetime('now') WHERE id=? AND user_id=?`)
-    .run(title, description, clayBodyId, studio, status, form, technique, dimensions, weight, materialCost, firingCost, laborHours, laborRate, salePrice, dateStarted, dateCompleted, dateSold, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null, req.params.id, req.userId);
-  if (r.changes === 0) return res.status(404).json({ error: 'Not found' });
-  if (glazeIds !== undefined) {
-    db.prepare('DELETE FROM piece_glazes WHERE piece_id=?').run(req.params.id);
-    if (glazeIds?.length) {
-      const ins = db.prepare('INSERT INTO piece_glazes (id,piece_id,glaze_id,custom_name,coats,application_method,layer_order) VALUES (?,?,?,?,?,?,?)');
-      glazeIds.forEach((g, i) => ins.run(uuidv4(), req.params.id, g.glazeId || null, g.customName || null, g.coats || 1, g.method || null, i));
+  // Piece update + glaze replace run in one transaction so a glaze insert
+  // failure (e.g. NOT NULL on glaze_id) rolls back the piece update too,
+  // instead of leaving the piece partially updated with no glazes.
+  let updateResult;
+  const updatePieceAndGlazes = db.transaction(() => {
+    updateResult = db.prepare(`UPDATE pieces SET title=?,description=?,clay_body_id=?,studio=?,status=?,form=?,technique=?,dimensions=?,weight=?,material_cost=?,firing_cost=?,labor_hours=?,labor_rate=?,sale_price=?,date_started=?,date_completed=?,date_sold=?,notes=?,casualty_type=?,casualty_notes=?,casualty_lesson=?,updated_at=datetime('now') WHERE id=? AND user_id=?`)
+      .run(title, description, clayBodyId, studio, status, form, technique, dimensions, weight, materialCost, firingCost, laborHours, laborRate, salePrice, dateStarted, dateCompleted, dateSold, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null, req.params.id, req.userId);
+    if (updateResult.changes === 0) return;
+    if (glazeIds !== undefined) {
+      db.prepare('DELETE FROM piece_glazes WHERE piece_id=?').run(req.params.id);
+      if (glazeIds?.length) {
+        const ins = db.prepare('INSERT INTO piece_glazes (id,piece_id,glaze_id,custom_name,coats,application_method,layer_order) VALUES (?,?,?,?,?,?,?)');
+        glazeIds.forEach((g, i) => ins.run(uuidv4(), req.params.id, g.glazeId || null, g.customName || null, g.coats || 1, g.method || null, i));
+      }
     }
+  });
+  try {
+    updatePieceAndGlazes();
+  } catch (dbErr) {
+    console.error('[DB ERROR] Update piece failed:', dbErr.message, { pieceId: req.params.id });
+    return res.status(400).json({ error: 'Could not save piece: ' + dbErr.message });
   }
+  if (updateResult.changes === 0) return res.status(404).json({ error: 'Not found' });
   res.json({ success: true });
 });
 
@@ -5355,7 +5374,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       if (best.score < 0.45) continue; // v9: cluster-based scoring, lower threshold
 
       const piecePhotos = db.prepare('SELECT * FROM piece_photos WHERE piece_id = ? ORDER BY sort_order').all(best.piece_id);
-      const pieceGlazes = db.prepare('SELECT pg.*, g.name as glaze_name, g.brand, g.glaze_type FROM piece_glazes pg JOIN glazes g ON pg.glaze_id = g.id WHERE pg.piece_id = ? ORDER BY pg.layer_order').all(best.piece_id);
+      const pieceGlazes = db.prepare('SELECT pg.*, COALESCE(g.name, pg.custom_name) as glaze_name, g.brand, g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id = g.id WHERE pg.piece_id = ? ORDER BY pg.layer_order').all(best.piece_id);
 
       matches.push({
         _id: best.piece_id,
@@ -5796,8 +5815,8 @@ app.get('/api/gallery/:id', (req, res) => {
 
     const photos = db.prepare('SELECT id, filename, stage FROM piece_photos WHERE piece_id=? ORDER BY sort_order').all(req.params.id);
     const glazes = db.prepare(`
-      SELECT g.name as glaze_name FROM piece_glazes pg
-      JOIN glazes g ON pg.glaze_id = g.id
+      SELECT COALESCE(g.name, pg.custom_name) as glaze_name FROM piece_glazes pg
+      LEFT JOIN glazes g ON pg.glaze_id = g.id
       WHERE pg.piece_id=?
     `).all(req.params.id);
 

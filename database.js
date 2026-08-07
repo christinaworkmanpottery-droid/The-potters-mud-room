@@ -542,6 +542,48 @@ function initDB() {
     }
   } catch(e) { /* migration already done or no data */ }
 
+  // Fix: piece_glazes.glaze_id was left NOT NULL after custom-named glaze support
+  // (custom_name column, commit 694bd5b) started sending glaze_id=NULL for
+  // manually-typed glazes. This caused every custom-glaze create/edit to throw
+  // SQLITE_CONSTRAINT_NOTNULL. Rebuild the table with glaze_id nullable.
+  // Explicit transaction (not relying on db.exec()'s implicit per-statement
+  // behavior) so the rebuild either fully commits or fully rolls back.
+  try {
+    const pieceGlazesSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='piece_glazes'").get();
+    if (pieceGlazesSchema && pieceGlazesSchema.sql && /glaze_id\s+TEXT\s+NOT\s+NULL/i.test(pieceGlazesSchema.sql)) {
+      const beforeCount = db.prepare('SELECT COUNT(*) as c FROM piece_glazes').get().c;
+      const migratePieceGlazes = db.transaction(() => {
+        db.exec(`
+          CREATE TABLE piece_glazes_new (
+            id TEXT PRIMARY KEY,
+            piece_id TEXT NOT NULL,
+            glaze_id TEXT,
+            coats INTEGER DEFAULT 1,
+            application_method TEXT CHECK(application_method IN ('dip', 'brush', 'spray', 'pour', 'wax-resist', 'other', NULL)),
+            layer_order INTEGER DEFAULT 0,
+            notes TEXT,
+            custom_name TEXT DEFAULT NULL,
+            FOREIGN KEY (piece_id) REFERENCES pieces(id) ON DELETE CASCADE,
+            FOREIGN KEY (glaze_id) REFERENCES glazes(id) ON DELETE CASCADE
+          );
+        `);
+        db.exec(`INSERT INTO piece_glazes_new SELECT id,piece_id,glaze_id,coats,application_method,layer_order,notes,custom_name FROM piece_glazes;`);
+        const afterCount = db.prepare('SELECT COUNT(*) as c FROM piece_glazes_new').get().c;
+        if (afterCount !== beforeCount) {
+          throw new Error(`piece_glazes migration row count mismatch: before=${beforeCount} after=${afterCount}`);
+        }
+        db.exec(`DROP TABLE piece_glazes;`);
+        db.exec(`ALTER TABLE piece_glazes_new RENAME TO piece_glazes;`);
+        db.exec(`CREATE INDEX IF NOT EXISTS idx_piece_glazes_piece ON piece_glazes(piece_id);`);
+      });
+      migratePieceGlazes();
+      const afterCount = db.prepare('SELECT COUNT(*) as c FROM piece_glazes').get().c;
+      console.log(`[Migration] piece_glazes.glaze_id made nullable. Rows before=${beforeCount} after=${afterCount}`);
+    }
+  } catch(e) {
+    console.error('[Migration] piece_glazes glaze_id nullable FAILED, table unchanged:', e.message);
+  }
+
   // Goals table (item 36)
   db.exec(`
     CREATE TABLE IF NOT EXISTS goals (
