@@ -2222,6 +2222,17 @@ app.put('/api/photos/:id/rotate', auth, (req, res) => {
   res.json({ success: true });
 });
 
+app.put('/api/pieces/:id/photos/reorder', auth, (req, res) => {
+  const { photoIds } = req.body;
+  if (!Array.isArray(photoIds)) return res.status(400).json({ error: 'photoIds must be an array' });
+  const piece = db.prepare('SELECT * FROM pieces WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!piece) return res.status(404).json({ error: 'Piece not found' });
+  photoIds.forEach((photoId, index) => {
+    db.prepare('UPDATE piece_photos SET sort_order=? WHERE id=? AND piece_id=?').run(index, photoId, req.params.id);
+  });
+  res.json({ success: true });
+});
+
 // ============ FIRING LOGS ============
 app.get('/api/firing-logs', auth, (req, res) => {
   const { sort } = req.query;

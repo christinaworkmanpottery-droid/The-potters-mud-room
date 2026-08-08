@@ -598,8 +598,10 @@ async function viewPiece(id) {
   try {
     const p = await api('/api/pieces/' + id);
     navigate('pieceDetail');
-    const photos = (p.photos||[]).map(ph =>
-      '<div class="detail-photo-wrap" style="position:relative">' +
+    window._currentPieceId = p.id;
+    window._currentPiecePhotos = p.photos || [];
+    const photos = (p.photos||[]).map((ph, idx) =>
+      '<div class="detail-photo-wrap" draggable="true" data-photo-id="' + ph.id + '" data-index="' + idx + '" style="position:relative">' +
       '<img class="detail-photo" src="/uploads/' + ph.filename + '" title="' + esc(ph.stage||'') + '" onclick="openLightbox(\'/uploads/' + ph.filename + '\')" style="cursor:zoom-in;transform:rotate(' + (ph.rotation||0) + 'deg)">' +
       '<span class="photo-stage-label">' + esc(ph.stage||'') + '</span>' +
       '<div style="position:absolute;top:4px;right:4px;display:flex;gap:2px">' +
@@ -3883,6 +3885,9 @@ async function editPhotoStage(photoId, currentStage, pieceId) {
   if (stage === null) return;
   try { await api('/api/photos/' + photoId + '/stage', {method:'PUT', body:{stage}}); toast('Stage updated','success'); viewPiece(pieceId); } catch(e) { toast(e.message,'error'); }
 }
+async function reorderPhotos(pieceId, photoIds) {
+  try { await api('/api/pieces/' + pieceId + '/photos/reorder', {method:'PUT', body:{photoIds}}); } catch(e) { toast(e.message,'error'); }
+}
 async function deleteGlazePhoto(photoId) {
   if (!confirm('Delete this photo?')) return;
   try { await api('/api/glaze-photos/' + photoId, {method:'DELETE'}); toast('Photo deleted','success'); loadGlazes(); } catch(e) { toast(e.message,'error'); }
@@ -5681,5 +5686,44 @@ document.addEventListener('click', function(e) {
       !e.target.closest('.nav-dropdown') &&
       !e.target.closest('.nav-toggle')) {
     closeNav();
+  }
+});
+
+// Photo drag-and-drop reordering
+let draggedPhotoElement = null;
+document.addEventListener('dragstart', function(e) {
+  if (e.target.classList.contains('detail-photo-wrap')) {
+    draggedPhotoElement = e.target;
+    e.target.style.opacity = '0.5';
+  }
+});
+document.addEventListener('dragend', function(e) {
+  if (e.target.classList.contains('detail-photo-wrap')) {
+    e.target.style.opacity = '1';
+    draggedPhotoElement = null;
+  }
+});
+document.addEventListener('dragover', function(e) {
+  if (e.target.closest('.detail-photo-wrap') && draggedPhotoElement) {
+    e.preventDefault();
+  }
+});
+document.addEventListener('drop', function(e) {
+  const dropTarget = e.target.closest('.detail-photo-wrap');
+  if (dropTarget && draggedPhotoElement && dropTarget !== draggedPhotoElement) {
+    e.preventDefault();
+    const container = dropTarget.parentElement;
+    const allPhotos = Array.from(container.querySelectorAll('.detail-photo-wrap'));
+    const draggedIndex = allPhotos.indexOf(draggedPhotoElement);
+    const targetIndex = allPhotos.indexOf(dropTarget);
+    if (draggedIndex < targetIndex) {
+      dropTarget.after(draggedPhotoElement);
+    } else {
+      dropTarget.before(draggedPhotoElement);
+    }
+    const newOrder = Array.from(container.querySelectorAll('.detail-photo-wrap')).map(el => el.dataset.photoId);
+    if (window._currentPieceId) {
+      reorderPhotos(window._currentPieceId, newOrder);
+    }
   }
 });
