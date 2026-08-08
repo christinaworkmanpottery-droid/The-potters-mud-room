@@ -600,11 +600,12 @@ async function viewPiece(id) {
     navigate('pieceDetail');
     window._currentPieceId = p.id;
     window._currentPiecePhotos = p.photos || [];
+    window._reorderMode = false;
     const photos = (p.photos||[]).map((ph, idx) =>
-      '<div class="detail-photo-wrap" draggable="true" data-photo-id="' + ph.id + '" data-index="' + idx + '" style="position:relative">' +
+      '<div class="detail-photo-wrap" draggable="false" data-photo-id="' + ph.id + '" data-index="' + idx + '" style="position:relative">' +
       '<img class="detail-photo" src="/uploads/' + ph.filename + '" title="' + esc(ph.stage||'') + '" onclick="openLightbox(\'/uploads/' + ph.filename + '\')" style="cursor:zoom-in;transform:rotate(' + (ph.rotation||0) + 'deg)">' +
       '<span class="photo-stage-label">' + esc(ph.stage||'') + '</span>' +
-      '<div style="position:absolute;top:4px;right:4px;display:flex;gap:2px">' +
+      '<div class="photo-controls" style="position:absolute;top:4px;right:4px;display:flex;gap:2px">' +
       '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();rotatePhoto(\'' + ph.id + '\',\'' + p.id + '\',false)" title="Rotate left">↶</button>' +
       '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();rotatePhoto(\'' + ph.id + '\',\'' + p.id + '\',true)" title="Rotate right">↷</button>' +
       '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();editPhotoStage(\'' + ph.id + '\',\'' + esc(ph.stage||'') + '\',\'' + p.id + '\')" title="Edit stage">✏️</button>' +
@@ -629,6 +630,7 @@ async function viewPiece(id) {
 
     const maxPhotos = (currentUser?.tier || 'free') === 'free' ? 1 : 3;
     const canAddPhoto = (p.photos||[]).length < maxPhotos;
+    const hasMultiplePhotos = (p.photos||[]).length > 1;
 
     document.getElementById('pieceDetailContent').innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:20px"><div>' +
@@ -639,7 +641,10 @@ async function viewPiece(id) {
       '<button class="btn btn-secondary btn-sm" onclick="duplicatePiece(\'' + p.id + '\')">📋 Duplicate</button>' +
       '<button class="btn btn-primary btn-sm" onclick="editPiece(\'' + p.id + '\')">✏️ Edit</button>' +
       '<button class="btn btn-danger btn-sm" onclick="deletePiece(\'' + p.id + '\')">🗑️</button></div></div>' +
-      (photos ? '<div class="detail-photos mb-16">' + photos + '</div>' : '') +
+      (photos ? '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+        '<div></div>' +
+        (hasMultiplePhotos ? '<button id="reorderPhotosBtn" class="btn btn-secondary btn-sm" onclick="togglePhotoReorderMode()">↕️ Reorder Photos</button>' : '') +
+        '</div><div class="detail-photos mb-16" id="photoReorderContainer">' + photos + '</div>' : '') +
       '<div class="detail-grid"><div class="card"><h3 style="margin-bottom:16px">Details</h3>' +
       df('Clay Body', p.clay_body_name||p.clay||p.studio) + '<div class="detail-field"><div class="detail-label">Glaze</div><div class="detail-value">' + ((p.glazes&&p.glazes.length) ? p.glazes.map(g => {
         let parts = [esc(g.glaze_name)];
@@ -3887,6 +3892,63 @@ async function editPhotoStage(photoId, currentStage, pieceId) {
 }
 async function reorderPhotos(pieceId, photoIds) {
   try { await api('/api/pieces/' + pieceId + '/photos/reorder', {method:'PUT', body:{photoIds}}); } catch(e) { toast(e.message,'error'); }
+}
+
+function togglePhotoReorderMode() {
+  window._reorderMode = !window._reorderMode;
+  const btn = document.getElementById('reorderPhotosBtn');
+  const container = document.getElementById('photoReorderContainer');
+  const wraps = container.querySelectorAll('.detail-photo-wrap');
+  const controls = container.querySelectorAll('.photo-controls');
+  
+  if (window._reorderMode) {
+    // Enter reorder mode
+    btn.textContent = '✓ Done';
+    btn.className = 'btn btn-primary btn-sm';
+    wraps.forEach(w => { w.draggable = true; w.style.cursor = 'grab'; });
+    controls.forEach(c => { c.style.display = 'none'; });
+    
+    // Setup drag handlers
+    let draggedElement = null;
+    
+    wraps.forEach(wrap => {
+      wrap.addEventListener('dragstart', function(e) {
+        draggedElement = this;
+        this.style.opacity = '0.5';
+        this.style.cursor = 'grabbing';
+      });
+      
+      wrap.addEventListener('dragend', function(e) {
+        this.style.opacity = '1';
+        this.style.cursor = 'grab';
+        draggedElement = null;
+      });
+      
+      wrap.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        if (draggedElement && draggedElement !== this) {
+          const rect = this.getBoundingClientRect();
+          const midpoint = rect.left + rect.width / 2;
+          if (e.clientX < midpoint) {
+            this.parentNode.insertBefore(draggedElement, this);
+          } else {
+            this.parentNode.insertBefore(draggedElement, this.nextSibling);
+          }
+        }
+      });
+    });
+  } else {
+    // Exit reorder mode and save
+    btn.textContent = '↕️ Reorder Photos';
+    btn.className = 'btn btn-secondary btn-sm';
+    wraps.forEach(w => { w.draggable = false; w.style.cursor = 'default'; });
+    controls.forEach(c => { c.style.display = 'flex'; });
+    
+    // Save new order
+    const photoIds = Array.from(wraps).map(w => w.getAttribute('data-photo-id'));
+    reorderPhotos(window._currentPieceId, photoIds);
+    toast('Photo order saved!', 'success');
+  }
 }
 async function deleteGlazePhoto(photoId) {
   if (!confirm('Delete this photo?')) return;
