@@ -442,6 +442,7 @@ function initDB() {
   safeAdd('users', 'plan_expires_at', 'TEXT');
   safeAdd('firing_logs', 'custom_speed_detail', 'TEXT');
   safeAdd('glaze_combos', 'photo_filename2', 'TEXT');
+  safeAdd('piece_photos', 'rotation', 'INTEGER DEFAULT 0');
   // Casualty tracking fields
   safeAdd('pieces', 'casualty_type', 'TEXT');
   safeAdd('pieces', 'casualty_notes', 'TEXT');

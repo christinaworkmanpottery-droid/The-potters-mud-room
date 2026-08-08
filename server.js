@@ -2211,6 +2211,17 @@ app.put('/api/photos/:id/stage', auth, (req, res) => {
   res.json({ success: true });
 });
 
+// Rotate piece photo
+app.put('/api/photos/:id/rotate', auth, (req, res) => {
+  const { clockwise } = req.body;
+  const ph = db.prepare('SELECT pp.* FROM piece_photos pp JOIN pieces p ON pp.piece_id=p.id WHERE pp.id=? AND p.user_id=?').get(req.params.id, req.userId);
+  if (!ph) return res.status(404).json({ error: 'Not found' });
+  const currentRotation = ph.rotation || 0;
+  const newRotation = clockwise ? (currentRotation + 90) % 360 : (currentRotation - 90 + 360) % 360;
+  db.prepare('UPDATE piece_photos SET rotation=? WHERE id=?').run(newRotation, req.params.id);
+  res.json({ success: true });
+});
+
 // ============ FIRING LOGS ============
 app.get('/api/firing-logs', auth, (req, res) => {
   const { sort } = req.query;

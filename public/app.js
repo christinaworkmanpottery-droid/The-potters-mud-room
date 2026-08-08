@@ -600,9 +600,11 @@ async function viewPiece(id) {
     navigate('pieceDetail');
     const photos = (p.photos||[]).map(ph =>
       '<div class="detail-photo-wrap" style="position:relative">' +
-      '<img class="detail-photo" src="/uploads/' + ph.filename + '" title="' + esc(ph.stage||'') + '" onclick="openLightbox(\'/uploads/' + ph.filename + '\')" style="cursor:zoom-in">' +
+      '<img class="detail-photo" src="/uploads/' + ph.filename + '" title="' + esc(ph.stage||'') + '" onclick="openLightbox(\'/uploads/' + ph.filename + '\')" style="cursor:zoom-in;transform:rotate(' + (ph.rotation||0) + 'deg)">' +
       '<span class="photo-stage-label">' + esc(ph.stage||'') + '</span>' +
       '<div style="position:absolute;top:4px;right:4px;display:flex;gap:2px">' +
+      '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();rotatePhoto(\'' + ph.id + '\',\'' + p.id + '\',false)" title="Rotate left">↶</button>' +
+      '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();rotatePhoto(\'' + ph.id + '\',\'' + p.id + '\',true)" title="Rotate right">↷</button>' +
       '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();editPhotoStage(\'' + ph.id + '\',\'' + esc(ph.stage||'') + '\',\'' + p.id + '\')" title="Edit stage">✏️</button>' +
       '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deletePhoto(\'' + ph.id + '\',\'' + p.id + '\')" title="Delete photo">🗑️</button>' +
       '</div></div>'
@@ -3872,6 +3874,9 @@ function closeLightbox() { document.getElementById('lightboxModal').style.displa
 async function deletePhoto(photoId, pieceId) {
   if (!confirm('Delete this photo?')) return;
   try { await api('/api/photos/' + photoId, {method:'DELETE'}); toast('Photo deleted','success'); viewPiece(pieceId); } catch(e) { toast(e.message,'error'); }
+}
+async function rotatePhoto(photoId, pieceId, clockwise) {
+  try { await api('/api/photos/' + photoId + '/rotate', {method:'PUT', body:{clockwise}}); viewPiece(pieceId); } catch(e) { toast(e.message,'error'); }
 }
 async function editPhotoStage(photoId, currentStage, pieceId) {
   const stage = prompt('Enter stage (wet, leather-hard, bone-dry, bisque, glazed, finished, detail, other):', currentStage);
