@@ -1756,9 +1756,21 @@ function casualtyCard(p) {
     '</div>';
 }
 
+let casualtiesFilter = null;
+
+function filterCasualties(filter) {
+  casualtiesFilter = filter;
+  loadCasualties();
+}
+
+function clearCasualtiesFilter() {
+  casualtiesFilter = null;
+  loadCasualties();
+}
+
 async function loadCasualties() {
   try {
-    const casualties = await api('/api/casualties');
+    const allCasualties = await api('/api/casualties');
     const c = document.getElementById('casualtyList'), em = document.getElementById('casualtyEmpty');
     const stats = document.getElementById('casualtyStats');
     
@@ -1766,21 +1778,33 @@ async function loadCasualties() {
     const bulkControls = document.getElementById('bulkControlsCasualties');
     if (bulkControls) bulkControls.innerHTML = renderBulkSelectionControls('casualties', 'casualty');
     
-    if (!casualties.length) { c.innerHTML=''; stats.innerHTML=''; em.classList.remove('hidden'); return; }
+    if (!allCasualties.length) { c.innerHTML=''; stats.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
 
-    // Stats summary
-    const broken = casualties.filter(p => p.status === 'broken').length;
-    const recycled = casualties.filter(p => p.status === 'recycled').length;
-    const typeCounts = {};
-    casualties.forEach(p => { if (p.casualty_type) typeCounts[p.casualty_type] = (typeCounts[p.casualty_type]||0) + 1; });
-    const topIssue = Object.entries(typeCounts).sort((a,b) => b[1]-a[1])[0];
-    stats.innerHTML = '<div class="stat-box"><div class="stat-number">' + casualties.length + '</div><div class="stat-label">Total Casualties</div></div>' +
-      '<div class="stat-box"><div class="stat-number">' + broken + '</div><div class="stat-label">Broken</div></div>' +
-      '<div class="stat-box"><div class="stat-number">' + recycled + '</div><div class="stat-label">Recycled</div></div>' +
-      (topIssue ? '<div class="stat-box"><div class="stat-number">⚠️</div><div class="stat-label">Top Issue: ' + esc(CASUALTY_LABELS[topIssue[0]]||topIssue[0]) + ' (' + topIssue[1] + ')</div></div>' : '');
+    // Apply filter if active
+    const casualties = casualtiesFilter ? allCasualties.filter(casualtiesFilter) : allCasualties;
 
-    c.innerHTML = casualties.map(p => casualtyCard(p)).join('');
+    // Stats summary with click handlers
+    const broken = allCasualties.filter(p => p.status === 'broken').length;
+    const recycled = allCasualties.filter(p => p.status === 'recycled').length;
+    const typeCounts = {};
+    allCasualties.forEach(p => { if (p.casualty_type) typeCounts[p.casualty_type] = (typeCounts[p.casualty_type]||0) + 1; });
+    const topIssue = Object.entries(typeCounts).sort((a,b) => b[1]-a[1])[0];
+    
+    const isFiltered = casualtiesFilter !== null;
+    const filterBanner = isFiltered ? '<div style="background:var(--primary-light);border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between"><span style="font-weight:600;color:var(--primary)">🔍 Filtered view</span><button class="btn btn-sm btn-secondary" onclick="clearCasualtiesFilter()">Show All</button></div>' : '';
+    
+    stats.innerHTML = filterBanner +
+      '<div class="stat-box" style="cursor:pointer" onclick="clearCasualtiesFilter()"><div class="stat-number">' + allCasualties.length + '</div><div class="stat-label">Total Casualties</div></div>' +
+      '<div class="stat-box" style="cursor:pointer" onclick="filterCasualties(p => p.status === \'broken\')"><div class="stat-number">' + broken + '</div><div class="stat-label">Broken</div></div>' +
+      '<div class="stat-box" style="cursor:pointer" onclick="filterCasualties(p => p.status === \'recycled\')"><div class="stat-number">' + recycled + '</div><div class="stat-label">Recycled</div></div>' +
+      (topIssue ? '<div class="stat-box" style="cursor:pointer" onclick="filterCasualties(p => p.casualty_type === \'' + topIssue[0] + '\')"><div class="stat-number">⚠️</div><div class="stat-label">Top Issue: ' + esc(CASUALTY_LABELS[topIssue[0]]||topIssue[0]) + ' (' + topIssue[1] + ')</div></div>' : '');
+
+    if (!casualties.length && isFiltered) {
+      c.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-title">No casualties match this filter</div></div>';
+    } else {
+      c.innerHTML = casualties.map(p => casualtyCard(p)).join('');
+    }
     updateBulkSelectionUI('casualties');
   } catch(e) { toast(e.message,'error'); }
 }
