@@ -1268,6 +1268,7 @@ async function saveGlaze(e) {
         await fetch('/api/glazes/' + savedId + '/photos', {method:'POST', headers:{Authorization:'Bearer '+token}, body:fd});
       } catch(pe) { console.warn('Glaze photo upload failed:', pe); }
     }
+    btn.disabled = false;
     closeModal('glazeModal'); loadGlazes();
   } catch(err) { toast(err.message,'error'); btn.disabled = false; }
 }
