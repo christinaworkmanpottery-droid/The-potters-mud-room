@@ -3894,10 +3894,16 @@ async function editPhotoStage(photoId, currentStage, pieceId) {
   try { await api('/api/photos/' + photoId + '/stage', {method:'PUT', body:{stage}}); toast('Stage updated','success'); viewPiece(pieceId); } catch(e) { toast(e.message,'error'); }
 }
 async function reorderPhotos(pieceId, photoIds) {
-  try { await api('/api/pieces/' + pieceId + '/photos/reorder', {method:'PUT', body:{photoIds}}); } catch(e) { toast(e.message,'error'); }
+  try {
+    await api('/api/pieces/' + pieceId + '/photos/reorder', {method:'PUT', body:{photoIds}});
+    return true;
+  } catch(e) {
+    toast(e.message,'error');
+    return false;
+  }
 }
 
-function togglePhotoReorderMode() {
+async function togglePhotoReorderMode() {
   window._reorderMode = !window._reorderMode;
   const btn = document.getElementById('reorderPhotosBtn');
   const container = document.getElementById('photoReorderContainer');
@@ -3908,13 +3914,67 @@ function togglePhotoReorderMode() {
     // Enter reorder mode
     btn.textContent = '✓ Done';
     btn.className = 'btn btn-primary btn-sm';
-    wraps.forEach(w => { w.draggable = true; w.style.cursor = 'grab'; });
     controls.forEach(c => { c.style.display = 'none'; });
+    container.style.userSelect = 'none';
+    container.style.webkitUserSelect = 'none';
+    container.style.webkitTouchCallout = 'none';
+
+    // HTML drag-and-drop is reliable with a mouse but not on iOS. Touch devices
+    // get explicit controls so Safari never owns a long-press/drag gesture.
+    const useMoveButtons = window.matchMedia && window.matchMedia('(hover: none), (pointer: coarse)').matches;
+
+    const updateMoveButtons = () => {
+      const current = Array.from(container.querySelectorAll('.detail-photo-wrap'));
+      current.forEach((wrap, index) => {
+        const previous = wrap.querySelector('.photo-move-previous');
+        const next = wrap.querySelector('.photo-move-next');
+        if (previous) previous.disabled = index === 0;
+        if (next) next.disabled = index === current.length - 1;
+      });
+    };
+
+    const movePhoto = (wrap, direction) => {
+      const sibling = direction < 0 ? wrap.previousElementSibling : wrap.nextElementSibling;
+      if (!sibling || !sibling.classList.contains('detail-photo-wrap')) return;
+      if (direction < 0) container.insertBefore(wrap, sibling);
+      else container.insertBefore(sibling, wrap);
+      updateMoveButtons();
+    };
     
     // Setup drag handlers
     let draggedElement = null;
     
     wraps.forEach(wrap => {
+      const image = wrap.querySelector('img');
+      wrap.draggable = !useMoveButtons;
+      wrap.style.cursor = useMoveButtons ? 'default' : 'grab';
+      wrap.style.userSelect = 'none';
+      wrap.style.webkitUserSelect = 'none';
+      wrap.style.webkitTouchCallout = 'none';
+      if (image) {
+        image.draggable = false;
+        image.style.userSelect = 'none';
+        image.style.webkitUserSelect = 'none';
+        image.style.webkitTouchCallout = 'none';
+      }
+
+      if (useMoveButtons) {
+        const moveControls = document.createElement('div');
+        moveControls.className = 'photo-reorder-controls';
+        moveControls.style.cssText = 'position:absolute;bottom:6px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:3';
+        moveControls.innerHTML =
+          '<button type="button" class="btn btn-primary btn-sm photo-move-previous" aria-label="Move photo left" title="Move photo left">←</button>' +
+          '<button type="button" class="btn btn-primary btn-sm photo-move-next" aria-label="Move photo right" title="Move photo right">→</button>';
+        moveControls.querySelector('.photo-move-previous').addEventListener('click', function(e) {
+          e.preventDefault(); e.stopPropagation(); movePhoto(wrap, -1);
+        });
+        moveControls.querySelector('.photo-move-next').addEventListener('click', function(e) {
+          e.preventDefault(); e.stopPropagation(); movePhoto(wrap, 1);
+        });
+        wrap.appendChild(moveControls);
+        return;
+      }
+
       wrap.addEventListener('dragstart', function(e) {
         window._blockLightbox = true;
         draggedElement = this;
@@ -3942,51 +4002,25 @@ function togglePhotoReorderMode() {
           }
         }
       });
-
-      // Touch equivalents (native HTML5 drag events don't fire on touch input)
-      wrap.addEventListener('touchstart', function(e) {
-        window._blockLightbox = true;
-        draggedElement = this;
-        this.style.opacity = '0.5';
-        this.style.cursor = 'grabbing';
-      }, { passive: true });
-
-      wrap.addEventListener('touchmove', function(e) {
-        if (!draggedElement) return;
-        e.preventDefault();
-        const touch = e.touches[0];
-        const target = document.elementFromPoint(touch.clientX, touch.clientY);
-        const targetWrap = target && target.closest ? target.closest('.detail-photo-wrap') : null;
-        if (targetWrap && targetWrap !== draggedElement && container.contains(targetWrap)) {
-          const rect = targetWrap.getBoundingClientRect();
-          const midpoint = rect.left + rect.width / 2;
-          if (touch.clientX < midpoint) {
-            targetWrap.parentNode.insertBefore(draggedElement, targetWrap);
-          } else {
-            targetWrap.parentNode.insertBefore(draggedElement, targetWrap.nextSibling);
-          }
-        }
-      }, { passive: false });
-
-      wrap.addEventListener('touchend', function(e) {
-        this.style.opacity = '1';
-        this.style.cursor = 'grab';
-        draggedElement = null;
-        setTimeout(() => { window._blockLightbox = false; }, 300);
-      });
     });
+    if (useMoveButtons) updateMoveButtons();
   } else {
     // Exit reorder mode and save
     btn.textContent = '↕️ Reorder Photos';
     btn.className = 'btn btn-secondary btn-sm';
     wraps.forEach(w => { w.draggable = false; w.style.cursor = 'default'; });
     controls.forEach(c => { c.style.display = 'flex'; });
+    container.querySelectorAll('.photo-reorder-controls').forEach(c => c.remove());
+    container.style.userSelect = '';
+    container.style.webkitUserSelect = '';
+    container.style.webkitTouchCallout = '';
     window._blockLightbox = false;
     
-    // Save new order
-    const photoIds = Array.from(wraps).map(w => w.getAttribute('data-photo-id'));
-    reorderPhotos(window._currentPieceId, photoIds);
-    toast('Photo order saved!', 'success');
+    // Read the live DOM order, not the original static NodeList captured above.
+    const photoIds = Array.from(container.querySelectorAll('.detail-photo-wrap')).map(w => w.getAttribute('data-photo-id'));
+    if (await reorderPhotos(window._currentPieceId, photoIds)) {
+      toast('Photo order saved!', 'success');
+    }
   }
 }
 async function deleteGlazePhoto(photoId) {
