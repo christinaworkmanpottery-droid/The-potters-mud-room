@@ -3874,6 +3874,7 @@ function getViewMode(section) { return localStorage.getItem('viewMode_' + sectio
 
 // Lightbox
 function openLightbox(src) {
+  if (window._reorderMode) return;
   document.getElementById('lightboxImg').src = src;
   document.getElementById('lightboxModal').style.display = 'flex';
 }
