@@ -603,7 +603,7 @@ async function viewPiece(id) {
     window._reorderMode = false;
     const photos = (p.photos||[]).map((ph, idx) =>
       '<div class="detail-photo-wrap" draggable="false" data-photo-id="' + ph.id + '" data-index="' + idx + '" style="position:relative">' +
-      '<img class="detail-photo" src="/uploads/' + ph.filename + '" title="' + esc(ph.stage||'') + '" onclick="if(!window._reorderMode&&!window._blockLightbox)openLightbox(\'/uploads/' + ph.filename + '\')" style="cursor:zoom-in;transform:rotate(' + (ph.rotation||0) + 'deg)">' +
+      '<img class="detail-photo" draggable="false" src="/uploads/' + ph.filename + '" title="' + esc(ph.stage||'') + '" onclick="if(!window._reorderMode&&!window._blockLightbox)openLightbox(\'/uploads/' + ph.filename + '\')" style="cursor:zoom-in;transform:rotate(' + (ph.rotation||0) + 'deg)">' +
       '<span class="photo-stage-label">' + esc(ph.stage||'') + '</span>' +
       '<div class="photo-controls" style="position:absolute;top:4px;right:4px;display:flex;gap:2px">' +
       '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();rotatePhoto(\'' + ph.id + '\',\'' + p.id + '\',false)" title="Rotate left">↶</button>' +
@@ -3941,6 +3941,38 @@ function togglePhotoReorderMode() {
             this.parentNode.insertBefore(draggedElement, this.nextSibling);
           }
         }
+      });
+
+      // Touch equivalents (native HTML5 drag events don't fire on touch input)
+      wrap.addEventListener('touchstart', function(e) {
+        window._blockLightbox = true;
+        draggedElement = this;
+        this.style.opacity = '0.5';
+        this.style.cursor = 'grabbing';
+      }, { passive: true });
+
+      wrap.addEventListener('touchmove', function(e) {
+        if (!draggedElement) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+        const targetWrap = target && target.closest ? target.closest('.detail-photo-wrap') : null;
+        if (targetWrap && targetWrap !== draggedElement && container.contains(targetWrap)) {
+          const rect = targetWrap.getBoundingClientRect();
+          const midpoint = rect.left + rect.width / 2;
+          if (touch.clientX < midpoint) {
+            targetWrap.parentNode.insertBefore(draggedElement, targetWrap);
+          } else {
+            targetWrap.parentNode.insertBefore(draggedElement, targetWrap.nextSibling);
+          }
+        }
+      }, { passive: false });
+
+      wrap.addEventListener('touchend', function(e) {
+        this.style.opacity = '1';
+        this.style.cursor = 'grab';
+        draggedElement = null;
+        setTimeout(() => { window._blockLightbox = false; }, 300);
       });
     });
   } else {
