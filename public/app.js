@@ -603,7 +603,7 @@ async function viewPiece(id) {
     window._reorderMode = false;
     const photos = (p.photos||[]).map((ph, idx) =>
       '<div class="detail-photo-wrap" draggable="false" data-photo-id="' + ph.id + '" data-index="' + idx + '" style="position:relative">' +
-      '<img class="detail-photo" src="/uploads/' + ph.filename + '" title="' + esc(ph.stage||'') + '" onclick="openLightbox(\'/uploads/' + ph.filename + '\')" style="cursor:zoom-in;transform:rotate(' + (ph.rotation||0) + 'deg)">' +
+      '<img class="detail-photo" src="/uploads/' + ph.filename + '" title="' + esc(ph.stage||'') + '" onclick="if(!window._reorderMode&&!window._blockLightbox)openLightbox(\'/uploads/' + ph.filename + '\')" style="cursor:zoom-in;transform:rotate(' + (ph.rotation||0) + 'deg)">' +
       '<span class="photo-stage-label">' + esc(ph.stage||'') + '</span>' +
       '<div class="photo-controls" style="position:absolute;top:4px;right:4px;display:flex;gap:2px">' +
       '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();rotatePhoto(\'' + ph.id + '\',\'' + p.id + '\',false)" title="Rotate left">↶</button>' +
@@ -768,6 +768,7 @@ function openPieceModal(p) {
   document.getElementById('pieceFiringCost').value = p?.firing_cost||'';
   document.getElementById('pieceLaborHours').value = p?.labor_hours||'';
   document.getElementById('pieceLaborRate').value = p?.labor_rate||'';
+  document.getElementById('pieceSalePrice').value = p?.sale_price||'';
   document.getElementById('pricingCalcPanel').style.display = 'none';
   updatePricingCalc();
   const ppf = document.getElementById('pieceInlinePhotoFile'); if (ppf) ppf.value = '';
@@ -813,6 +814,7 @@ async function savePiece(e) {
     firingCost: document.getElementById('pieceFiringCost').value||null,
     laborHours: document.getElementById('pieceLaborHours').value||null,
     laborRate: document.getElementById('pieceLaborRate').value||null,
+    salePrice: document.getElementById('pieceSalePrice').value||null,
     glazeIds: gIds,
     casualtyType: document.getElementById('pieceCasualtyType').value||null,
     casualtyNotes: document.getElementById('pieceCasualtyNotes').value||null,
@@ -3913,6 +3915,7 @@ function togglePhotoReorderMode() {
     
     wraps.forEach(wrap => {
       wrap.addEventListener('dragstart', function(e) {
+        window._blockLightbox = true;
         draggedElement = this;
         this.style.opacity = '0.5';
         this.style.cursor = 'grabbing';
@@ -3922,6 +3925,8 @@ function togglePhotoReorderMode() {
         this.style.opacity = '1';
         this.style.cursor = 'grab';
         draggedElement = null;
+        // Keep lightbox blocked for 300ms after drag ends to prevent click event from opening it
+        setTimeout(() => { window._blockLightbox = false; }, 300);
       });
       
       wrap.addEventListener('dragover', function(e) {
@@ -3943,6 +3948,7 @@ function togglePhotoReorderMode() {
     btn.className = 'btn btn-secondary btn-sm';
     wraps.forEach(w => { w.draggable = false; w.style.cursor = 'default'; });
     controls.forEach(c => { c.style.display = 'flex'; });
+    window._blockLightbox = false;
     
     // Save new order
     const photoIds = Array.from(wraps).map(w => w.getAttribute('data-photo-id'));

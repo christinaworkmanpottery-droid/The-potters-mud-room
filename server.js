@@ -1860,6 +1860,7 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
   const firingCost = body.firingCost || body.firing_cost || null;
   const laborHours = body.laborHours || body.labor_hours || null;
   const laborRate = body.laborRate || body.labor_rate || null;
+  const salePrice = body.salePrice || body.sale_price || null;
   const dateStarted = body.dateStarted || body.date_started || null;
   // Combine all text info into notes
   const firingTemp = String(body.firingTemp || body.firing_temp || '').trim();
@@ -1899,8 +1900,8 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
   // (e.g. NOT NULL on glaze_id) rolls back the piece insert too, instead of
   // leaving an orphaned Piece row behind.
   const insertPieceAndGlazes = db.transaction(() => {
-    db.prepare('INSERT INTO pieces (id,user_id,title,description,clay_body_id,studio,status,form,technique,dimensions,weight,material_cost,firing_cost,labor_hours,labor_rate,date_started,notes,casualty_type,casualty_notes,casualty_lesson) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-      .run(id, req.userId, title, description, clayBodyId, clayText, status || 'in-progress', form, technique, dimensions, weight, materialCost, firingCost, laborHours, laborRate, dateStarted, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null);
+    db.prepare('INSERT INTO pieces (id,user_id,title,description,clay_body_id,studio,status,form,technique,dimensions,weight,material_cost,firing_cost,labor_hours,labor_rate,sale_price,date_started,notes,casualty_type,casualty_notes,casualty_lesson) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(id, req.userId, title, description, clayBodyId, clayText, status || 'in-progress', form, technique, dimensions, weight, materialCost, firingCost, laborHours, laborRate, salePrice, dateStarted, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null);
     if (glazeIds?.length) {
       const ins = db.prepare('INSERT INTO piece_glazes (id,piece_id,glaze_id,custom_name,coats,application_method,layer_order) VALUES (?,?,?,?,?,?,?)');
       glazeIds.forEach((g, i) => ins.run(uuidv4(), id, g.glazeId || null, g.customName || null, g.coats || 1, g.method || null, i));
