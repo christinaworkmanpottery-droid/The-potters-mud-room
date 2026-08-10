@@ -158,6 +158,7 @@ function initDB() {
       application_method TEXT CHECK(application_method IN ('dip', 'brush', 'spray', 'pour', 'wax-resist', 'other', NULL)),
       layer_order INTEGER DEFAULT 0,
       notes TEXT,
+      custom_name TEXT DEFAULT NULL,
       FOREIGN KEY (piece_id) REFERENCES pieces(id) ON DELETE CASCADE,
       FOREIGN KEY (glaze_id) REFERENCES glazes(id) ON DELETE CASCADE
     );
@@ -552,6 +553,8 @@ function initDB() {
   try {
     const pieceGlazesSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='piece_glazes'").get();
     if (pieceGlazesSchema && pieceGlazesSchema.sql && /glaze_id\s+TEXT\s+NOT\s+NULL/i.test(pieceGlazesSchema.sql)) {
+      const hasCustomName = db.prepare("SELECT 1 FROM pragma_table_info('piece_glazes') WHERE name='custom_name'").get();
+      if (!hasCustomName) db.exec('ALTER TABLE piece_glazes ADD COLUMN custom_name TEXT DEFAULT NULL');
       const beforeCount = db.prepare('SELECT COUNT(*) as c FROM piece_glazes').get().c;
       const migratePieceGlazes = db.transaction(() => {
         db.exec(`

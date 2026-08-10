@@ -5240,7 +5240,7 @@ try {
   const done = db.prepare('SELECT 1 FROM migrations WHERE name=?').get('color_sig_hsl_v3');
   if (!done) {
     const cleared = db.prepare("UPDATE piece_photos SET avg_color = NULL WHERE avg_color IS NOT NULL").run();
-    db.prepare('INSERT INTO migrations (name, applied_at) VALUES (?, datetime("now"))').run('color_sig_hsl_v3');
+    db.prepare(`INSERT INTO migrations (name, applied_at) VALUES (?, datetime('now'))`).run('color_sig_hsl_v3');
     console.log(`[Photo Search] Migration color_sig_hsl_v3: cleared ${cleared.changes} color signatures for recompute`);
   }
 } catch(e) { console.warn('[Photo Search] Migration error:', e.message); }
@@ -5250,7 +5250,7 @@ try {
   const doneV4 = db.prepare('SELECT 1 FROM migrations WHERE name=?').get('color_sig_v4_hue_gate');
   if (!doneV4) {
     const cleared = db.prepare("UPDATE piece_photos SET avg_color = NULL WHERE avg_color IS NOT NULL").run();
-    db.prepare('INSERT INTO migrations (name, applied_at) VALUES (?, datetime("now"))').run('color_sig_v4_hue_gate');
+    db.prepare(`INSERT INTO migrations (name, applied_at) VALUES (?, datetime('now'))`).run('color_sig_v4_hue_gate');
     console.log(`[Photo Search] Migration color_sig_v4_hue_gate: cleared ${cleared.changes} color signatures for recompute with improved algorithm`);
   }
 } catch(e) { console.warn('[Photo Search] Migration v4 error:', e.message); }
@@ -5260,7 +5260,7 @@ try {
   const doneV5 = db.prepare('SELECT 1 FROM migrations WHERE name=?').get('color_sig_v5_force_nuke');
   if (!doneV5) {
     const cleared = db.prepare("UPDATE piece_photos SET avg_color = NULL WHERE avg_color IS NOT NULL").run();
-    db.prepare('INSERT INTO migrations (name, applied_at) VALUES (?, datetime("now"))').run('color_sig_v5_force_nuke');
+    db.prepare(`INSERT INTO migrations (name, applied_at) VALUES (?, datetime('now'))`).run('color_sig_v5_force_nuke');
     console.log(`[Photo Search] Migration color_sig_v5_force_nuke: cleared ${cleared.changes} color signatures`);
   }
 } catch(e) { console.warn('[Photo Search] Migration v5 error:', e.message); }
@@ -5271,7 +5271,7 @@ try {
   const doneV7 = db.prepare('SELECT 1 FROM migrations WHERE name=?').get('color_sig_v7_saturation_aware');
   if (!doneV7) {
     const cleared = db.prepare("UPDATE piece_photos SET avg_color = NULL WHERE avg_color IS NOT NULL").run();
-    db.prepare('INSERT INTO migrations (name, applied_at) VALUES (?, datetime("now"))').run('color_sig_v7_saturation_aware');
+    db.prepare(`INSERT INTO migrations (name, applied_at) VALUES (?, datetime('now'))`).run('color_sig_v7_saturation_aware');
     console.log(`[Photo Search] Migration color_sig_v7_saturation_aware: cleared ${cleared.changes} color signatures for recompute`);
   }
 } catch(e) { console.warn('[Photo Search] Migration v7 error:', e.message); }
@@ -5282,7 +5282,7 @@ try {
   const doneV9 = db.prepare('SELECT 1 FROM migrations WHERE name=?').get('color_sig_v9_kmeans');
   if (!doneV9) {
     const cleared = db.prepare("UPDATE piece_photos SET avg_color = NULL WHERE avg_color IS NOT NULL").run();
-    db.prepare('INSERT INTO migrations (name, applied_at) VALUES (?, datetime("now"))').run('color_sig_v9_kmeans');
+    db.prepare(`INSERT INTO migrations (name, applied_at) VALUES (?, datetime('now'))`).run('color_sig_v9_kmeans');
     console.log(`[Photo Search] Migration color_sig_v9_kmeans: cleared ${cleared.changes} color signatures — recomputing with k-means clustering`);
   }
 } catch(e) { console.warn('[Photo Search] Migration v9 error:', e.message); }
@@ -5293,7 +5293,7 @@ try {
   const doneV9b = db.prepare('SELECT 1 FROM migrations WHERE name=?').get('phash_v9b_dct');
   if (!doneV9b) {
     const cleared = db.prepare("UPDATE piece_photos SET phash = NULL WHERE phash IS NOT NULL").run();
-    db.prepare('INSERT INTO migrations (name, applied_at) VALUES (?, datetime("now"))').run('phash_v9b_dct');
+    db.prepare(`INSERT INTO migrations (name, applied_at) VALUES (?, datetime('now'))`).run('phash_v9b_dct');
     console.log(`[Photo Search] Migration phash_v9b_dct: cleared ${cleared.changes} phashes — recomputing with pHash (DCT)`);
   }
 } catch(e) { console.warn('[Photo Search] Migration v9b error:', e.message); }
