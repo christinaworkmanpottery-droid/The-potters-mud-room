@@ -110,6 +110,11 @@ body.nav-open { overflow: hidden; }
 .modal-close:hover { color: var(--text); }
 .modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); flex-shrink: 0; }
 
+/* iPhone decimal keyboards do not include a native Done key. */
+.numeric-keyboard-toolbar { position: fixed; left: 0; right: 0; z-index: 10000; display: none; justify-content: flex-end; align-items: center; min-height: 44px; padding: 5px 12px; background: #f7f7f7; border-top: 1px solid #c8c8c8; box-shadow: 0 -2px 8px rgba(0,0,0,0.12); }
+.numeric-keyboard-toolbar.visible { display: flex; }
+.numeric-keyboard-done { min-width: 72px; min-height: 34px; border: 0; background: transparent; color: #8f4d29; font: 700 1rem var(--font); text-align: right; cursor: pointer; }
+
 .auth-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; background: linear-gradient(135deg, var(--bg) 0%, var(--primary-light) 100%); }
 .auth-card { background: var(--bg-card); border-radius: var(--radius-lg); padding: 40px; width: 100%; max-width: 420px; box-shadow: var(--shadow-lg); text-align: center; }
 .auth-logo { font-size: 3.5rem; margin-bottom: 8px; }

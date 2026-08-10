@@ -200,6 +200,64 @@ function fmtStatus(s) { return s ? '<span class="status-badge status-' + s + '">
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
+// iOS decimal keyboards have no native Done key. Give every numeric field a
+// consistent way to dismiss the keyboard so form buttons remain reachable.
+function initNumericKeyboardDismissal() {
+  const toolbar = document.createElement('div');
+  toolbar.className = 'numeric-keyboard-toolbar';
+  toolbar.setAttribute('role', 'toolbar');
+  toolbar.setAttribute('aria-label', 'Number keyboard controls');
+  toolbar.innerHTML = '<button type="button" class="numeric-keyboard-done">Done</button>';
+  document.body.appendChild(toolbar);
+
+  const positionToolbar = () => {
+    if (!toolbar.classList.contains('visible')) return;
+    const viewport = window.visualViewport;
+    const bottom = viewport ? viewport.offsetTop + viewport.height : window.innerHeight;
+    toolbar.style.top = Math.max(0, bottom - toolbar.offsetHeight) + 'px';
+  };
+  const showToolbar = () => {
+    toolbar.classList.add('visible');
+    positionToolbar();
+  };
+  const hideToolbar = () => {
+    toolbar.classList.remove('visible');
+    toolbar.style.top = '';
+  };
+  const dismissNumericKeyboard = () => {
+    if (document.activeElement?.matches('input[type="number"]')) document.activeElement.blur();
+    hideToolbar();
+  };
+
+  document.addEventListener('focusin', event => {
+    if (event.target.matches('input[type="number"]')) showToolbar();
+  });
+  document.addEventListener('focusout', event => {
+    if (event.target.matches('input[type="number"]')) setTimeout(() => {
+      if (!document.activeElement?.matches('input[type="number"]')) hideToolbar();
+    }, 0);
+  });
+  document.addEventListener('pointerdown', event => {
+    if (document.activeElement?.matches('input[type="number"]') &&
+        !event.target.matches('input[type="number"]') &&
+        !toolbar.contains(event.target)) {
+      dismissNumericKeyboard();
+    }
+  });
+  toolbar.querySelector('button').addEventListener('pointerdown', event => {
+    event.preventDefault();
+    dismissNumericKeyboard();
+  });
+  window.visualViewport?.addEventListener('resize', positionToolbar);
+  window.visualViewport?.addEventListener('scroll', positionToolbar);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initNumericKeyboardDismissal);
+} else {
+  initNumericKeyboardDismissal();
+}
+
 function showMemberGroup(filter) {
   const m = window._adminMembers || [];
   let filtered = m;
