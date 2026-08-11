@@ -1498,18 +1498,18 @@ app.get('/api/clay-bodies/:id', auth, (req, res) => {
 });
 
 app.post('/api/clay-bodies', auth, (req, res) => {
-  const { name, brand, colorWet, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, costPerBag, bagWeight, source, sourceUrl, inStock, buyUrl, notes } = req.body;
+  const { name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, costPerBag, bagWeight, source, sourceUrl, inStock, buyUrl, notes } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });
   const id = uuidv4();
-  db.prepare('INSERT INTO clay_bodies (id,user_id,name,brand,color_wet,color_fired,shrinkage_pct,absorption_pct,cone_range,clay_type,cost_per_bag,bag_weight,source,source_url,in_stock,buy_url,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-    .run(id, req.userId, name, brand, colorWet, colorFired, shrinkagePct, absorptionPct||null, coneRange, clayType, costPerBag, bagWeight, source||null, sourceUrl||null, inStock!==undefined?(inStock?1:0):1, buyUrl||null, notes);
+  db.prepare('INSERT INTO clay_bodies (id,user_id,name,brand,color_wet,color_dry,color_fired,shrinkage_pct,absorption_pct,cone_range,clay_type,cost_per_bag,bag_weight,source,source_url,in_stock,buy_url,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .run(id, req.userId, name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct||null, coneRange, clayType, costPerBag, bagWeight, source||null, sourceUrl||null, inStock!==undefined?(inStock?1:0):1, buyUrl||null, notes);
   res.json({ id, name });
 });
 
 app.put('/api/clay-bodies/:id', auth, (req, res) => {
-  const { name, brand, colorWet, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, costPerBag, bagWeight, source, sourceUrl, inStock, buyUrl, notes } = req.body;
-  const r = db.prepare(`UPDATE clay_bodies SET name=?,brand=?,color_wet=?,color_fired=?,shrinkage_pct=?,absorption_pct=?,cone_range=?,clay_type=?,cost_per_bag=?,bag_weight=?,source=?,source_url=?,in_stock=?,buy_url=?,notes=?,updated_at=datetime('now') WHERE id=? AND user_id=?`)
-    .run(name, brand, colorWet, colorFired, shrinkagePct, absorptionPct||null, coneRange, clayType, costPerBag, bagWeight, source||null, sourceUrl||null, inStock!==undefined?(inStock?1:0):1, buyUrl||null, notes, req.params.id, req.userId);
+  const { name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, costPerBag, bagWeight, source, sourceUrl, inStock, buyUrl, notes } = req.body;
+  const r = db.prepare(`UPDATE clay_bodies SET name=?,brand=?,color_wet=?,color_dry=?,color_fired=?,shrinkage_pct=?,absorption_pct=?,cone_range=?,clay_type=?,cost_per_bag=?,bag_weight=?,source=?,source_url=?,in_stock=?,buy_url=?,notes=?,updated_at=datetime('now') WHERE id=? AND user_id=?`)
+    .run(name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct||null, coneRange, clayType, costPerBag, bagWeight, source||null, sourceUrl||null, inStock!==undefined?(inStock?1:0):1, buyUrl||null, notes, req.params.id, req.userId);
   if (r.changes === 0) return res.status(404).json({ error: 'Not found' });
   res.json({ success: true });
 });
@@ -1529,12 +1529,15 @@ app.post('/api/clay-bodies/:id/photos', auth, upload.single('photo'), (req, res)
   if (!req.file) return res.status(400).json({ error: 'No photo' });
   const maxPhotos = (req.userTier === 'free') ? 1 : 3;
   const existing = db.prepare('SELECT * FROM clay_photos WHERE clay_id=? ORDER BY sort_order').all(req.params.id);
-  // If at max, replace the oldest photo instead of rejecting
-  if (existing.length >= maxPhotos) {
-    const oldest = existing[0];
-    const oldFile = path.join(UPLOADS_DIR, oldest.filename);
-    if (fs.existsSync(oldFile)) fs.unlinkSync(oldFile);
-    db.prepare('DELETE FROM clay_photos WHERE id=?').run(oldest.id);
+  // An edit explicitly replaces the current Clay photo. New Clay photos and
+  // additional paid-tier photos retain the existing max-photo behavior.
+  if (req.body.replace === 'true' || existing.length >= maxPhotos) {
+    const photosToDelete = req.body.replace === 'true' ? existing : [existing[0]];
+    photosToDelete.forEach(photo => {
+      const oldFile = path.join(UPLOADS_DIR, photo.filename);
+      if (fs.existsSync(oldFile)) fs.unlinkSync(oldFile);
+      db.prepare('DELETE FROM clay_photos WHERE id=?').run(photo.id);
+    });
   }
   const count = db.prepare('SELECT COUNT(*) as c FROM clay_photos WHERE clay_id=?').get(req.params.id).c;
   const id = uuidv4();

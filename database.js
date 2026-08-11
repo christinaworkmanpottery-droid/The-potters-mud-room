@@ -451,6 +451,7 @@ function initDB() {
 
   // Part 1 revamp — new fields for clays
   safeAdd('clay_bodies', 'absorption_pct', 'REAL');
+  safeAdd('clay_bodies', 'color_dry', 'TEXT');
   safeAdd('clay_bodies', 'source', 'TEXT');
   safeAdd('clay_bodies', 'source_url', 'TEXT');
   safeAdd('clay_bodies', 'in_stock', 'INTEGER DEFAULT 1');
