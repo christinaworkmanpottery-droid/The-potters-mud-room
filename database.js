@@ -153,7 +153,7 @@ function initDB() {
     CREATE TABLE IF NOT EXISTS piece_glazes (
       id TEXT PRIMARY KEY,
       piece_id TEXT NOT NULL,
-      glaze_id TEXT NOT NULL,
+      glaze_id TEXT,
       coats INTEGER DEFAULT 1,
       application_method TEXT CHECK(application_method IN ('dip', 'brush', 'spray', 'pour', 'wax-resist', 'other', NULL)),
       layer_order INTEGER DEFAULT 0,

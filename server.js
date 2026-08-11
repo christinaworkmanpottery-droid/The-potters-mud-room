@@ -58,6 +58,34 @@ try { db.exec("ALTER TABLE pieces ADD COLUMN labor_hours REAL DEFAULT NULL"); } 
 try { db.exec("ALTER TABLE pieces ADD COLUMN labor_rate REAL DEFAULT NULL"); } catch(e) {}
 try { db.exec("ALTER TABLE users ADD COLUMN default_labor_rate REAL DEFAULT NULL"); } catch(e) {}
 try { db.exec("ALTER TABLE piece_glazes ADD COLUMN custom_name TEXT DEFAULT NULL"); } catch(e) {}
+// Custom typed glazes have no library glaze_id. Older databases created the
+// relationship column as NOT NULL, which rolled back piece saves containing
+// a custom glaze. Rebuild only that table when the old constraint is present.
+try {
+  const glazeIdColumn = db.prepare('PRAGMA table_info(piece_glazes)').all().find(c => c.name === 'glaze_id');
+  if (glazeIdColumn?.notnull) {
+    db.transaction(() => {
+      db.exec(`
+        CREATE TABLE piece_glazes_migrated (
+          id TEXT PRIMARY KEY,
+          piece_id TEXT NOT NULL,
+          glaze_id TEXT,
+          coats INTEGER DEFAULT 1,
+          application_method TEXT CHECK(application_method IN ('dip', 'brush', 'spray', 'pour', 'wax-resist', 'other', NULL)),
+          layer_order INTEGER DEFAULT 0,
+          notes TEXT,
+          custom_name TEXT DEFAULT NULL,
+          FOREIGN KEY (piece_id) REFERENCES pieces(id) ON DELETE CASCADE,
+          FOREIGN KEY (glaze_id) REFERENCES glazes(id) ON DELETE CASCADE
+        );
+        INSERT INTO piece_glazes_migrated (id,piece_id,glaze_id,coats,application_method,layer_order,notes,custom_name)
+          SELECT id,piece_id,glaze_id,coats,application_method,layer_order,notes,custom_name FROM piece_glazes;
+        DROP TABLE piece_glazes;
+        ALTER TABLE piece_glazes_migrated RENAME TO piece_glazes;
+      `);
+    })();
+  }
+} catch(e) { console.error('⚠️  Could not migrate custom piece glaze support:', e.message); }
 // Nodemailer setup for newsletter emails
 let transporter = null;
 function setupTransporter(user, pass, host, port) {
