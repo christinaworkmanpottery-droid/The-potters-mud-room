@@ -2062,6 +2062,11 @@ app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
 });
 
 app.delete('/api/pieces/:id', auth, (req, res) => {
+  // Treat repeated deletes as successful so stale app screens do not show
+  // an error after the piece was already removed.
+  const piece = db.prepare('SELECT id FROM pieces WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!piece) return res.json({ success: true });
+
   const photos = db.prepare('SELECT filename FROM piece_photos WHERE piece_id=?').all(req.params.id);
   photos.forEach(p => { const f = path.join(UPLOADS_DIR, p.filename); if (fs.existsSync(f)) fs.unlinkSync(f); });
   db.prepare('DELETE FROM piece_photos WHERE piece_id=?').run(req.params.id);
