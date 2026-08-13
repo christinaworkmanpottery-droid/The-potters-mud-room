@@ -1,14 +1,11 @@
-const { Pool } = require('pg');
+const Database = require('better-sqlite3');
 const fs = require('fs');
 const path = require('path');
 
-// Database connection
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes('localhost') ? false : { rejectUnauthorized: false }
-});
+// Database connection (SQLite)
+const DB_PATH = path.join(__dirname, 'data', 'pottery.db');
 
-async function runMigration(filename) {
+function runMigration(filename) {
   const migrationPath = path.join(__dirname, 'migrations', filename);
   
   if (!fs.existsSync(migrationPath)) {
@@ -19,15 +16,17 @@ async function runMigration(filename) {
   const sql = fs.readFileSync(migrationPath, 'utf8');
   
   console.log(`Running migration: ${filename}`);
+  console.log(`Database: ${DB_PATH}`);
   
   try {
-    await pool.query(sql);
+    const db = new Database(DB_PATH);
+    db.exec(sql);
+    db.close();
     console.log('✓ Migration completed successfully');
   } catch (error) {
     console.error('✗ Migration failed:', error.message);
-    throw error;
-  } finally {
-    await pool.end();
+    console.error(error.stack);
+    process.exit(1);
   }
 }
 
