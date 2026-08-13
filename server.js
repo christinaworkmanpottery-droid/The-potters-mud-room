@@ -4658,6 +4658,36 @@ app.use((err, req, res, next) => {
   }
 });
 
+// Admin endpoint to run database migrations
+app.post('/api/admin/run-migration', (req, res) => {
+  // Require admin API key
+  const adminKey = req.headers['x-admin-key'];
+  if (!adminKey || adminKey !== ADMIN_API_KEY) {
+    return res.status(403).json({ error: 'Admin key required' });
+  }
+
+  const { filename } = req.body;
+  if (!filename) {
+    return res.status(400).json({ error: 'Migration filename required' });
+  }
+
+  const migrationPath = path.join(__dirname, 'migrations', filename);
+  
+  if (!fs.existsSync(migrationPath)) {
+    return res.status(404).json({ error: `Migration file not found: ${filename}` });
+  }
+
+  try {
+    const sql = fs.readFileSync(migrationPath, 'utf8');
+    db.exec(sql);
+    console.log(`✓ Migration completed: ${filename}`);
+    res.json({ success: true, message: `Migration ${filename} completed successfully` });
+  } catch (error) {
+    console.error(`✗ Migration failed: ${filename}`, error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/ai/usage', auth, (req, res) => {
   const monthStart = new Date();
   monthStart.setDate(1);
