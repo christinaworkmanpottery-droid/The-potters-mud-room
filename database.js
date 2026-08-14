@@ -1073,12 +1073,6 @@ function initDB() {
     }
   } catch(e) { console.warn('[migration] firing_logs lustre migration:', e.message); }
 
-  // One-time cleanup: remove ghost "Untitled" pieces with no real data (from iOS FormData bug)
-  try {
-    const deleted = db.prepare("DELETE FROM pieces WHERE (title IS NULL OR title = '' OR title = 'Untitled Piece') AND (description IS NULL OR description = '') AND (notes IS NULL OR notes = '')").run();
-    if (deleted.changes > 0) console.log(`[cleanup] Removed ${deleted.changes} ghost untitled pieces`);
-  } catch(e) { /* ignore */ }
-
   // Backfill: retroactive announcement from 2026-05-08
   try {
     db.prepare(`INSERT OR IGNORE INTO email_sends (id, type, subject, sent_at, sent_by, recipients_count, blog_post_id)
@@ -1158,7 +1152,7 @@ function initDB() {
       application_method TEXT CHECK(application_method IN ('dip', 'brush', 'spray', 'pour', 'other', NULL)),
       coats INTEGER DEFAULT 1,
       thickness TEXT CHECK(thickness IN ('thin', 'medium', 'thick', NULL)),
-      surface_result TEXT CHECK(surface_result IN ('gloss', 'satin', 'matte', 'crystal', 'metallic', 'other', NULL)),
+      surface_result TEXT CHECK(surface_result IN ('gloss', 'satin', 'matte', 'crystal', 'metallic', 'underglaze', 'other', NULL)),
       color_result TEXT,
       layered_over TEXT,
       layered_under TEXT,
@@ -1180,6 +1174,77 @@ function initDB() {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_test_tiles_user ON test_tiles(user_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_test_tiles_glaze ON test_tiles(glaze_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_test_tiles_clay ON test_tiles(clay_body_id)`);
+
+  // Existing databases created before the Underglaze option need a safe table
+  // rebuild because SQLite cannot alter a CHECK constraint in place. Explicit
+  // columns prevent future schema additions from shifting or erasing data.
+  try {
+    const testTilesSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='test_tiles'").get();
+    if (testTilesSchema && !/surface_result[^)]*underglaze/i.test(testTilesSchema.sql)) {
+      const staleMigrationTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='test_tiles_new'").get();
+      if (staleMigrationTable) {
+        throw new Error('test_tiles_new already exists; refusing to overwrite possible recovery data');
+      }
+      const migrateTestTiles = db.transaction(() => {
+        db.exec(`
+          CREATE TABLE test_tiles_new (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            name TEXT,
+            glaze_id TEXT,
+            glaze_name TEXT,
+            clay_body_id TEXT,
+            clay_name TEXT,
+            cone TEXT,
+            atmosphere TEXT CHECK(atmosphere IN ('oxidation', 'reduction', 'neutral', NULL)),
+            application_method TEXT CHECK(application_method IN ('dip', 'brush', 'spray', 'pour', 'other', NULL)),
+            coats INTEGER DEFAULT 1,
+            thickness TEXT CHECK(thickness IN ('thin', 'medium', 'thick', NULL)),
+            surface_result TEXT CHECK(surface_result IN ('gloss', 'satin', 'matte', 'crystal', 'metallic', 'underglaze', 'other', NULL)),
+            color_result TEXT,
+            layered_over TEXT,
+            layered_under TEXT,
+            kiln_position TEXT,
+            firing_schedule TEXT,
+            photo_filename TEXT,
+            photo_filename2 TEXT,
+            photo_filename3 TEXT,
+            notes TEXT,
+            rating INTEGER CHECK(rating BETWEEN 1 AND 5 OR rating IS NULL),
+            tags TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (glaze_id) REFERENCES glazes(id) ON DELETE SET NULL,
+            FOREIGN KEY (clay_body_id) REFERENCES clay_bodies(id) ON DELETE SET NULL
+          );
+          INSERT INTO test_tiles_new (
+            id, user_id, name, glaze_id, glaze_name, clay_body_id, clay_name,
+            cone, atmosphere, application_method, coats, thickness, surface_result,
+            color_result, layered_over, layered_under, kiln_position, firing_schedule,
+            photo_filename, photo_filename2, photo_filename3, notes, rating, tags,
+            created_at, updated_at
+          ) SELECT
+            id, user_id, name, glaze_id, glaze_name, clay_body_id, clay_name,
+            cone, atmosphere, application_method, coats, thickness, surface_result,
+            color_result, layered_over, layered_under, kiln_position, firing_schedule,
+            photo_filename, photo_filename2, photo_filename3, notes, rating, tags,
+            created_at, updated_at
+          FROM test_tiles;
+          DROP TABLE test_tiles;
+          ALTER TABLE test_tiles_new RENAME TO test_tiles;
+          CREATE INDEX idx_test_tiles_user ON test_tiles(user_id);
+          CREATE INDEX idx_test_tiles_glaze ON test_tiles(glaze_id);
+          CREATE INDEX idx_test_tiles_clay ON test_tiles(clay_body_id);
+        `);
+      });
+      migrateTestTiles();
+      console.log('[migration] Test tiles surface_result now accepts underglaze');
+    }
+  } catch (e) {
+    console.error('[migration] Test tiles schema migration failed:', e.message);
+    throw e;
+  }
 
   // IAP purchases table (native Apple/Google subscriptions)
   db.exec(`

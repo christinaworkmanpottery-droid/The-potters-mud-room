@@ -4680,9 +4680,18 @@ app.post('/api/admin/run-migration', (req, res) => {
   try {
     const sql = fs.readFileSync(migrationPath, 'utf8');
     db.exec(sql);
+    // A failed script after BEGIN must never leave the shared connection
+    // serving a temporary, half-rebuilt schema until the next restart.
+    if (db.inTransaction) {
+      db.exec('ROLLBACK');
+      throw new Error('Migration did not commit; transaction was rolled back');
+    }
     console.log(`✓ Migration completed: ${filename}`);
     res.json({ success: true, message: `Migration ${filename} completed successfully` });
   } catch (error) {
+    if (db.inTransaction) {
+      try { db.exec('ROLLBACK'); } catch (rollbackError) { console.error('✗ Migration rollback failed:', rollbackError.message); }
+    }
     console.error(`✗ Migration failed: ${filename}`, error);
     res.status(500).json({ error: error.message });
   }
@@ -5641,10 +5650,24 @@ app.post('/api/test-tiles', auth, requireTier('starter'), upload.array('photos',
     if (glaze) finalGlazeName = glaze.name;
   }
 
-  db.prepare(`INSERT INTO test_tiles (id, user_id, name, glaze_id, glaze_name, clay_body_id, clay_name, cone, atmosphere, application_method, coats, thickness, surface_result, color_result, layered_over, layered_under, kiln_position, firing_schedule, photo_filename, photo_filename2, photo_filename3, notes, rating, tags)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(id, req.userId, name || null, glaze_id || null, finalGlazeName, clay_body_id || null, finalClayName, cone || null, atmosphere || null, application_method || null, coats ? parseInt(coats) : 1, thickness || null, surface_result || null, color_result || null, layered_over || null, layered_under || null, kiln_position || null, firing_schedule || null, photo_filename, photo_filename2, photo_filename3, notes || null, rating ? parseInt(rating) : null, tags || null);
+  try {
+    db.prepare(`INSERT INTO test_tiles (id, user_id, name, glaze_id, glaze_name, clay_body_id, clay_name, cone, atmosphere, application_method, coats, thickness, surface_result, color_result, layered_over, layered_under, kiln_position, firing_schedule, photo_filename, photo_filename2, photo_filename3, notes, rating, tags)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(id, req.userId, name || null, glaze_id || null, finalGlazeName, clay_body_id || null, finalClayName, cone || null, atmosphere || null, application_method || null, coats ? parseInt(coats) : 1, thickness || null, surface_result || null, color_result || null, layered_over || null, layered_under || null, kiln_position || null, firing_schedule || null, photo_filename, photo_filename2, photo_filename3, notes || null, rating ? parseInt(rating) : null, tags || null);
+  } catch (error) {
+    photos.forEach(photo => {
+      if (photo?.path && fs.existsSync(photo.path)) fs.unlinkSync(photo.path);
+    });
+    console.error('[Test Tiles] Create failed', {
+      userId: req.userId,
+      surfaceResult: surface_result || null,
+      photoCount: photos.length,
+      error: error.message,
+    });
+    return res.status(500).json({ error: 'Could not save test tile. Please try again.' });
+  }
   
+  console.log('[Test Tiles] Created', { userId: req.userId, tileId: id, photoCount: photos.length });
   res.json({ id, name: name || null, glaze_name: finalGlazeName, clay_name: finalClayName });
 });
 
@@ -5660,20 +5683,19 @@ app.put('/api/test-tiles/:id', auth, requireTier('starter'), upload.array('photo
   let photo_filename2 = tile.photo_filename2;
   let photo_filename3 = tile.photo_filename3;
   
-  // Handle photo removals
+  // Defer physical deletion until the database update succeeds. A failed save
+  // must not erase an existing member photo while its row still references it.
+  const photosToDelete = [];
   if (remove_photo === 'true' && tile.photo_filename) {
-    const f = path.join(UPLOADS_DIR, tile.photo_filename);
-    if (fs.existsSync(f)) fs.unlinkSync(f);
+    photosToDelete.push(path.join(UPLOADS_DIR, tile.photo_filename));
     photo_filename = null;
   }
   if (remove_photo2 === 'true' && tile.photo_filename2) {
-    const f = path.join(UPLOADS_DIR, tile.photo_filename2);
-    if (fs.existsSync(f)) fs.unlinkSync(f);
+    photosToDelete.push(path.join(UPLOADS_DIR, tile.photo_filename2));
     photo_filename2 = null;
   }
   if (remove_photo3 === 'true' && tile.photo_filename3) {
-    const f = path.join(UPLOADS_DIR, tile.photo_filename3);
-    if (fs.existsSync(f)) fs.unlinkSync(f);
+    photosToDelete.push(path.join(UPLOADS_DIR, tile.photo_filename3));
     photo_filename3 = null;
   }
   
@@ -5696,9 +5718,27 @@ app.put('/api/test-tiles/:id', auth, requireTier('starter'), upload.array('photo
     if (glaze) finalGlazeName = glaze.name;
   }
 
-  db.prepare(`UPDATE test_tiles SET name=?, glaze_id=?, glaze_name=?, clay_body_id=?, clay_name=?, cone=?, atmosphere=?, application_method=?, coats=?, thickness=?, surface_result=?, color_result=?, layered_over=?, layered_under=?, kiln_position=?, firing_schedule=?, photo_filename=?, photo_filename2=?, photo_filename3=?, notes=?, rating=?, tags=?, updated_at=datetime('now') WHERE id=? AND user_id=?`)
-    .run(name !== undefined ? name : tile.name, glaze_id || tile.glaze_id, finalGlazeName, clay_body_id || tile.clay_body_id, finalClayName, cone !== undefined ? cone : tile.cone, atmosphere !== undefined ? atmosphere : tile.atmosphere, application_method !== undefined ? application_method : tile.application_method, coats ? parseInt(coats) : tile.coats, thickness !== undefined ? thickness : tile.thickness, surface_result !== undefined ? surface_result : tile.surface_result, color_result !== undefined ? color_result : tile.color_result, layered_over !== undefined ? layered_over : tile.layered_over, layered_under !== undefined ? layered_under : tile.layered_under, kiln_position !== undefined ? kiln_position : tile.kiln_position, firing_schedule !== undefined ? firing_schedule : tile.firing_schedule, photo_filename, photo_filename2, photo_filename3, notes !== undefined ? notes : tile.notes, rating ? parseInt(rating) : tile.rating, tags !== undefined ? tags : tile.tags, req.params.id, req.userId);
-  
+  try {
+    db.prepare(`UPDATE test_tiles SET name=?, glaze_id=?, glaze_name=?, clay_body_id=?, clay_name=?, cone=?, atmosphere=?, application_method=?, coats=?, thickness=?, surface_result=?, color_result=?, layered_over=?, layered_under=?, kiln_position=?, firing_schedule=?, photo_filename=?, photo_filename2=?, photo_filename3=?, notes=?, rating=?, tags=?, updated_at=datetime('now') WHERE id=? AND user_id=?`)
+      .run(name !== undefined ? name : tile.name, glaze_id || tile.glaze_id, finalGlazeName, clay_body_id || tile.clay_body_id, finalClayName, cone !== undefined ? cone : tile.cone, atmosphere !== undefined ? atmosphere : tile.atmosphere, application_method !== undefined ? application_method : tile.application_method, coats ? parseInt(coats) : tile.coats, thickness !== undefined ? thickness : tile.thickness, surface_result !== undefined ? surface_result : tile.surface_result, color_result !== undefined ? color_result : tile.color_result, layered_over !== undefined ? layered_over : tile.layered_over, layered_under !== undefined ? layered_under : tile.layered_under, kiln_position !== undefined ? kiln_position : tile.kiln_position, firing_schedule !== undefined ? firing_schedule : tile.firing_schedule, photo_filename, photo_filename2, photo_filename3, notes !== undefined ? notes : tile.notes, rating ? parseInt(rating) : tile.rating, tags !== undefined ? tags : tile.tags, req.params.id, req.userId);
+  } catch (error) {
+    photos.forEach(photo => {
+      if (photo?.path && fs.existsSync(photo.path)) fs.unlinkSync(photo.path);
+    });
+    console.error('[Test Tiles] Update failed', {
+      userId: req.userId,
+      tileId: req.params.id,
+      surfaceResult: surface_result !== undefined ? surface_result : tile.surface_result,
+      photoCount: photos.length,
+      error: error.message,
+    });
+    return res.status(500).json({ error: 'Could not update test tile. Your existing tile was not changed.' });
+  }
+
+  photosToDelete.forEach(photoPath => {
+    if (fs.existsSync(photoPath)) fs.unlinkSync(photoPath);
+  });
+  console.log('[Test Tiles] Updated', { userId: req.userId, tileId: req.params.id, photoCount: photos.length });
   res.json({ success: true });
 });
 
