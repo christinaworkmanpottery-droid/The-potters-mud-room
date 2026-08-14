@@ -1498,10 +1498,13 @@ async function saveTestTile(e) {
     const f = document.getElementById(fid)?.files[0]; if (f) fd.append('photos', f);
   });
   try {
-    if (id) { await fetch('/api/test-tiles/' + id, {method:'PUT', headers:{Authorization:'Bearer '+token}, body:fd}); toast('Test tile updated! ✓','success'); }
-    else { await fetch('/api/test-tiles', {method:'POST', headers:{Authorization:'Bearer '+token}, body:fd}); toast('Test tile saved! ✓','success'); }
+    let resp;
+    if (id) { resp = await fetch('/api/test-tiles/' + id, {method:'PUT', headers:{Authorization:'Bearer '+token}, body:fd}); }
+    else { resp = await fetch('/api/test-tiles', {method:'POST', headers:{Authorization:'Bearer '+token}, body:fd}); }
+    if (!resp.ok) { const err = await resp.json(); throw new Error(err.error || 'Save failed'); }
+    toast(id ? 'Test tile updated! ✓' : 'Test tile saved! ✓','success');
     closeModal('testTileModal'); loadTestTiles();
-  } catch(err) { toast(err.message || 'Save failed','error'); btn.disabled = false; }
+  } catch(err) { toast(err.message || 'Save failed','error'); } finally { btn.disabled = false; }
 }
 
 async function deleteTestTile(id) {
