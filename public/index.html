@@ -186,6 +186,9 @@
       y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
     })(window, document, "clarity", "script", "CLARITY_ID");
   </script>
+  <!-- Cropper.js for photo editing -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" integrity="sha512-UtLOu9C7NuThQhuXXrGwx9Jb/z9zPQJctuAgNUBK3Z6kkSYT9wJ+2+dh6klS+TDBCV9kNPBbAxbVD+vCcfgPNA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js" integrity="sha512-JyCZjCOZoyeQZSd5+YEAcFgz2fowJ1F1hyJOXgtKu4llIa0KneLcidn5bONlcuLn0FQWQGJV3YCKgqWECVPiHg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body>
 
@@ -2803,6 +2806,25 @@
 <div id="lightboxModal" class="modal-overlay" onclick="closeLightbox()" style="background:rgba(0,0,0,0.9);display:none;z-index:2000;cursor:zoom-out">
   <img id="lightboxImg" src="" style="max-width:95%;max-height:95%;object-fit:contain;margin:auto" onclick="event.stopPropagation()">
   <button style="position:absolute;top:16px;right:20px;background:none;border:none;color:white;font-size:2rem;cursor:pointer" onclick="closeLightbox()">&times;</button>
+</div>
+
+<!-- PHOTO CROPPER MODAL -->
+<div id="photoCropperModal" class="modal-overlay" style="display:none;z-index:2001" onclick="if(event.target===this)closeCropper()">
+  <div class="modal" style="max-width:800px">
+    <div class="modal-header">
+      <h2>Crop & Adjust Photo</h2>
+      <button class="modal-close" onclick="closeCropper()">&times;</button>
+    </div>
+    <div style="padding:0 16px 16px">
+      <div style="max-height:60vh;overflow:hidden;background:#000;border-radius:var(--radius-sm)">
+        <img id="cropperImage" src="" style="max-width:100%;display:block">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeCropper()">Cancel</button>
+      <button type="button" class="btn btn-primary" onclick="acceptCroppedPhoto()">Use Photo</button>
+    </div>
+  </div>
 </div>
 
 <!-- CHEMICAL MODAL -->

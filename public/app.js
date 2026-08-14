@@ -935,17 +935,52 @@ function openPhotoUpload(pid) {
   document.getElementById('photoSubmitBtn').disabled = true;
   openModal('photoModal');
 }
+let photoCropper = null;
+let currentPhotoInput = null;
+let croppedPhotoBlob = null;
+
 function handlePhotoSelect(input) {
   if (input.files?.[0]) {
+    currentPhotoInput = input;
     const r = new FileReader();
     r.onload = e => {
-      const p = document.getElementById('photoPreview');
-      p.innerHTML = '<img src="' + e.target.result + '" style="max-width:100%;max-height:200px;border-radius:var(--radius-sm)">';
-      p.classList.remove('hidden');
-      document.getElementById('photoSubmitBtn').disabled = false;
+      document.getElementById('cropperImage').src = e.target.result;
+      document.getElementById('photoCropperModal').style.display = 'flex';
+      if (photoCropper) photoCropper.destroy();
+      photoCropper = new Cropper(document.getElementById('cropperImage'), {
+        aspectRatio: 1,
+        viewMode: 1,
+        autoCropArea: 1,
+        responsive: true,
+        restore: false,
+        guides: true,
+        center: true,
+        highlight: false,
+        cropBoxMovable: true,
+        cropBoxResizable: true,
+        toggleDragModeOnDblclick: false,
+      });
     };
     r.readAsDataURL(input.files[0]);
   }
+}
+
+function closeCropper() {
+  document.getElementById('photoCropperModal').style.display = 'none';
+  if (photoCropper) { photoCropper.destroy(); photoCropper = null; }
+  croppedPhotoBlob = null;
+}
+
+function acceptCroppedPhoto() {
+  if (!photoCropper) return;
+  photoCropper.getCroppedCanvas({ width: 1024, height: 1024, imageSmoothingQuality: 'high' }).toBlob(blob => {
+    croppedPhotoBlob = blob;
+    const p = document.getElementById('photoPreview');
+    p.innerHTML = '<img src="' + URL.createObjectURL(blob) + '" style="max-width:100%;max-height:200px;border-radius:var(--radius-sm)">';
+    p.classList.remove('hidden');
+    document.getElementById('photoSubmitBtn').disabled = false;
+    closeCropper();
+  }, 'image/jpeg', 0.9);
 }
 const dz = document.getElementById('photoDropZone');
 if (dz) {
@@ -956,12 +991,13 @@ if (dz) {
 async function uploadPhoto(e) {
   e.preventDefault();
   const pid = document.getElementById('photoPieceId').value;
-  const f = document.getElementById('photoFile').files[0]; if (!f) return;
-  const fd = new FormData(); fd.append('photo', f); fd.append('stage', document.getElementById('photoStage').value);
+  const f = croppedPhotoBlob || document.getElementById('photoFile').files[0]; if (!f) return;
+  const fd = new FormData(); fd.append('photo', f, 'photo.jpg'); fd.append('stage', document.getElementById('photoStage').value);
   try {
     const r = await fetch('/api/pieces/' + pid + '/photos', { method:'POST', headers:{Authorization:'Bearer '+token}, body:fd });
     const d = await r.json(); if (!r.ok) throw new Error(d.error);
     toast('Photo uploaded!','success'); trackActivity('upload_photo', 'pieces'); closeModal('photoModal'); viewPiece(pid);
+    croppedPhotoBlob = null;
   } catch(err) { toast(err.message,'error'); }
 }
 
