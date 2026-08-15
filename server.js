@@ -2312,12 +2312,6 @@ app.put('/api/photos/by-filename/:filename', auth, replacementPhotoUpload, async
     return res.status(404).json({ error: 'Photo not found.' });
   }
 
-  const targetExtension = path.extname(filename).toLowerCase();
-  if (!new Set(['.jpg', '.jpeg', '.png']).has(targetExtension)) {
-    discardUpload();
-    return res.status(400).json({ error: 'This photo format cannot be safely replaced.' });
-  }
-
   const target = path.join(UPLOADS_DIR, filename);
   if (!fs.existsSync(target)) {
     discardUpload();
@@ -2325,6 +2319,23 @@ app.put('/api/photos/by-filename/:filename', auth, replacementPhotoUpload, async
   }
 
   try {
+    // Validate the actual encoded formats, not filename suffixes. Existing
+    // records may have legacy or extensionless filenames.
+    const [existingMeta, replacementMeta] = await Promise.all([
+      sharp(target).metadata(),
+      sharp(req.file.path).metadata(),
+    ]);
+    const supportedFormats = new Set(['jpeg', 'png']);
+    if (
+      !supportedFormats.has(existingMeta.format) ||
+      existingMeta.format !== replacementMeta.format
+    ) {
+      discardUpload();
+      return res.status(400).json({
+        error: 'Replacement image format must match the stored photo.',
+      });
+    }
+
     // Same-filesystem atomic rename: the old file remains until replacement succeeds.
     fs.renameSync(req.file.path, target);
 
