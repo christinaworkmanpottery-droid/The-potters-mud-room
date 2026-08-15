@@ -2239,6 +2239,113 @@ app.delete('/api/photos/:id', auth, (req, res) => {
   res.json({ success: true });
 });
 
+const isStoredPhotoOwned = (filename, userId) => {
+  const ownershipChecks = [
+    ['SELECT 1 FROM users WHERE id=? AND (avatar_filename=? OR profile_photo=?)', [userId, filename, filename]],
+    ['SELECT 1 FROM piece_photos pp JOIN pieces p ON pp.piece_id=p.id WHERE pp.filename=? AND p.user_id=?', [filename, userId]],
+    ['SELECT 1 FROM clay_photos cp JOIN clay_bodies c ON cp.clay_id=c.id WHERE cp.filename=? AND c.user_id=?', [filename, userId]],
+    ['SELECT 1 FROM glaze_photos gp JOIN glazes g ON gp.glaze_id=g.id WHERE gp.filename=? AND g.user_id=?', [filename, userId]],
+    ['SELECT 1 FROM glaze_clay_tests gt JOIN glazes g ON gt.glaze_id=g.id WHERE gt.photo_filename=? AND g.user_id=?', [filename, userId]],
+    ['SELECT 1 FROM firing_photos fp JOIN firing_logs f ON fp.firing_id=f.id WHERE fp.filename=? AND f.user_id=?', [filename, userId]],
+    ['SELECT 1 FROM sales WHERE image_filename=? AND user_id=?', [filename, userId]],
+    ['SELECT 1 FROM events WHERE image_filename=? AND user_id=?', [filename, userId]],
+    ['SELECT 1 FROM project_photos pp JOIN projects p ON pp.project_id=p.id WHERE pp.filename=? AND p.user_id=?', [filename, userId]],
+    ['SELECT 1 FROM glaze_combos WHERE (photo_filename=? OR photo_filename2=?) AND user_id=?', [filename, filename, userId]],
+    ['SELECT 1 FROM test_tiles WHERE (photo_filename=? OR photo_filename2=? OR photo_filename3=?) AND user_id=?', [filename, filename, filename, userId]],
+    [`SELECT 1 FROM forum_photos fp
+       LEFT JOIN forum_posts p ON fp.post_id=p.id
+       LEFT JOIN forum_replies r ON fp.reply_id=r.id
+      WHERE fp.filename=? AND (p.user_id=? OR r.user_id=?)`, [filename, userId, userId]],
+  ];
+  return ownershipChecks.some(([sql, params]) => !!db.prepare(sql).get(...params));
+};
+
+const replacementPhotoUpload = (req, res, next) => {
+  upload.single('photo')(req, res, (error) => {
+    if (!error) return next();
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (cleanupError) {}
+    }
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'Replacement photo must be 20MB or smaller.' });
+    }
+    console.error('[PHOTO-EDIT] Upload parsing failed:', error.message);
+    return res.status(400).json({ error: 'Could not read the replacement photo.' });
+  });
+};
+
+// Replace existing photo pixels without changing its filename or database links.
+app.put('/api/photos/by-filename/:filename', auth, replacementPhotoUpload, async (req, res) => {
+  const rawFilename = String(req.params.filename || '');
+  const filename = path.basename(rawFilename);
+  const invalidFilename = !rawFilename || rawFilename !== filename || filename === '.' || filename === '..' || filename.includes('\0') || filename.length > 255;
+  const discardUpload = () => {
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (error) {}
+    }
+  };
+
+  if (invalidFilename || !req.file) {
+    discardUpload();
+    return res.status(400).json({ error: 'A valid replacement photo is required.' });
+  }
+
+  const allowedImageTypes = new Set([
+    'image/jpeg', 'image/jpg', 'image/png', 'image/gif',
+    'image/webp', 'image/heic', 'image/heif',
+  ]);
+  if (!allowedImageTypes.has(String(req.file.mimetype || '').toLowerCase()) || req.file.size > MAX_IMAGE_SIZE) {
+    discardUpload();
+    return res.status(400).json({ error: 'Replacement must be a supported image under 20MB.' });
+  }
+
+  let owned = false;
+  try {
+    owned = isStoredPhotoOwned(filename, req.userId);
+  } catch (error) {
+    discardUpload();
+    console.error('[PHOTO-EDIT] Ownership check failed:', error.message);
+    return res.status(500).json({ error: 'Could not verify this photo.' });
+  }
+  if (!owned) {
+    discardUpload();
+    return res.status(404).json({ error: 'Photo not found.' });
+  }
+
+  const targetExtension = path.extname(filename).toLowerCase();
+  if (!new Set(['.jpg', '.jpeg', '.png']).has(targetExtension)) {
+    discardUpload();
+    return res.status(400).json({ error: 'This photo format cannot be safely replaced.' });
+  }
+
+  const target = path.join(UPLOADS_DIR, filename);
+  if (!fs.existsSync(target)) {
+    discardUpload();
+    return res.status(404).json({ error: 'Photo file not found.' });
+  }
+
+  try {
+    // Same-filesystem atomic rename: the old file remains until replacement succeeds.
+    fs.renameSync(req.file.path, target);
+
+    const piecePhoto = db.prepare('SELECT id FROM piece_photos WHERE filename=?').get(filename);
+    if (piecePhoto) {
+      try {
+        const phash = await computePHash(fs.readFileSync(target));
+        db.prepare('UPDATE piece_photos SET phash=? WHERE id=?').run(phash, piecePhoto.id);
+      } catch (error) {
+        console.warn('[PHOTO-EDIT] pHash refresh skipped:', error.message);
+      }
+    }
+
+    return res.json({ success: true, filename, updatedAt: Date.now() });
+  } catch (error) {
+    discardUpload();
+    console.error('[PHOTO-EDIT] Replacement failed:', error.message);
+    return res.status(500).json({ error: 'Could not save the edited photo.' });
+  }
+});
+
 // Update piece photo stage
 app.put('/api/photos/:id/stage', auth, (req, res) => {
   const { stage } = req.body;
