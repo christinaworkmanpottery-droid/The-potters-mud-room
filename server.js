@@ -2260,6 +2260,50 @@ const isStoredPhotoOwned = (filename, userId) => {
   return ownershipChecks.some(([sql, params]) => !!db.prepare(sql).get(...params));
 };
 
+const storedPhotoReferenceQueries = [
+  'SELECT 1 FROM users WHERE avatar_filename=? OR profile_photo=? LIMIT 1',
+  'SELECT 1 FROM piece_photos WHERE filename=? LIMIT 1',
+  'SELECT 1 FROM clay_photos WHERE filename=? LIMIT 1',
+  'SELECT 1 FROM glaze_photos WHERE filename=? LIMIT 1',
+  'SELECT 1 FROM glaze_clay_tests WHERE photo_filename=? LIMIT 1',
+  'SELECT 1 FROM firing_photos WHERE filename=? LIMIT 1',
+  'SELECT 1 FROM sales WHERE image_filename=? LIMIT 1',
+  'SELECT 1 FROM events WHERE image_filename=? LIMIT 1',
+  'SELECT 1 FROM project_photos WHERE filename=? LIMIT 1',
+  'SELECT 1 FROM glaze_combos WHERE photo_filename=? OR photo_filename2=? LIMIT 1',
+  'SELECT 1 FROM test_tiles WHERE photo_filename=? OR photo_filename2=? OR photo_filename3=? LIMIT 1',
+  'SELECT 1 FROM forum_photos WHERE filename=? LIMIT 1',
+  'SELECT 1 FROM merchant_products WHERE image_filename=? OR download_filename=? LIMIT 1',
+];
+
+const hasStoredPhotoReference = (filename) => storedPhotoReferenceQueries.some((sql) => {
+  const parameterCount = (sql.match(/\?/g) || []).length;
+  return !!db.prepare(sql).get(...Array(parameterCount).fill(filename));
+});
+
+const replaceStoredPhotoReferences = db.transaction((oldFilename, newFilename, userId) => {
+  let changes = 0;
+  const run = (sql, ...params) => { changes += db.prepare(sql).run(...params).changes; };
+
+  run('UPDATE users SET avatar_filename=CASE WHEN avatar_filename=? THEN ? ELSE avatar_filename END, profile_photo=CASE WHEN profile_photo=? THEN ? ELSE profile_photo END WHERE id=? AND (avatar_filename=? OR profile_photo=?)', oldFilename, newFilename, oldFilename, newFilename, userId, oldFilename, oldFilename);
+  run('UPDATE piece_photos SET filename=? WHERE filename=? AND piece_id IN (SELECT id FROM pieces WHERE user_id=?)', newFilename, oldFilename, userId);
+  run('UPDATE clay_photos SET filename=? WHERE filename=? AND clay_id IN (SELECT id FROM clay_bodies WHERE user_id=?)', newFilename, oldFilename, userId);
+  run('UPDATE glaze_photos SET filename=? WHERE filename=? AND glaze_id IN (SELECT id FROM glazes WHERE user_id=?)', newFilename, oldFilename, userId);
+  run('UPDATE glaze_clay_tests SET photo_filename=? WHERE photo_filename=? AND glaze_id IN (SELECT id FROM glazes WHERE user_id=?)', newFilename, oldFilename, userId);
+  run('UPDATE firing_photos SET filename=? WHERE filename=? AND firing_id IN (SELECT id FROM firing_logs WHERE user_id=?)', newFilename, oldFilename, userId);
+  run('UPDATE sales SET image_filename=? WHERE image_filename=? AND user_id=?', newFilename, oldFilename, userId);
+  run('UPDATE events SET image_filename=? WHERE image_filename=? AND user_id=?', newFilename, oldFilename, userId);
+  run('UPDATE project_photos SET filename=? WHERE filename=? AND project_id IN (SELECT id FROM projects WHERE user_id=?)', newFilename, oldFilename, userId);
+  run('UPDATE glaze_combos SET photo_filename=CASE WHEN photo_filename=? THEN ? ELSE photo_filename END, photo_filename2=CASE WHEN photo_filename2=? THEN ? ELSE photo_filename2 END WHERE user_id=? AND (photo_filename=? OR photo_filename2=?)', oldFilename, newFilename, oldFilename, newFilename, userId, oldFilename, oldFilename);
+  run('UPDATE test_tiles SET photo_filename=CASE WHEN photo_filename=? THEN ? ELSE photo_filename END, photo_filename2=CASE WHEN photo_filename2=? THEN ? ELSE photo_filename2 END, photo_filename3=CASE WHEN photo_filename3=? THEN ? ELSE photo_filename3 END WHERE user_id=? AND (photo_filename=? OR photo_filename2=? OR photo_filename3=?)', oldFilename, newFilename, oldFilename, newFilename, oldFilename, newFilename, userId, oldFilename, oldFilename, oldFilename);
+  run(`UPDATE forum_photos SET filename=? WHERE filename=? AND (
+    post_id IN (SELECT id FROM forum_posts WHERE user_id=?) OR
+    reply_id IN (SELECT id FROM forum_replies WHERE user_id=?)
+  )`, newFilename, oldFilename, userId, userId);
+
+  return changes;
+});
+
 const replacementPhotoUpload = (req, res, next) => {
   upload.single('photo')(req, res, (error) => {
     if (!error) return next();
@@ -2274,7 +2318,8 @@ const replacementPhotoUpload = (req, res, next) => {
   });
 };
 
-// Replace existing photo pixels without changing its filename or database links.
+// Replace existing photo pixels. Legacy HEIC/HEIF records migrate to a new JPEG
+// filename because Build 34 always sends JPEG bytes.
 app.put('/api/photos/by-filename/:filename', auth, replacementPhotoUpload, async (req, res) => {
   const rawFilename = String(req.params.filename || '');
   const filename = path.basename(rawFilename);
@@ -2318,41 +2363,85 @@ app.put('/api/photos/by-filename/:filename', auth, replacementPhotoUpload, async
     return res.status(404).json({ error: 'Photo file not found.' });
   }
 
+  let replacementMeta;
   try {
-    // Validate the actual encoded formats, not filename suffixes. Existing
-    // records may have legacy or extensionless filenames.
-    const [existingMeta, replacementMeta] = await Promise.all([
-      sharp(target).metadata(),
-      sharp(req.file.path).metadata(),
-    ]);
-    const supportedFormats = new Set(['jpeg', 'png']);
-    if (
-      !supportedFormats.has(existingMeta.format) ||
-      existingMeta.format !== replacementMeta.format
-    ) {
+    // Decode only the new upload. The legacy HEIC is deliberately never passed
+    // to Sharp because old files can exceed libheif's reference security limit.
+    replacementMeta = await sharp(req.file.path).metadata();
+  } catch (error) {
+    discardUpload();
+    console.error('[PHOTO-EDIT] Replacement validation failed:', error.message);
+    return res.status(400).json({ error: 'The replacement photo is not a valid image.' });
+  }
+  if (replacementMeta.format !== 'jpeg') {
+    discardUpload();
+    return res.status(400).json({ error: 'Edited replacement must be a JPEG.' });
+  }
+
+  const isLegacyHeif = new Set(['.heic', '.heif']).has(path.extname(filename).toLowerCase());
+  if (!isLegacyHeif) {
+    try {
+      // Preserve existing same-format behavior for non-legacy assets.
+      const existingMeta = await sharp(target).metadata();
+      if (existingMeta.format !== 'jpeg') {
+        discardUpload();
+        return res.status(400).json({ error: 'Replacement image format must match the stored photo.' });
+      }
+      fs.renameSync(req.file.path, target);
+
+      const piecePhoto = db.prepare('SELECT id FROM piece_photos WHERE filename=?').get(filename);
+      if (piecePhoto) {
+        try {
+          const phash = await computePHash(fs.readFileSync(target));
+          db.prepare('UPDATE piece_photos SET phash=? WHERE id=?').run(phash, piecePhoto.id);
+        } catch (error) {
+          console.warn('[PHOTO-EDIT] pHash refresh skipped:', error.message);
+        }
+      }
+      return res.json({ success: true, filename, updatedAt: Date.now() });
+    } catch (error) {
       discardUpload();
-      return res.status(400).json({
-        error: 'Replacement image format must match the stored photo.',
-      });
+      console.error('[PHOTO-EDIT] Replacement failed:', error.message);
+      return res.status(500).json({ error: 'Could not save the edited photo.' });
     }
+  }
 
-    // Same-filesystem atomic rename: the old file remains until replacement succeeds.
-    fs.renameSync(req.file.path, target);
+  const newFilename = `${uuidv4()}.jpg`;
+  const newTarget = path.join(UPLOADS_DIR, newFilename);
+  let referencesUpdated = false;
+  try {
+    // Create the new JPEG first. A failed DB transaction leaves the old HEIC
+    // and its references untouched; only this unreferenced JPEG is removed.
+    fs.renameSync(req.file.path, newTarget);
+    const changed = replaceStoredPhotoReferences(filename, newFilename, req.userId);
+    if (!changed) {
+      fs.unlinkSync(newTarget);
+      return res.status(404).json({ error: 'Photo reference was not found.' });
+    }
+    referencesUpdated = true;
 
-    const piecePhoto = db.prepare('SELECT id FROM piece_photos WHERE filename=?').get(filename);
+    const piecePhoto = db.prepare('SELECT id FROM piece_photos WHERE filename=?').get(newFilename);
     if (piecePhoto) {
       try {
-        const phash = await computePHash(fs.readFileSync(target));
+        const phash = await computePHash(fs.readFileSync(newTarget));
         db.prepare('UPDATE piece_photos SET phash=? WHERE id=?').run(phash, piecePhoto.id);
       } catch (error) {
         console.warn('[PHOTO-EDIT] pHash refresh skipped:', error.message);
       }
     }
 
-    return res.json({ success: true, filename, updatedAt: Date.now() });
+    // Delete the legacy file only after commit and only when no table refers to it.
+    if (!hasStoredPhotoReference(filename) && fs.existsSync(target)) {
+      try { fs.unlinkSync(target); } catch (error) {
+        console.warn('[PHOTO-EDIT] Old HEIC cleanup skipped:', error.message);
+      }
+    }
+    return res.json({ success: true, filename: newFilename, updatedAt: Date.now() });
   } catch (error) {
-    discardUpload();
-    console.error('[PHOTO-EDIT] Replacement failed:', error.message);
+    if (!referencesUpdated && fs.existsSync(newTarget)) {
+      try { fs.unlinkSync(newTarget); } catch (cleanupError) {}
+    }
+    console.error('[PHOTO-EDIT] Replacement migration failed:', error.message);
     return res.status(500).json({ error: 'Could not save the edited photo.' });
   }
 });
