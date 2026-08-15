@@ -5676,33 +5676,38 @@ app.put('/api/test-tiles/:id', auth, requireTier('starter'), upload.array('photo
   const tile = db.prepare('SELECT * FROM test_tiles WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!tile) return res.status(404).json({ error: 'Test tile not found' });
   
-  const { name, glaze_id, glaze_name, clay_body_id, clay_name, cone, atmosphere, application_method, coats, thickness, surface_result, color_result, layered_over, layered_under, kiln_position, firing_schedule, notes, rating, tags, remove_photo, remove_photo2, remove_photo3 } = req.body;
+  const { name, glaze_id, glaze_name, clay_body_id, clay_name, cone, atmosphere, application_method, coats, thickness, surface_result, color_result, layered_over, layered_under, kiln_position, firing_schedule, notes, rating, tags, remove_photo, remove_photo2, remove_photo3, photo_order } = req.body;
   const photos = req.files || [];
-  
-  let photo_filename = tile.photo_filename;
-  let photo_filename2 = tile.photo_filename2;
-  let photo_filename3 = tile.photo_filename3;
-  
+
   // Defer physical deletion until the database update succeeds. A failed save
   // must not erase an existing member photo while its row still references it.
   const photosToDelete = [];
-  if (remove_photo === 'true' && tile.photo_filename) {
-    photosToDelete.push(path.join(UPLOADS_DIR, tile.photo_filename));
-    photo_filename = null;
+  const originalSlots = [tile.photo_filename, tile.photo_filename2, tile.photo_filename3];
+  const originalPhotos = originalSlots.filter(Boolean);
+  const removeFlags = [remove_photo, remove_photo2, remove_photo3];
+  const removedExistingPhotos = originalSlots.filter((filename, index) => filename && removeFlags[index] === 'true');
+  removedExistingPhotos.forEach(filename => photosToDelete.push(path.join(UPLOADS_DIR, filename)));
+
+  let orderedPhotos = originalPhotos.filter(filename => !removedExistingPhotos.includes(filename));
+  if (photo_order) {
+    try {
+      const requestedOrder = JSON.parse(photo_order);
+      if (Array.isArray(requestedOrder)) {
+        orderedPhotos = requestedOrder.filter(filename => orderedPhotos.includes(filename));
+        orderedPhotos.push(...originalPhotos.filter(filename => !removedExistingPhotos.includes(filename) && !orderedPhotos.includes(filename)));
+      }
+    } catch (error) {
+      // Keep the existing order if an older or malformed client sends no usable order.
+    }
   }
-  if (remove_photo2 === 'true' && tile.photo_filename2) {
-    photosToDelete.push(path.join(UPLOADS_DIR, tile.photo_filename2));
-    photo_filename2 = null;
-  }
-  if (remove_photo3 === 'true' && tile.photo_filename3) {
-    photosToDelete.push(path.join(UPLOADS_DIR, tile.photo_filename3));
-    photo_filename3 = null;
-  }
-  
+
+  let photo_filename = orderedPhotos[0] || null;
+  let photo_filename2 = orderedPhotos[1] || null;
+  let photo_filename3 = orderedPhotos[2] || null;
+
   // Handle new photo uploads (fill empty slots)
   let photoIdx = 0;
   if (photos.length > photoIdx && !photo_filename) { photo_filename = photos[photoIdx++].filename; }
-  else if (photos.length > photoIdx && remove_photo === 'true') { photo_filename = photos[photoIdx++].filename; }
   if (photos.length > photoIdx && !photo_filename2) { photo_filename2 = photos[photoIdx++].filename; }
   if (photos.length > photoIdx && !photo_filename3) { photo_filename3 = photos[photoIdx++].filename; }
   
