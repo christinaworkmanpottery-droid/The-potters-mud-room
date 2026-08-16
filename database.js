@@ -62,6 +62,7 @@ function initDB() {
       shrinkage_pct REAL,
       cone_range TEXT,
       clay_type TEXT CHECK(clay_type IN ('stoneware', 'porcelain', 'earthenware', 'terracotta', 'raku', 'other')),
+      custom_clay_type TEXT,
       cost_per_bag REAL,
       bag_weight TEXT,
       notes TEXT,

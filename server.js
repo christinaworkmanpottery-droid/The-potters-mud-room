@@ -1526,18 +1526,18 @@ app.get('/api/clay-bodies/:id', auth, (req, res) => {
 });
 
 app.post('/api/clay-bodies', auth, (req, res) => {
-  const { name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, costPerBag, bagWeight, source, sourceUrl, inStock, buyUrl, notes } = req.body;
+  const { name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, customClayType, costPerBag, bagWeight, source, sourceUrl, inStock, buyUrl, notes } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });
   const id = uuidv4();
-  db.prepare('INSERT INTO clay_bodies (id,user_id,name,brand,color_wet,color_dry,color_fired,shrinkage_pct,absorption_pct,cone_range,clay_type,cost_per_bag,bag_weight,source,source_url,in_stock,buy_url,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-    .run(id, req.userId, name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct||null, coneRange, clayType, costPerBag, bagWeight, source||null, sourceUrl||null, inStock!==undefined?(inStock?1:0):1, buyUrl||null, notes);
+  db.prepare('INSERT INTO clay_bodies (id,user_id,name,brand,color_wet,color_dry,color_fired,shrinkage_pct,absorption_pct,cone_range,clay_type,custom_clay_type,cost_per_bag,bag_weight,source,source_url,in_stock,buy_url,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .run(id, req.userId, name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct||null, coneRange, clayType, customClayType||null, costPerBag, bagWeight, source||null, sourceUrl||null, inStock!==undefined?(inStock?1:0):1, buyUrl||null, notes);
   res.json({ id, name });
 });
 
 app.put('/api/clay-bodies/:id', auth, (req, res) => {
-  const { name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, costPerBag, bagWeight, source, sourceUrl, inStock, buyUrl, notes } = req.body;
-  const r = db.prepare(`UPDATE clay_bodies SET name=?,brand=?,color_wet=?,color_dry=?,color_fired=?,shrinkage_pct=?,absorption_pct=?,cone_range=?,clay_type=?,cost_per_bag=?,bag_weight=?,source=?,source_url=?,in_stock=?,buy_url=?,notes=?,updated_at=datetime('now') WHERE id=? AND user_id=?`)
-    .run(name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct||null, coneRange, clayType, costPerBag, bagWeight, source||null, sourceUrl||null, inStock!==undefined?(inStock?1:0):1, buyUrl||null, notes, req.params.id, req.userId);
+  const { name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, customClayType, costPerBag, bagWeight, source, sourceUrl, inStock, buyUrl, notes } = req.body;
+  const r = db.prepare(`UPDATE clay_bodies SET name=?,brand=?,color_wet=?,color_dry=?,color_fired=?,shrinkage_pct=?,absorption_pct=?,cone_range=?,clay_type=?,custom_clay_type=?,cost_per_bag=?,bag_weight=?,source=?,source_url=?,in_stock=?,buy_url=?,notes=?,updated_at=datetime('now') WHERE id=? AND user_id=?`)
+    .run(name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct||null, coneRange, clayType, customClayType||null, costPerBag, bagWeight, source||null, sourceUrl||null, inStock!==undefined?(inStock?1:0):1, buyUrl||null, notes, req.params.id, req.userId);
   if (r.changes === 0) return res.status(404).json({ error: 'Not found' });
   res.json({ success: true });
 });
@@ -2239,6 +2239,110 @@ app.delete('/api/photos/:id', auth, (req, res) => {
   res.json({ success: true });
 });
 
+const isStoredPhotoOwned = (filename, userId) => {
+  const ownershipChecks = [
+    ['SELECT 1 FROM users WHERE id=? AND (avatar_filename=? OR profile_photo=?)', [userId, filename, filename]],
+    ['SELECT 1 FROM piece_photos pp JOIN pieces p ON pp.piece_id=p.id WHERE pp.filename=? AND p.user_id=?', [filename, userId]],
+    ['SELECT 1 FROM clay_photos cp JOIN clay_bodies c ON cp.clay_id=c.id WHERE cp.filename=? AND c.user_id=?', [filename, userId]],
+    ['SELECT 1 FROM glaze_photos gp JOIN glazes g ON gp.glaze_id=g.id WHERE gp.filename=? AND g.user_id=?', [filename, userId]],
+    ['SELECT 1 FROM glaze_clay_tests gt JOIN glazes g ON gt.glaze_id=g.id WHERE gt.photo_filename=? AND g.user_id=?', [filename, userId]],
+    ['SELECT 1 FROM firing_photos fp JOIN firing_logs f ON fp.firing_id=f.id WHERE fp.filename=? AND f.user_id=?', [filename, userId]],
+    ['SELECT 1 FROM sales WHERE image_filename=? AND user_id=?', [filename, userId]],
+    ['SELECT 1 FROM events WHERE image_filename=? AND user_id=?', [filename, userId]],
+    ['SELECT 1 FROM project_photos pp JOIN projects p ON pp.project_id=p.id WHERE pp.filename=? AND p.user_id=?', [filename, userId]],
+    ['SELECT 1 FROM glaze_combos WHERE (photo_filename=? OR photo_filename2=?) AND user_id=?', [filename, filename, userId]],
+    ['SELECT 1 FROM test_tiles WHERE (photo_filename=? OR photo_filename2=? OR photo_filename3=?) AND user_id=?', [filename, filename, filename, userId]],
+    [`SELECT 1 FROM forum_photos fp
+       LEFT JOIN forum_posts p ON fp.post_id=p.id
+       LEFT JOIN forum_replies r ON fp.reply_id=r.id
+      WHERE fp.filename=? AND (p.user_id=? OR r.user_id=?)`, [filename, userId, userId]],
+  ];
+  return ownershipChecks.some(([sql, params]) => !!db.prepare(sql).get(...params));
+};
+
+// The website uses this to show Edit only on photos owned by the signed-in member.
+app.get('/api/photos/by-filename/:filename/editable', auth, (req, res) => {
+  const filename = path.basename(req.params.filename || '');
+  if (!filename || filename !== req.params.filename) return res.status(400).json({ editable: false });
+  try {
+    res.json({ editable: isStoredPhotoOwned(filename, req.userId) });
+  } catch (error) {
+    console.error('[PHOTO-EDIT] Editable check failed:', error.message);
+    res.status(500).json({ error: 'Could not verify this photo.' });
+  }
+});
+
+// Replace the pixels of an existing photo while preserving its filename,
+// database record, ordering, and every link to it. Used by the shared crop editor.
+app.put('/api/photos/by-filename/:filename', auth, upload.single('photo'), async (req, res) => {
+  const filename = path.basename(req.params.filename || '');
+  const discardUpload = () => {
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (e) {}
+    }
+  };
+
+  if (!filename || filename !== req.params.filename || !req.file) {
+    discardUpload();
+    return res.status(400).json({ error: 'A valid replacement photo is required.' });
+  }
+  if (!req.file.mimetype?.startsWith('image/')) {
+    discardUpload();
+    return res.status(400).json({ error: 'Only image files can be edited.' });
+  }
+
+  let owned = false;
+  try {
+    owned = isStoredPhotoOwned(filename, req.userId);
+  } catch (error) {
+    discardUpload();
+    console.error('[PHOTO-EDIT] Ownership check failed:', error.message);
+    return res.status(500).json({ error: 'Could not verify this photo.' });
+  }
+  if (!owned) {
+    discardUpload();
+    return res.status(404).json({ error: 'Photo not found.' });
+  }
+
+  const target = path.join(UPLOADS_DIR, filename);
+  if (!fs.existsSync(target)) {
+    discardUpload();
+    return res.status(404).json({ error: 'Photo file not found.' });
+  }
+
+  const backup = `${target}.edit-backup-${uuidv4()}`;
+  try {
+    fs.renameSync(target, backup);
+    fs.renameSync(req.file.path, target);
+    fs.unlinkSync(backup);
+
+    // Keep visual-search data accurate when a piece photo is cropped.
+    const piecePhoto = db.prepare('SELECT id FROM piece_photos WHERE filename=?').get(filename);
+    if (piecePhoto) {
+      try {
+        const phash = await computePHash(fs.readFileSync(target));
+        db.prepare('UPDATE piece_photos SET phash=? WHERE id=?').run(phash, piecePhoto.id);
+      } catch (error) {
+        console.warn('[PHOTO-EDIT] pHash refresh skipped:', error.message);
+      }
+    }
+
+    res.json({ success: true, filename, updatedAt: Date.now() });
+  } catch (error) {
+    try {
+      if (fs.existsSync(backup)) {
+        if (fs.existsSync(target)) fs.unlinkSync(target);
+        fs.renameSync(backup, target);
+      }
+    } catch (restoreError) {
+      console.error('[PHOTO-EDIT] Restore failed:', restoreError.message);
+    }
+    discardUpload();
+    console.error('[PHOTO-EDIT] Replacement failed:', error.message);
+    res.status(500).json({ error: 'Could not save the edited photo.' });
+  }
+});
+
 // Update piece photo stage
 app.put('/api/photos/:id/stage', auth, (req, res) => {
   const { stage } = req.body;
@@ -2546,15 +2650,22 @@ app.post('/api/community/combos', auth, requireTier('starter'), upload.array('ph
 
 // Edit combo (owner only)
 app.put('/api/community/combos/:id', auth, upload.array('photos', 2), (req, res) => {
-  const combo = db.prepare('SELECT user_id FROM glaze_combos WHERE id=?').get(req.params.id);
+  const combo = db.prepare('SELECT * FROM glaze_combos WHERE id=?').get(req.params.id);
   if (!combo || combo.user_id !== req.userId) return res.status(403).json({ error: 'Not authorized' });
   
   const { name, clayBodyName, cone, atmosphere, description, notes, isShared, layers } = req.body;
-  const photo1 = req.files?.[0]?.filename || null;
-  const photo2 = req.files?.[1]?.filename || null;
+  const photoSlots = [combo.photo_filename, combo.photo_filename2];
+  for (const file of (req.files || [])) {
+    const openIndex = photoSlots.findIndex(value => !value);
+    if (openIndex === -1) {
+      try { fs.unlinkSync(file.path); } catch (e) {}
+      continue;
+    }
+    photoSlots[openIndex] = file.filename;
+  }
   
-  db.prepare('UPDATE glaze_combos SET name=?,clay_body_name=?,cone=?,atmosphere=?,description=?,notes=?,is_shared=?,photo_filename=COALESCE(?,photo_filename),photo_filename2=COALESCE(?,photo_filename2),updated_at=datetime(\'now\') WHERE id=?')
-    .run(name, clayBodyName, cone, atmosphere, description, notes, isShared === 'true' || isShared === true ? 1 : 0, photo1, photo2, req.params.id);
+  db.prepare('UPDATE glaze_combos SET name=?,clay_body_name=?,cone=?,atmosphere=?,description=?,notes=?,is_shared=?,photo_filename=?,photo_filename2=?,updated_at=datetime(\'now\') WHERE id=?')
+    .run(name, clayBodyName, cone, atmosphere, description, notes, isShared === 'true' || isShared === true ? 1 : 0, photoSlots[0], photoSlots[1], req.params.id);
   
   if (layers) {
     const parsedLayers = typeof layers === 'string' ? JSON.parse(layers) : layers;
