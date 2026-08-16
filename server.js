@@ -2260,35 +2260,88 @@ const isStoredPhotoOwned = (filename, userId) => {
   return ownershipChecks.some(([sql, params]) => !!db.prepare(sql).get(...params));
 };
 
-// The website uses this to show Edit only on photos owned by the signed-in member.
-app.get('/api/photos/by-filename/:filename/editable', auth, (req, res) => {
-  const filename = path.basename(req.params.filename || '');
-  if (!filename || filename !== req.params.filename) return res.status(400).json({ editable: false });
-  try {
-    res.json({ editable: isStoredPhotoOwned(filename, req.userId) });
-  } catch (error) {
-    console.error('[PHOTO-EDIT] Editable check failed:', error.message);
-    res.status(500).json({ error: 'Could not verify this photo.' });
-  }
+const storedPhotoReferenceQueries = [
+  'SELECT 1 FROM users WHERE avatar_filename=? OR profile_photo=? LIMIT 1',
+  'SELECT 1 FROM piece_photos WHERE filename=? LIMIT 1',
+  'SELECT 1 FROM clay_photos WHERE filename=? LIMIT 1',
+  'SELECT 1 FROM glaze_photos WHERE filename=? LIMIT 1',
+  'SELECT 1 FROM glaze_clay_tests WHERE photo_filename=? LIMIT 1',
+  'SELECT 1 FROM firing_photos WHERE filename=? LIMIT 1',
+  'SELECT 1 FROM sales WHERE image_filename=? LIMIT 1',
+  'SELECT 1 FROM events WHERE image_filename=? LIMIT 1',
+  'SELECT 1 FROM project_photos WHERE filename=? LIMIT 1',
+  'SELECT 1 FROM glaze_combos WHERE photo_filename=? OR photo_filename2=? LIMIT 1',
+  'SELECT 1 FROM test_tiles WHERE photo_filename=? OR photo_filename2=? OR photo_filename3=? LIMIT 1',
+  'SELECT 1 FROM forum_photos WHERE filename=? LIMIT 1',
+  'SELECT 1 FROM merchant_products WHERE image_filename=? OR download_filename=? LIMIT 1',
+];
+
+const hasStoredPhotoReference = (filename) => storedPhotoReferenceQueries.some((sql) => {
+  const parameterCount = (sql.match(/\?/g) || []).length;
+  return !!db.prepare(sql).get(...Array(parameterCount).fill(filename));
 });
 
-// Replace the pixels of an existing photo while preserving its filename,
-// database record, ordering, and every link to it. Used by the shared crop editor.
-app.put('/api/photos/by-filename/:filename', auth, upload.single('photo'), async (req, res) => {
-  const filename = path.basename(req.params.filename || '');
+const replaceStoredPhotoReferences = db.transaction((oldFilename, newFilename, userId) => {
+  let changes = 0;
+  const run = (sql, ...params) => { changes += db.prepare(sql).run(...params).changes; };
+
+  run('UPDATE users SET avatar_filename=CASE WHEN avatar_filename=? THEN ? ELSE avatar_filename END, profile_photo=CASE WHEN profile_photo=? THEN ? ELSE profile_photo END WHERE id=? AND (avatar_filename=? OR profile_photo=?)', oldFilename, newFilename, oldFilename, newFilename, userId, oldFilename, oldFilename);
+  run('UPDATE piece_photos SET filename=? WHERE filename=? AND piece_id IN (SELECT id FROM pieces WHERE user_id=?)', newFilename, oldFilename, userId);
+  run('UPDATE clay_photos SET filename=? WHERE filename=? AND clay_id IN (SELECT id FROM clay_bodies WHERE user_id=?)', newFilename, oldFilename, userId);
+  run('UPDATE glaze_photos SET filename=? WHERE filename=? AND glaze_id IN (SELECT id FROM glazes WHERE user_id=?)', newFilename, oldFilename, userId);
+  run('UPDATE glaze_clay_tests SET photo_filename=? WHERE photo_filename=? AND glaze_id IN (SELECT id FROM glazes WHERE user_id=?)', newFilename, oldFilename, userId);
+  run('UPDATE firing_photos SET filename=? WHERE filename=? AND firing_id IN (SELECT id FROM firing_logs WHERE user_id=?)', newFilename, oldFilename, userId);
+  run('UPDATE sales SET image_filename=? WHERE image_filename=? AND user_id=?', newFilename, oldFilename, userId);
+  run('UPDATE events SET image_filename=? WHERE image_filename=? AND user_id=?', newFilename, oldFilename, userId);
+  run('UPDATE project_photos SET filename=? WHERE filename=? AND project_id IN (SELECT id FROM projects WHERE user_id=?)', newFilename, oldFilename, userId);
+  run('UPDATE glaze_combos SET photo_filename=CASE WHEN photo_filename=? THEN ? ELSE photo_filename END, photo_filename2=CASE WHEN photo_filename2=? THEN ? ELSE photo_filename2 END WHERE user_id=? AND (photo_filename=? OR photo_filename2=?)', oldFilename, newFilename, oldFilename, newFilename, userId, oldFilename, oldFilename);
+  run('UPDATE test_tiles SET photo_filename=CASE WHEN photo_filename=? THEN ? ELSE photo_filename END, photo_filename2=CASE WHEN photo_filename2=? THEN ? ELSE photo_filename2 END, photo_filename3=CASE WHEN photo_filename3=? THEN ? ELSE photo_filename3 END WHERE user_id=? AND (photo_filename=? OR photo_filename2=? OR photo_filename3=?)', oldFilename, newFilename, oldFilename, newFilename, oldFilename, newFilename, userId, oldFilename, oldFilename, oldFilename);
+  run(`UPDATE forum_photos SET filename=? WHERE filename=? AND (
+    post_id IN (SELECT id FROM forum_posts WHERE user_id=?) OR
+    reply_id IN (SELECT id FROM forum_replies WHERE user_id=?)
+  )`, newFilename, oldFilename, userId, userId);
+
+  return changes;
+});
+
+const replacementPhotoUpload = (req, res, next) => {
+  upload.single('photo')(req, res, (error) => {
+    if (!error) return next();
+    if (req.file?.path && fs.existsSync(req.file.path)) {
+      try { fs.unlinkSync(req.file.path); } catch (cleanupError) {}
+    }
+    if (error.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'Replacement photo must be 20MB or smaller.' });
+    }
+    console.error('[PHOTO-EDIT] Upload parsing failed:', error.message);
+    return res.status(400).json({ error: 'Could not read the replacement photo.' });
+  });
+};
+
+// Replace existing photo pixels. Legacy HEIC/HEIF records migrate to a new JPEG
+// filename because Build 34 always sends JPEG bytes.
+app.put('/api/photos/by-filename/:filename', auth, replacementPhotoUpload, async (req, res) => {
+  const rawFilename = String(req.params.filename || '');
+  const filename = path.basename(rawFilename);
+  const invalidFilename = !rawFilename || rawFilename !== filename || filename === '.' || filename === '..' || filename.includes('\0') || filename.length > 255;
   const discardUpload = () => {
     if (req.file?.path && fs.existsSync(req.file.path)) {
-      try { fs.unlinkSync(req.file.path); } catch (e) {}
+      try { fs.unlinkSync(req.file.path); } catch (error) {}
     }
   };
 
-  if (!filename || filename !== req.params.filename || !req.file) {
+  if (invalidFilename || !req.file) {
     discardUpload();
     return res.status(400).json({ error: 'A valid replacement photo is required.' });
   }
-  if (!req.file.mimetype?.startsWith('image/')) {
+
+  const allowedImageTypes = new Set([
+    'image/jpeg', 'image/jpg', 'image/png', 'image/gif',
+    'image/webp', 'image/heic', 'image/heif',
+  ]);
+  if (!allowedImageTypes.has(String(req.file.mimetype || '').toLowerCase()) || req.file.size > MAX_IMAGE_SIZE) {
     discardUpload();
-    return res.status(400).json({ error: 'Only image files can be edited.' });
+    return res.status(400).json({ error: 'Replacement must be a supported image under 20MB.' });
   }
 
   let owned = false;
@@ -2310,36 +2363,86 @@ app.put('/api/photos/by-filename/:filename', auth, upload.single('photo'), async
     return res.status(404).json({ error: 'Photo file not found.' });
   }
 
-  const backup = `${target}.edit-backup-${uuidv4()}`;
+  let replacementMeta;
   try {
-    fs.renameSync(target, backup);
-    fs.renameSync(req.file.path, target);
-    fs.unlinkSync(backup);
+    // Decode only the new upload. The legacy HEIC is deliberately never passed
+    // to Sharp because old files can exceed libheif's reference security limit.
+    replacementMeta = await sharp(req.file.path).metadata();
+  } catch (error) {
+    discardUpload();
+    console.error('[PHOTO-EDIT] Replacement validation failed:', error.message);
+    return res.status(400).json({ error: 'The replacement photo is not a valid image.' });
+  }
+  if (replacementMeta.format !== 'jpeg') {
+    discardUpload();
+    return res.status(400).json({ error: 'Edited replacement must be a JPEG.' });
+  }
 
-    // Keep visual-search data accurate when a piece photo is cropped.
-    const piecePhoto = db.prepare('SELECT id FROM piece_photos WHERE filename=?').get(filename);
+  const isLegacyHeif = new Set(['.heic', '.heif']).has(path.extname(filename).toLowerCase());
+  if (!isLegacyHeif) {
+    try {
+      // Preserve existing same-format behavior for non-legacy assets.
+      const existingMeta = await sharp(target).metadata();
+      if (existingMeta.format !== 'jpeg') {
+        discardUpload();
+        return res.status(400).json({ error: 'Replacement image format must match the stored photo.' });
+      }
+      fs.renameSync(req.file.path, target);
+
+      const piecePhoto = db.prepare('SELECT id FROM piece_photos WHERE filename=?').get(filename);
+      if (piecePhoto) {
+        try {
+          const phash = await computePHash(fs.readFileSync(target));
+          db.prepare('UPDATE piece_photos SET phash=? WHERE id=?').run(phash, piecePhoto.id);
+        } catch (error) {
+          console.warn('[PHOTO-EDIT] pHash refresh skipped:', error.message);
+        }
+      }
+      return res.json({ success: true, filename, updatedAt: Date.now() });
+    } catch (error) {
+      discardUpload();
+      console.error('[PHOTO-EDIT] Replacement failed:', error.message);
+      return res.status(500).json({ error: 'Could not save the edited photo.' });
+    }
+  }
+
+  const newFilename = `${uuidv4()}.jpg`;
+  const newTarget = path.join(UPLOADS_DIR, newFilename);
+  let referencesUpdated = false;
+  try {
+    // Create the new JPEG first. A failed DB transaction leaves the old HEIC
+    // and its references untouched; only this unreferenced JPEG is removed.
+    fs.renameSync(req.file.path, newTarget);
+    const changed = replaceStoredPhotoReferences(filename, newFilename, req.userId);
+    if (!changed) {
+      fs.unlinkSync(newTarget);
+      return res.status(404).json({ error: 'Photo reference was not found.' });
+    }
+    referencesUpdated = true;
+
+    const piecePhoto = db.prepare('SELECT id FROM piece_photos WHERE filename=?').get(newFilename);
     if (piecePhoto) {
       try {
-        const phash = await computePHash(fs.readFileSync(target));
+        const phash = await computePHash(fs.readFileSync(newTarget));
         db.prepare('UPDATE piece_photos SET phash=? WHERE id=?').run(phash, piecePhoto.id);
       } catch (error) {
         console.warn('[PHOTO-EDIT] pHash refresh skipped:', error.message);
       }
     }
 
-    res.json({ success: true, filename, updatedAt: Date.now() });
-  } catch (error) {
-    try {
-      if (fs.existsSync(backup)) {
-        if (fs.existsSync(target)) fs.unlinkSync(target);
-        fs.renameSync(backup, target);
+    // Delete the legacy file only after commit and only when no table refers to it.
+    if (!hasStoredPhotoReference(filename) && fs.existsSync(target)) {
+      try { fs.unlinkSync(target); } catch (error) {
+        console.warn('[PHOTO-EDIT] Old HEIC cleanup skipped:', error.message);
       }
-    } catch (restoreError) {
-      console.error('[PHOTO-EDIT] Restore failed:', restoreError.message);
     }
-    discardUpload();
-    console.error('[PHOTO-EDIT] Replacement failed:', error.message);
-    res.status(500).json({ error: 'Could not save the edited photo.' });
+    return res.json({ success: true, filename: newFilename, updatedAt: Date.now() });
+  } catch (error) {
+    if (!referencesUpdated && fs.existsSync(newTarget)) {
+      try { fs.unlinkSync(newTarget); } catch (cleanupError) {}
+    }
+    console.error('[PHOTO-EDIT] Replacement migration failed:', error.message);
+    return res.status(500).json({ error: 'Could not save the edited photo.' });
   }
 });
 
@@ -2650,22 +2753,15 @@ app.post('/api/community/combos', auth, requireTier('starter'), upload.array('ph
 
 // Edit combo (owner only)
 app.put('/api/community/combos/:id', auth, upload.array('photos', 2), (req, res) => {
-  const combo = db.prepare('SELECT * FROM glaze_combos WHERE id=?').get(req.params.id);
+  const combo = db.prepare('SELECT user_id FROM glaze_combos WHERE id=?').get(req.params.id);
   if (!combo || combo.user_id !== req.userId) return res.status(403).json({ error: 'Not authorized' });
   
   const { name, clayBodyName, cone, atmosphere, description, notes, isShared, layers } = req.body;
-  const photoSlots = [combo.photo_filename, combo.photo_filename2];
-  for (const file of (req.files || [])) {
-    const openIndex = photoSlots.findIndex(value => !value);
-    if (openIndex === -1) {
-      try { fs.unlinkSync(file.path); } catch (e) {}
-      continue;
-    }
-    photoSlots[openIndex] = file.filename;
-  }
+  const photo1 = req.files?.[0]?.filename || null;
+  const photo2 = req.files?.[1]?.filename || null;
   
-  db.prepare('UPDATE glaze_combos SET name=?,clay_body_name=?,cone=?,atmosphere=?,description=?,notes=?,is_shared=?,photo_filename=?,photo_filename2=?,updated_at=datetime(\'now\') WHERE id=?')
-    .run(name, clayBodyName, cone, atmosphere, description, notes, isShared === 'true' || isShared === true ? 1 : 0, photoSlots[0], photoSlots[1], req.params.id);
+  db.prepare('UPDATE glaze_combos SET name=?,clay_body_name=?,cone=?,atmosphere=?,description=?,notes=?,is_shared=?,photo_filename=COALESCE(?,photo_filename),photo_filename2=COALESCE(?,photo_filename2),updated_at=datetime(\'now\') WHERE id=?')
+    .run(name, clayBodyName, cone, atmosphere, description, notes, isShared === 'true' || isShared === true ? 1 : 0, photo1, photo2, req.params.id);
   
   if (layers) {
     const parsedLayers = typeof layers === 'string' ? JSON.parse(layers) : layers;
