@@ -6129,6 +6129,32 @@ app.post('/api/emergency/disk-cleanup', (req, res) => {
   }
 });
 
+// One-time migration endpoint (remove after use)
+app.post('/api/admin/run-migration-007', (req, res) => {
+  const { password } = req.body;
+  if (password !== 'luce13') return res.status(401).json({ error: 'Unauthorized' });
+  
+  try {
+    console.log('[MIGRATION] Running 007-add-custom-clay-type.sql');
+    db.exec('ALTER TABLE clay_bodies ADD COLUMN custom_clay_type TEXT');
+    console.log('[MIGRATION] ✓ Migration completed');
+    
+    // Verify column exists
+    const columns = db.prepare('PRAGMA table_info(clay_bodies)').all();
+    const hasCustomType = columns.some(c => c.name === 'custom_clay_type');
+    
+    res.json({ 
+      success: true, 
+      message: 'Migration 007 completed',
+      columnAdded: hasCustomType,
+      columns: columns.map(c => c.name)
+    });
+  } catch (error) {
+    console.error('[MIGRATION] Failed:', error.message);
+    res.status(500).json({ error: error.message, alreadyExists: error.message.includes('duplicate column') });
+  }
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🏺 The Potter's Mud Room running on http://localhost:${PORT}`);
   // Eagerly backfill color signatures at startup so they're ready before first search
