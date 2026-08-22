@@ -387,12 +387,11 @@ app.post('/api/analytics/pageview', (req, res) => {
     const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.ip || '';
     const safePath = typeof pagePath === 'string' && /^\/[A-Za-z0-9_./-]{0,180}$/.test(pagePath) ? pagePath : '/';
     const source = normalizeAnalyticsSource(referrer);
-    if (source === 'internal') return res.json({ ok: true, counted: false });
     // Extract user from token if present
     let userId = null;
     const t = req.headers.authorization?.replace('Bearer ', '');
     if (t) { try { const d = jwt.verify(t, JWT_SECRET); userId = d.userId; } catch {} }
-    db.prepare('INSERT INTO page_views (path, referrer, source, user_agent, ip, visitor_key, user_id) VALUES (?,?,?,?,?,?,?)')
+    db.prepare('INSERT INTO page_views (path, referrer, source, user_agent, ip, visitor_key, is_valid, user_id) VALUES (?,?,?,?,?,?,1,?)')
       .run(safePath, referrer || null, source, ua, ip, typeof visitorKey === 'string' ? visitorKey.slice(0, 128) : null, userId);
     res.json({ ok: true, counted: true });
   } catch(e) { res.json({ ok: true }); /* don't fail on analytics */ }
@@ -1420,14 +1419,16 @@ app.get('/api/admin/orders', auth, (req, res) => {
 app.get('/api/admin/analytics', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
-    const today = db.prepare("SELECT COUNT(*) as c FROM page_views WHERE created_at >= datetime('now', '-1 day')").get().c;
-    const week = db.prepare("SELECT COUNT(*) as c FROM page_views WHERE created_at >= datetime('now', '-7 day')").get().c;
-    const month = db.prepare("SELECT COUNT(*) as c FROM page_views WHERE created_at >= datetime('now', '-30 day')").get().c;
-    const total = db.prepare("SELECT COUNT(*) as c FROM page_views").get().c;
-    const byDay = db.prepare("SELECT date(created_at) as day, COUNT(*) as views FROM page_views WHERE created_at >= datetime('now', '-30 day') GROUP BY day ORDER BY day").all();
-    const topReferrers = db.prepare("SELECT source as referrer, COUNT(*) as c FROM page_views WHERE source IS NOT NULL AND source NOT IN ('direct','internal','unknown') GROUP BY source ORDER BY c DESC LIMIT 20").all();
-    const topPages = db.prepare("SELECT path, COUNT(*) as c FROM page_views GROUP BY path ORDER BY c DESC LIMIT 10").all();
-    const uniqueVisitors = db.prepare("SELECT COUNT(DISTINCT COALESCE(NULLIF(visitor_key,''), ip)) as c FROM page_views WHERE created_at >= datetime('now', '-30 day') AND source != 'internal'").get().c;
+    // New dashboard traffic metrics intentionally include only rows accepted by
+    // the repaired collector. Legacy rows remain stored and unchanged.
+    const today = db.prepare("SELECT COUNT(*) as c FROM page_views WHERE is_valid=1 AND created_at >= datetime('now', '-1 day')").get().c;
+    const week = db.prepare("SELECT COUNT(*) as c FROM page_views WHERE is_valid=1 AND created_at >= datetime('now', '-7 day')").get().c;
+    const month = db.prepare("SELECT COUNT(*) as c FROM page_views WHERE is_valid=1 AND created_at >= datetime('now', '-30 day')").get().c;
+    const total = db.prepare("SELECT COUNT(*) as c FROM page_views WHERE is_valid=1").get().c;
+    const byDay = db.prepare("SELECT date(created_at) as day, COUNT(*) as views FROM page_views WHERE is_valid=1 AND created_at >= datetime('now', '-30 day') GROUP BY day ORDER BY day").all();
+    const topReferrers = db.prepare("SELECT source as referrer, COUNT(*) as c FROM page_views WHERE is_valid=1 AND source IS NOT NULL AND source NOT IN ('direct','internal','unknown') GROUP BY source ORDER BY c DESC LIMIT 20").all();
+    const topPages = db.prepare("SELECT path, COUNT(*) as c FROM page_views WHERE is_valid=1 GROUP BY path ORDER BY c DESC LIMIT 10").all();
+    const uniqueVisitors = db.prepare("SELECT COUNT(DISTINCT COALESCE(NULLIF(visitor_key,''), ip)) as c FROM page_views WHERE is_valid=1 AND created_at >= datetime('now', '-30 day')").get().c;
     const signupsByDay = db.prepare("SELECT date(created_at) as day, COUNT(*) as signups FROM users WHERE created_at >= datetime('now', '-30 day') GROUP BY day ORDER BY day").all();
     // Signup sources breakdown
     const signupSources = db.prepare("SELECT COALESCE(signup_source, 'unknown') as source, COUNT(*) as count FROM users GROUP BY source ORDER BY count DESC").all();

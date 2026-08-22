@@ -435,7 +435,7 @@ function logout() {
 async function checkAuth() {
   // Don't override reset-password view
   if (window.location.hash.startsWith('#reset-password')) return;
-  if (!token) { document.getElementById('landingPage').style.display = ''; return; }
+  if (!token) { document.getElementById('landingPage').style.display = ''; if (!window.location.hash && window.location.pathname === '/') trackPageView('/'); return; }
   try {
     document.getElementById('landingPage').style.display = 'none';
     const d = await api('/api/auth/me');
