@@ -203,6 +203,19 @@ function initDB() {
       FOREIGN KEY (piece_id) REFERENCES pieces(id) ON DELETE SET NULL
     );
 
+    -- Saved Pricing Calculations
+    CREATE TABLE IF NOT EXISTS pricing_calculations (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT,
+      description TEXT,
+      inputs_json TEXT NOT NULL,
+      result_json TEXT NOT NULL,
+      photo_filename TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
     -- Community Glaze Combos
     CREATE TABLE IF NOT EXISTS glaze_combos (
       id TEXT PRIMARY KEY,
@@ -424,6 +437,7 @@ function initDB() {
     CREATE INDEX IF NOT EXISTS idx_piece_glazes_piece ON piece_glazes(piece_id);
     CREATE INDEX IF NOT EXISTS idx_firing_user ON firing_logs(user_id);
     CREATE INDEX IF NOT EXISTS idx_sales_user ON sales(user_id);
+    CREATE INDEX IF NOT EXISTS idx_pricing_calculations_user ON pricing_calculations(user_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_combos_shared ON glaze_combos(is_shared);
     CREATE INDEX IF NOT EXISTS idx_forum_posts_cat ON forum_posts(category_id);
     CREATE INDEX IF NOT EXISTS idx_forum_posts_user ON forum_posts(user_id);

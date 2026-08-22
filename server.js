@@ -922,6 +922,7 @@ app.delete('/api/account', auth, (req, res) => {
     db.prepare('DELETE FROM piece_photos WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
     db.prepare('DELETE FROM piece_glazes WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
     db.prepare('DELETE FROM sales WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM pricing_calculations WHERE user_id=?').run(uid);
     db.prepare('DELETE FROM glaze_clay_tests WHERE glaze_id IN (SELECT id FROM glazes WHERE user_id=?)').run(uid);
     db.prepare('DELETE FROM pieces WHERE user_id=?').run(uid);
     db.prepare('DELETE FROM glaze_combos WHERE user_id=?').run(uid);
@@ -1281,6 +1282,7 @@ app.delete('/api/admin/members/:id', auth, (req, res) => {
     db.prepare('DELETE FROM piece_photos WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
     db.prepare('DELETE FROM piece_glazes WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
     db.prepare('DELETE FROM sales WHERE user_id=?').run(uid);
+    db.prepare('DELETE FROM pricing_calculations WHERE user_id=?').run(uid);
     db.prepare('DELETE FROM glaze_clay_tests WHERE glaze_id IN (SELECT id FROM glazes WHERE user_id=?)').run(uid);
     db.prepare('DELETE FROM pieces WHERE user_id=?').run(uid);
     db.prepare('DELETE FROM glaze_combos WHERE user_id=?').run(uid);
@@ -2572,6 +2574,67 @@ app.get('/api/export/firing-logs', auth, (req, res) => {
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename=potters-mudroom-firing-logs.csv');
   res.send(csv);
+});
+
+// ============ PRICING CALCULATIONS ============
+const parsePricingCalculation = (row) => ({
+  id: row.id,
+  name: row.name,
+  description: row.description,
+  inputs: JSON.parse(row.inputs_json),
+  result: JSON.parse(row.result_json),
+  photo_filename: row.photo_filename,
+  created_at: row.created_at,
+});
+
+app.get('/api/pricing-calculations', auth, (req, res) => {
+  const rows = db.prepare('SELECT * FROM pricing_calculations WHERE user_id=? ORDER BY created_at DESC').all(req.userId);
+  res.json(rows.map(parsePricingCalculation));
+});
+
+app.post('/api/pricing-calculations', auth, upload.single('photo'), (req, res) => {
+  const discardUpload = () => {
+    if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+  };
+  let inputs;
+  let result;
+  try {
+    inputs = typeof req.body.inputs === 'string' ? JSON.parse(req.body.inputs) : req.body.inputs;
+    result = typeof req.body.result === 'string' ? JSON.parse(req.body.result) : req.body.result;
+  } catch (error) {
+    discardUpload();
+    return res.status(400).json({ error: 'Calculator inputs and result must be valid.' });
+  }
+  if (!inputs || !result || typeof inputs !== 'object' || typeof result !== 'object') {
+    discardUpload();
+    return res.status(400).json({ error: 'Calculator inputs and result are required.' });
+  }
+  if (req.file && (!String(req.file.mimetype || '').startsWith('image/') || req.file.size > MAX_IMAGE_SIZE)) {
+    discardUpload();
+    return res.status(400).json({ error: 'Piece photo must be a supported image under 20MB.' });
+  }
+  const id = uuidv4();
+  db.prepare('INSERT INTO pricing_calculations (id,user_id,name,description,inputs_json,result_json,photo_filename) VALUES (?,?,?,?,?,?,?)')
+    .run(id, req.userId, String(req.body.name || '').trim() || null, String(req.body.description || '').trim() || null, JSON.stringify(inputs), JSON.stringify(result), req.file?.filename || null);
+  res.status(201).json(parsePricingCalculation(db.prepare('SELECT * FROM pricing_calculations WHERE id=? AND user_id=?').get(id, req.userId)));
+});
+
+app.get('/api/pricing-calculations/:id', auth, (req, res) => {
+  const row = db.prepare('SELECT * FROM pricing_calculations WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!row) return res.status(404).json({ error: 'Pricing calculation not found.' });
+  res.json(parsePricingCalculation(row));
+});
+
+app.delete('/api/pricing-calculations/:id', auth, (req, res) => {
+  const row = db.prepare('SELECT * FROM pricing_calculations WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!row) return res.status(404).json({ error: 'Pricing calculation not found.' });
+  db.prepare('DELETE FROM pricing_calculations WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  if (row.photo_filename) {
+    const referenced = db.prepare(`SELECT 1 FROM pricing_calculations WHERE photo_filename=? LIMIT 1`).get(row.photo_filename);
+    const target = path.join(UPLOADS_DIR, row.photo_filename);
+    if (!referenced && fs.existsSync(target)) fs.unlinkSync(target);
+  }
+  res.json({ ok: true });
 });
 
 // ============ SALES ============
