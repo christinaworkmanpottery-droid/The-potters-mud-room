@@ -406,7 +406,7 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     const referredBy = sessionStorage.getItem('referral_code') || null;
     dbg('Sending login request...');
     const data = await api(isSignUp ? '/api/auth/register' : '/api/auth/login', {
-      method: 'POST', body: isSignUp ? { email, password, displayName: name, referredBy, signupSource: 'web_app' } : { email, password }
+      method: 'POST', body: isSignUp ? { email, password, displayName: name, referredBy, signupSource: 'web_app', newsletterSubscribed: false } : { email, password }
     });
     dbg('Got response, saving token...');
     if (isSignUp && referredBy) sessionStorage.removeItem('referral_code');

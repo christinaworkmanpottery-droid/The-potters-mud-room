@@ -416,17 +416,41 @@ function generateReferralCode() {
   return code;
 }
 
+// Keep the legacy member flag and the newsletter subscriber list aligned.
+// Re-activation is allowed only when the user has explicitly opted in again.
+function syncNewsletterSubscriber(email, subscribed, allowReactivation = false) {
+  const existing = db.prepare('SELECT id, is_active FROM newsletter_subscribers WHERE email=?').get(email);
+  if (subscribed) {
+    if (!existing) {
+      db.prepare('INSERT INTO newsletter_subscribers (id, email) VALUES (?,?)').run(uuidv4(), email);
+    } else if (!existing.is_active && allowReactivation) {
+      db.prepare('UPDATE newsletter_subscribers SET is_active=1 WHERE id=?').run(existing.id);
+    }
+  } else if (existing?.is_active) {
+    db.prepare('UPDATE newsletter_subscribers SET is_active=0 WHERE id=?').run(existing.id);
+  }
+}
+
 // ============ AUTH ============
 app.post('/api/auth/register', (req, res) => {
   try {
     const { password, displayName, referredBy, signupSource } = req.body;
+    const newsletterSubscribed = req.body.newsletterSubscribed === undefined ? true : !!req.body.newsletterSubscribed;
     const email = (req.body.email || '').trim().toLowerCase();
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
     if (db.prepare('SELECT id FROM users WHERE email=?').get(email)) return res.status(409).json({ error: 'Email already registered' });
     const id = uuidv4(), hash = bcrypt.hashSync(password, 10);
     const refCode = generateReferralCode();
-    db.prepare('INSERT INTO users (id,email,password_hash,display_name,referral_code,referred_by,signup_source) VALUES (?,?,?,?,?,?,?)')
-      .run(id, email, hash, displayName || email.split('@')[0], refCode, referredBy || null, signupSource || null);
+    db.prepare('INSERT INTO users (id,email,password_hash,display_name,referral_code,referred_by,signup_source,newsletter_subscribed) VALUES (?,?,?,?,?,?,?,?)')
+      .run(id, email, hash, displayName || email.split('@')[0], refCode, referredBy || null, signupSource || null, newsletterSubscribed ? 1 : 0);
+
+    // Newsletter enrollment must never make an otherwise valid account fail.
+    try {
+      if (newsletterSubscribed) syncNewsletterSubscriber(email, true, true);
+    } catch (e) {
+      console.warn('Newsletter enrollment failed after account creation:', e.message);
+      db.prepare('UPDATE users SET newsletter_subscribed=0 WHERE id=?').run(id);
+    }
 
     // Process referral rewards — both get 1 free month of starter
     if (referredBy) {
@@ -1036,8 +1060,11 @@ app.get('/api/admin/demographics', auth, (req, res) => {
 app.put('/api/profile/newsletter', auth, (req, res) => {
   try {
     const { subscribed } = req.body;
+    const user = db.prepare('SELECT email FROM users WHERE id=?').get(req.userId);
+    if (!user) return res.status(404).json({ error: 'User not found' });
     db.prepare('UPDATE users SET newsletter_subscribed=?, updated_at=datetime(\'now\') WHERE id=?')
       .run(subscribed ? 1 : 0, req.userId);
+    syncNewsletterSubscriber(user.email, !!subscribed, !!subscribed);
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -4115,12 +4142,17 @@ app.post('/api/newsletter/subscribe', (req, res) => {
     if (!email || !email.includes('@')) return res.status(400).json({ error: 'Valid email required' });
     const existing = db.prepare('SELECT id, is_active FROM newsletter_subscribers WHERE email=?').get(email);
     if (existing) {
-      if (existing.is_active) return res.json({ success: true, message: 'You\'re already subscribed!' });
+      if (existing.is_active) {
+        db.prepare('UPDATE users SET newsletter_subscribed=1 WHERE email=?').run(email);
+        return res.json({ success: true, message: 'You\'re already subscribed!' });
+      }
       db.prepare('UPDATE newsletter_subscribers SET is_active=1 WHERE id=?').run(existing.id);
+      db.prepare('UPDATE users SET newsletter_subscribed=1 WHERE email=?').run(email);
       return res.json({ success: true, message: 'Welcome back! You\'re re-subscribed.' });
     }
     const id = uuidv4();
     db.prepare('INSERT INTO newsletter_subscribers (id, email) VALUES (?,?)').run(id, email);
+    db.prepare('UPDATE users SET newsletter_subscribed=1 WHERE email=?').run(email);
     res.json({ success: true, message: 'You\'re in! Watch your inbox for pottery tips.' });
   } catch(e) {
     if (e.message.includes('UNIQUE')) return res.json({ success: true, message: 'You\'re already subscribed!' });
