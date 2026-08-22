@@ -383,7 +383,7 @@ app.post('/api/analytics/pageview', (req, res) => {
   try {
     const { path: pagePath, referrer, visitorKey } = req.body;
     const ua = req.headers['user-agent'] || '';
-    if (isAnalyticsBot(ua)) return res.json({ ok: true, counted: false });
+    if (isAnalyticsBot(ua) || typeof visitorKey !== 'string' || !visitorKey || /^(localhost|127\.0\.0\.1)(:|$)/i.test(req.headers.host || '')) return res.json({ ok: true, counted: false });
     const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.ip || '';
     const safePath = typeof pagePath === 'string' && /^\/[A-Za-z0-9_./-]{0,180}$/.test(pagePath) ? pagePath : '/';
     const source = normalizeAnalyticsSource(referrer);
@@ -391,6 +391,7 @@ app.post('/api/analytics/pageview', (req, res) => {
     let userId = null;
     const t = req.headers.authorization?.replace('Bearer ', '');
     if (t) { try { const d = jwt.verify(t, JWT_SECRET); userId = d.userId; } catch {} }
+    if (userId && db.prepare("SELECT 1 FROM users WHERE id=? AND LOWER(email) LIKE '%@example.com'").get(userId)) return res.json({ ok: true, counted: false });
     db.prepare('INSERT INTO page_views (path, referrer, source, user_agent, ip, visitor_key, is_valid, user_id) VALUES (?,?,?,?,?,?,1,?)')
       .run(safePath, referrer || null, source, ua, ip, typeof visitorKey === 'string' ? visitorKey.slice(0, 128) : null, userId);
     res.json({ ok: true, counted: true });
@@ -1425,16 +1426,17 @@ app.get('/api/admin/analytics', auth, (req, res) => {
     const week = db.prepare("SELECT COUNT(*) as c FROM page_views WHERE is_valid=1 AND created_at >= datetime('now', '-7 day')").get().c;
     const month = db.prepare("SELECT COUNT(*) as c FROM page_views WHERE is_valid=1 AND created_at >= datetime('now', '-30 day')").get().c;
     const total = db.prepare("SELECT COUNT(*) as c FROM page_views WHERE is_valid=1").get().c;
+    const legacyRawTotal = db.prepare("SELECT COUNT(*) as c FROM page_views WHERE is_valid=0").get().c;
     const byDay = db.prepare("SELECT date(created_at) as day, COUNT(*) as views FROM page_views WHERE is_valid=1 AND created_at >= datetime('now', '-30 day') GROUP BY day ORDER BY day").all();
-    const topReferrers = db.prepare("SELECT source as referrer, COUNT(*) as c FROM page_views WHERE is_valid=1 AND source IS NOT NULL AND source NOT IN ('direct','internal','unknown') GROUP BY source ORDER BY c DESC LIMIT 20").all();
+    const topReferrers = db.prepare("SELECT source as referrer, COUNT(*) as c FROM page_views WHERE is_valid=1 AND source IS NOT NULL AND source != 'internal' GROUP BY source ORDER BY c DESC LIMIT 20").all();
     const topPages = db.prepare("SELECT path, COUNT(*) as c FROM page_views WHERE is_valid=1 GROUP BY path ORDER BY c DESC LIMIT 10").all();
     const uniqueVisitors = db.prepare("SELECT COUNT(DISTINCT COALESCE(NULLIF(visitor_key,''), ip)) as c FROM page_views WHERE is_valid=1 AND created_at >= datetime('now', '-30 day')").get().c;
-    const signupsByDay = db.prepare("SELECT date(created_at) as day, COUNT(*) as signups FROM users WHERE created_at >= datetime('now', '-30 day') GROUP BY day ORDER BY day").all();
+    const signupsByDay = db.prepare("SELECT date(created_at) as day, COUNT(*) as signups FROM users WHERE created_at >= datetime('now', '-30 day') AND LOWER(email) NOT LIKE '%@example.com' GROUP BY day ORDER BY day").all();
     // Signup sources breakdown
-    const signupSources = db.prepare("SELECT COALESCE(signup_source, 'unknown') as source, COUNT(*) as count FROM users GROUP BY source ORDER BY count DESC").all();
-    const recentSignups = db.prepare("SELECT display_name, email, COALESCE(signup_source, 'unknown') as source, referred_by, created_at FROM users ORDER BY created_at DESC LIMIT 20").all();
-    res.json({ today, week, month, total, byDay, topReferrers, topPages, uniqueVisitors, signupsByDay, signupSources, recentSignups });
-  } catch(e) { res.json({ today:0, week:0, month:0, total:0, byDay:[], topReferrers:[], topPages:[], uniqueVisitors:0, signupsByDay:[], signupSources:[], recentSignups:[] }); }
+    const signupSources = db.prepare("SELECT COALESCE(signup_source, 'unknown') as source, COUNT(*) as count FROM users WHERE LOWER(email) NOT LIKE '%@example.com' GROUP BY source ORDER BY count DESC").all();
+    const recentSignups = db.prepare("SELECT display_name, email, COALESCE(signup_source, 'unknown') as source, referred_by, created_at FROM users WHERE LOWER(email) NOT LIKE '%@example.com' ORDER BY created_at DESC LIMIT 20").all();
+    res.json({ today, week, month, total, legacyRawTotal, byDay, topReferrers, topPages, uniqueVisitors, signupsByDay, signupSources, recentSignups });
+  } catch(e) { res.json({ today:0, week:0, month:0, total:0, legacyRawTotal:0, byDay:[], topReferrers:[], topPages:[], uniqueVisitors:0, signupsByDay:[], signupSources:[], recentSignups:[] }); }
 });
 
 // ============ PROMO CODES ============

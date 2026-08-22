@@ -482,6 +482,7 @@ function showApp() {
       navigate(hashPage);
     } else {
       loadDashboard();
+      trackPageView('/dashboard');
     }
     loadClayBodies(); loadGlazes();
     pollNotificationBadges();
@@ -3161,10 +3162,11 @@ async function loadAdminAnalytics() {
     const a = await api('/api/admin/analytics');
     const el = document.getElementById('adminAnalytics');
     let html = '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">' +
-      '<div class="stat-box"><div class="stat-number">' + (a.today || 0) + '</div><div class="stat-label">Today</div></div>' +
-      '<div class="stat-box"><div class="stat-number">' + (a.week || 0) + '</div><div class="stat-label">This Week</div></div>' +
-      '<div class="stat-box"><div class="stat-number">' + (a.month || 0) + '</div><div class="stat-label">This Month</div></div>' +
-      '<div class="stat-box"><div class="stat-number">' + (a.total || 0) + '</div><div class="stat-label">All Time</div></div>' +
+      '<div class="stat-box"><div class="stat-number">' + (a.today || 0) + '</div><div class="stat-label">Verified Today</div></div>' +
+      '<div class="stat-box"><div class="stat-number">' + (a.week || 0) + '</div><div class="stat-label">Verified This Week</div></div>' +
+      '<div class="stat-box"><div class="stat-number">' + (a.month || 0) + '</div><div class="stat-label">Verified This Month</div></div>' +
+      '<div class="stat-box"><div class="stat-number">' + (a.total || 0) + '</div><div class="stat-label">Verified Since Repair</div></div>' +
+      '<div class="stat-box"><div class="stat-number">' + (a.legacyRawTotal || 0) + '</div><div class="stat-label">Legacy Raw Events</div></div>' +
       '<div class="stat-box"><div class="stat-number">' + (a.uniqueVisitors || 0) + '</div><div class="stat-label">Unique Visitors (30d)</div></div>' +
       '</div>';
 
