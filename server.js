@@ -361,20 +361,55 @@ app.get('/purchase-success', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'purchase-success.html'));
 });
 
-// Simple analytics — track page views
+// Analytics helpers. Counts exclude obvious automation and normalize sources.
+const INTERNAL_HOSTS = new Set(['thepottersmudroom.com', 'www.thepottersmudroom.com', 'the-potters-mud-room.onrender.com', 'localhost', '127.0.0.1']);
+function isAnalyticsBot(ua) { return !ua || /bot|crawler|spider|slurp|facebookexternalhit|linkedinbot|twitterbot|discordbot|whatsapp|skypeuripreview|pingdom|uptimerobot|headless|phantom|lighthouse|curl|wget/i.test(ua); }
+function normalizeAnalyticsSource(rawReferrer) {
+  if (!rawReferrer) return 'direct';
+  try {
+    const host = new URL(rawReferrer).hostname.toLowerCase().replace(/^www\./, '');
+    if (INTERNAL_HOSTS.has(host)) return 'internal';
+    if (/^(facebook|fb)\.com$|^(m|l)\.facebook\.com$/.test(host)) return 'facebook';
+    if (/^instagram\.com$|^l\.instagram\.com$/.test(host)) return 'instagram';
+    if (/^(twitter|x)\.com$|^t\.co$/.test(host)) return 'x';
+    if (/^pinterest\.com$|^pin\.it$/.test(host)) return 'pinterest';
+    if (/^(google|bing|duckduckgo|yahoo)\./.test(host)) return 'search';
+    return host;
+  } catch { return 'unknown'; }
+}
+
+// Simple analytics — track validated browser page events.
 app.post('/api/analytics/pageview', (req, res) => {
   try {
-    const { path: pagePath, referrer } = req.body;
+    const { path: pagePath, referrer, visitorKey } = req.body;
     const ua = req.headers['user-agent'] || '';
+    if (isAnalyticsBot(ua)) return res.json({ ok: true, counted: false });
     const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.ip || '';
+    const safePath = typeof pagePath === 'string' && /^\/[A-Za-z0-9_./-]{0,180}$/.test(pagePath) ? pagePath : '/';
+    const source = normalizeAnalyticsSource(referrer);
+    if (source === 'internal') return res.json({ ok: true, counted: false });
     // Extract user from token if present
     let userId = null;
     const t = req.headers.authorization?.replace('Bearer ', '');
     if (t) { try { const d = jwt.verify(t, JWT_SECRET); userId = d.userId; } catch {} }
-    db.prepare('INSERT INTO page_views (path, referrer, user_agent, ip, user_id) VALUES (?,?,?,?,?)')
-      .run(pagePath || '/', referrer || null, ua, ip, userId);
-    res.json({ ok: true });
+    db.prepare('INSERT INTO page_views (path, referrer, source, user_agent, ip, visitor_key, user_id) VALUES (?,?,?,?,?,?,?)')
+      .run(safePath, referrer || null, source, ua, ip, typeof visitorKey === 'string' ? visitorKey.slice(0, 128) : null, userId);
+    res.json({ ok: true, counted: true });
   } catch(e) { res.json({ ok: true }); /* don't fail on analytics */ }
+});
+
+app.post('/api/analytics/blog-view', (req, res) => {
+  try {
+    const { postId, visitorKey } = req.body;
+    const ua = req.headers['user-agent'] || '';
+    if (!postId || typeof visitorKey !== 'string' || !visitorKey || isAnalyticsBot(ua)) return res.json({ ok: true, counted: false });
+    const key = visitorKey.slice(0, 128);
+    if (db.prepare("SELECT id FROM blog_view_events WHERE blog_post_id=? AND visitor_key=? AND created_at >= datetime('now','-30 minutes') LIMIT 1").get(postId, key)) return res.json({ ok: true, counted: false });
+    const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.ip || '';
+    db.prepare('INSERT INTO blog_view_events (blog_post_id, visitor_key, user_agent, ip) VALUES (?,?,?,?)').run(postId, key, ua, ip);
+    db.prepare('UPDATE blog_posts SET view_count=COALESCE(view_count,0)+1 WHERE id=?').run(postId);
+    res.json({ ok: true, counted: true });
+  } catch(e) { res.json({ ok: true, counted: false }); }
 });
 
 // Auth middleware
@@ -1390,15 +1425,15 @@ app.get('/api/admin/analytics', auth, (req, res) => {
     const month = db.prepare("SELECT COUNT(*) as c FROM page_views WHERE created_at >= datetime('now', '-30 day')").get().c;
     const total = db.prepare("SELECT COUNT(*) as c FROM page_views").get().c;
     const byDay = db.prepare("SELECT date(created_at) as day, COUNT(*) as views FROM page_views WHERE created_at >= datetime('now', '-30 day') GROUP BY day ORDER BY day").all();
-    const topReferrers = db.prepare("SELECT referrer, COUNT(*) as c FROM page_views WHERE referrer IS NOT NULL AND referrer != '' GROUP BY referrer ORDER BY c DESC LIMIT 20").all();
+    const topReferrers = db.prepare("SELECT source as referrer, COUNT(*) as c FROM page_views WHERE source IS NOT NULL AND source NOT IN ('direct','internal','unknown') GROUP BY source ORDER BY c DESC LIMIT 20").all();
     const topPages = db.prepare("SELECT path, COUNT(*) as c FROM page_views GROUP BY path ORDER BY c DESC LIMIT 10").all();
-    const uniqueIPs = db.prepare("SELECT COUNT(DISTINCT ip) as c FROM page_views WHERE created_at >= datetime('now', '-30 day')").get().c;
+    const uniqueVisitors = db.prepare("SELECT COUNT(DISTINCT COALESCE(NULLIF(visitor_key,''), ip)) as c FROM page_views WHERE created_at >= datetime('now', '-30 day') AND source != 'internal'").get().c;
     const signupsByDay = db.prepare("SELECT date(created_at) as day, COUNT(*) as signups FROM users WHERE created_at >= datetime('now', '-30 day') GROUP BY day ORDER BY day").all();
     // Signup sources breakdown
     const signupSources = db.prepare("SELECT COALESCE(signup_source, 'unknown') as source, COUNT(*) as count FROM users GROUP BY source ORDER BY count DESC").all();
     const recentSignups = db.prepare("SELECT display_name, email, COALESCE(signup_source, 'unknown') as source, referred_by, created_at FROM users ORDER BY created_at DESC LIMIT 20").all();
-    res.json({ today, week, month, total, byDay, topReferrers, topPages, uniqueIPs, signupsByDay, signupSources, recentSignups });
-  } catch(e) { res.json({ today:0, week:0, month:0, total:0, byDay:[], topReferrers:[], topPages:[], uniqueIPs:0, signupsByDay:[], signupSources:[], recentSignups:[] }); }
+    res.json({ today, week, month, total, byDay, topReferrers, topPages, uniqueVisitors, signupsByDay, signupSources, recentSignups });
+  } catch(e) { res.json({ today:0, week:0, month:0, total:0, byDay:[], topReferrers:[], topPages:[], uniqueVisitors:0, signupsByDay:[], signupSources:[], recentSignups:[] }); }
 });
 
 // ============ PROMO CODES ============
@@ -3987,8 +4022,6 @@ app.get('/api/blog/posts/:slug', (req, res) => {
   try {
     const post = db.prepare('SELECT * FROM blog_posts WHERE slug=? AND is_published=1').get(req.params.slug);
     if (!post) return res.status(404).json({ error: 'Post not found' });
-    // Track blog view
-    try { db.prepare("UPDATE blog_posts SET view_count=COALESCE(view_count,0)+1 WHERE id=?").run(post.id); } catch(e) {}
     res.json(post);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -4546,6 +4579,13 @@ app.get('/blog/:slug', (req, res) => {
   </style>
 </head>
 <body>
+  <script>
+    (function () {
+      var key = localStorage.getItem('mudlog_visitor_key');
+      if (!key) { key = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID() : Date.now() + '-' + Math.random(); localStorage.setItem('mudlog_visitor_key', key); }
+      fetch('/api/analytics/blog-view', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ postId: ${JSON.stringify(post.id)}, visitorKey: key }) }).catch(function () {});
+    }());
+  </script>
   <div class="header"><a href="https://thepottersmudroom.com">🏺 The Potter's <span>Mud Room</span></a></div>
   <div class="container">
     <h1>${post.title}</h1>

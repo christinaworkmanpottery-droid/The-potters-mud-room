@@ -2870,17 +2870,24 @@ async function cancelSubscription() {
 // Track page views for analytics
 function trackPageView(pagePath) {
   try {
+    let visitorKey = localStorage.getItem('mudlog_visitor_key');
+    if (!visitorKey) { visitorKey = (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : Date.now() + '-' + Math.random()); localStorage.setItem('mudlog_visitor_key', visitorKey); }
     const h = {};
     if (token) h['Authorization'] = 'Bearer ' + token;
     h['Content-Type'] = 'application/json';
     fetch('/api/analytics/pageview', {
       method: 'POST', headers: h,
-      body: JSON.stringify({ path: pagePath || window.location.pathname, referrer: document.referrer })
+      body: JSON.stringify({ path: pagePath || window.location.pathname, referrer: document.referrer, visitorKey })
     }).catch(() => {});
   } catch(e) {}
 }
-// Track landing page view immediately
-trackPageView('/');
+function trackBlogView(postId) {
+  try {
+    const visitorKey = localStorage.getItem('mudlog_visitor_key');
+    if (!visitorKey || !postId) return;
+    fetch('/api/analytics/blog-view', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ postId, visitorKey }) }).catch(() => {});
+  } catch(e) {}
+}
 
 // ---- User Activity Tracking ----
 let _activityThrottle = {};
@@ -3158,7 +3165,7 @@ async function loadAdminAnalytics() {
       '<div class="stat-box"><div class="stat-number">' + (a.week || 0) + '</div><div class="stat-label">This Week</div></div>' +
       '<div class="stat-box"><div class="stat-number">' + (a.month || 0) + '</div><div class="stat-label">This Month</div></div>' +
       '<div class="stat-box"><div class="stat-number">' + (a.total || 0) + '</div><div class="stat-label">All Time</div></div>' +
-      '<div class="stat-box"><div class="stat-number">' + (a.uniqueIPs || 0) + '</div><div class="stat-label">Unique Visitors (30d)</div></div>' +
+      '<div class="stat-box"><div class="stat-number">' + (a.uniqueVisitors || 0) + '</div><div class="stat-label">Unique Visitors (30d)</div></div>' +
       '</div>';
 
     // Signups by day
@@ -5526,6 +5533,7 @@ async function viewBlogPost(slug) {
         "image": "https://thepottersmudroom.com/og-image.png",
         "description": post.excerpt || post.title
       }) + '<\/script>';
+    trackBlogView(post.id);
   } catch(e) { toast(e.message, 'error'); }
 }
 

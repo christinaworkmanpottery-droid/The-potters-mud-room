@@ -389,8 +389,10 @@ function initDB() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       path TEXT NOT NULL,
       referrer TEXT,
+      source TEXT,
       user_agent TEXT,
       ip TEXT,
+      visitor_key TEXT,
       user_id TEXT,
       created_at TEXT DEFAULT (datetime('now'))
     );
@@ -1022,6 +1024,9 @@ function initDB() {
   safeAdd('users', 'is_beta_tester', 'INTEGER DEFAULT 0');
   safeAdd('users', 'last_login', 'TEXT DEFAULT NULL');
   safeAdd('blog_posts', 'view_count', 'INTEGER DEFAULT 0');
+  safeAdd('page_views', 'source', 'TEXT');
+  safeAdd('page_views', 'visitor_key', 'TEXT');
+  db.exec(`CREATE TABLE IF NOT EXISTS blog_view_events (id INTEGER PRIMARY KEY AUTOINCREMENT, blog_post_id TEXT NOT NULL, visitor_key TEXT NOT NULL, user_agent TEXT, ip TEXT, created_at TEXT DEFAULT (datetime('now')), FOREIGN KEY (blog_post_id) REFERENCES blog_posts(id) ON DELETE CASCADE); CREATE INDEX IF NOT EXISTS idx_blog_view_events_post ON blog_view_events(blog_post_id, created_at); CREATE INDEX IF NOT EXISTS idx_blog_view_events_visitor ON blog_view_events(visitor_key, created_at);`);
 
   // Sync beta signups to lifetime beta access on startup
   try {
