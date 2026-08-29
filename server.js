@@ -5384,10 +5384,10 @@ async function computeColorSignature(buffer) {
   const w = meta.width || 100;
   const h = meta.height || 100;
 
-  // === TIGHT CENTER CROP (40%) — avoids backgrounds, hands, props ===
-  // Pottery photos typically have the piece centered; 40% captures the glaze zone.
-  const cropW = Math.max(1, Math.round(w * 0.40));
-  const cropH = Math.max(1, Math.round(h * 0.40));
+  // === CENTER CROP (70%) — retain centered pieces without cutting off their rims ===
+  // The former 40% crop could discard substantial width from a centered piece.
+  const cropW = Math.max(1, Math.round(w * 0.70));
+  const cropH = Math.max(1, Math.round(h * 0.70));
   const left = Math.max(0, Math.round((w - cropW) / 2));
   const top = Math.max(0, Math.round((h - cropH) / 2));
 
@@ -5399,9 +5399,12 @@ async function computeColorSignature(buffer) {
     .raw()
     .toBuffer();
 
-  // Collect all pixels, compute saturation per pixel
+  // Collect all pixels, compute saturation per pixel.
+  // Keep a separate, bounded dark/near-neutral set: black glazes have little
+  // saturation, but a small dark shadow/noise patch should not qualify alone.
   const allPixels = [];
   const saturatedPixels = [];
+  const darkNeutralPixels = [];
 
   for (let i = 0; i < pixels.length; i += 3) {
     const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
@@ -5414,14 +5417,21 @@ async function computeColorSignature(buffer) {
     if (saturation > 0.15 && l > 0.08 && l < 0.94) {
       saturatedPixels.push(px);
     }
+    if (saturation <= 0.40 && l > 0.01 && l <= 0.15) {
+      darkNeutralPixels.push(px);
+    }
   }
 
   if (!allPixels.length) return JSON.stringify([]);
 
-  // Use saturated pixels if plentiful; otherwise fall back to all non-extreme pixels
+  // Use saturated pixels when plentiful, plus dark/near-neutral pixels only when
+  // they occupy at least 5% of the sample (and at least 12 pixels). This keeps
+  // a small shadow/noise patch from becoming a candidate object while retaining
+  // a substantial black or charcoal glaze.
+  const substantialDarkNeutral = darkNeutralPixels.length >= Math.max(12, Math.ceil(allPixels.length * 0.05));
   const workingSet = saturatedPixels.length >= 12
-    ? saturatedPixels
-    : allPixels.filter(p => p.l > 0.05 && p.l < 0.95);
+    ? (substantialDarkNeutral ? saturatedPixels.concat(darkNeutralPixels) : saturatedPixels)
+    : (substantialDarkNeutral ? darkNeutralPixels : allPixels.filter(p => p.l > 0.05 && p.l < 0.95));
 
   if (!workingSet.length) return JSON.stringify([]);
 
