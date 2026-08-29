@@ -5,7 +5,7 @@ const fs = require('fs');
 const multer = require('multer');
 
 // Deploy version tag — used to verify which code is actually running on Render
-const DEPLOY_VERSION = 'v10-studio-notes-2026-07-14';
+const DEPLOY_VERSION = 'v11-build39-backend-2026-08-29';
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
@@ -1526,8 +1526,14 @@ app.get('/api/clay-bodies/:id', auth, (req, res) => {
 });
 
 app.post('/api/clay-bodies', auth, (req, res) => {
-  const { name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, customClayType, costPerBag, bagWeight, source, sourceUrl, inStock, buyUrl, notes } = req.body;
+  let { name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, customClayType, costPerBag, bagWeight, source, sourceUrl, inStock, buyUrl, notes } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });
+  // better-sqlite3 rejects undefined bindings; omitted optional mobile fields must be SQL NULL.
+  const optional = value => value === undefined ? null : value;
+  brand = optional(brand); colorWet = optional(colorWet); colorDry = optional(colorDry); colorFired = optional(colorFired);
+  shrinkagePct = optional(shrinkagePct); absorptionPct = optional(absorptionPct); coneRange = optional(coneRange);
+  clayType = optional(clayType); customClayType = optional(customClayType); costPerBag = optional(costPerBag); bagWeight = optional(bagWeight);
+  source = optional(source); sourceUrl = optional(sourceUrl); buyUrl = optional(buyUrl); notes = optional(notes);
   const id = uuidv4();
   db.prepare('INSERT INTO clay_bodies (id,user_id,name,brand,color_wet,color_dry,color_fired,shrinkage_pct,absorption_pct,cone_range,clay_type,custom_clay_type,cost_per_bag,bag_weight,source,source_url,in_stock,buy_url,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
     .run(id, req.userId, name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct||null, coneRange, clayType, customClayType||null, costPerBag, bagWeight, source||null, sourceUrl||null, inStock!==undefined?(inStock?1:0):1, buyUrl||null, notes);
@@ -5700,10 +5706,15 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       // White plates vs white bowls have identical color — shape must distinguish them.
       // For saturated glazes (blue, green, red), color is more reliable.
       const avgSaturation = (dominantHsl.s + photoHsl.s) / 2;
+      // A dark neutral piece should not lose to a lighter speckled piece merely
+      // because both are low-saturation. Use tone only as a small tie-breaker.
+      const toneScore = avgSaturation < 0.15
+        ? Math.max(0, 1 - Math.abs(dominantHsl.l - photoHsl.l) / 0.5)
+        : 0.5;
       let colorWeight, shapeWeight;
       if (avgSaturation < 0.15) {
         // Neutral colors (white, gray, black) — shape dominant
-        colorWeight = 0.35; shapeWeight = 0.65;
+        colorWeight = 0.35; shapeWeight = 0.55;
       } else if (avgSaturation < 0.30) {
         // Low saturation (off-white, beige, muted) — balanced
         colorWeight = 0.50; shapeWeight = 0.50;
@@ -5712,7 +5723,8 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         colorWeight = 0.70; shapeWeight = 0.30;
       }
 
-      const score = Math.min(1.0, (colorScore * colorWeight) + (shapeScore * shapeWeight) + nearDuplicateBonus);
+      const neutralToneWeight = avgSaturation < 0.15 ? 0.10 : 0;
+      const score = Math.min(1.0, (colorScore * colorWeight) + (shapeScore * shapeWeight) + (toneScore * neutralToneWeight) + nearDuplicateBonus);
 
       // Hue diff for logging
       let hueDiff2 = Math.abs(dominantHsl.h - photoHsl.h);
@@ -5733,6 +5745,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         avgDist,
         shapeScore,
         colorScore,
+        toneScore,
         colorWeight,
         shapeWeight,
         avgSaturation,
@@ -6206,6 +6219,11 @@ app.patch('/api/pieces/:id/public', auth, (req, res) => {
     if (piece.user_id !== req.userId) return res.status(403).json({ error: 'Not your piece' });
 
     const { isPublic, displayName, allowMessages } = req.body;
+    const normalizedStatus = String(piece.status || '').trim().toLowerCase().replace(/[_\s]+/g, '-');
+    const eligibleStatuses = new Set(['glaze-fired', 'done', 'sold']);
+    if (isPublic && !eligibleStatuses.has(normalizedStatus)) {
+      return res.status(400).json({ error: 'Only finished pieces can be shared to the Gallery.' });
+    }
     db.prepare('UPDATE pieces SET is_public=?, public_display_name=?, allow_messages=?, updated_at=datetime(\'now\') WHERE id=?')
       .run(isPublic ? 1 : 0, displayName || null, allowMessages ? 1 : 0, req.params.id);
 
@@ -6229,12 +6247,12 @@ app.get('/api/gallery', (req, res) => {
       FROM pieces p
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN clay_bodies cb ON p.clay_body_id = cb.id
-      WHERE p.is_public = 1 AND p.status IN ('glaze-fired', 'done', 'sold')
+      WHERE p.is_public = 1 AND REPLACE(LOWER(TRIM(p.status)), ' ', '-') IN ('glaze-fired', 'done', 'sold', 'complete')
       ORDER BY p.updated_at DESC
       LIMIT ? OFFSET ?
     `).all(limit, offset);
 
-    const total = db.prepare('SELECT COUNT(*) as c FROM pieces WHERE is_public=1 AND status IN (\'glaze-fired\', \'done\', \'sold\')').get().c;
+    const total = db.prepare("SELECT COUNT(*) as c FROM pieces WHERE is_public=1 AND REPLACE(LOWER(TRIM(status)), ' ', '-') IN ('glaze-fired', 'done', 'sold', 'complete')").get().c;
 
     const results = pieces.map(p => ({
       id: p.id,
