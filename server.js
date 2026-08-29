@@ -5519,6 +5519,7 @@ async function computeColorSignature(buffer) {
   // Collect all pixels, compute saturation per pixel
   const allPixels = [];
   const saturatedPixels = [];
+  const darkNeutralPixels = [];
 
   for (let i = 0; i < pixels.length; i += 3) {
     const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
@@ -5531,14 +5532,18 @@ async function computeColorSignature(buffer) {
     if (saturation > 0.15 && l > 0.08 && l < 0.94) {
       saturatedPixels.push(px);
     }
+    if (saturation <= 0.40 && l > 0.01 && l <= 0.15) {
+      darkNeutralPixels.push(px);
+    }
   }
 
   if (!allPixels.length) return JSON.stringify([]);
 
   // Use saturated pixels if plentiful; otherwise fall back to all non-extreme pixels
+  const substantialDarkNeutral = darkNeutralPixels.length >= Math.max(12, Math.ceil(allPixels.length * 0.05));
   const workingSet = saturatedPixels.length >= 12
-    ? saturatedPixels
-    : allPixels.filter(p => p.l > 0.05 && p.l < 0.95);
+    ? (substantialDarkNeutral ? saturatedPixels.concat(darkNeutralPixels) : saturatedPixels)
+    : (substantialDarkNeutral ? darkNeutralPixels : allPixels.filter(p => p.l > 0.05 && p.l < 0.95));
 
   if (!workingSet.length) return JSON.stringify([]);
 
