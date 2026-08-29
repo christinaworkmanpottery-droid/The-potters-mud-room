@@ -5384,10 +5384,10 @@ async function computeColorSignature(buffer) {
   const w = meta.width || 100;
   const h = meta.height || 100;
 
-  // === CENTER CROP (70%) — retain centered pieces without cutting off their rims ===
-  // The former 40% crop could discard substantial width from a centered piece.
-  const cropW = Math.max(1, Math.round(w * 0.70));
-  const cropH = Math.max(1, Math.round(h * 0.70));
+  // === TIGHT CENTER CROP (40%) — avoids backgrounds, hands, props ===
+  // Pottery photos typically have the piece centered; 40% captures the glaze zone.
+  const cropW = Math.max(1, Math.round(w * 0.40));
+  const cropH = Math.max(1, Math.round(h * 0.40));
   const left = Math.max(0, Math.round((w - cropW) / 2));
   const top = Math.max(0, Math.round((h - cropH) / 2));
 
