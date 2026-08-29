@@ -5461,14 +5461,41 @@ function parseColorSignature(signature) {
 // Select an object cluster when a very light dominant cluster is likely background.
 // The existing cluster distance, pHash, hue gate, score formula, and response stay unchanged.
 function selectObjectCluster(signature) {
-  if (!signature.length) return null;
+  if (!signature.length) {
+    console.log('[Photo Diagnostic] selector: no clusters available; selected=null');
+    return null;
+  }
   const dominant = signature.reduce((best, cluster) => cluster.weight > best.weight ? cluster : best, signature[0]);
-  const lightness = rgbToHsl(dominant.r, dominant.g, dominant.b).l;
-  if (lightness > 0.72) {
+  const dominantHsl = rgbToHsl(dominant.r, dominant.g, dominant.b);
+  const clusterDiagnostics = signature.map((cluster, index) => {
+    const hsl = rgbToHsl(cluster.r, cluster.g, cluster.b);
+    const lightPass = dominantHsl.l > 0.72;
+    const darkPass = hsl.l < 0.58;
+    const representationPass = cluster.weight >= dominant.weight * 0.12;
+    const reasons = [];
+    if (!lightPass) reasons.push('dominant lightness <= 0.72');
+    if (!darkPass) reasons.push('cluster lightness >= 0.58');
+    if (!representationPass) reasons.push('weight below dominant*0.12');
+    return { index, rgb: [cluster.r, cluster.g, cluster.b], hsl: { h: +hsl.h.toFixed(3), s: +hsl.s.toFixed(3), l: +hsl.l.toFixed(3) }, weight: cluster.weight, conditions: { dominantLightPass: lightPass, darkPass, representationPass }, result: lightPass && darkPass && representationPass ? 'passed' : 'failed', reasons };
+  });
+  console.log('[Photo Diagnostic] selector:', JSON.stringify({
+    clusterCount: signature.length,
+    dominantIndex: signature.indexOf(dominant),
+    dominant: { rgb: [dominant.r, dominant.g, dominant.b], hsl: { h: +dominantHsl.h.toFixed(3), s: +dominantHsl.s.toFixed(3), l: +dominantHsl.l.toFixed(3) }, weight: dominant.weight },
+    thresholds: { dominantLightnessGreaterThan: 0.72, objectLightnessLessThan: 0.58, minimumWeightRatio: 0.12 },
+    clusters: clusterDiagnostics
+  }));
+  if (dominantHsl.l > 0.72) {
     const darkCluster = signature
       .filter(cluster => rgbToHsl(cluster.r, cluster.g, cluster.b).l < 0.58 && cluster.weight >= dominant.weight * 0.12)
       .sort((a, b) => b.weight - a.weight)[0];
-    if (darkCluster) return darkCluster;
+    if (darkCluster) {
+      console.log('[Photo Diagnostic] selector result: dark object cluster selected', JSON.stringify({ rgb: [darkCluster.r, darkCluster.g, darkCluster.b], weight: darkCluster.weight }));
+      return darkCluster;
+    }
+    console.log('[Photo Diagnostic] selector result: dominant selected; no cluster passed all object conditions');
+  } else {
+    console.log('[Photo Diagnostic] selector result: dominant selected; dominant lightness condition failed');
   }
   return dominant;
 }
@@ -6100,12 +6127,16 @@ app.patch('/api/pieces/:id/public', auth, (req, res) => {
     const { isPublic, displayName, allowMessages } = req.body;
     const normalizedStatus = String(piece.status || '').trim().toLowerCase().replace(/[_\s]+/g, '-');
     const eligibleStatuses = new Set(['glaze-fired', 'done', 'complete', 'sold']);
-    if (isPublic && !eligibleStatuses.has(normalizedStatus)) {
+    const statusEligible = eligibleStatuses.has(normalizedStatus);
+    const shareFields = { isPublic: !!isPublic, allowMessages: !!allowMessages, hasDisplayName: !!(displayName && String(displayName).trim()) };
+    if (isPublic && !statusEligible) {
+      console.log('[Gallery Diagnostic] rejected', JSON.stringify({ pieceId: req.params.id, rawStatus: piece.status, normalizedStatus, statusEligible, ...shareFields, reason: 'Only finished pieces can be shared to the Gallery.' }));
       return res.status(400).json({ error: 'Only finished pieces can be shared to the Gallery.' });
     }
     db.prepare('UPDATE pieces SET is_public=?, public_display_name=?, allow_messages=?, updated_at=datetime(\'now\') WHERE id=?')
       .run(isPublic ? 1 : 0, displayName || null, allowMessages ? 1 : 0, req.params.id);
 
+    console.log('[Gallery Diagnostic] accepted', JSON.stringify({ pieceId: req.params.id, rawStatus: piece.status, normalizedStatus, statusEligible, ...shareFields, reason: isPublic ? 'eligible completed status' : 'unshare request' }));
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
