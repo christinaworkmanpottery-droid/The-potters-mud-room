@@ -5,7 +5,7 @@ const fs = require('fs');
 const multer = require('multer');
 
 // Deploy version tag — used to verify which code is actually running on Render
-const DEPLOY_VERSION = 'v10-studio-notes-2026-07-14';
+const DEPLOY_VERSION = 'v12-build39-runtime-repairs-2026-08-29';
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
@@ -1595,19 +1595,40 @@ app.get('/api/clay-bodies/:id', auth, (req, res) => {
 });
 
 app.post('/api/clay-bodies', auth, (req, res) => {
-  const { name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, customClayType, costPerBag, bagWeight, source, sourceUrl, inStock, buyUrl, notes } = req.body;
+  let { name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, customClayType, costPerBag, bagWeight, source, sourceUrl, inStock, buyUrl, notes } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });
+  // better-sqlite3 rejects undefined bindings; omitted optional mobile fields must be SQL NULL.
+  const optional = value => value === undefined ? null : value;
+  brand = optional(brand); colorWet = optional(colorWet); colorDry = optional(colorDry); colorFired = optional(colorFired);
+  shrinkagePct = optional(shrinkagePct); absorptionPct = optional(absorptionPct); coneRange = optional(coneRange);
+  clayType = optional(clayType); customClayType = optional(customClayType); costPerBag = optional(costPerBag); bagWeight = optional(bagWeight);
+  source = optional(source); sourceUrl = optional(sourceUrl); buyUrl = optional(buyUrl); notes = optional(notes);
   const id = uuidv4();
-  db.prepare('INSERT INTO clay_bodies (id,user_id,name,brand,color_wet,color_dry,color_fired,shrinkage_pct,absorption_pct,cone_range,clay_type,custom_clay_type,cost_per_bag,bag_weight,source,source_url,in_stock,buy_url,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-    .run(id, req.userId, name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct||null, coneRange, clayType, customClayType||null, costPerBag, bagWeight, source||null, sourceUrl||null, inStock!==undefined?(inStock?1:0):1, buyUrl||null, notes);
+  const columns = db.prepare('PRAGMA table_info(clay_bodies)').all().map(column => column.name);
+  const hasCustomClayType = columns.includes('custom_clay_type');
+  if (hasCustomClayType) {
+    db.prepare('INSERT INTO clay_bodies (id,user_id,name,brand,color_wet,color_dry,color_fired,shrinkage_pct,absorption_pct,cone_range,clay_type,custom_clay_type,cost_per_bag,bag_weight,source,source_url,in_stock,buy_url,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(id, req.userId, name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct||null, coneRange, clayType, customClayType||null, costPerBag, bagWeight, source||null, sourceUrl||null, inStock!==undefined?(inStock?1:0):1, buyUrl||null, notes);
+  } else {
+    db.prepare('INSERT INTO clay_bodies (id,user_id,name,brand,color_wet,color_dry,color_fired,shrinkage_pct,absorption_pct,cone_range,clay_type,cost_per_bag,bag_weight,source,source_url,in_stock,buy_url,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(id, req.userId, name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct||null, coneRange, clayType, costPerBag, bagWeight, source||null, sourceUrl||null, inStock!==undefined?(inStock?1:0):1, buyUrl||null, notes);
+  }
   res.json({ id, name });
 });
 
 app.put('/api/clay-bodies/:id', auth, (req, res) => {
-  const { name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, customClayType, costPerBag, bagWeight, source, sourceUrl, inStock, buyUrl, notes } = req.body;
-  const r = db.prepare(`UPDATE clay_bodies SET name=?,brand=?,color_wet=?,color_dry=?,color_fired=?,shrinkage_pct=?,absorption_pct=?,cone_range=?,clay_type=?,custom_clay_type=?,cost_per_bag=?,bag_weight=?,source=?,source_url=?,in_stock=?,buy_url=?,notes=?,updated_at=datetime('now') WHERE id=? AND user_id=?`)
-    .run(name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct||null, coneRange, clayType, customClayType||null, costPerBag, bagWeight, source||null, sourceUrl||null, inStock!==undefined?(inStock?1:0):1, buyUrl||null, notes, req.params.id, req.userId);
-  if (r.changes === 0) return res.status(404).json({ error: 'Not found' });
+  let { name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, customClayType, costPerBag, bagWeight, source, sourceUrl, inStock, buyUrl, notes } = req.body;
+  const optional = value => value === undefined ? null : value;
+  brand = optional(brand); colorWet = optional(colorWet); colorDry = optional(colorDry); colorFired = optional(colorFired);
+  shrinkagePct = optional(shrinkagePct); absorptionPct = optional(absorptionPct); coneRange = optional(coneRange);
+  clayType = optional(clayType); customClayType = optional(customClayType); costPerBag = optional(costPerBag); bagWeight = optional(bagWeight);
+  source = optional(source); sourceUrl = optional(sourceUrl); buyUrl = optional(buyUrl); notes = optional(notes);
+  const columns = db.prepare('PRAGMA table_info(clay_bodies)').all().map(column => column.name);
+  const hasCustomClayType = columns.includes('custom_clay_type');
+  const update = hasCustomClayType
+    ? db.prepare(`UPDATE clay_bodies SET name=?,brand=?,color_wet=?,color_dry=?,color_fired=?,shrinkage_pct=?,absorption_pct=?,cone_range=?,clay_type=?,custom_clay_type=?,cost_per_bag=?,bag_weight=?,source=?,source_url=?,in_stock=?,buy_url=?,notes=?,updated_at=datetime('now') WHERE id=? AND user_id=?`).run(name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, customClayType, costPerBag, bagWeight, source, sourceUrl, inStock!==undefined?(inStock?1:0):1, buyUrl, notes, req.params.id, req.userId)
+    : db.prepare(`UPDATE clay_bodies SET name=?,brand=?,color_wet=?,color_dry=?,color_fired=?,shrinkage_pct=?,absorption_pct=?,cone_range=?,clay_type=?,cost_per_bag=?,bag_weight=?,source=?,source_url=?,in_stock=?,buy_url=?,notes=?,updated_at=datetime('now') WHERE id=? AND user_id=?`).run(name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, costPerBag, bagWeight, source, sourceUrl, inStock!==undefined?(inStock?1:0):1, buyUrl, notes, req.params.id, req.userId);
+  if (update.changes === 0) return res.status(404).json({ error: 'Not found' });
   res.json({ success: true });
 });
 
@@ -5533,7 +5554,9 @@ async function computeColorSignature(buffer) {
     .raw()
     .toBuffer();
 
-  // Collect all pixels, compute saturation per pixel
+  // Collect all pixels, compute saturation per pixel.
+  // Keep a separate, bounded dark/near-neutral set: black glazes have little
+  // saturation, but a small dark shadow/noise patch should not qualify alone.
   const allPixels = [];
   const saturatedPixels = [];
   const darkNeutralPixels = [];
@@ -5556,7 +5579,10 @@ async function computeColorSignature(buffer) {
 
   if (!allPixels.length) return JSON.stringify([]);
 
-  // Use saturated pixels if plentiful; otherwise fall back to all non-extreme pixels
+  // Use saturated pixels when plentiful, plus dark/near-neutral pixels only when
+  // they occupy at least 5% of the sample (and at least 12 pixels). This keeps
+  // a small shadow/noise patch from becoming a candidate object while retaining
+  // a substantial black or charcoal glaze.
   const substantialDarkNeutral = darkNeutralPixels.length >= Math.max(12, Math.ceil(allPixels.length * 0.05));
   const workingSet = saturatedPixels.length >= 12
     ? (substantialDarkNeutral ? saturatedPixels.concat(darkNeutralPixels) : saturatedPixels)
@@ -5595,6 +5621,48 @@ function parseColorSignature(signature) {
     }
     return [];
   }
+}
+
+// Select an object cluster when a very light dominant cluster is likely background.
+// The existing cluster distance, pHash, hue gate, score formula, and response stay unchanged.
+function selectObjectCluster(signature) {
+  if (!signature.length) {
+    console.log('[Photo Diagnostic] selector: no clusters available; selected=null');
+    return null;
+  }
+  const dominant = signature.reduce((best, cluster) => cluster.weight > best.weight ? cluster : best, signature[0]);
+  const dominantHsl = rgbToHsl(dominant.r, dominant.g, dominant.b);
+  const clusterDiagnostics = signature.map((cluster, index) => {
+    const hsl = rgbToHsl(cluster.r, cluster.g, cluster.b);
+    const lightPass = dominantHsl.l > 0.72;
+    const darkPass = hsl.l < 0.58;
+    const representationPass = cluster.weight >= dominant.weight * 0.12;
+    const reasons = [];
+    if (!lightPass) reasons.push('dominant lightness <= 0.72');
+    if (!darkPass) reasons.push('cluster lightness >= 0.58');
+    if (!representationPass) reasons.push('weight below dominant*0.12');
+    return { index, rgb: [cluster.r, cluster.g, cluster.b], hsl: { h: +hsl.h.toFixed(3), s: +hsl.s.toFixed(3), l: +hsl.l.toFixed(3) }, weight: cluster.weight, conditions: { dominantLightPass: lightPass, darkPass, representationPass }, result: lightPass && darkPass && representationPass ? 'passed' : 'failed', reasons };
+  });
+  console.log('[Photo Diagnostic] selector:', JSON.stringify({
+    clusterCount: signature.length,
+    dominantIndex: signature.indexOf(dominant),
+    dominant: { rgb: [dominant.r, dominant.g, dominant.b], hsl: { h: +dominantHsl.h.toFixed(3), s: +dominantHsl.s.toFixed(3), l: +dominantHsl.l.toFixed(3) }, weight: dominant.weight },
+    thresholds: { dominantLightnessGreaterThan: 0.72, objectLightnessLessThan: 0.58, minimumWeightRatio: 0.12 },
+    clusters: clusterDiagnostics
+  }));
+  if (dominantHsl.l > 0.72) {
+    const darkCluster = signature
+      .filter(cluster => rgbToHsl(cluster.r, cluster.g, cluster.b).l < 0.58 && cluster.weight >= dominant.weight * 0.12)
+      .sort((a, b) => b.weight - a.weight)[0];
+    if (darkCluster) {
+      console.log('[Photo Diagnostic] selector result: dark object cluster selected', JSON.stringify({ rgb: [darkCluster.r, darkCluster.g, darkCluster.b], weight: darkCluster.weight }));
+      return darkCluster;
+    }
+    console.log('[Photo Diagnostic] selector result: dominant selected; no cluster passed all object conditions');
+  } else {
+    console.log('[Photo Diagnostic] selector result: dominant selected; dominant lightness condition failed');
+  }
+  return dominant;
 }
 
 // Convert RGB to HSL
@@ -5801,7 +5869,10 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
     }
 
     // Find dominant cluster (highest weight) from search photo
-    const dominantSearch = searchSig.reduce((best, c) => c.weight > best.weight ? c : best, searchSig[0]);
+    const dominantSearch = selectObjectCluster(searchSig);
+    const rawDominantSearch = searchSig.reduce((best, c) => c.weight > best.weight ? c : best, searchSig[0]);
+    const objectColorSearch = dominantSearch !== rawDominantSearch;
+    const scoringSearchSig = objectColorSearch ? [dominantSearch] : searchSig;
     const dominantHsl = rgbToHsl(dominantSearch.r, dominantSearch.g, dominantSearch.b);
 
     console.log('[v9] Search dominant RGB:', dominantSearch.r, dominantSearch.g, dominantSearch.b, 'weight:', dominantSearch.weight.toFixed(3));
@@ -5812,7 +5883,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       if (!photoSig.length) continue;
 
       // Find dominant cluster in stored photo
-      const dominantPhoto = photoSig.reduce((best, c) => c.weight > best.weight ? c : best, photoSig[0]);
+      const dominantPhoto = selectObjectCluster(photoSig);
       const photoHsl = rgbToHsl(dominantPhoto.r, dominantPhoto.g, dominantPhoto.b);
 
       // === HUE GATE: compare dominant clusters only ===
@@ -5830,7 +5901,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       // === SCORING: cluster-to-cluster distance ===
       // Find best match between any search cluster and any photo cluster (weighted)
       let totalDist = 0, totalWeight = 0;
-      for (const sCluster of searchSig) {
+      for (const sCluster of scoringSearchSig) {
         let bestDist = Infinity;
         for (const pCluster of photoSig) {
           const dist = perceptualColorDistance(sCluster, pCluster);
@@ -5860,10 +5931,15 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       // White plates vs white bowls have identical color — shape must distinguish them.
       // For saturated glazes (blue, green, red), color is more reliable.
       const avgSaturation = (dominantHsl.s + photoHsl.s) / 2;
+      // A dark neutral piece should not lose to a lighter speckled piece merely
+      // because both are low-saturation. Use tone only as a small tie-breaker.
+      const toneScore = avgSaturation < 0.15
+        ? Math.max(0, 1 - Math.abs(dominantHsl.l - photoHsl.l) / 0.5)
+        : 0.5;
       let colorWeight, shapeWeight;
       if (avgSaturation < 0.15) {
         // Neutral colors (white, gray, black) — shape dominant
-        colorWeight = 0.35; shapeWeight = 0.65;
+        colorWeight = 0.35; shapeWeight = 0.55;
       } else if (avgSaturation < 0.30) {
         // Low saturation (off-white, beige, muted) — balanced
         colorWeight = 0.50; shapeWeight = 0.50;
@@ -5872,7 +5948,8 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         colorWeight = 0.70; shapeWeight = 0.30;
       }
 
-      const score = Math.min(1.0, (colorScore * colorWeight) + (shapeScore * shapeWeight) + nearDuplicateBonus);
+      const neutralToneWeight = avgSaturation < 0.15 ? 0.10 : 0;
+      const score = Math.min(1.0, (colorScore * colorWeight) + (shapeScore * shapeWeight) + (toneScore * neutralToneWeight) + nearDuplicateBonus);
 
       // Hue diff for logging
       let hueDiff2 = Math.abs(dominantHsl.h - photoHsl.h);
@@ -5893,6 +5970,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         avgDist,
         shapeScore,
         colorScore,
+        toneScore,
         colorWeight,
         shapeWeight,
         avgSaturation,
@@ -6211,14 +6289,18 @@ app.patch('/api/pieces/:id/public', auth, (req, res) => {
     if (piece.user_id !== req.userId) return res.status(403).json({ error: 'Not your piece' });
 
     const { isPublic, displayName, allowMessages } = req.body;
-    const eligibleStatuses = new Set(['glaze-fired', 'done', 'sold']);
+    const eligibleStatuses = new Set(['glaze-fired', 'done', 'complete', 'sold']);
     const normalizedStatus = String(piece.status || '').trim().toLowerCase().replace(/[ _]+/g, '-').replace(/^final-fired$/, 'glaze-fired');
-    if (isPublic && !eligibleStatuses.has(normalizedStatus)) {
+    const statusEligible = eligibleStatuses.has(normalizedStatus);
+    const shareFields = { isPublic: !!isPublic, allowMessages: !!allowMessages, hasDisplayName: !!(displayName && String(displayName).trim()) };
+    if (isPublic && !statusEligible) {
+      console.log('[Gallery Diagnostic] rejected', JSON.stringify({ pieceId: req.params.id, rawStatus: piece.status, normalizedStatus, statusEligible, ...shareFields, reason: 'Only finished pieces can be shared to the Gallery.' }));
       return res.status(400).json({ error: 'Only finished pieces can be shared to the Gallery.' });
     }
     db.prepare('UPDATE pieces SET is_public=?, public_display_name=?, allow_messages=?, updated_at=datetime(\'now\') WHERE id=? AND user_id=?')
       .run(isPublic ? 1 : 0, displayName || null, allowMessages ? 1 : 0, req.params.id, req.userId);
 
+    console.log('[Gallery Diagnostic] accepted', JSON.stringify({ pieceId: req.params.id, rawStatus: piece.status, normalizedStatus, statusEligible, ...shareFields, reason: isPublic ? 'eligible completed status' : 'unshare request' }));
     res.json({ success: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -6239,12 +6321,12 @@ app.get('/api/gallery', (req, res) => {
       FROM pieces p
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN clay_bodies cb ON p.clay_body_id = cb.id
-      WHERE p.is_public = 1 AND REPLACE(LOWER(REPLACE(REPLACE(TRIM(p.status), ' ', '-'), '_', '-')), 'final-fired', 'glaze-fired') IN ('glaze-fired', 'done', 'sold')
+      WHERE p.is_public = 1 AND REPLACE(LOWER(REPLACE(REPLACE(TRIM(p.status), ' ', '-'), '_', '-')), 'final-fired', 'glaze-fired') IN ('glaze-fired', 'done', 'complete', 'sold')
       ORDER BY p.updated_at DESC
       LIMIT ? OFFSET ?
     `).all(limit, offset);
 
-    const total = db.prepare("SELECT COUNT(*) as c FROM pieces WHERE is_public=1 AND REPLACE(LOWER(REPLACE(REPLACE(TRIM(status), ' ', '-'), '_', '-')), 'final-fired', 'glaze-fired') IN ('glaze-fired', 'done', 'sold')").get().c;
+    const total = db.prepare("SELECT COUNT(*) as c FROM pieces WHERE is_public=1 AND REPLACE(LOWER(REPLACE(REPLACE(TRIM(status), ' ', '-'), '_', '-')), 'final-fired', 'glaze-fired') IN ('glaze-fired', 'done', 'complete', 'sold')").get().c;
 
     const results = pieces.map(p => ({
       id: p.id,
