@@ -1094,13 +1094,15 @@ app.get('/api/admin/demographics', auth, (req, res) => {
 // Newsletter subscription toggle
 app.put('/api/profile/newsletter', auth, (req, res) => {
   try {
-    const { subscribed } = req.body;
+    const subscribed = req.body.subscribed !== undefined
+      ? req.body.subscribed
+      : req.body.newsletterSubscribed;
     const user = db.prepare('SELECT email FROM users WHERE id=?').get(req.userId);
     if (!user) return res.status(404).json({ error: 'User not found' });
     db.prepare('UPDATE users SET newsletter_subscribed=?, updated_at=datetime(\'now\') WHERE id=?')
       .run(subscribed ? 1 : 0, req.userId);
     syncNewsletterSubscriber(user.email, !!subscribed, !!subscribed);
-    res.json({ success: true });
+    res.json({ success: true, newsletterSubscribed: !!(subscribed ? 1 : 0) });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -1696,21 +1698,36 @@ app.put('/api/glazes/:id', auth, (req, res) => {
 });
 
 app.delete('/api/glazes/:id', auth, (req, res) => {
+  const glaze = db.prepare('SELECT id FROM glazes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!glaze) return res.status(404).json({ error: 'Not found' });
   db.prepare('DELETE FROM glaze_ingredients WHERE glaze_id=?').run(req.params.id);
   db.prepare('DELETE FROM glaze_photos WHERE glaze_id=?').run(req.params.id);
-  const r = db.prepare('DELETE FROM glazes WHERE id=? AND user_id=?').run(req.params.id, req.userId);
-  if (r.changes === 0) return res.status(404).json({ error: 'Not found' });
+  db.prepare('DELETE FROM glazes WHERE id=? AND user_id=?').run(req.params.id, req.userId);
   res.json({ success: true });
 });
 
 app.post('/api/glazes/:id/photos', auth, upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo' });
+  const glaze = db.prepare('SELECT id FROM glazes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!glaze) { try { fs.unlinkSync(req.file.path); } catch (e) {} return res.status(404).json({ error: 'Glaze not found' }); }
   const maxPhotos = (req.userTier === 'free') ? 1 : 3;
   const count = db.prepare('SELECT COUNT(*) as c FROM glaze_photos WHERE glaze_id=?').get(req.params.id).c;
-  if (count >= maxPhotos) return res.status(403).json({ error: req.userTier === 'free' ? 'Free tier allows 1 photo per glaze. Upgrade to add up to 3!' : 'Max 3 photos per glaze' });
+  if (count >= maxPhotos) { try { fs.unlinkSync(req.file.path); } catch (e) {} return res.status(403).json({ error: req.userTier === 'free' ? 'Free tier allows 1 photo per glaze. Upgrade to add up to 3!' : 'Max 3 photos per glaze' }); }
   const id = uuidv4();
   db.prepare('INSERT INTO glaze_photos (id,glaze_id,filename,original_name,photo_label,notes,sort_order) VALUES (?,?,?,?,?,?,?)').run(id, req.params.id, req.file.filename, req.file.originalname, req.body.label||null, req.body.notes||null, count);
   res.json({ id, filename: req.file.filename });
+});
+
+app.put('/api/glazes/:id/photos/reorder', auth, (req, res) => {
+  const { photoIds } = req.body;
+  if (!Array.isArray(photoIds)) return res.status(400).json({ error: 'photoIds must be an array' });
+  const glaze = db.prepare('SELECT id FROM glazes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!glaze) return res.status(404).json({ error: 'Glaze not found' });
+  const owned = db.prepare('SELECT id FROM glaze_photos WHERE glaze_id=?').all(req.params.id).map(row => row.id);
+  if (photoIds.length !== owned.length || photoIds.some(id => !owned.includes(id))) return res.status(400).json({ error: 'Invalid glaze photo order.' });
+  const update = db.prepare('UPDATE glaze_photos SET sort_order=? WHERE id=? AND glaze_id=?');
+  db.transaction(() => photoIds.forEach((photoId, index) => update.run(index, photoId, req.params.id)))();
+  res.json({ success: true });
 });
 
 // Glaze photo delete
@@ -2450,9 +2467,9 @@ app.put('/api/photos/by-filename/:filename', auth, replacementPhotoUpload, async
     try {
       // Preserve existing same-format behavior for non-legacy assets.
       const existingMeta = await sharp(target).metadata();
-      if (existingMeta.format !== 'jpeg') {
+      if (!new Set(['jpeg', 'png']).has(existingMeta.format)) {
         discardUpload();
-        return res.status(400).json({ error: 'Replacement image format must match the stored photo.' });
+        return res.status(400).json({ error: 'Replacement image format is not supported.' });
       }
       fs.renameSync(req.file.path, target);
 
@@ -6195,7 +6212,8 @@ app.patch('/api/pieces/:id/public', auth, (req, res) => {
 
     const { isPublic, displayName, allowMessages } = req.body;
     const eligibleStatuses = new Set(['glaze-fired', 'done', 'sold']);
-    if (isPublic && !eligibleStatuses.has(piece.status)) {
+    const normalizedStatus = String(piece.status || '').trim().toLowerCase().replace(/[ _]+/g, '-').replace(/^final-fired$/, 'glaze-fired');
+    if (isPublic && !eligibleStatuses.has(normalizedStatus)) {
       return res.status(400).json({ error: 'Only finished pieces can be shared to the Gallery.' });
     }
     db.prepare('UPDATE pieces SET is_public=?, public_display_name=?, allow_messages=?, updated_at=datetime(\'now\') WHERE id=? AND user_id=?')
@@ -6221,12 +6239,12 @@ app.get('/api/gallery', (req, res) => {
       FROM pieces p
       LEFT JOIN users u ON p.user_id = u.id
       LEFT JOIN clay_bodies cb ON p.clay_body_id = cb.id
-      WHERE p.is_public = 1 AND p.status IN ('glaze-fired', 'done', 'sold')
+      WHERE p.is_public = 1 AND REPLACE(LOWER(REPLACE(REPLACE(TRIM(p.status), ' ', '-'), '_', '-')), 'final-fired', 'glaze-fired') IN ('glaze-fired', 'done', 'sold')
       ORDER BY p.updated_at DESC
       LIMIT ? OFFSET ?
     `).all(limit, offset);
 
-    const total = db.prepare('SELECT COUNT(*) as c FROM pieces WHERE is_public=1 AND status IN (\'glaze-fired\', \'done\', \'sold\')').get().c;
+    const total = db.prepare("SELECT COUNT(*) as c FROM pieces WHERE is_public=1 AND REPLACE(LOWER(REPLACE(REPLACE(TRIM(status), ' ', '-'), '_', '-')), 'final-fired', 'glaze-fired') IN ('glaze-fired', 'done', 'sold')").get().c;
 
     const results = pieces.map(p => ({
       id: p.id,
