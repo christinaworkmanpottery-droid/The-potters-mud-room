@@ -1918,12 +1918,9 @@ app.get('/api/pieces', auth, (req, res) => {
     // Legacy field aliases so older app builds can read piece data
     p.name = p.title;
     p.clay = p.clay_body_name || null;
-    // Extract glaze from notes if stored there, or from glazes array
+    // Glazes are hydrated from structured piece_glazes rows.
     if (p.glazes && p.glazes.length > 0) {
       p.glaze = p.glazes.map(g => g.glaze_name || g.name).join(', ');
-    } else if (p.notes) {
-      const gm = p.notes.match(/Glaze:\s*([^|]+)/);
-      if (gm) p.glaze = gm[1].trim();
     }
     // Extract firing temp from notes
     if (p.notes) {
@@ -1956,18 +1953,13 @@ app.get('/api/pieces/:id', auth, (req, res) => {
   p.clay = p.clay_body_name || null;
   if (p.glazes && p.glazes.length > 0) {
     p.glaze = p.glazes.map(g => g.glaze_name || g.name).join(', ');
-  } else if (p.notes) {
-    const gm = p.notes.match(/Glaze:\s*([^|]+)/);
-    if (gm) p.glaze = gm[1].trim();
   }
   if (p.notes) {
     const fm = p.notes.match(/Firing temp:\s*([^|]+)/);
     if (fm) p.firingTemp = fm[1].trim();
     // Clean notes — strip embedded glaze/firing temp for display
     p.cleanNotes = p.notes
-      .replace(/\s*\|\s*Glaze:[^|]+/g, '')
       .replace(/\s*\|\s*Firing temp:[^|]+/g, '')
-      .replace(/^Glaze:[^|]+\s*\|?\s*/g, '')
       .replace(/^Firing temp:[^|]+\s*\|?\s*/g, '')
       .trim() || null;
   }
@@ -1984,7 +1976,6 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
   const title = String(body.title || body.name || '').trim() || null;
   const clayText = String(body.clay || body.studio || '').trim() || null;
   const clayBodyId = body.clayBodyId || body.clay_body_id || null;
-  const glazeText = String(body.glaze || '').trim() || null;
   const statusMap = {'In Progress':'in-progress','Bisque Fired':'bisque-fired','Glazed':'glazed','Final Fired':'glaze-fired','Glaze Fired':'glaze-fired','Complete':'done','Done':'done','Sold':'sold','Broken':'broken','Recycled':'recycled'};
   const rawStatus = String(body.status || 'in-progress').trim();
   const status = statusMap[rawStatus] || rawStatus.toLowerCase().replace(/\s+/g,'-');
@@ -2004,8 +1995,6 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
   const userNotes = String(body.description || '').trim();
   // If body.notes already has content (from app), use it as base; otherwise build from parts
   let existingNotes = String(body.notes || '').trim();
-  // Strip auto-generated glaze text from existing notes (backward compatibility cleanup)
-  existingNotes = existingNotes.replace(/Glaze:\s*[^|]+(\|\s*)?/g, '').replace(/\s*\|\s*$/, '').replace(/^\s*\|\s*/, '').trim();
   let notes;
   if (existingNotes) {
     // App already combined notes — just ensure firing temp is included if needed
@@ -2026,7 +2015,7 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
   let glazeIds = body.glazeIds || body.glaze_ids || null;
   if (typeof glazeIds === 'string') { try { glazeIds = JSON.parse(glazeIds); } catch(e) { glazeIds = null; } }
 
-  console.log('[DEBUG] POST /api/pieces content-type:', req.headers['content-type'], 'body:', JSON.stringify(body), 'file:', req.file ? req.file.originalname : 'none', 'title:', title, 'status:', status, 'clay:', clayText, 'glaze:', glazeText, 'notes:', notes);
+  console.log('[DEBUG] POST /api/pieces content-type:', req.headers['content-type'], 'body:', JSON.stringify(body), 'file:', req.file ? req.file.originalname : 'none', 'title:', title, 'status:', status, 'clay:', clayText, 'notes:', notes);
 
   if (!iap.hasPremiumAccess(db, req.userId) && getPieceCount(req.userId) >= 10) return res.status(403).json({ error: 'Free tier limited to 10 pieces. Upgrade to Unlimited for more!' });
 
@@ -2147,13 +2136,10 @@ app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
   const dateStarted = body.dateStarted || body.date_started || null;
   const dateCompleted = body.dateCompleted || body.date_completed || null;
   const dateSold = body.dateSold || body.date_sold || null;
-  const glazeText = String(body.glaze || '').trim() || null;
   const firingTemp = String(body.firingTemp || body.firing_temp || '').trim();
   // Same logic as POST — app may send pre-combined notes
   const userNotes = String(body.description || '').trim();
   let existingNotes = String(body.notes || '').trim();
-  // Strip auto-generated glaze text from existing notes (backward compatibility cleanup)
-  existingNotes = existingNotes.replace(/Glaze:\s*[^|]+(\|\s*)?/g, '').replace(/\s*\|\s*$/, '').replace(/^\s*\|\s*/, '').trim();
   let notes;
   if (existingNotes) {
     const noteParts = [existingNotes];
