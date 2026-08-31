@@ -2568,6 +2568,17 @@ app.put('/api/pieces/:id/photos/reorder', auth, (req, res) => {
   res.json({ success: true });
 });
 
+app.put('/api/firing-logs/:id/photos/reorder', auth, (req, res) => {
+  const { photoIds } = req.body;
+  if (!Array.isArray(photoIds)) return res.status(400).json({ error: 'photoIds must be an array' });
+  const log = db.prepare('SELECT * FROM firing_logs WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!log) return res.status(404).json({ error: 'Firing log not found' });
+  photoIds.forEach((photoId, index) => {
+    db.prepare('UPDATE firing_photos SET sort_order=? WHERE id=? AND firing_id=?').run(index, photoId, req.params.id);
+  });
+  res.json({ success: true });
+});
+
 // ============ FIRING LOGS ============
 app.get('/api/firing-logs', auth, (req, res) => {
   const { sort } = req.query;
@@ -3296,8 +3307,13 @@ app.get('/api/casualties', auth, (req, res) => {
     WHERE p.user_id=? AND p.status IN ('broken','recycled') 
     ORDER BY p.updated_at DESC`).all(req.userId);
   const getGl = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order');
-  const getPh = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order LIMIT 1');
-  pieces.forEach(p => { p.glazes = getGl.all(p.id); p.primaryPhoto = getPh.get(p.id) || null; });
+  const getPh = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order');
+  pieces.forEach(p => {
+    p.glazes = getGl.all(p.id);
+    const allPhotos = getPh.all(p.id);
+    p.photos = allPhotos;
+    p.primaryPhoto = allPhotos[0] || null;
+  });
   res.json(pieces);
 });
 
