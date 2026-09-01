@@ -2818,9 +2818,9 @@ app.post('/api/sales/bulk', auth, requireTier('starter'), (req, res) => {
 });
 
 app.get('/api/sales/summary', auth, requireTier('starter'), (req, res) => {
-  const total = db.prepare('SELECT COUNT(*) as count, SUM(price) as total FROM sales WHERE user_id=?').get(req.userId);
-  const byVenue = db.prepare('SELECT venue_type,COUNT(*) as count,SUM(price) as total FROM sales WHERE user_id=? GROUP BY venue_type').all(req.userId);
-  const byMonth = db.prepare(`SELECT strftime('%Y-%m',date) as month,COUNT(*) as count,SUM(price) as total FROM sales WHERE user_id=? GROUP BY month ORDER BY month DESC LIMIT 12`).all(req.userId);
+  const total = db.prepare('SELECT COUNT(*) as count, SUM(price * COALESCE(quantity, 1)) as total FROM sales WHERE user_id=?').get(req.userId);
+  const byVenue = db.prepare('SELECT venue_type,COUNT(*) as count,SUM(price * COALESCE(quantity, 1)) as total FROM sales WHERE user_id=? GROUP BY venue_type').all(req.userId);
+  const byMonth = db.prepare(`SELECT strftime('%Y-%m',date) as month,COUNT(*) as count,SUM(price * COALESCE(quantity, 1)) as total FROM sales WHERE user_id=? GROUP BY month ORDER BY month DESC LIMIT 12`).all(req.userId);
   res.json({ total, byVenue, byMonth });
 });
 
@@ -3294,7 +3294,7 @@ app.get('/api/dashboard', auth, (req, res) => {
   stats.totalCasualties = db.prepare("SELECT COUNT(*) as c FROM pieces WHERE user_id=? AND status IN ('broken','recycled')").get(req.userId).c;
 
   if (tier !== 'free') {
-    const sales = db.prepare('SELECT COUNT(*) as count, SUM(price) as total FROM sales WHERE user_id=?').get(req.userId);
+    const sales = db.prepare('SELECT COUNT(*) as count, SUM(price * COALESCE(quantity, 1)) as total FROM sales WHERE user_id=?').get(req.userId);
     stats.sales = sales;
   }
   res.json(stats);
@@ -5432,7 +5432,18 @@ const sharp = require('sharp');
 // Uses 32x32 resize, 8x8 DCT coefficients, median threshold → 16 hex chars (64 bits).
 async function computePHash(buffer) {
   const size = 32;
+  // Compare the centered subject, not the full camera/gallery frame. The
+  // color signature already uses this subject boundary; using the full frame
+  // here lets neutral backgrounds, hands, or screenshots dominate shape.
+  const meta = await sharp(buffer).metadata();
+  const width = meta.width || size;
+  const height = meta.height || size;
+  const cropWidth = Math.max(1, Math.round(width * 0.60));
+  const cropHeight = Math.max(1, Math.round(height * 0.60));
+  const left = Math.max(0, Math.round((width - cropWidth) / 2));
+  const top = Math.max(0, Math.round((height - cropHeight) / 2));
   const pixels = await sharp(buffer)
+    .extract({ left, top, width: cropWidth, height: cropHeight })
     .resize(size, size, { fit: 'fill' })
     .grayscale()
     .raw()
@@ -5798,6 +5809,17 @@ try {
     console.log(`[Photo Search] Migration color_sig_v9_kmeans: cleared ${cleared.changes} color signatures — recomputing with k-means clustering`);
   }
 } catch(e) { console.warn('[Photo Search] Migration v9 error:', e.message); }
+
+// v10 migration: pHash now uses the same centered subject boundary as color
+// signatures; invalidate hashes generated from the full frame.
+try {
+  const doneV10 = db.prepare('SELECT 1 FROM migrations WHERE name=?').get('phash_v10_center_crop');
+  if (!doneV10) {
+    const cleared = db.prepare('UPDATE piece_photos SET phash=NULL WHERE phash IS NOT NULL').run();
+    db.prepare("INSERT INTO migrations (name, applied_at) VALUES (?, datetime('now'))").run('phash_v10_center_crop');
+    console.log(`[Photo Search] Migration phash_v10_center_crop: cleared ${cleared.changes} phashes`);
+  }
+} catch (e) { console.warn('[Photo Search] Migration v10 error:', e.message); }
 
 // v9b migration: switch from aHash to pHash (DCT-based) for better form discrimination
 // aHash cannot distinguish plates from bowls — pHash captures structural frequency differences
