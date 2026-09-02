@@ -1591,7 +1591,11 @@ app.get('/api/clay-bodies/:id', auth, (req, res) => {
   const clay = db.prepare('SELECT * FROM clay_bodies WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!clay) return res.status(404).json({ error: 'Not found' });
   clay.photos = db.prepare('SELECT * FROM clay_photos WHERE clay_id=? ORDER BY sort_order').all(clay.id);
-  console.log('[TEMP-CLAY-DIAG-BACKEND] GET clay', JSON.stringify({ clayId: clay.id, photoCount: clay.photos.length }));
+  console.log('[TEMP-CLAY-DIAG-BACKEND] GET clay', JSON.stringify({
+    clayId: clay.id,
+    photoCount: clay.photos.length,
+    photos: clay.photos.map(photo => ({ id: photo.id, filename: photo.filename }))
+  }));
   res.json({ clay });
 });
 
@@ -1645,18 +1649,20 @@ app.delete('/api/clay-bodies/:id', auth, (req, res) => {
 
 // Clay photo upload (replaces existing photo if at max, so edits always persist)
 app.post('/api/clay-bodies/:id/photos', auth, upload.single('photo'), (req, res) => {
-  console.log('[TEMP-CLAY-DIAG-BACKEND] photo upload request', JSON.stringify({ clayId: req.params.id, replace: req.body.replace, hasFile: !!req.file }));
+  console.log('[TEMP-CLAY-DIAG-BACKEND] photo upload request', JSON.stringify({
+    clayId: req.params.id,
+    hasFile: !!req.file,
+    file: req.file ? { originalName: req.file.originalname, mimeType: req.file.mimetype, size: req.file.size } : null,
+    replace: req.body.replace
+  }));
   if (!req.file) return res.status(400).json({ error: 'No photo' });
-  const clay = db.prepare('SELECT id FROM clay_bodies WHERE id=? AND user_id=?').get(req.params.id, req.userId);
-  if (!clay) return res.status(403).json({ error: 'Not authorized' });
   const maxPhotos = (req.userTier === 'free') ? 1 : 3;
   const existing = db.prepare('SELECT * FROM clay_photos WHERE clay_id=? ORDER BY sort_order').all(req.params.id);
-  console.log('[TEMP-CLAY-DIAG-BACKEND] existing photos', JSON.stringify({ count: existing.length, replace: req.body.replace, maxPhotos }));
+  console.log('[TEMP-CLAY-DIAG-BACKEND] existing photos', JSON.stringify({ clayId: req.params.id, count: existing.length, replace: req.body.replace }));
   // An edit explicitly replaces the current Clay photo. New Clay photos and
   // additional paid-tier photos retain the existing max-photo behavior.
   if (req.body.replace === 'true' || existing.length >= maxPhotos) {
     const photosToDelete = req.body.replace === 'true' ? existing : [existing[0]];
-    console.log('[TEMP-CLAY-DIAG-BACKEND] deleting photos', JSON.stringify({ deleteCount: photosToDelete.length, reason: req.body.replace === 'true' ? 'replace' : 'maxReached' }));
     photosToDelete.forEach(photo => {
       const oldFile = path.join(UPLOADS_DIR, photo.filename);
       if (fs.existsSync(oldFile)) fs.unlinkSync(oldFile);
@@ -1665,10 +1671,16 @@ app.post('/api/clay-bodies/:id/photos', auth, upload.single('photo'), (req, res)
   }
   const count = db.prepare('SELECT COUNT(*) as c FROM clay_photos WHERE clay_id=?').get(req.params.id).c;
   const id = uuidv4();
-  console.log('[TEMP-CLAY-DIAG-BACKEND] inserting new photo', JSON.stringify({ id, filename: req.file.filename, sortOrder: count }));
-  db.prepare('INSERT INTO clay_photos (id,clay_id,filename,original_name,photo_label,notes,sort_order) VALUES (?,?,?,?,?,?,?)')
+  console.log('[TEMP-CLAY-DIAG-BACKEND] INSERT reached', JSON.stringify({ clayId: req.params.id, insertedPhotoId: id, filename: req.file.filename, sortOrder: count }));
+  const insertResult = db.prepare('INSERT INTO clay_photos (id,clay_id,filename,original_name,photo_label,notes,sort_order) VALUES (?,?,?,?,?,?,?)')
     .run(id, req.params.id, req.file.filename, req.file.originalname, req.body.label||null, req.body.notes||null, count);
-  console.log('[TEMP-CLAY-DIAG-BACKEND] photo upload complete', JSON.stringify({ id, filename: req.file.filename }));
+  const afterInsert = db.prepare('SELECT id,filename,sort_order FROM clay_photos WHERE clay_id=? ORDER BY sort_order').all(req.params.id);
+  console.log('[TEMP-CLAY-DIAG-BACKEND] INSERT result and same-Clay query', JSON.stringify({
+    clayId: req.params.id,
+    insert: { changes: insertResult.changes, lastInsertRowid: insertResult.lastInsertRowid },
+    photoRowCount: afterInsert.length,
+    photos: afterInsert
+  }));
   res.json({ id, filename: req.file.filename });
 });
 
