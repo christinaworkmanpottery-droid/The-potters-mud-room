@@ -1622,6 +1622,11 @@ app.post('/api/clay-bodies', auth, (req, res) => {
 });
 
 app.put('/api/clay-bodies/:id', auth, (req, res) => {
+  const clayUpdateStartedAt = Date.now();
+  console.log('[TEMP-CLAY-UPDATE-DIAG] update entered', JSON.stringify({ clayId: req.params.id }));
+  res.once('finish', () => {
+    console.log('[TEMP-CLAY-UPDATE-DIAG] update response', JSON.stringify({ clayId: req.params.id, status: res.statusCode, elapsedMs: Date.now() - clayUpdateStartedAt }));
+  });
   let { name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, customClayType, costPerBag, bagWeight, source, sourceUrl, inStock, buyUrl, notes } = req.body;
   const optional = value => value === undefined ? null : value;
   brand = optional(brand); colorWet = optional(colorWet); colorDry = optional(colorDry); colorFired = optional(colorFired);
@@ -1633,6 +1638,7 @@ app.put('/api/clay-bodies/:id', auth, (req, res) => {
   const update = hasCustomClayType
     ? db.prepare(`UPDATE clay_bodies SET name=?,brand=?,color_wet=?,color_dry=?,color_fired=?,shrinkage_pct=?,absorption_pct=?,cone_range=?,clay_type=?,custom_clay_type=?,cost_per_bag=?,bag_weight=?,source=?,source_url=?,in_stock=?,buy_url=?,notes=?,updated_at=datetime('now') WHERE id=? AND user_id=?`).run(name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, customClayType, costPerBag, bagWeight, source, sourceUrl, inStock!==undefined?(inStock?1:0):1, buyUrl, notes, req.params.id, req.userId)
     : db.prepare(`UPDATE clay_bodies SET name=?,brand=?,color_wet=?,color_dry=?,color_fired=?,shrinkage_pct=?,absorption_pct=?,cone_range=?,clay_type=?,cost_per_bag=?,bag_weight=?,source=?,source_url=?,in_stock=?,buy_url=?,notes=?,updated_at=datetime('now') WHERE id=? AND user_id=?`).run(name, brand, colorWet, colorDry, colorFired, shrinkagePct, absorptionPct, coneRange, clayType, costPerBag, bagWeight, source, sourceUrl, inStock!==undefined?(inStock?1:0):1, buyUrl, notes, req.params.id, req.userId);
+  console.log('[TEMP-CLAY-UPDATE-DIAG] update database result', JSON.stringify({ clayId: req.params.id, changes: update.changes }));
   if (update.changes === 0) return res.status(404).json({ error: 'Not found' });
   res.json({ success: true });
 });
