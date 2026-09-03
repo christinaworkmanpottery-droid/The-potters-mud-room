@@ -1654,7 +1654,12 @@ app.delete('/api/clay-bodies/:id', auth, (req, res) => {
 });
 
 // Clay photo upload (replaces existing photo if at max, so edits always persist)
-app.post('/api/clay-bodies/:id/photos', auth, upload.single('photo'), (req, res) => {
+app.post('/api/clay-bodies/:id/photos', auth, (req, res, next) => {
+  req.clayUploadDiagStartedAt = Date.now();
+  console.log('[DIAG-CLAY-UPLOAD] before multer', JSON.stringify({ clayId: req.params.id }));
+  next();
+}, upload.single('photo'), (req, res) => {
+  console.log('[TEMP-CLAY-DIAG-BACKEND] after multer', JSON.stringify({ clayId: req.params.id, multerElapsedMs: Date.now() - req.clayUploadDiagStartedAt, hasFile: !!req.file }));
   console.log('[TEMP-CLAY-DIAG-BACKEND] photo upload request', JSON.stringify({
     clayId: req.params.id,
     hasFile: !!req.file,
@@ -2627,6 +2632,7 @@ app.get('/api/firing-logs/:id', auth, (req, res) => {
   const log = db.prepare('SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id WHERE fl.id=? AND fl.user_id=?').get(req.params.id, req.userId);
   if (!log) return res.status(404).json({ error: 'Not found' });
   const photos = db.prepare('SELECT id,filename FROM firing_photos WHERE firing_id=? ORDER BY sort_order ASC').all(req.params.id);
+  res.once('finish', () => console.log('[DIAG-FIRING-TIME] GET', JSON.stringify({ firingLogId: req.params.id, startTime: log.start_time ?? null, status: res.statusCode })));
   res.json({ ...log, photos });
 });
 
@@ -2645,6 +2651,8 @@ app.post('/api/firing-logs', auth, (req, res) => {
   const id = uuidv4();
   db.prepare('INSERT INTO firing_logs (id,user_id,piece_id,firing_type,cone,temperature,atmosphere,kiln_name,schedule,duration,firing_speed,custom_speed_detail,hold_used,hold_duration,date,results,notes,firing_time,firing_mode,load_description,firing_mode_notes,start_time,end_time,open_temp) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
     .run(id, req.userId, pieceId, firingType || null, cone, temperature, atmosphere || null, kilnName, schedule, duration, firingSpeed || null, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null, firingModeNotes || null, startTime || null, endTime || null, openTemp || null);
+  const stored = db.prepare('SELECT start_time FROM firing_logs WHERE id=? AND user_id=?').get(id, req.userId);
+  res.once('finish', () => console.log('[DIAG-FIRING-TIME] POST', JSON.stringify({ firingLogId: id, requestStartTime: startTime ?? null, storedStartTime: stored?.start_time ?? null, status: res.statusCode })));
   res.json({ id });
 });
 
@@ -2653,6 +2661,8 @@ app.put('/api/firing-logs/:id', auth, (req, res) => {
   const { pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail, holdUsed, holdDuration, date, results, notes, firingTime, firingMode, loadDescription, firingModeNotes, startTime, endTime, openTemp } = req.body;
   db.prepare('UPDATE firing_logs SET piece_id=?,firing_type=?,cone=?,temperature=?,atmosphere=?,kiln_name=?,schedule=?,duration=?,firing_speed=?,custom_speed_detail=?,hold_used=?,hold_duration=?,date=?,results=?,notes=?,firing_time=?,firing_mode=?,load_description=?,firing_mode_notes=?,start_time=?,end_time=?,open_temp=? WHERE id=? AND user_id=?')
     .run(pieceId || null, firingType || null, cone, temperature, atmosphere || null, kilnName, schedule, duration, firingSpeed || null, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null, firingModeNotes || null, startTime || null, endTime || null, openTemp || null, req.params.id, req.userId);
+  const stored = db.prepare('SELECT start_time FROM firing_logs WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  res.once('finish', () => console.log('[DIAG-FIRING-TIME] PUT', JSON.stringify({ firingLogId: req.params.id, requestStartTime: startTime ?? null, storedStartTime: stored?.start_time ?? null, status: res.statusCode })));
   res.json({ success: true });
 });
 
@@ -2665,11 +2675,12 @@ app.delete('/api/firing-logs/:id', auth, (req, res) => {
 // Firing photos upload
 app.post('/api/firing-logs/:id/photos', auth, upload.array('photos', 3), (req, res) => {
   if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
+  const nextSortOrder = db.prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM firing_photos WHERE firing_id=?').get(req.params.id).next;
   const photos = [];
   req.files.forEach((file, idx) => {
     const photoId = uuidv4();
     db.prepare('INSERT INTO firing_photos (id,firing_id,filename,original_name,sort_order) VALUES (?,?,?,?,?)')
-      .run(photoId, req.params.id, file.filename, file.originalname, idx);
+      .run(photoId, req.params.id, file.filename, file.originalname, nextSortOrder + idx);
     photos.push({ id: photoId, filename: file.filename });
   });
   res.json(photos);
@@ -3881,6 +3892,7 @@ app.delete('/api/project-photos/:id', auth, (req, res) => {
 // ============ EVENTS ============
 app.get('/api/events', auth, (req, res) => {
   const events = db.prepare('SELECT * FROM events WHERE user_id=? ORDER BY event_date ASC').all(req.userId);
+  res.once('finish', () => console.log('[DIAG-EVENT-PHOTO] GET', JSON.stringify({ events: events.map(event => ({ eventId: event.id, imageFilename: event.image_filename ?? null })), status: res.statusCode })));
   res.json(events);
 });
 
@@ -3903,7 +3915,12 @@ app.post('/api/events', auth, (req, res) => {
   res.json({ id });
 });
 
-app.post('/api/events/:id/photo', auth, upload.single('photo'), (req, res) => {
+app.post('/api/events/:id/photo', auth, (req, res, next) => {
+  req.eventPhotoDiagStartedAt = Date.now();
+  console.log('[DIAG-EVENT-PHOTO] route reached', JSON.stringify({ eventId: req.params.id }));
+  next();
+}, upload.single('photo'), (req, res) => {
+  console.log('[DIAG-EVENT-PHOTO] after multer', JSON.stringify({ eventId: req.params.id, hasFile: !!req.file, file: req.file ? { originalName: req.file.originalname, mimeType: req.file.mimetype, size: req.file.size } : null, multerElapsedMs: Date.now() - req.eventPhotoDiagStartedAt }));
   if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
   const ev = db.prepare('SELECT * FROM events WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!ev) return res.status(404).json({ error: 'Event not found' });
@@ -3913,6 +3930,8 @@ app.post('/api/events/:id/photo', auth, upload.single('photo'), (req, res) => {
     if (fs.existsSync(old)) fs.unlinkSync(old);
   }
   db.prepare('UPDATE events SET image_filename=? WHERE id=?').run(req.file.filename, req.params.id);
+  const stored = db.prepare('SELECT image_filename FROM events WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  res.once('finish', () => console.log('[DIAG-EVENT-PHOTO] response', JSON.stringify({ eventId: req.params.id, imageFilename: stored?.image_filename ?? null, status: res.statusCode })));
   res.json({ filename: req.file.filename });
 });
 
