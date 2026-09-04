@@ -2726,6 +2726,44 @@ app.get('/api/pricing-calculations/:id', auth, (req, res) => {
   res.json(parsePricingCalculation(row));
 });
 
+app.put('/api/pricing-calculations/:id', auth, upload.single('photo'), (req, res) => {
+  const existing = db.prepare('SELECT * FROM pricing_calculations WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  const discardUpload = () => {
+    if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+  };
+  if (!existing) {
+    discardUpload();
+    return res.status(404).json({ error: 'Pricing calculation not found.' });
+  }
+  let inputs;
+  let result;
+  try {
+    inputs = typeof req.body.inputs === 'string' ? JSON.parse(req.body.inputs) : req.body.inputs;
+    result = typeof req.body.result === 'string' ? JSON.parse(req.body.result) : req.body.result;
+  } catch (error) {
+    discardUpload();
+    return res.status(400).json({ error: 'Calculator inputs and result must be valid.' });
+  }
+  if (!inputs || !result || typeof inputs !== 'object' || typeof result !== 'object') {
+    discardUpload();
+    return res.status(400).json({ error: 'Calculator inputs and result are required.' });
+  }
+  if (req.file && (!String(req.file.mimetype || '').startsWith('image/') || req.file.size > MAX_IMAGE_SIZE)) {
+    discardUpload();
+    return res.status(400).json({ error: 'Piece photo must be a supported image under 20MB.' });
+  }
+  const oldPhotoFilename = existing.photo_filename;
+  const photoFilename = req.file?.filename || oldPhotoFilename;
+  db.prepare('UPDATE pricing_calculations SET name=?,description=?,inputs_json=?,result_json=?,photo_filename=? WHERE id=? AND user_id=?')
+    .run(String(req.body.name || '').trim() || null, String(req.body.description || '').trim() || null, JSON.stringify(inputs), JSON.stringify(result), photoFilename, req.params.id, req.userId);
+  if (req.file && oldPhotoFilename && oldPhotoFilename !== photoFilename) {
+    const referenced = db.prepare('SELECT 1 FROM pricing_calculations WHERE photo_filename=? LIMIT 1').get(oldPhotoFilename);
+    const oldPath = path.join(UPLOADS_DIR, oldPhotoFilename);
+    if (!referenced && fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+  }
+  res.json(parsePricingCalculation(db.prepare('SELECT * FROM pricing_calculations WHERE id=? AND user_id=?').get(req.params.id, req.userId)));
+});
+
 app.delete('/api/pricing-calculations/:id', auth, (req, res) => {
   const row = db.prepare('SELECT * FROM pricing_calculations WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!row) return res.status(404).json({ error: 'Pricing calculation not found.' });
