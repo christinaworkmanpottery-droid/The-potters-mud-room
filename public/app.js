@@ -526,7 +526,7 @@ function navigate(page) {
       dashboard:'pageDashboard', pieces:'pagePieces', pieceDetail:'pagePieceDetail',
       clayBodies:'pageClayBodies', glazes:'pageGlazes', firings:'pageFirings',
       casualties:'pageCasualties',
-      sales:'pageSales', goals:'pageGoals', projects:'pageProjects', events:'pageEvents',
+      sales:'pageSales', pricingCalculator:'pagePricingCalculator', goals:'pageGoals', projects:'pageProjects', events:'pageEvents',
       contacts:'pageContacts', community:'pageCommunity', forum:'pageForum',
       forumPost:'pageForumPost', profile:'pageProfile', shop:'pageShop',
       upgrade:'pageUpgrade', help:'pageHelp', admin:'pageAdmin',
@@ -543,7 +543,7 @@ function navigate(page) {
     try { const nb = document.querySelector('.nav-link[data-page="' + page + '"]'); if (nb) nb.classList.add('active'); } catch(e) {}
   const loaders = {
     dashboard:loadDashboard, pieces:loadPieces, clayBodies:loadClayBodies,
-    glazes:loadGlazes, firings:loadFirings, casualties:loadCasualties, sales:loadSales, testTiles:loadTestTiles, findPotter:loadFindPotter,
+    glazes:loadGlazes, firings:loadFirings, casualties:loadCasualties, sales:loadSales, pricingCalculator:loadPricingCalculator, testTiles:loadTestTiles, findPotter:loadFindPotter,
     goals:loadGoals, projects:loadProjects, events:loadEvents, contacts:loadContacts, studioNotes:loadStudioNotes,
     community:loadCombos, forum:loadForum, profile:loadProfile,
     shop:loadShop, upgrade:loadUpgrade, admin:loadAdmin,
@@ -2145,6 +2145,505 @@ async function deleteSale(id) {
     toast('Sale deleted', 'success');
     loadSales();
   } catch(e) { toast(e.message, 'error'); }
+}
+
+// ---- Pricing Calculator ----
+let pricingCalcState = {
+  savedRates: null,
+  result: null,
+  savedCalculations: [],
+  selectedCalculationId: null,
+  calculationPhoto: null,
+  savedPhotoFilename: null
+};
+
+async function loadPricingCalculator() {
+  const page = document.getElementById('pagePricingCalculator');
+  const isPaid = currentUser?.tier && currentUser.tier !== 'free';
+  
+  // Load saved rates for paid users
+  if (isPaid && !pricingCalcState.savedRates) {
+    try {
+      const stored = localStorage.getItem('@mudroom_pricing_rates');
+      if (stored) pricingCalcState.savedRates = JSON.parse(stored);
+    } catch(e) { /* silent */ }
+  }
+  
+  // Load saved calculations history
+  try {
+    pricingCalcState.savedCalculations = await api('/api/pricing-calculations');
+  } catch(e) {
+    console.warn('Could not load pricing calculations:', e.message);
+  }
+  
+  page.innerHTML = `
+    <div class="page-header">
+      <h2>🧮 Pricing Calculator</h2>
+    </div>
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-size:2.5rem;margin-bottom:8px">🧮</div>
+      <h3 style="margin:0 0 8px 0">Pricing Calculator</h3>
+      <p style="color:var(--text-light);margin:0">Know your true costs. Price with confidence.</p>
+    </div>
+    
+    <!-- Costs for this piece -->
+    <div class="card" style="margin-bottom:20px">
+      <h3 style="margin-bottom:16px">Costs for this piece</h3>
+      <div class="form-group">
+        <label>Clay used for this piece</label>
+        <div class="input-group" style="display:flex;align-items:center;gap:8px">
+          <span style="font-weight:600;color:var(--text-light)">$</span>
+          <input type="number" step="0.01" class="form-input" id="calcClayCost" placeholder="0.00" style="flex:1">
+        </div>
+        <p class="text-sm" style="color:var(--text-muted);margin-top:4px">Enter your best guess for the clay cost of this one piece.</p>
+      </div>
+      <div class="form-group">
+        <label>Glaze used for this piece</label>
+        <div class="input-group" style="display:flex;align-items:center;gap:8px">
+          <span style="font-weight:600;color:var(--text-light)">$</span>
+          <input type="number" step="0.01" class="form-input" id="calcGlazeCost" placeholder="0.00" style="flex:1">
+        </div>
+        <p class="text-sm" style="color:var(--text-muted);margin-top:4px">If you are not sure, estimate.</p>
+      </div>
+      <div class="form-group">
+        <label>Other supplies for this piece</label>
+        <div class="input-group" style="display:flex;align-items:center;gap:8px">
+          <span style="font-weight:600;color:var(--text-light)">$</span>
+          <input type="number" step="0.01" class="form-input" id="calcSuppliesCost" placeholder="0.00" style="flex:1">
+        </div>
+        <p class="text-sm" style="color:var(--text-muted);margin-top:4px">Examples: underglaze, decals, trimming tools wear, packaging.</p>
+      </div>
+      <div class="form-group">
+        <label>Firing cost for this piece</label>
+        <div class="input-group" style="display:flex;align-items:center;gap:8px">
+          <span style="font-weight:600;color:var(--text-light)">$</span>
+          <input type="number" step="0.01" class="form-input" id="calcFiringCost" placeholder="0.00" style="flex:1">
+        </div>
+        <p class="text-sm" style="color:var(--text-muted);margin-top:4px">Enter what you think this piece cost to fire. A best guess is fine.</p>
+      </div>
+    </div>
+    
+    <!-- Monthly studio costs -->
+    <div class="card" style="margin-bottom:20px">
+      <h3 style="margin-bottom:16px">Monthly studio costs</h3>
+      <div class="form-group">
+        <label>Monthly studio rent + utilities</label>
+        <div class="input-group" style="display:flex;align-items:center;gap:8px">
+          <span style="font-weight:600;color:var(--text-light)">$</span>
+          <input type="number" step="0.01" class="form-input" id="calcStudioCost" placeholder="0.00" style="flex:1">
+        </div>
+        <p class="text-sm" style="color:var(--text-muted);margin-top:4px">Enter the full monthly amount. The app will divide it across your pieces.</p>
+      </div>
+      <div class="form-group">
+        <label>Other monthly business costs</label>
+        <div class="input-group" style="display:flex;align-items:center;gap:8px">
+          <span style="font-weight:600;color:var(--text-light)">$</span>
+          <input type="number" step="0.01" class="form-input" id="calcOverheadCost" placeholder="0.00" style="flex:1">
+        </div>
+        <p class="text-sm" style="color:var(--text-muted);margin-top:4px">Examples: website, software, market fees, subscriptions, packaging.</p>
+      </div>
+      <div class="form-group">
+        <label>About how many pieces do you make in a month?</label>
+        <input type="number" step="1" class="form-input" id="calcMonthlyPieces" placeholder="45">
+        <p class="text-sm" style="color:var(--text-muted);margin-top:4px">This lets the app divide your monthly costs across each piece automatically.</p>
+      </div>
+    </div>
+    
+    <!-- Your time -->
+    <div class="card" style="margin-bottom:20px">
+      <h3 style="margin-bottom:16px">Your time</h3>
+      <div class="form-group">
+        <label>How much do you want to pay yourself per hour?</label>
+        <div class="input-group" style="display:flex;align-items:center;gap:8px">
+          <span style="font-weight:600;color:var(--text-light)">$</span>
+          <input type="number" step="0.01" class="form-input" id="calcHourlyRate" placeholder="25.00" style="flex:1">
+        </div>
+        <p class="text-sm" style="color:var(--text-muted);margin-top:4px">Example: if you want to make $25 per hour, enter 25.</p>
+      </div>
+      <div class="form-group">
+        <label>How many hours did this piece take?</label>
+        <div class="input-group" style="display:flex;align-items:center;gap:8px">
+          <input type="number" step="0.1" class="form-input" id="calcHoursSpent" placeholder="0" style="flex:1">
+          <span style="font-weight:600;color:var(--text-light)">hrs</span>
+        </div>
+        <p class="text-sm" style="color:var(--text-muted);margin-top:4px">Include making, trimming, decorating, and finishing. Estimate if needed.</p>
+      </div>
+    </div>
+    
+    <!-- Markup -->
+    <div class="card" style="margin-bottom:20px">
+      <h3 style="margin-bottom:16px">Markup</h3>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <button class="btn btn-sm" style="min-width:60px" onclick="setMarkup('2')" id="markup2">2×</button>
+        <button class="btn btn-sm btn-primary" style="min-width:60px" onclick="setMarkup('2.5')" id="markup2_5">2.5×</button>
+        <button class="btn btn-sm" style="min-width:60px" onclick="setMarkup('3')" id="markup3">3×</button>
+        <button class="btn btn-sm" style="min-width:60px" onclick="setMarkup('4')" id="markup4">4×</button>
+        <div style="display:flex;align-items:center;gap:4px">
+          <input type="number" step="0.1" class="form-input" id="calcMarkup" placeholder="2.5" style="width:80px" value="2.5" oninput="updateMarkupButtons()">
+          <span>×</span>
+        </div>
+      </div>
+      <p class="text-sm" style="color:var(--text-muted)">This multiplies your total cost. Start with 2.5× or 3× if you are not sure.</p>
+    </div>
+    
+    <!-- Action buttons -->
+    <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="calculatePrice()" style="flex:1;min-width:140px">🧮 Calculate</button>
+      <button class="btn btn-secondary" onclick="clearPricingCalculator()" style="flex:1;min-width:100px">Clear</button>
+    </div>
+    
+    <!-- Save rates (paid feature) -->
+    <div style="cursor:pointer;padding:12px;background:var(--bg-light);border-radius:8px;margin-bottom:20px;display:flex;align-items:center;gap:10px" onclick="savePricingRates()">
+      <span style="font-size:1.2rem">🔖</span>
+      <span style="flex:1;font-size:0.9rem;color:var(--text-light)">${isPaid ? 'Save My Rates' : 'Save My Rates (Upgrade to unlock)'}</span>
+      ${pricingCalcState.savedRates && isPaid ? '<span style="color:var(--success)">✓</span>' : ''}
+    </div>
+    
+    <!-- Results -->
+    <div id="pricingResults" style="display:none"></div>
+    
+    <!-- Saved calculations history -->
+    <div class="card" style="margin-top:24px">
+      <h3 style="margin-bottom:16px">Saved Calculations</h3>
+      <div id="savedCalculationsList"></div>
+    </div>
+  `;
+  
+  // Restore saved rates if available
+  if (pricingCalcState.savedRates) {
+    if (pricingCalcState.savedRates.hourlyRate) document.getElementById('calcHourlyRate').value = pricingCalcState.savedRates.hourlyRate;
+    if (pricingCalcState.savedRates.studioCost) document.getElementById('calcStudioCost').value = pricingCalcState.savedRates.studioCost;
+    if (pricingCalcState.savedRates.monthlyPieces) document.getElementById('calcMonthlyPieces').value = pricingCalcState.savedRates.monthlyPieces;
+    if (pricingCalcState.savedRates.firingCost) document.getElementById('calcFiringCost').value = pricingCalcState.savedRates.firingCost;
+    if (pricingCalcState.savedRates.markup) {
+      document.getElementById('calcMarkup').value = pricingCalcState.savedRates.markup;
+      updateMarkupButtons();
+    }
+  }
+  
+  renderSavedCalculations();
+}
+
+function setMarkup(value) {
+  document.getElementById('calcMarkup').value = value;
+  updateMarkupButtons();
+}
+
+function updateMarkupButtons() {
+  const markup = document.getElementById('calcMarkup').value;
+  ['2', '2.5', '3', '4'].forEach(m => {
+    const btn = document.getElementById('markup' + m.replace('.', '_'));
+    if (btn) {
+      if (markup === m) {
+        btn.classList.add('btn-primary');
+        btn.classList.remove('btn-secondary');
+      } else {
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-secondary');
+      }
+    }
+  });
+}
+
+function calculatePrice() {
+  const clay = parseFloat(document.getElementById('calcClayCost').value) || 0;
+  const glaze = parseFloat(document.getElementById('calcGlazeCost').value) || 0;
+  const supplies = parseFloat(document.getElementById('calcSuppliesCost').value) || 0;
+  const firing = parseFloat(document.getElementById('calcFiringCost').value) || 0;
+  const monthlyStudio = parseFloat(document.getElementById('calcStudioCost').value) || 0;
+  const piecesPerMonth = parseFloat(document.getElementById('calcMonthlyPieces').value) || 0;
+  const rate = parseFloat(document.getElementById('calcHourlyRate').value) || 0;
+  const hours = parseFloat(document.getElementById('calcHoursSpent').value) || 0;
+  const monthlyOverhead = parseFloat(document.getElementById('calcOverheadCost').value) || 0;
+  const mult = parseFloat(document.getElementById('calcMarkup').value) || 2.5;
+  
+  if ((monthlyStudio > 0 || monthlyOverhead > 0) && piecesPerMonth <= 0) {
+    toast('Enter how many pieces you make per month so the app can divide your monthly costs', 'error');
+    return;
+  }
+  
+  const materialsCost = clay + glaze + supplies;
+  const laborCost = rate * hours;
+  const studioPerPiece = piecesPerMonth > 0 ? monthlyStudio / piecesPerMonth : 0;
+  const overheadPerPiece = piecesPerMonth > 0 ? monthlyOverhead / piecesPerMonth : 0;
+  const totalCost = materialsCost + firing + studioPerPiece + laborCost + overheadPerPiece;
+  const suggestedPrice = totalCost * mult;
+  
+  pricingCalcState.result = {
+    materialsCost, laborCost, firing, studioPerPiece, overheadPerPiece,
+    monthlyStudio, monthlyOverhead, piecesPerMonth,
+    totalCost, markup: mult, suggestedPrice,
+    profit: suggestedPrice - totalCost
+  };
+  
+  const results = document.getElementById('pricingResults');
+  results.style.display = 'block';
+  results.innerHTML = `
+    <div class="card" style="background:var(--bg-light);border:2px solid var(--primary)">
+      <h3 style="margin-bottom:16px">Price Breakdown</h3>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span>Materials</span>
+        <span style="font-weight:600">$${materialsCost.toFixed(2)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span>Labor (${hours}h × $${rate}/hr)</span>
+        <span style="font-weight:600">$${laborCost.toFixed(2)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span>Firing</span>
+        <span style="font-weight:600">$${firing.toFixed(2)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span>Studio share for this piece</span>
+        <span style="font-weight:600">$${studioPerPiece.toFixed(2)}</span>
+      </div>
+      ${piecesPerMonth > 0 ? `<div style="font-size:0.8rem;color:var(--text-muted);padding:4px 0 8px 0;border-bottom:1px solid var(--border)">$${monthlyStudio.toFixed(2)} monthly studio / ${piecesPerMonth.toFixed(0)} pieces</div>` : ''}
+      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span>Other monthly costs share</span>
+        <span style="font-weight:600">$${overheadPerPiece.toFixed(2)}</span>
+      </div>
+      ${piecesPerMonth > 0 ? `<div style="font-size:0.8rem;color:var(--text-muted);padding:4px 0 8px 0;border-bottom:1px solid var(--border)">$${monthlyOverhead.toFixed(2)} monthly overhead / ${piecesPerMonth.toFixed(0)} pieces</div>` : ''}
+      
+      <div style="display:flex;justify-content:space-between;padding:12px 0;font-weight:700;font-size:1.1rem;border-bottom:2px solid var(--border)">
+        <span>Total Cost</span>
+        <span>$${totalCost.toFixed(2)}</span>
+      </div>
+      
+      <div style="display:flex;justify-content:space-between;padding:12px 0;font-weight:700;font-size:1.2rem;color:var(--primary)">
+        <span>Suggested Price (${mult}×)</span>
+        <span style="font-size:1.4rem">$${suggestedPrice.toFixed(2)}</span>
+      </div>
+      
+      <div style="display:flex;justify-content:space-between;padding:8px 0;color:var(--success)">
+        <span>Your Profit</span>
+        <span style="font-weight:600">$${pricingCalcState.result.profit.toFixed(2)}</span>
+      </div>
+      
+      <div style="background:#fffbf0;border-left:3px solid var(--warning);padding:12px;margin-top:16px;border-radius:4px">
+        <div style="display:flex;gap:8px;align-items:start">
+          <span style="font-size:1.2rem">💡</span>
+          <p style="margin:0;font-size:0.9rem;color:var(--text-light)">Monthly costs are now divided across the number of pieces you make, so one plate does not get charged your full monthly rent.</p>
+        </div>
+      </div>
+      
+      <!-- Save calculation -->
+      <div style="margin-top:20px;padding-top:20px;border-top:2px solid var(--border)">
+        <h4 style="margin-bottom:12px">Save this calculation</h4>
+        <div class="form-group">
+          <input type="text" class="form-input" id="calcName" placeholder="Piece name (optional)">
+        </div>
+        <div class="form-group">
+          <textarea class="form-textarea" id="calcDescription" placeholder="Description or notes (optional)" rows="2"></textarea>
+        </div>
+        <div id="calcPhotoPreview" style="display:none;margin-bottom:12px">
+          <img id="calcPhotoImg" style="max-width:200px;border-radius:8px;border:2px solid var(--border)">
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <label class="btn btn-secondary" style="cursor:pointer;margin:0">
+            <input type="file" accept="image/*" onchange="handleCalculationPhoto(event)" style="display:none">
+            📷 <span id="calcPhotoLabel">Add Photo</span>
+          </label>
+          <button class="btn btn-primary" onclick="saveCalculation()" style="flex:1">💾 Save Calculation</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function handleCalculationPhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    pricingCalcState.calculationPhoto = e.target.result;
+    pricingCalcState.savedPhotoFilename = null;
+    document.getElementById('calcPhotoPreview').style.display = 'block';
+    document.getElementById('calcPhotoImg').src = e.target.result;
+    document.getElementById('calcPhotoLabel').textContent = 'Change Photo';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function saveCalculation() {
+  if (!pricingCalcState.result) {
+    toast('Calculate a price first', 'error');
+    return;
+  }
+  
+  try {
+    const formData = new FormData();
+    formData.append('name', document.getElementById('calcName').value.trim() || `Pricing calculation ${new Date().toLocaleDateString()}`);
+    formData.append('description', document.getElementById('calcDescription').value.trim());
+    formData.append('inputs', JSON.stringify({
+      clayCost: document.getElementById('calcClayCost').value,
+      glazeCost: document.getElementById('calcGlazeCost').value,
+      suppliesCost: document.getElementById('calcSuppliesCost').value,
+      firingCost: document.getElementById('calcFiringCost').value,
+      studioCost: document.getElementById('calcStudioCost').value,
+      monthlyPieces: document.getElementById('calcMonthlyPieces').value,
+      hourlyRate: document.getElementById('calcHourlyRate').value,
+      hoursSpent: document.getElementById('calcHoursSpent').value,
+      overheadCost: document.getElementById('calcOverheadCost').value,
+      markup: document.getElementById('calcMarkup').value
+    }));
+    formData.append('result', JSON.stringify(pricingCalcState.result));
+    
+    if (pricingCalcState.calculationPhoto) {
+      const blob = await (await fetch(pricingCalcState.calculationPhoto)).blob();
+      formData.append('photo', blob, 'calculation-photo.jpg');
+    }
+    
+    let saved;
+    if (pricingCalcState.selectedCalculationId) {
+      const res = await fetch('/api/pricing-calculations/' + pricingCalcState.selectedCalculationId, {
+        method: 'PUT',
+        headers: { Authorization: 'Bearer ' + token },
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not update');
+      saved = data;
+      pricingCalcState.savedCalculations = pricingCalcState.savedCalculations.map(c => c.id === saved.id ? saved : c);
+      toast('Calculation updated', 'success');
+    } else {
+      const res = await fetch('/api/pricing-calculations', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + token },
+        body: formData
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save');
+      saved = data;
+      pricingCalcState.selectedCalculationId = saved.id;
+      pricingCalcState.savedCalculations.unshift(saved);
+      toast('Calculation saved', 'success');
+    }
+    
+    renderSavedCalculations();
+  } catch(e) {
+    toast(e.message, 'error');
+  }
+}
+
+function renderSavedCalculations() {
+  const list = document.getElementById('savedCalculationsList');
+  if (!list) return;
+  
+  if (pricingCalcState.savedCalculations.length === 0) {
+    list.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px 0">Your saved calculations will appear here.</p>';
+    return;
+  }
+  
+  list.innerHTML = pricingCalcState.savedCalculations.map(calc => `
+    <div class="card" style="margin-bottom:12px;padding:12px;display:flex;gap:12px;align-items:center;cursor:pointer" onclick="reopenCalculation('${calc.id}')">
+      ${calc.photo_filename ? `<img src="/uploads/${calc.photo_filename}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:2px solid var(--border)">` : `<div style="width:60px;height:60px;background:var(--bg-light);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.5rem">🧮</div>`}
+      <div style="flex:1">
+        <div style="font-weight:600;margin-bottom:4px">${calc.name || 'Saved calculation'}</div>
+        <div style="font-size:0.85rem;color:var(--text-light)">${calc.created_at ? new Date(calc.created_at.replace(' ', 'T') + 'Z').toLocaleDateString() : ''}</div>
+        <div style="font-size:0.9rem;color:var(--primary);font-weight:600;margin-top:4px">$${Number(calc.result?.suggestedPrice || 0).toFixed(2)} suggested</div>
+      </div>
+      <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteCalculation('${calc.id}')" title="Delete">🗑️</button>
+    </div>
+  `).join('');
+}
+
+async function reopenCalculation(id) {
+  const calc = pricingCalcState.savedCalculations.find(c => c.id === id);
+  if (!calc) return;
+  
+  pricingCalcState.selectedCalculationId = id;
+  const inputs = calc.inputs || {};
+  
+  document.getElementById('calcClayCost').value = inputs.clayCost || '';
+  document.getElementById('calcGlazeCost').value = inputs.glazeCost || '';
+  document.getElementById('calcSuppliesCost').value = inputs.suppliesCost || '';
+  document.getElementById('calcFiringCost').value = inputs.firingCost || '';
+  document.getElementById('calcStudioCost').value = inputs.studioCost || '';
+  document.getElementById('calcMonthlyPieces').value = inputs.monthlyPieces || '';
+  document.getElementById('calcHourlyRate').value = inputs.hourlyRate || '';
+  document.getElementById('calcHoursSpent').value = inputs.hoursSpent || '';
+  document.getElementById('calcOverheadCost').value = inputs.overheadCost || '';
+  document.getElementById('calcMarkup').value = inputs.markup || '2.5';
+  updateMarkupButtons();
+  
+  pricingCalcState.result = calc.result || null;
+  pricingCalcState.calculationPhoto = null;
+  pricingCalcState.savedPhotoFilename = calc.photo_filename || null;
+  
+  if (calc.result) {
+    calculatePrice();
+    if (calc.name) document.getElementById('calcName').value = calc.name;
+    if (calc.description) document.getElementById('calcDescription').value = calc.description;
+    if (calc.photo_filename) {
+      document.getElementById('calcPhotoPreview').style.display = 'block';
+      document.getElementById('calcPhotoImg').src = '/uploads/' + calc.photo_filename;
+      document.getElementById('calcPhotoLabel').textContent = 'Change Photo';
+    }
+  }
+  
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function deleteCalculation(id) {
+  if (!confirm('Delete this saved calculation? This cannot be undone.')) return;
+  
+  try {
+    await api('/api/pricing-calculations/' + id, { method: 'DELETE' });
+    pricingCalcState.savedCalculations = pricingCalcState.savedCalculations.filter(c => c.id !== id);
+    toast('Calculation deleted', 'success');
+    renderSavedCalculations();
+  } catch(e) {
+    toast(e.message, 'error');
+  }
+}
+
+function clearPricingCalculator() {
+  const savedRates = pricingCalcState.savedRates;
+  document.getElementById('calcClayCost').value = '';
+  document.getElementById('calcGlazeCost').value = '';
+  document.getElementById('calcSuppliesCost').value = '';
+  document.getElementById('calcFiringCost').value = savedRates?.firingCost || '';
+  document.getElementById('calcStudioCost').value = savedRates?.studioCost || '';
+  document.getElementById('calcMonthlyPieces').value = savedRates?.monthlyPieces || '';
+  document.getElementById('calcHourlyRate').value = savedRates?.hourlyRate || '';
+  document.getElementById('calcHoursSpent').value = '';
+  document.getElementById('calcOverheadCost').value = '';
+  document.getElementById('calcMarkup').value = savedRates?.markup || '2.5';
+  updateMarkupButtons();
+  
+  pricingCalcState.result = null;
+  pricingCalcState.selectedCalculationId = null;
+  pricingCalcState.calculationPhoto = null;
+  pricingCalcState.savedPhotoFilename = null;
+  
+  document.getElementById('pricingResults').style.display = 'none';
+  if (document.getElementById('calcName')) document.getElementById('calcName').value = '';
+  if (document.getElementById('calcDescription')) document.getElementById('calcDescription').value = '';
+  if (document.getElementById('calcPhotoPreview')) document.getElementById('calcPhotoPreview').style.display = 'none';
+}
+
+function savePricingRates() {
+  const isPaid = currentUser?.tier && currentUser.tier !== 'free';
+  if (!isPaid) {
+    if (confirm('Save your rates so you don\'t have to re-enter them each time. Upgrade to unlock this feature?')) {
+      navigate('upgrade');
+    }
+    return;
+  }
+  
+  const rates = {
+    hourlyRate: document.getElementById('calcHourlyRate').value,
+    studioCost: document.getElementById('calcStudioCost').value,
+    monthlyPieces: document.getElementById('calcMonthlyPieces').value,
+    firingCost: document.getElementById('calcFiringCost').value,
+    markup: document.getElementById('calcMarkup').value
+  };
+  
+  localStorage.setItem('@mudroom_pricing_rates', JSON.stringify(rates));
+  pricingCalcState.savedRates = rates;
+  toast('Your rates are saved for next time', 'success');
+  loadPricingCalculator();
 }
 
 // ---- Community Combos ----
