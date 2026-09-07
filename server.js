@@ -1012,6 +1012,73 @@ app.delete('/api/account', auth, (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ============ MY STORE ============
+app.get('/api/user/stores', auth, (req, res) => {
+  const stores = db.prepare('SELECT * FROM user_stores WHERE user_id=? ORDER BY sort_order ASC, created_at ASC').all(req.userId);
+  res.json(stores);
+});
+
+app.post('/api/user/stores', auth, (req, res) => {
+  const { name, url, platform } = req.body;
+  if (!url) return res.status(400).json({ error: 'URL required' });
+
+  const user = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
+  const isPaid = user?.tier && user.tier !== 'free';
+
+  const storeCount = db.prepare('SELECT COUNT(*) as c FROM user_stores WHERE user_id=?').get(req.userId).c;
+
+  // Free tier: enforce 1-store limit for NEW additions
+  if (!isPaid && storeCount >= 1) {
+    return res.status(403).json({ 
+      error: 'Free members can link 1 store. Upgrade to add more.',
+      upgradeRequired: true 
+    });
+  }
+
+  // Normalize URL
+  let normalizedUrl = url.trim();
+  if (normalizedUrl && !normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
+    normalizedUrl = 'https://' + normalizedUrl;
+  }
+
+  // Detect platform
+  const lower = normalizedUrl.toLowerCase();
+  let detectedPlatform = 'website';
+  if (lower.includes('etsy.com')) detectedPlatform = 'etsy';
+  else if (lower.includes('shopify') || lower.includes('myshopify')) detectedPlatform = 'shopify';
+  else if (lower.includes('square')) detectedPlatform = 'square';
+
+  const platformId = platform || detectedPlatform;
+
+  // Default name based on platform
+  const platformNames = {
+    etsy: 'Etsy',
+    shopify: 'Shopify',
+    square: 'Square',
+    website: 'My Website',
+    other: 'Other'
+  };
+  const storeName = (name && name.trim()) || platformNames[platformId] || 'My Store';
+
+  const id = uuidv4();
+
+  try {
+    db.prepare('INSERT INTO user_stores (id, user_id, name, url, platform, sort_order) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(id, req.userId, storeName, normalizedUrl, platformId, storeCount);
+    res.json({ id, name: storeName, url: normalizedUrl, platform: platformId });
+  } catch (err) {
+    if (err.message.includes('UNIQUE constraint')) {
+      return res.status(400).json({ error: 'This store URL is already linked.' });
+    }
+    throw err;
+  }
+});
+
+app.delete('/api/user/stores/:id', auth, (req, res) => {
+  db.prepare('DELETE FROM user_stores WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  res.json({ success: true });
+});
+
 // ============ USER PROFILE ============
 app.put('/api/profile', auth, (req, res) => {
   const { displayName, username, bio, location, website, isPrivate, unitSystem, tempUnit, shopUrl, shopUrl2, shopUrl3, city, stateRegion, country, findable } = req.body;

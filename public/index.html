@@ -166,6 +166,9 @@
     .bulk-item-desc{flex:1}
     .bulk-qty{width:80px}
     .bulk-price-each{width:100px}
+    .platform-chip{padding:8px 14px;border-radius:20px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:0.85rem;font-weight:600;transition:all 0.2s;display:inline-flex;align-items:center;gap:6px}
+    .platform-chip:hover{border-color:var(--primary);background:var(--primary-light)}
+    .platform-chip.selected{background:var(--primary);color:#fff;border-color:var(--primary)}
   </style>
 
   <!-- Google Analytics 4 -->
@@ -773,6 +776,7 @@
         <div class="nav-section-title">Business</div>
         <button class="nav-link" data-page="sales" onclick="navigate('sales'); closeNav()">Sales</button>
         <button class="nav-link" data-page="pricingCalculator" onclick="navigate('pricingCalculator'); closeNav()">🧮 Pricing Calculator</button>
+        <button class="nav-link" data-page="myStore" onclick="navigate('myStore'); closeNav()">🏪 My Store</button>
         <button class="nav-link" data-page="shoppingList" onclick="navigate('shoppingList'); closeNav()">🛒 Shopping</button>
         <button class="nav-link" data-page="goals" onclick="navigate('goals'); closeNav()">Goals</button>
         <button class="nav-link" data-page="projects" onclick="navigate('projects'); closeNav()">Projects</button>
@@ -1317,6 +1321,83 @@
       </div>
     </div>
 
+    <!-- MY STORE -->
+    <div id="pageMyStore" class="page">
+      <div class="page-header">
+        <div style="text-align:center; margin-bottom:24px">
+          <div style="font-size:40px; margin-bottom:12px">🏪</div>
+          <h2>My Store</h2>
+          <p class="text-sm" style="color:var(--text-light); max-width:500px; margin:8px auto 0">Link your online shop for quick access. Etsy, Shopify, Square, or your own website.</p>
+        </div>
+      </div>
+
+      <!-- Store List -->
+      <div id="myStoresList" class="card-grid" style="margin-bottom:20px"></div>
+
+      <!-- Empty State -->
+      <div id="myStoresEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">🏪</div>
+        <div class="empty-state-title">No stores linked yet</div>
+        <p>Add your shop link so you can access it anytime.</p>
+      </div>
+
+      <!-- Add Store Button -->
+      <div id="addStoreButtonContainer" style="text-align:center; margin-top:20px">
+        <button class="btn btn-primary" onclick="showAddStoreForm()" id="addStoreBtn">
+          + Add Store Link
+        </button>
+      </div>
+
+      <!-- Add Store Form -->
+      <div id="addStoreForm" class="card" style="display:none; max-width:600px; margin:20px auto">
+        <h3 style="margin-bottom:16px">Add Store Link</h3>
+
+        <div class="form-group">
+          <label>Platform</label>
+          <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px">
+            <button type="button" class="platform-chip" data-platform="etsy" onclick="selectPlatform('etsy')">
+              <span>🛒</span> Etsy
+            </button>
+            <button type="button" class="platform-chip" data-platform="shopify" onclick="selectPlatform('shopify')">
+              <span>🛍️</span> Shopify
+            </button>
+            <button type="button" class="platform-chip" data-platform="square" onclick="selectPlatform('square')">
+              <span>💳</span> Square
+            </button>
+            <button type="button" class="platform-chip" data-platform="website" onclick="selectPlatform('website')">
+              <span>🌐</span> My Website
+            </button>
+            <button type="button" class="platform-chip" data-platform="other" onclick="selectPlatform('other')">
+              <span>🔗</span> Other
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Store Name (optional)</label>
+          <input type="text" class="form-input" id="newStoreName" placeholder="My Etsy Shop">
+        </div>
+
+        <div class="form-group">
+          <label>Store URL *</label>
+          <input type="text" class="form-input" id="newStoreUrl" placeholder="https://www.etsy.com/shop/yourshop" required>
+        </div>
+
+        <div class="modal-footer" style="margin-top:20px">
+          <button type="button" class="btn btn-secondary" onclick="hideAddStoreForm()">Cancel</button>
+          <button type="button" class="btn btn-primary" onclick="saveNewStore()">Add Store</button>
+        </div>
+      </div>
+
+      <!-- Upgrade Note (free tier) -->
+      <div id="myStoreUpgradeNote" class="card" style="display:none; max-width:600px; margin:20px auto; background:var(--warm-tan-10); border:1px solid var(--warm-tan)">
+        <div style="display:flex; align-items:center; gap:10px">
+          <span style="font-size:20px">ℹ️</span>
+          <p class="text-sm" style="margin:0; color:var(--text-dark)">Free members can link 1 store. Upgrade to add unlimited stores.</p>
+        </div>
+      </div>
+    </div>
+
     <!-- PROJECTS -->
     <div id="pageProjects" class="page">
       <div class="page-header">
@@ -1496,30 +1577,14 @@
         </div>
 
         <div class="card">
-          <h3 style="margin-bottom:4px">🛒 My Shop</h3>
-          <p class="text-sm" style="color:var(--text-light);margin-bottom:16px">Save your shop link(s) — tap Open My Shop to go straight to your store. Shown on your public profile so other potters can find and buy your work.</p>
-          <div class="form-group">
-            <label>Shop URL 1 <span style="color:var(--text-muted);font-weight:normal">(Etsy, Shopify, website, etc.)</span></label>
-            <div style="display:flex;gap:8px">
-              <input type="text" class="form-input" id="profileShopUrl" placeholder="https://etsy.com/shop/yourshop" style="flex:1">
-              <button type="button" class="btn btn-secondary btn-sm" onclick="openShop('profileShopUrl')">Open</button>
-            </div>
+          <h3 style="margin-bottom:4px">🛍️ My Shop Links</h3>
+          <p class="text-sm" style="color:var(--text-light);margin-bottom:12px">
+            Your shop links are shown on your public profile.
+            <a href="#" onclick="navigate('myStore'); return false;" style="color:var(--olive-green); font-weight:600">Manage in My Store →</a>
+          </p>
+          <div id="profileStoresList">
+            <!-- Dynamically populated from user_stores -->
           </div>
-          <div class="form-group">
-            <label>Shop URL 2 <span style="color:var(--text-muted);font-weight:normal">(optional)</span></label>
-            <div style="display:flex;gap:8px">
-              <input type="text" class="form-input" id="profileShopUrl2" placeholder="https://..." style="flex:1">
-              <button type="button" class="btn btn-secondary btn-sm" onclick="openShop('profileShopUrl2')">Open</button>
-            </div>
-          </div>
-          <div class="form-group">
-            <label>Shop URL 3 <span style="color:var(--text-muted);font-weight:normal">(optional)</span></label>
-            <div style="display:flex;gap:8px">
-              <input type="text" class="form-input" id="profileShopUrl3" placeholder="https://..." style="flex:1">
-              <button type="button" class="btn btn-secondary btn-sm" onclick="openShop('profileShopUrl3')">Open</button>
-            </div>
-          </div>
-          <button class="btn btn-primary" onclick="saveProfile()">Save</button>
         </div>
 
         <div class="card">
