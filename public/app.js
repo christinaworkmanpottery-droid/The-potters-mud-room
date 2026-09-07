@@ -1661,6 +1661,8 @@ function openFiringModal(f = null) {
   document.getElementById('firingKiln').value = f?.kiln_name || '';
   document.getElementById('firingSpeed').value = f?.firing_speed || '';
   document.getElementById('firingTime').value = f?.firing_time || '';
+  document.getElementById('firingStartTime').value = f?.start_time || '';
+  document.getElementById('firingEndTime').value = f?.end_time || '';
   document.getElementById('firingMode').value = f?.firing_mode || 'kiln-load';
   document.getElementById('firingLoadDescription').value = f?.load_description || '';
   document.getElementById('firingLoadDescription').parentElement.classList.toggle('hidden', (f?.firing_mode || 'kiln-load') !== 'kiln-load');
@@ -1794,6 +1796,8 @@ function viewFiring(id) {
       df('Kiln', f.kiln_name) +
       df('Firing Speed', f.firing_speed ? (f.firing_speed + (f.custom_speed_detail ? ' — ' + f.custom_speed_detail : '')) : '') +
       df('Duration', f.firing_time) +
+      df('Start Time', f.start_time) +
+      df('End Time', f.end_time) +
       df('Hold Used', f.hold_used ? ('Yes' + (f.hold_duration ? ' — ' + f.hold_duration : '')) : '') +
       df('Load', f.load_description) +
       df('Results', f.results) +
@@ -1919,6 +1923,8 @@ async function saveFiring(e) {
     holdDuration: document.getElementById('firingHoldDuration').value || null,
     date: document.getElementById('firingDate').value || null,
     firingTime: document.getElementById('firingTime').value || null,
+    startTime: document.getElementById('firingStartTime').value || null,
+    endTime: document.getElementById('firingEndTime').value || null,
     firingMode: document.getElementById('firingMode').value || 'kiln-load',
     loadDescription: document.getElementById('firingLoadDescription').value || null,
     firingModeNotes: document.getElementById('firingModeNotes').value || null,
