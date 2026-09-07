@@ -1773,12 +1773,17 @@ function viewFiring(id) {
     if (!f) return;
     const df = (label, val) => val ? '<div class="detail-row"><span class="detail-label">' + esc(label) + '</span><span class="detail-value">' + esc(String(val)) + '</span></div>' : '';
     let photosHtml = '';
+    let photos = [];
     try {
-      const photos = await api('/api/firing-logs/' + f.id + '/photos');
+      photos = await api('/api/firing-logs/' + f.id + '/photos');
       if (photos && photos.length) {
-        photosHtml = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">' +
+        photosHtml = '<div style="margin-top:12px">';
+        if (photos.length > 1) {
+          photosHtml += '<button class="btn btn-sm btn-secondary" onclick="openFiringPhotoReorder(\'' + f.id + '\')" style="margin-bottom:8px"><span style="font-size:1rem">⇅</span> Rearrange Photos</button>';
+        }
+        photosHtml += '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
           photos.map(p => '<img src="/uploads/' + p.filename + '" style="width:90px;height:90px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')">').join('') +
-          '</div>';
+          '</div></div>';
       }
     } catch(e) {}
     document.getElementById('firingViewBody').innerHTML =
@@ -1808,6 +1813,88 @@ async function deleteFiring(id) {
     toast('Firing deleted', 'success');
     loadFirings();
   } catch(e) { toast(e.message, 'error'); }
+}
+
+// ---- Firing Photo Reordering ----
+let firingPhotoReorderState = {
+  firingId: null,
+  photos: []
+};
+
+async function openFiringPhotoReorder(firingId) {
+  try {
+    const photos = await api('/api/firing-logs/' + firingId + '/photos');
+    if (!photos || photos.length < 2) {
+      toast('Need at least 2 photos to rearrange', 'error');
+      return;
+    }
+    
+    firingPhotoReorderState.firingId = firingId;
+    firingPhotoReorderState.photos = photos;
+    
+    renderFiringPhotoReorder();
+    openModal('firingPhotoReorderModal');
+  } catch(e) {
+    toast(e.message, 'error');
+  }
+}
+
+function renderFiringPhotoReorder() {
+  const photos = firingPhotoReorderState.photos;
+  const html = '<div class="photo-reorder-list">' +
+    photos.map((p, index) => 
+      '<div class="photo-reorder-item" style="display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--bg-card)">' +
+        '<div style="font-weight:600;color:var(--text-light);min-width:30px">' + (index + 1) + '</div>' +
+        '<img src="/uploads/' + p.filename + '" style="width:60px;height:60px;object-fit:cover;border-radius:4px">' +
+        '<div style="flex:1">' +
+          '<div style="font-size:0.9rem;color:var(--text-light)">' + (index === 0 ? 'Main Photo' : 'Photo ' + (index + 1)) + '</div>' +
+          (index === 0 ? '<div style="font-size:0.75rem;color:var(--text-muted)">Shows on firing detail</div>' : '') +
+        '</div>' +
+        '<div style="display:flex;gap:4px">' +
+          '<button class="btn btn-sm btn-secondary" onclick="moveFiringPhoto(' + index + ', -1)" ' + (index === 0 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : '') + ' title="Move up">↑</button>' +
+          '<button class="btn btn-sm btn-secondary" onclick="moveFiringPhoto(' + index + ', 1)" ' + (index === photos.length - 1 ? 'disabled style="opacity:0.3;cursor:not-allowed"' : '') + ' title="Move down">↓</button>' +
+        '</div>' +
+      '</div>'
+    ).join('') +
+    '</div>';
+  
+  document.getElementById('firingPhotoReorderContent').innerHTML = html;
+}
+
+function moveFiringPhoto(index, direction) {
+  const newIndex = index + direction;
+  if (newIndex < 0 || newIndex >= firingPhotoReorderState.photos.length) return;
+  
+  const photos = firingPhotoReorderState.photos;
+  [photos[index], photos[newIndex]] = [photos[newIndex], photos[index]];
+  
+  renderFiringPhotoReorder();
+}
+
+async function saveFiringPhotoOrder() {
+  const saveBtn = document.getElementById('saveFiringPhotoOrderBtn');
+  if (saveBtn.disabled) return;
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving...';
+  
+  try {
+    const photoIds = firingPhotoReorderState.photos.map(p => p.id);
+    await api('/api/firing-logs/' + firingPhotoReorderState.firingId + '/photos/reorder', {
+      method: 'PUT',
+      body: { photoIds }
+    });
+    
+    toast('Photo order saved', 'success');
+    closeModal('firingPhotoReorderModal');
+    
+    // Refresh the firing detail view
+    viewFiring(firingPhotoReorderState.firingId);
+  } catch(e) {
+    toast(e.message, 'error');
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save Order';
+  }
 }
 
 async function saveFiring(e) {

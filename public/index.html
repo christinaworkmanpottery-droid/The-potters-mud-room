@@ -2365,6 +2365,25 @@
   </div>
 </div>
 
+
+<!-- FIRING PHOTO REORDER MODAL -->
+<div id="firingPhotoReorderModal" class="modal-overlay" onclick="if(event.target===this)closeModal('firingPhotoReorderModal')">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Rearrange Photos</h2>
+      <button class="modal-close" onclick="closeModal('firingPhotoReorderModal')">&times;</button>
+    </div>
+    <div class="modal-body" style="padding:16px">
+      <p style="color:var(--text-light);margin-bottom:16px">Use the arrows to change the photo order. The first photo shows on the firing detail.</p>
+      <div id="firingPhotoReorderContent"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="closeModal('firingPhotoReorderModal')">Cancel</button>
+      <button type="button" id="saveFiringPhotoOrderBtn" class="btn btn-primary" onclick="saveFiringPhotoOrder()">Save Order</button>
+    </div>
+  </div>
+</div>
+
 <!-- SALE MODAL -->
 <div id="saleModal" class="modal-overlay" onclick="if(event.target===this)closeModal('saleModal')">
   <div class="modal">
