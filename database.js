@@ -1302,7 +1302,131 @@ function initDB() {
   safeAdd('users', 'country', 'TEXT');
   safeAdd('users', 'findable', 'INTEGER DEFAULT 0');
 
+  // My Store migration tracking
+  safeAdd('users', 'stores_migrated', 'INTEGER DEFAULT 0');
+
+  // My Store: user_stores table
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS user_stores (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      url TEXT NOT NULL,
+      platform TEXT NOT NULL CHECK(platform IN ('etsy', 'shopify', 'square', 'website', 'other')),
+      sort_order INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(user_id, url)
+    )
+  `).run();
+
+  db.prepare('CREATE INDEX IF NOT EXISTS idx_user_stores_user_id ON user_stores(user_id)').run();
+
+  // Run My Store migration (idempotent)
+  migrateShopUrlsToUserStores(db);
+
 return db;
+}
+
+function migrateShopUrlsToUserStores(db) {
+  // Get users who have NOT been migrated yet AND have at least one shop URL
+  const usersToMigrate = db.prepare(`
+    SELECT id, shop_url, shop_url_2, shop_url_3 
+    FROM users 
+    WHERE stores_migrated = 0 
+    AND (shop_url IS NOT NULL OR shop_url_2 IS NOT NULL OR shop_url_3 IS NOT NULL)
+  `).all();
+
+  // Also mark users with no shop URLs as migrated
+  db.prepare('UPDATE users SET stores_migrated = 1 WHERE stores_migrated = 0 AND shop_url IS NULL AND shop_url_2 IS NULL AND shop_url_3 IS NULL').run();
+
+  if (usersToMigrate.length === 0) return;
+
+  console.log(`[Migration] Migrating stores for ${usersToMigrate.length} users...`);
+
+  const insertStore = db.prepare(`
+    INSERT OR IGNORE INTO user_stores (id, user_id, name, url, platform, sort_order, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+  `);
+
+  const markMigrated = db.prepare('UPDATE users SET stores_migrated = 1 WHERE id = ?');
+
+  for (const user of usersToMigrate) {
+    const urls = [
+      { url: user.shop_url, order: 0 },
+      { url: user.shop_url_2, order: 1 },
+      { url: user.shop_url_3, order: 2 }
+    ].filter(item => item.url && item.url.trim());
+
+    // Deduplicate URLs within same user (case-insensitive)
+    const seen = new Set();
+    const uniqueUrls = [];
+
+    for (const item of urls) {
+      const normalized = normalizeStoreUrl(item.url);
+      const lowerUrl = normalized.toLowerCase();
+
+      if (lowerUrl && !seen.has(lowerUrl)) {
+        seen.add(lowerUrl);
+        uniqueUrls.push({ url: normalized, order: item.order });
+      }
+    }
+
+    // Insert each unique URL
+    for (const item of uniqueUrls) {
+      try {
+        const platform = detectStorePlatform(item.url);
+        const { v4: uuidv4 } = require('uuid');
+        insertStore.run(
+          uuidv4(),
+          user.id,
+          platform.name,
+          item.url,
+          platform.id,
+          item.order
+        );
+      } catch (err) {
+        // INSERT OR IGNORE will skip if (user_id, url) already exists
+        if (!err.message.includes('UNIQUE constraint')) {
+          console.error(`[Migration] Failed to migrate store for user ${user.id}:`, err.message);
+        }
+      }
+    }
+
+    // Mark this user as migrated
+    markMigrated.run(user.id);
+  }
+
+  console.log('[Migration] My Store migration complete.');
+}
+
+function normalizeStoreUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+
+  let normalized = url.trim();
+
+  // Add https:// if missing protocol
+  if (normalized && !normalized.startsWith('http://') && !normalized.startsWith('https://')) {
+    normalized = 'https://' + normalized;
+  }
+
+  return normalized;
+}
+
+function detectStorePlatform(url) {
+  const lower = (url || '').toLowerCase();
+
+  if (lower.includes('etsy.com')) {
+    return { id: 'etsy', name: 'Etsy' };
+  }
+  if (lower.includes('shopify') || lower.includes('myshopify')) {
+    return { id: 'shopify', name: 'Shopify' };
+  }
+  if (lower.includes('square')) {
+    return { id: 'square', name: 'Square' };
+  }
+
+  return { id: 'website', name: 'My Website' };
 }
 
 module.exports = { initDB, DB_PATH };

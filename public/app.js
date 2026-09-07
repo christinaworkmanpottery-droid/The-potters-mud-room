@@ -473,7 +473,7 @@ function showApp() {
     });
     checkUrlParams();
     const hashPage = window.location.hash.replace('#', '').split('?')[0];
-    const validPages = ['dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','projects','events','contacts','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog','studioNotes','visualSearch','testTiles','findPotter'];
+    const validPages = ['dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','myStore','projects','events','contacts','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog','studioNotes','visualSearch','testTiles','findPotter'];
     if (hashPage && hashPage.startsWith('blog/')) {
       const slug = hashPage.replace('blog/', '');
       if (slug) viewBlogPost(slug);
@@ -526,7 +526,7 @@ function navigate(page) {
       dashboard:'pageDashboard', pieces:'pagePieces', pieceDetail:'pagePieceDetail',
       clayBodies:'pageClayBodies', glazes:'pageGlazes', firings:'pageFirings',
       casualties:'pageCasualties',
-      sales:'pageSales', pricingCalculator:'pagePricingCalculator', goals:'pageGoals', projects:'pageProjects', events:'pageEvents',
+      sales:'pageSales', pricingCalculator:'pagePricingCalculator', myStore:'pageMyStore', goals:'pageGoals', projects:'pageProjects', events:'pageEvents',
       contacts:'pageContacts', community:'pageCommunity', forum:'pageForum',
       forumPost:'pageForumPost', profile:'pageProfile', shop:'pageShop',
       upgrade:'pageUpgrade', help:'pageHelp', admin:'pageAdmin',
@@ -544,7 +544,7 @@ function navigate(page) {
   const loaders = {
     dashboard:loadDashboard, pieces:loadPieces, clayBodies:loadClayBodies,
     glazes:loadGlazes, firings:loadFirings, casualties:loadCasualties, sales:loadSales, pricingCalculator:loadPricingCalculator, testTiles:loadTestTiles, findPotter:loadFindPotter,
-    goals:loadGoals, projects:loadProjects, events:loadEvents, contacts:loadContacts, studioNotes:loadStudioNotes,
+    goals:loadGoals, myStore:loadMyStores, projects:loadProjects, events:loadEvents, contacts:loadContacts, studioNotes:loadStudioNotes,
     community:loadCombos, forum:loadForum, profile:loadProfile,
     shop:loadShop, upgrade:loadUpgrade, admin:loadAdmin,
     shoppingList:loadShoppingList, chemicals:loadChemicals,
@@ -558,7 +558,7 @@ function navigate(page) {
     const activityMap = {
       dashboard:'view_dashboard', pieces:'view_pieces', clayBodies:'view_clays',
       glazes:'view_glazes', firings:'view_firings', casualties:'view_casualties',
-      sales:'view_sales', goals:'view_goals', projects:'view_projects',
+      sales:'view_sales', goals:'view_goals', myStore:'view_my_store', projects:'view_projects',
       events:'view_calendar', contacts:'view_contacts', community:'view_combos',
       forum:'view_forum', profile:'view_profile', shoppingList:'view_shopping_list',
       chemicals:'view_chemicals', communityMembers:'view_community_members',
@@ -3202,10 +3202,10 @@ async function loadProfile() {
     document.getElementById('profilePrivate').checked = !!d.user.is_private;
     document.getElementById('profileUnits').value = d.user.unit_system || 'imperial';
     document.getElementById('profileTemp').value = d.user.temp_unit || 'fahrenheit';
-    // My Store fields
-    document.getElementById('profileShopUrl').value = d.user.shop_url || '';
-    document.getElementById('profileShopUrl2').value = d.user.shop_url_2 || '';
-    document.getElementById('profileShopUrl3').value = d.user.shop_url_3 || '';
+    
+    // Load stores from user_stores (read-only display)
+    loadProfileStores();
+    
     // Find a Potter fields
     document.getElementById('profileCity').value = d.user.city || '';
     document.getElementById('profileState').value = d.user.state_region || '';
@@ -3281,6 +3281,36 @@ async function toggleNewsletterSubscription() {
   } catch(e) { toast(e.message, 'error'); }
 }
 
+async function loadProfileStores() {
+  try {
+    const stores = await api('/api/user/stores');
+    const container = document.getElementById('profileStoresList');
+    
+    if (!container) return;
+    
+    if (!stores.length) {
+      container.innerHTML = '<p class="text-sm" style="color:var(--text-muted)">No shop links yet. <a href="#" onclick="navigate(\'myStore\'); return false;" style="color:var(--olive-green); font-weight:600">Add one →</a></p>';
+      return;
+    }
+    
+    container.innerHTML = stores.map(s => {
+      const platform = getStorePlatformInfo(s.platform);
+      return `
+        <div style="display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid var(--border-color)">
+          <span style="font-size:20px">${platform.icon}</span>
+          <div style="flex:1">
+            <div style="font-weight:600; color:var(--text-dark)">${esc(s.name)}</div>
+            <div class="text-xs" style="color:var(--text-muted)">${esc(s.url)}</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="window.open('${esc(s.url)}', '_blank')">Open</button>
+        </div>
+      `;
+    }).join('');
+  } catch (e) {
+    console.error('Failed to load stores:', e);
+  }
+}
+
 async function saveProfile() {
   try {
     await api('/api/profile', { method: 'PUT', body: {
@@ -3292,9 +3322,6 @@ async function saveProfile() {
       isPrivate: document.getElementById('profilePrivate').checked,
       unitSystem: document.getElementById('profileUnits').value,
       tempUnit: document.getElementById('profileTemp').value,
-      shopUrl: document.getElementById('profileShopUrl').value || null,
-      shopUrl2: document.getElementById('profileShopUrl2').value || null,
-      shopUrl3: document.getElementById('profileShopUrl3').value || null,
       city: document.getElementById('profileCity').value || null,
       stateRegion: document.getElementById('profileState').value || null,
       country: document.getElementById('profileCountry').value || null,
@@ -5502,6 +5529,137 @@ async function saveGoal(e) {
 async function deleteGoal(id) {
   if (!confirm('Delete this goal?')) return;
   try { await api('/api/goals/' + id, {method:'DELETE'}); toast('Deleted','success'); loadGoals(); } catch(e) { toast(e.message,'error'); }
+}
+
+// ============ MY STORE ============
+let selectedStorePlatform = null;
+
+async function loadMyStores() {
+  try {
+    const stores = await api('/api/user/stores');
+    const list = document.getElementById('myStoresList');
+    const empty = document.getElementById('myStoresEmpty');
+    const addBtn = document.getElementById('addStoreBtn');
+    const upgradeNote = document.getElementById('myStoreUpgradeNote');
+
+    if (!stores.length) {
+      list.innerHTML = '';
+      empty.classList.remove('hidden');
+    } else {
+      empty.classList.add('hidden');
+      list.innerHTML = stores.map(s => {
+        const platformInfo = getStorePlatformInfo(s.platform);
+        return `
+          <div class="card" style="position:relative">
+            <div style="display:flex; align-items:center; gap:14px">
+              <div style="font-size:32px; width:50px; height:50px; display:flex; align-items:center; justify-content:center; background:${platformInfo.color}15; border-radius:10px; color:${platformInfo.color}">
+                ${platformInfo.icon}
+              </div>
+              <div style="flex:1; min-width:0">
+                <div style="font-weight:700; font-size:1rem; color:var(--text-dark); margin-bottom:4px">${esc(s.name)}</div>
+                <div class="text-sm" style="color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${esc(s.url)}</div>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="window.open('${esc(s.url)}', '_blank')" style="flex-shrink:0">Open</button>
+              <button class="btn btn-sm" onclick="deleteStore('${s.id}')" style="color:var(--danger); flex-shrink:0" title="Remove store">
+                <span style="font-size:18px">×</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Show/hide add button and upgrade note based on tier
+    const isPaid = currentUser?.tier && currentUser.tier !== 'free';
+    if (!isPaid && stores.length >= 1) {
+      addBtn.disabled = true;
+      addBtn.textContent = 'Upgrade to Add More';
+      addBtn.onclick = () => navigate('upgrade');
+      upgradeNote.style.display = 'block';
+    } else {
+      addBtn.disabled = false;
+      addBtn.textContent = '+ Add Store Link';
+      addBtn.onclick = showAddStoreForm;
+      upgradeNote.style.display = 'none';
+    }
+
+    trackActivity('view_my_store', 'myStore');
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
+function getStorePlatformInfo(platformId) {
+  const platforms = {
+    etsy: { icon: '🛒', name: 'Etsy', color: '#F56400' },
+    shopify: { icon: '🛍️', name: 'Shopify', color: '#96BF48' },
+    square: { icon: '💳', name: 'Square', color: '#006AFF' },
+    website: { icon: '🌐', name: 'My Website', color: '#8B5A2B' },
+    other: { icon: '🔗', name: 'Other', color: '#999' }
+  };
+  return platforms[platformId] || platforms.other;
+}
+
+function showAddStoreForm() {
+  document.getElementById('addStoreForm').style.display = 'block';
+  document.getElementById('addStoreButtonContainer').style.display = 'none';
+  document.getElementById('newStoreName').value = '';
+  document.getElementById('newStoreUrl').value = '';
+  selectedStorePlatform = null;
+  document.querySelectorAll('.platform-chip').forEach(c => c.classList.remove('selected'));
+}
+
+function hideAddStoreForm() {
+  document.getElementById('addStoreForm').style.display = 'none';
+  document.getElementById('addStoreButtonContainer').style.display = 'block';
+  selectedStorePlatform = null;
+}
+
+function selectPlatform(platform) {
+  selectedStorePlatform = platform;
+  document.querySelectorAll('.platform-chip').forEach(c => c.classList.remove('selected'));
+  document.querySelector(`[data-platform="${platform}"]`)?.classList.add('selected');
+}
+
+async function saveNewStore() {
+  const url = document.getElementById('newStoreUrl').value.trim();
+  const name = document.getElementById('newStoreName').value.trim();
+
+  if (!url) {
+    toast('Please enter a store URL', 'error');
+    return;
+  }
+
+  try {
+    await api('/api/user/stores', {
+      method: 'POST',
+      body: { url, name: name || undefined, platform: selectedStorePlatform || undefined }
+    });
+    toast('Store added!', 'success');
+    hideAddStoreForm();
+    loadMyStores();
+    trackActivity('add_store', 'myStore');
+  } catch (e) {
+    if (e.message.includes('Upgrade')) {
+      toast('Free members can link 1 store. Upgrade to add more!', 'warning');
+      setTimeout(() => navigate('upgrade'), 2000);
+    } else {
+      toast(e.message, 'error');
+    }
+  }
+}
+
+async function deleteStore(storeId) {
+  if (!confirm('Remove this store link?')) return;
+
+  try {
+    await api('/api/user/stores/' + storeId, { method: 'DELETE' });
+    toast('Store removed', 'success');
+    loadMyStores();
+    trackActivity('delete_store', 'myStore');
+  } catch (e) {
+    toast(e.message, 'error');
+  }
 }
 
 // ============ PROJECTS ============
