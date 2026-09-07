@@ -7,3 +7,4 @@ data/
 *.db-wal
 .env
 database.sqlite
+.buildwork/

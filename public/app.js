@@ -5545,12 +5545,20 @@ async function loadProjects() {
 }
 
 function openProjectModal(p = null) {
+  const isEditing = !!p?.id;
   document.getElementById('projectId').value = p?.id || '';
   document.getElementById('projectTitle').value = p?.title || '';
   document.getElementById('projectDescription').value = p?.description || '';
   document.getElementById('projectStatus').value = p?.status || 'active';
   document.getElementById('projectDueDate').value = p?.due_date || '';
   document.getElementById('projectPriority').value = p?.priority || 'medium';
+  // Show photo input only when creating (not editing)
+  const photoSection = document.getElementById('projectPhotoSection');
+  const photoInput = document.getElementById('projectPhotoInput');
+  const photoPreview = document.getElementById('projectPhotoPreviewContainer');
+  if (photoSection) photoSection.style.display = isEditing ? 'none' : 'block';
+  if (photoInput) photoInput.value = '';
+  if (photoPreview) photoPreview.innerHTML = '';
   openModal('projectModal');
 }
 
@@ -5572,8 +5580,28 @@ async function saveProject(e) {
     priority: document.getElementById('projectPriority').value || 'medium'
   };
   try {
-    if (id) { await api('/api/projects/' + id, {method:'PUT',body}); toast('Project updated!','success'); trackActivity('edit_project', 'projects'); }
-    else { await api('/api/projects', {method:'POST',body}); toast('Project added!','success'); trackActivity('create_project', 'projects'); }
+    if (id) {
+      await api('/api/projects/' + id, {method:'PUT',body});
+      toast('Project updated!','success');
+      trackActivity('edit_project', 'projects');
+    } else {
+      const created = await api('/api/projects', {method:'POST',body});
+      trackActivity('create_project', 'projects');
+      // Upload photo if one was selected
+      const photoInput = document.getElementById('projectPhotoInput');
+      if (photoInput && photoInput.files && photoInput.files.length > 0 && created?.id) {
+        try {
+          const formData = new FormData();
+          formData.append('photos', photoInput.files[0]);
+          await api('/api/projects/' + created.id + '/photos', { method: 'POST', body: formData });
+          toast('Project added with photo!','success');
+        } catch (photoError) {
+          toast('Project saved, but photo could not be uploaded. You can add it later.','warning');
+        }
+      } else {
+        toast('Project added!','success');
+      }
+    }
     closeModal('projectModal');
     document.getElementById('projectId').value = '';
     loadProjects();
@@ -5583,6 +5611,21 @@ async function saveProject(e) {
 async function deleteProject(id) {
   if (!confirm('Delete this project?')) return;
   try { await api('/api/projects/' + id, {method:'DELETE'}); toast('Deleted','success'); loadProjects(); } catch(e) { toast(e.message,'error'); }
+}
+
+function previewProjectPhoto(event) {
+  const file = event.target.files[0];
+  const container = document.getElementById('projectPhotoPreviewContainer');
+  if (!container) return;
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      container.innerHTML = '<img src="' + e.target.result + '" style="max-width:200px; max-height:200px; border-radius:8px; margin:8px 0;" alt="Project photo preview">';
+    };
+    reader.readAsDataURL(file);
+  } else {
+    container.innerHTML = '';
+  }
 }
 
 function openProjectPhotoUpload(projectId) {
