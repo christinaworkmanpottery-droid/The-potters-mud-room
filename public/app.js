@@ -584,12 +584,38 @@ async function loadDashboard() {
     document.getElementById('statGlazes').textContent = d.totalGlazes;
     const sb = document.getElementById('statSalesBox');
     if (d.sales?.total) { document.getElementById('statSales').textContent = '$' + (d.sales.total||0).toFixed(0); sb.style.display=''; } else { sb.style.display='none'; }
+    // Build 47 parity: Forum posts count
+    const fpb = document.getElementById('statForumPostsBox');
+    if (fpb) {
+      document.getElementById('statForumPosts').textContent = d.totalForumPosts || 0;
+      fpb.style.display = '';
+    }
     const ban = document.getElementById('upgradeBanner');
     if (d.tier === 'free') { ban.classList.remove('hidden'); document.getElementById('pieceCountText').textContent = d.totalPieces + '/10 pieces used'; } else { ban.classList.add('hidden'); }
     const c = document.getElementById('recentPieces'), em = document.getElementById('dashboardEmpty');
     if (!d.recentPieces.length) { c.innerHTML = ''; em.classList.remove('hidden'); }
     else { em.classList.add('hidden'); c.innerHTML = d.recentPieces.map(pieceCard).join(''); }
+    // Build 47 parity: Load notification bell indicator
+    loadNotificationIndicator();
   } catch (err) { toast(err.message, 'error'); }
+}
+
+// Build 47 parity: Notification bell indicator
+async function loadNotificationIndicator() {
+  try {
+    const notifs = await api('/api/notifications');
+    const unread = notifs.filter(n => !n.is_read).length;
+    const bell = document.getElementById('notificationBell');
+    if (bell) {
+      if (unread > 0) {
+        bell.innerHTML = '<span style="position:relative;cursor:pointer" onclick="navigate(\'notifications\')">🔔<span style="position:absolute;top:-4px;right:-4px;background:var(--danger);color:#fff;border-radius:10px;padding:2px 6px;font-size:0.7rem;font-weight:600">' + unread + '</span></span>';
+      } else {
+        bell.innerHTML = '<span style="cursor:pointer;opacity:0.5" onclick="navigate(\'notifications\')">🔔</span>';
+      }
+    }
+  } catch (err) {
+    // Silently fail if notifications unavailable
+  }
 }
 
 // ---- Piece Card ----
