@@ -3342,6 +3342,9 @@ app.get('/api/dashboard', auth, (req, res) => {
   // Casualty count
   stats.totalCasualties = db.prepare("SELECT COUNT(*) as c FROM pieces WHERE user_id=? AND status IN ('broken','recycled')").get(req.userId).c;
 
+  // Forum posts count (Build 47 parity)
+  stats.totalForumPosts = db.prepare('SELECT COUNT(*) as c FROM forum_posts WHERE user_id=?').get(req.userId).c;
+
   if (tier !== 'free') {
     const sales = db.prepare('SELECT COUNT(*) as count, SUM(price * COALESCE(quantity, 1)) as total FROM sales WHERE user_id=?').get(req.userId);
     stats.sales = sales;
