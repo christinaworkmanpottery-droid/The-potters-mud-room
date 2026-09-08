@@ -354,6 +354,11 @@ app.get('/memes-gallery/', (req, res) => {
   res.redirect(301, '/memes-gallery');
 });
 
+// Pricing Calculator landing page
+app.get('/features/pricing-calculator', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'pricing-calculator.html'));
+});
+
 // Prevent browser caching of HTML/JS/CSS so updates show immediately
 app.use(express.static(path.join(__dirname, 'public'), {
   etag: false,
@@ -4660,6 +4665,7 @@ app.get('/sitemap.xml', (req, res) => {
     xml += `  <url><loc>${BASE_URL}/beta</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>\n`;
     xml += `  <url><loc>${BASE_URL}/privacy-policy</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>\n`;
     xml += `  <url><loc>${BASE_URL}/memes-gallery</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>\n`;
+    xml += `  <url><loc>${BASE_URL}/features/pricing-calculator</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>\n`;
     posts.forEach(p => {
       const date = (p.updated_at || p.published_at || '').split(' ')[0];
       xml += `  <url><loc>${BASE_URL}/blog/${p.slug}</loc>${date ? '<lastmod>' + date + '</lastmod>' : ''}<changefreq>weekly</changefreq><priority>0.8</priority></url>\n`;
