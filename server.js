@@ -4587,6 +4587,9 @@ app.get('/sitemap.xml', (req, res) => {
     const posts = db.prepare("SELECT slug, updated_at, published_at FROM blog_posts WHERE is_published=1 ORDER BY published_at DESC").all();
     let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
     xml += `  <url><loc>${BASE_URL}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>\n`;
+    xml += `  <url><loc>${BASE_URL}/beta</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>\n`;
+    xml += `  <url><loc>${BASE_URL}/privacy-policy</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>\n`;
+    xml += `  <url><loc>${BASE_URL}/memes-gallery</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>\n`;
     posts.forEach(p => {
       const date = (p.updated_at || p.published_at || '').split(' ')[0];
       xml += `  <url><loc>${BASE_URL}/blog/${p.slug}</loc>${date ? '<lastmod>' + date + '</lastmod>' : ''}<changefreq>weekly</changefreq><priority>0.8</priority></url>\n`;
