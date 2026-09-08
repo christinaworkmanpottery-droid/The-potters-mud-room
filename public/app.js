@@ -137,7 +137,7 @@ function requireSignup(feature) {
   document.getElementById('authScreen').style.display = 'flex';
 }
 function isGuestPreviewPage(page) {
-  return ['blog','forum','community','communityMembers','shop','upgrade','help'].includes(page);
+  return ['blog','forum','community','communityMembers','reviews','shop','upgrade','help'].includes(page);
 }
 function previewRibbon(message, cta = 'Sign Up Free', action = "requireSignup('unlock the full app')") {
   return '<div class="card mb-16" style="background:linear-gradient(135deg,#f7efe7 0%,#fff8f2 100%);border:1px dashed var(--primary)">' +
@@ -534,7 +534,7 @@ function navigate(page) {
       communityMembers:'pageCommunityMembers',
       memberProfile:'pageMemberProfile',
       notifications:'pageNotifications', messages:'pageMessages', messageThread:'pageMessageThread',
-      blog:'pageBlog', blogPost:'pageBlogPost', publicCombo:'pagePublicCombo',
+      blog:'pageBlog', blogPost:'pageBlogPost', reviews:'pageReviews', publicCombo:'pagePublicCombo',
       aiChat:'pageAiChat',
       studioNotes:'pageStudioNotes', visualSearch:'pageVisualSearch',
       testTiles:'pageTestTiles', findPotter:'pageFindPotter'
@@ -550,7 +550,7 @@ function navigate(page) {
     shoppingList:loadShoppingList, chemicals:loadChemicals,
     communityMembers:loadCommunityMembers,
     notifications:loadNotifications, messages:loadMessages,
-    blog:loadBlog, aiChat:loadAiChatHistory
+    blog:loadBlog, reviews:loadReviews, aiChat:loadAiChatHistory
   };
   if (loaders[page]) loaders[page]();
     trackPageView('/' + page);
@@ -563,6 +563,7 @@ function navigate(page) {
       forum:'view_forum', profile:'view_profile', shoppingList:'view_shopping_list',
       chemicals:'view_chemicals', communityMembers:'view_community_members',
       notifications:'view_notifications', messages:'view_messages', blog:'view_blog',
+      reviews:'view_reviews',
       help:'view_help', admin:'view_admin', shop:'view_shop', upgrade:'view_upgrade',
       testTiles:'view_test_tiles',
       findPotter:'view_find_potter'
@@ -6769,6 +6770,184 @@ document.addEventListener('dragover', function(e) {
     e.preventDefault();
   }
 });
+
+// ============ REVIEWS ============
+let myReview = null;
+
+async function loadReviews() {
+  try {
+    const [reviews, mine] = await Promise.all([
+      guestMode ? fetch('/api/reviews').then(r => r.json()) : api('/api/reviews'),
+      guestMode ? Promise.resolve(null) : api('/api/reviews/mine').catch(() => null)
+    ]);
+
+    myReview = mine;
+
+    const list = document.getElementById('reviewsList');
+    const empty = document.getElementById('reviewsEmpty');
+    const formContainer = document.getElementById('reviewFormContainer');
+
+    // Show review form for logged-in users
+    if (!guestMode) {
+      formContainer.innerHTML = renderReviewForm();
+    } else {
+      formContainer.innerHTML = '';
+    }
+
+    if (!reviews || reviews.length === 0) {
+      list.innerHTML = guestMode ? previewEmptyState('⭐', 'Reviews live here.', 'See what other potters say about The Potter\'s Mud Room. Join free to track your pottery and share your own experience.', 'Join Free', "requireSignup('track your pottery and share your experience')") : '';
+      empty.classList.remove('hidden');
+      return;
+    }
+
+    empty.classList.add('hidden');
+    const ribbon = guestMode ? previewHero('Real feedback from real potters.', 'These reviews come from potters actually using the app to track pieces, firings, glazes, and sales. Join free to start your own pottery record.', ['Track everything from wet clay to finished piece', 'Join the pottery community conversation', 'Keep a record that actually helps your work'], 'Start Tracking Free', "requireSignup('track your pottery and join the community')") : '';
+    list.innerHTML = ribbon + reviews.map(r => renderReview(r)).join('');
+  } catch(e) {
+    console.error('Load reviews error:', e);
+    toast(e.message, 'error');
+  }
+}
+
+function renderReview(review) {
+  const stars = Array.from({ length: 5 }, (_, i) => i < (review.rating || 5) ? '⭐' : '☆').join('');
+  return `
+    <div class="card" style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div>
+          <div style="font-weight:600;color:var(--text);margin-bottom:4px">${esc(review.display_name || 'Potter')}</div>
+          <div style="font-size:1.2rem;letter-spacing:2px;color:var(--warm-tan)">${stars}</div>
+        </div>
+        <div class="text-sm" style="color:var(--text-muted)">${fmtDate(review.created_at)}</div>
+      </div>
+      <p style="color:var(--text-light);line-height:1.6">${esc(review.body || '')}</p>
+    </div>
+  `;
+}
+
+function renderReviewForm() {
+  if (myReview && myReview.id) {
+    const stars = Array.from({ length: 5 }, (_, i) => i < (myReview.rating || 5) ? '⭐' : '☆').join('');
+    const statusText = myReview.is_approved ? 'Your review is published! ✓' : 'Your review is pending approval.';
+    const statusColor = myReview.is_approved ? 'var(--olive-green)' : 'var(--warm-tan)';
+    return `
+      <div class="card" style="background:var(--warm-tan-10);border:1px solid var(--warm-tan)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div>
+            <div style="font-weight:600;margin-bottom:4px">Your Review</div>
+            <div style="font-size:1.2rem;letter-spacing:2px;color:var(--warm-tan)">${stars}</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="showEditReviewForm()">Edit</button>
+        </div>
+        <p style="color:var(--text);margin-bottom:8px">${esc(myReview.body || '')}</p>
+        <p class="text-sm" style="color:${statusColor};font-weight:600">${statusText}</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="card">
+      <h3 style="margin-bottom:16px">Share Your Experience</h3>
+      <div id="reviewFormContent">
+        <div class="form-group">
+          <label>Rating *</label>
+          <div style="display:flex;gap:8px;font-size:1.8rem;margin-bottom:16px">
+            ${Array.from({ length: 5 }, (_, i) => `
+              <button type="button" onclick="setReviewRating(${i + 1})" style="background:none;border:none;cursor:pointer;padding:0" class="review-star" data-rating="${i + 1}">
+                ${i < 5 ? '⭐' : '☆'}
+              </button>
+            `).join('')}
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Your Review *</label>
+          <textarea id="reviewText" class="form-input" rows="4" placeholder="Share your experience with The Potter's Mud Room..."></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="submitReview()">Submit Review</button>
+      </div>
+    </div>
+  `;
+}
+
+function showEditReviewForm() {
+  if (!myReview) return;
+  const formContainer = document.getElementById('reviewFormContainer');
+  formContainer.innerHTML = `
+    <div class="card">
+      <h3 style="margin-bottom:16px">Edit Your Review</h3>
+      <div class="form-group">
+        <label>Rating *</label>
+        <div style="display:flex;gap:8px;font-size:1.8rem;margin-bottom:16px">
+          ${Array.from({ length: 5 }, (_, i) => `
+            <button type="button" onclick="setReviewRating(${i + 1})" style="background:none;border:none;cursor:pointer;padding:0" class="review-star" data-rating="${i + 1}">
+              ${i < myReview.rating ? '⭐' : '☆'}
+            </button>
+          `).join('')}
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Your Review *</label>
+        <textarea id="reviewText" class="form-input" rows="4">${esc(myReview.body || '')}</textarea>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" onclick="loadReviews()">Cancel</button>
+        <button class="btn btn-primary" onclick="updateReview()">Update Review</button>
+      </div>
+    </div>
+  `;
+}
+
+let currentReviewRating = 5;
+
+function setReviewRating(rating) {
+  currentReviewRating = rating;
+  document.querySelectorAll('.review-star').forEach((btn, i) => {
+    btn.textContent = i < rating ? '⭐' : '☆';
+  });
+}
+
+async function submitReview() {
+  const text = document.getElementById('reviewText')?.value?.trim();
+  if (!text) {
+    toast('Please write a review', 'error');
+    return;
+  }
+
+  try {
+    await api('/api/reviews', {
+      method: 'POST',
+      body: { rating: currentReviewRating, body: text }
+    });
+    toast('Review submitted! It will appear once approved.', 'success');
+    loadReviews();
+  } catch(e) {
+    if (e.message && e.message.includes('already submitted')) {
+      toast('You already have a review. Tap Edit to update it.', 'error');
+    } else {
+      toast(e.message || 'Could not submit review', 'error');
+    }
+  }
+}
+
+async function updateReview() {
+  const text = document.getElementById('reviewText')?.value?.trim();
+  if (!text) {
+    toast('Please write a review', 'error');
+    return;
+  }
+
+  try {
+    await api(`/api/reviews/${myReview.id}`, {
+      method: 'PUT',
+      body: { rating: currentReviewRating, body: text }
+    });
+    toast('Review updated! It will be re-reviewed before appearing.', 'success');
+    loadReviews();
+  } catch(e) {
+    toast(e.message || 'Could not update review', 'error');
+  }
+}
+
 document.addEventListener('drop', function(e) {
   const dropTarget = e.target.closest('.detail-photo-wrap');
   if (dropTarget && draggedPhotoElement && dropTarget !== draggedPhotoElement) {
