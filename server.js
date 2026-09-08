@@ -4910,6 +4910,19 @@ app.get('/beta', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'beta.html'));
 });
 
+app.get('/privacy-policy', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'privacy-policy.html'));
+});
+
+app.get('/memes-gallery', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'memes-gallery.html'));
+});
+
+// Redirect /memes-gallery/ (trailing slash) to canonical /memes-gallery
+app.get('/memes-gallery/', (req, res) => {
+  res.redirect(301, '/memes-gallery');
+});
+
 // === PASSWORD RESET ENDPOINTS ===
 
 // Admin: reset a member's password
