@@ -791,6 +791,7 @@
         <button class="nav-link" data-page="communityMembers" onclick="navigate('communityMembers'); closeNav()">👥 Members</button>
         <button class="nav-link" data-page="findPotter" onclick="navigate('findPotter'); closeNav()">📍 Find a Potter</button>
         <button class="nav-link" data-page="forum" onclick="navigate('forum'); closeNav()">Forum</button>
+        <button class="nav-link" data-page="reviews" onclick="navigate('reviews'); closeNav()">⭐ Reviews</button>
         <button class="nav-link" data-page="blog" onclick="navigate('blog'); closeNav()">📝 Blog</button>
         <button class="nav-link" data-page="shop" onclick="navigate('shop'); closeNav()">Shop</button>
       </div>
@@ -1691,6 +1692,30 @@
     <!-- PUBLIC COMBO VIEW -->
     <div id="pagePublicCombo" class="page">
       <div id="publicComboContent"></div>
+    </div>
+
+    <!-- REVIEWS -->
+    <div id="pageReviews" class="page">
+      <div class="page-header">
+        <div style="text-align:center; margin-bottom:24px">
+          <div style="font-size:40px; margin-bottom:12px">⭐</div>
+          <h2>Reviews</h2>
+          <p class="text-sm" style="color:var(--text-light); max-width:600px; margin:8px auto 0">See what other potters are saying about The Potter's Mud Room.</p>
+        </div>
+      </div>
+
+      <!-- Add/Edit Review Form (logged in users) -->
+      <div id="reviewFormContainer" style="max-width:700px; margin:0 auto 32px"></div>
+
+      <!-- Reviews List -->
+      <div id="reviewsList" style="max-width:800px; margin:0 auto"></div>
+
+      <!-- Empty State -->
+      <div id="reviewsEmpty" class="empty-state hidden">
+        <div class="empty-state-icon">⭐</div>
+        <div class="empty-state-title">No reviews yet</div>
+        <p>Be the first to share your experience!</p>
+      </div>
     </div>
 
     <!-- NOTIFICATIONS -->
