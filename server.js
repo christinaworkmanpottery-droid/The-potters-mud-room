@@ -344,6 +344,16 @@ app.use('/app', express.static(path.join(__dirname, 'public', 'app'), {
   redirect: false,
   setHeaders: noCacheWebHeaders,
 }));
+
+// Memes gallery routes (must come BEFORE static middleware to prevent directory auto-redirect)
+app.get('/memes-gallery', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'memes-gallery.html'));
+});
+
+app.get('/memes-gallery/', (req, res) => {
+  res.redirect(301, '/memes-gallery');
+});
+
 // Prevent browser caching of HTML/JS/CSS so updates show immediately
 app.use(express.static(path.join(__dirname, 'public'), {
   etag: false,
@@ -4912,15 +4922,6 @@ app.get('/beta', (req, res) => {
 
 app.get('/privacy-policy', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'privacy-policy.html'));
-});
-
-app.get('/memes-gallery', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'memes-gallery.html'));
-});
-
-// Redirect /memes-gallery/ (trailing slash) to canonical /memes-gallery
-app.get('/memes-gallery/', (req, res) => {
-  res.redirect(301, '/memes-gallery');
 });
 
 // === PASSWORD RESET ENDPOINTS ===
