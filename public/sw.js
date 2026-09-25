@@ -1,4 +1,4 @@
-const CACHE = 'mudroom-sept25-2026b';
+const CACHE = 'mudroom-v47';
 const STATIC = ['/','style.css','app.js','/manifest.json','/assets/icon-192.png','/assets/icon-512.png'];
 
 self.addEventListener('install', e => {

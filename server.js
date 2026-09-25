@@ -6,7 +6,7 @@ const multer = require('multer');
 const { normalizeExternalUrl, moneyCents, saleQuantity } = require('./public/website-utils');
 
 // Deploy version tag — used to verify which code is actually running on Render
-const DEPLOY_VERSION = 'v12-build39-runtime-repairs-2026-08-29';
+const DEPLOY_VERSION = '47';
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
