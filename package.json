@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node server.js",
     "start": "node server.js",
-    "test:website": "node tests/website-api.cjs && node tests/website-dom.cjs"
+    "test:website": "node tests/directory-calendar.cjs && node tests/website-api.cjs && node tests/website-dom.cjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

@@ -2031,11 +2031,16 @@ async function loadCasualties() {
     const isFiltered = casualtiesFilter !== null;
     const filterBanner = isFiltered ? '<div style="background:var(--primary-light);border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between"><span style="font-weight:600;color:var(--primary)">🔍 Filtered view</span><button class="btn btn-sm btn-secondary" onclick="clearCasualtiesFilter()">Show All</button></div>' : '';
     
-    stats.innerHTML = filterBanner +
-      '<div class="stat-box" style="cursor:pointer" onclick="clearCasualtiesFilter()"><div class="stat-number">' + allCasualties.length + '</div><div class="stat-label">Total Casualties</div></div>' +
-      '<div class="stat-box" style="cursor:pointer" onclick="filterCasualties(p => p.status === \'broken\')"><div class="stat-number">' + broken + '</div><div class="stat-label">Broken</div></div>' +
-      '<div class="stat-box" style="cursor:pointer" onclick="filterCasualties(p => p.status === \'recycled\')"><div class="stat-number">' + recycled + '</div><div class="stat-label">Recycled</div></div>' +
-      (topIssue ? '<div class="stat-box" style="cursor:pointer" onclick="filterCasualties(p => p.casualty_type === \'' + topIssue[0] + '\')"><div class="stat-number">⚠️</div><div class="stat-label">Top Issue: ' + esc(CASUALTY_LABELS[topIssue[0]]||topIssue[0]) + ' (' + topIssue[1] + ')</div></div>' : '');
+    const cards = [
+      {label:'Total Casualties',value:allCasualties.length,filter:null},
+      {label:'Broken',value:broken,filter:p=>p.status==='broken'},
+      {label:'Recycled',value:recycled,filter:p=>p.status==='recycled'}
+    ];
+    if (topIssue) cards.push({label:'Top Issue: '+(CASUALTY_LABELS[topIssue[0]]||topIssue[0])+' ('+topIssue[1]+')',value:'⚠️',filter:p=>p.casualty_type===topIssue[0]});
+    stats.innerHTML = filterBanner + cards.map((card,i)=>'<button type="button" class="stat-box" data-casualty-filter="'+i+'" style="font:inherit;color:inherit;cursor:pointer"><span class="stat-number" style="display:block">'+card.value+'</span><span class="stat-label" style="display:block">'+esc(card.label)+'</span></button>').join('');
+    stats.querySelectorAll('[data-casualty-filter]').forEach(button => {
+      button.addEventListener('click',()=>filterCasualties(cards[Number(button.dataset.casualtyFilter)].filter));
+    });
 
     if (!casualties.length && isFiltered) {
       c.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-title">No casualties match this filter</div></div>';
@@ -2046,6 +2051,15 @@ async function loadCasualties() {
   } catch(e) { toast(e.message,'error'); }
 }
 
+function showSalesSummaryRecords() {
+  const list=document.getElementById('salesList');
+  list.setAttribute('tabindex','-1'); list.focus({preventScroll:true}); list.scrollIntoView({block:'start',behavior:'smooth'});
+  toast('Showing the sales used for these totals.');
+}
+// Keyboard support for the site's existing interactive summary cards.
+document.addEventListener('keydown',event=>{
+  if ((event.key==='Enter'||event.key===' ') && event.target.matches('.stat-box[role="button"]')) {event.preventDefault();event.target.click();}
+});
 async function loadSales() {
   try {
     const dateFrom = document.getElementById('salesDateFrom')?.value || '';
@@ -2059,9 +2073,9 @@ async function loadSales() {
     if (!sales.length) { c.innerHTML=''; sum.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
     const total = sales.reduce((sum,x) => sum + WebsiteUtils.moneyCents(x.price || 0) * (x.quantity || 1), 0) / 100;
-    sum.innerHTML = '<div class="stat-box"><div class="stat-number">' + sales.length + '</div><div class="stat-label">Sales</div></div>' +
-      '<div class="stat-box"><div class="stat-number">$' + total.toFixed(2) + '</div><div class="stat-label">Revenue</div></div>' +
-      '<div class="stat-box"><div class="stat-number">$' + (total/sales.length).toFixed(2) + '</div><div class="stat-label">Avg Price</div></div>';
+    sum.innerHTML = '<div class="stat-box" role="button" tabindex="0" onclick="showSalesSummaryRecords()"><div class="stat-number">' + sales.length + '</div><div class="stat-label">Sales</div></div>' +
+      '<div class="stat-box" role="button" tabindex="0" onclick="showSalesSummaryRecords()"><div class="stat-number">$' + total.toFixed(2) + '</div><div class="stat-label">Revenue</div></div>' +
+      '<div class="stat-box" role="button" tabindex="0" onclick="showSalesSummaryRecords()"><div class="stat-number">$' + (total/sales.length).toFixed(2) + '</div><div class="stat-label">Avg Price</div></div>';
     const mode = getViewMode('sales');
     c.className = mode === 'list' ? '' : 'card-grid';
     if (mode === 'list') {
@@ -3357,6 +3371,11 @@ async function loadProfileStores() {
 
 async function saveProfile() {
   try {
+    if (document.getElementById('profileFindable').checked && document.getElementById('profilePrivate').checked) {
+      toast('Your profile is private. Uncheck “Make my profile private” to appear in Find a Potter, then save.', 'error');
+      document.getElementById('profilePrivate').scrollIntoView({block:'center'});
+      return;
+    }
     await api('/api/profile', { method: 'PUT', body: {
       displayName: document.getElementById('profileName').value,
       username: document.getElementById('profileUsername').value || null,
@@ -3371,15 +3390,19 @@ async function saveProfile() {
       country: document.getElementById('profileCountry').value.replace(/^United State$/i, 'United States') || null,
       findable: document.getElementById('profileFindable').checked
     }});
-    toast('Profile saved!', 'success');
+    toast(document.getElementById('profileFindable').checked ? 'Profile saved — your public directory listing is enabled.' : 'Profile saved!', 'success');
     trackActivity('edit_profile', 'profile');
   } catch(e) { toast(e.message,'error'); }
 }
 
 // ---- Find a Potter ----
+let findPotterRequest = 0;
 async function loadFindPotter() {
   if (currentPage !== 'findPotter') return;
-  const q = document.getElementById('findPotterSearch')?.value || '';
+  const requestId = ++findPotterRequest;
+  const q = document.getElementById('findPotterSearch')?.value.trim() || '';
+  const near = document.getElementById('findPotterNear')?.value.trim() || '';
+  const radius = document.getElementById('findPotterRadius')?.value || '10';
   const state = document.getElementById('findPotterState')?.value || '';
   const country = document.getElementById('findPotterCountry')?.value || '';
   const c = document.getElementById('findPotterList');
@@ -3390,14 +3413,19 @@ async function loadFindPotter() {
     if (q) params.set('q', q);
     if (state) params.set('state', state);
     if (country) params.set('country', country);
-    const potters = await api('/api/potters/find?' + params.toString());
+    if (near) { params.set('near',near); params.set('radius',radius); }
+    em.classList.add('hidden');
+    const result = await api('/api/potters/find?' + params.toString());
+    if (requestId !== findPotterRequest || currentPage !== 'findPotter') return;
+    const potters = Array.isArray(result) ? result : result.potters;
+    document.getElementById('findPotterNotice').textContent = result.notice || '';
     if (!potters.length) { c.innerHTML = ''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
     c.innerHTML = potters.map(p => {
       const avatar = p.avatarFilename
         ? '<img src="/uploads/' + esc(p.avatarFilename) + '" style="width:48px;height:48px;object-fit:cover;border-radius:50%;flex-shrink:0">'
         : '<div style="width:48px;height:48px;border-radius:50%;background:var(--bg-light);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">🏺</div>';
-      const loc = [p.city, p.stateRegion, p.country].filter(Boolean).join(', ');
+      const loc = [p.city, p.stateRegion, p.country].filter(Boolean).join(', ') + (p.distanceMiles !== undefined ? ' · about ' + p.distanceMiles + ' miles between city centres' : '');
       const shops = [p.shopUrl, p.shopUrl2, p.shopUrl3].filter(Boolean);
       const shopLinks = shops.map((u, i) => '<a href="' + externalHref(u) + '" target="_blank" rel="noopener" rel="noopener" class="btn btn-secondary btn-sm" style="font-size:0.8rem">🛒 Shop' + (shops.length > 1 ? ' ' + (i+1) : '') + '</a>').join('');
       return '<div class="card" style="display:flex;gap:12px;align-items:flex-start;cursor:pointer" onclick="navigate(\'memberProfile\',\''+p.id+'\')">' +
@@ -3409,7 +3437,7 @@ async function loadFindPotter() {
         (shopLinks ? '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">' + shopLinks + '</div>' : '') +
         '</div></div>';
     }).join('');
-  } catch(e) { toast(e.message, 'error'); c.innerHTML = ''; }
+  } catch(e) { if (requestId !== findPotterRequest) return; em.classList.add('hidden'); c.innerHTML = '<p role="alert">' + esc(e.message) + '</p>'; }
 }
 
 // ---- Upgrade / Billing ----
@@ -5891,7 +5919,8 @@ async function loadEvents() {
       (e.description ? '<div class="text-sm mt-8">' + esc(e.description) + '</div>' : '') +
       '</div>' +
       '<div style="display:flex;gap:4px;margin-top:10px;flex-wrap:wrap">' +
-      (!isPast ? '<a href="' + esc(gCalUrl) + '" target="_blank" rel="noopener" class="btn btn-sm btn-secondary" style="text-decoration:none">📅 Add to Calendar</a>' : '') +
+      (!isPast ? '<a href="' + esc(gCalUrl) + '" target="_blank" rel="noopener" class="btn btn-sm btn-secondary" style="text-decoration:none">📅 Google Calendar</a>' : '') +
+      '<button type="button" onclick="downloadEventsiCal(\'' + e.id + '\')" class="btn btn-sm btn-secondary">📅 Apple Calendar / iCal</button>' +
       ((e.address || e.location) ? '<a href="' + esc(mapsUrl) + '" target="_blank" rel="noopener" class="btn btn-sm btn-secondary" style="text-decoration:none">🗺️ Directions</a>' : '') +
       '<button onclick="shareEvent(\'' + e.id + '\')" class="btn btn-sm btn-secondary">📤 Share</button>' +
       '<button onclick="editEvent(\'' + e.id + '\')" class="btn-small">✎</button>' +
@@ -5984,14 +6013,15 @@ function showICalSubscribeUrl() {
     alert(msg);
   }
 }
-async function downloadEventsiCal() {
+async function downloadEventsiCal(eventId) {
   try {
-    const res = await fetch('/api/events/export/ics', { headers: { 'Authorization': 'Bearer ' + token } });
+    const res = await fetch('/api/events/export/ics' + (eventId ? '?eventId='+encodeURIComponent(eventId) : ''), { headers: { 'Authorization': 'Bearer ' + token } });
     if (!res.ok) throw new Error('Download failed');
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = 'pottery-events.ics'; a.click();
-    URL.revokeObjectURL(url);
+    const a = document.createElement('a'); a.href = url; a.download = eventId ? 'pottery-event.ics' : 'pottery-events.ics';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
     toast('Calendar downloaded! Open the .ics file to add to your calendar app.', 'success');
   } catch(e) { toast(e.message, 'error'); }
 }

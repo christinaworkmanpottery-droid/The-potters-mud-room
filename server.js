@@ -20,7 +20,8 @@ const expo = new Expo();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'pottery-app-dev-secret-change-in-prod';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error('JWT_SECRET must be configured');
 const db = initDB();
 
 // AI usage tracking table
@@ -1063,14 +1064,6 @@ app.delete('/api/user/stores/:id', auth, (req, res) => {
 });
 
 // ============ USER PROFILE ============
-app.put('/api/profile', auth, (req, res) => {
-  const { displayName, username, bio, location, website, isPrivate, unitSystem, tempUnit, shopUrl, shopUrl2, shopUrl3, city, stateRegion, country, findable } = req.body;
-  db.prepare(`UPDATE users SET display_name=?,username=?,bio=?,location=?,website=?,is_private=?,unit_system=?,temp_unit=?,shop_url=?,shop_url_2=?,shop_url_3=?,city=?,state_region=?,country=?,findable=?,updated_at=datetime('now') WHERE id=?`)
-    .run(displayName, username || null, bio, location, website, isPrivate ? 1 : 0, unitSystem || 'imperial', tempUnit || 'fahrenheit', shopUrl || null, shopUrl2 || null, shopUrl3 || null, city || null, stateRegion || null, country || null, findable ? 1 : 0, req.userId);
-  const user = db.prepare('SELECT * FROM users WHERE id=?').get(req.userId);
-  res.json({ success: true, user });
-});
-
 // Alias: GET /api/user/profile
 app.get('/api/user/profile', auth, (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE id=?').get(req.userId);
@@ -1080,7 +1073,7 @@ app.get('/api/user/profile', auth, (req, res) => {
 });
 
 // Alias: PUT /api/user/profile
-app.put('/api/user/profile', auth, (req, res) => {
+app.put(['/api/profile', '/api/user/profile'], auth, (req, res) => {
   const { displayName, username, bio, location, website, isPrivate, unitSystem, tempUnit, shopUrl, shopUrl2, shopUrl3, city, stateRegion, country, findable } = req.body;
   const current = db.prepare('SELECT * FROM users WHERE id=?').get(req.userId);
   if (!current) return res.status(404).json({ error: 'User not found' });
@@ -1184,17 +1177,14 @@ app.get('/api/profile/:id', auth, (req, res) => {
 });
 
 // Find a Potter — search members who have opted in
+const { searchPotters } = require('./directory-search');
 app.get('/api/potters/find', auth, (req, res) => {
-  const { city, state, country, q } = req.query;
-  let sql = `SELECT id, display_name, bio, avatar_filename, city, state_region, country, website, shop_url, shop_url_2, shop_url_3, tier, created_at FROM users WHERE findable=1 AND is_private=0`;
-  const params = [];
-  if (city) { sql += ` AND city LIKE ?`; params.push('%' + city + '%'); }
-  if (state) { sql += ` AND state_region LIKE ?`; params.push('%' + state + '%'); }
-  if (country) { sql += ` AND country LIKE ?`; params.push('%' + country + '%'); }
-  if (q) { sql += ` AND (display_name LIKE ? OR bio LIKE ? OR city LIKE ?)`; params.push('%'+q+'%','%'+q+'%','%'+q+'%'); }
-  sql += ` ORDER BY display_name ASC LIMIT 100`;
-  const potters = db.prepare(sql).all(...params);
-  res.json(potters.map(p => ({ id: p.id, displayName: p.display_name, bio: p.bio, avatarFilename: p.avatar_filename, city: p.city, stateRegion: p.state_region, country: /^United State$/i.test(p.country || '') ? 'United States' : p.country, website: p.website, shopUrl: p.shop_url, shopUrl2: p.shop_url_2, shopUrl3: p.shop_url_3 })));
+  try {
+    const rows = db.prepare(`SELECT id, display_name, bio, avatar_filename, city, state_region, country, website, shop_url, shop_url_2, shop_url_3, findable, is_private FROM users WHERE findable=1 AND is_private=0`).all();
+    const result = searchPotters(rows, {...req.query, q:req.query.q || req.query.city});
+    const potters = result.potters.map(p => ({id:p.id, displayName:p.display_name, bio:p.bio, avatarFilename:p.avatar_filename, city:p.city, stateRegion:p.state_region, country:/^United State$/i.test(p.country||'')?'United States':p.country, website:p.website, shopUrl:p.shop_url, shopUrl2:p.shop_url_2, shopUrl3:p.shop_url_3, ...(p.distanceMiles !== undefined ? {distanceMiles:Math.round(p.distanceMiles*10)/10}: {})}));
+    res.json(req.query.near ? {potters,notice:result.notice} : potters);
+  } catch(e) { res.status(400).json({error:e.message}); }
 });
 
 app.post('/api/block/:userId', auth, (req, res) => {
@@ -1370,7 +1360,7 @@ app.post('/api/billing/cancel', auth, async (req, res) => {
 
 // ============ ADMIN ============
 const ADMIN_EMAIL = 'christinaworkmanpottery@gmail.com';
-const ADMIN_API_KEY = process.env.ADMIN_API_KEY || 'mudroom-admin-2026';
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY || require('crypto').randomBytes(32).toString('hex');
 function isAdmin(req) {
   if (req.headers['x-admin-key'] === ADMIN_API_KEY) return true;
   const u = db.prepare('SELECT email FROM users WHERE id=?').get(req.userId);
@@ -4060,9 +4050,12 @@ app.delete('/api/events/:id', auth, (req, res) => {
 
 // Events export as iCalendar (.ics)
 app.get('/api/events/export/ics', auth, (req, res) => {
-  const events = db.prepare('SELECT * FROM events WHERE user_id=? ORDER BY event_date ASC').all(req.userId);
+  const events = req.query.eventId
+    ? db.prepare('SELECT * FROM events WHERE user_id=? AND id=?').all(req.userId, req.query.eventId)
+    : db.prepare('SELECT * FROM events WHERE user_id=? ORDER BY event_date ASC').all(req.userId);
+  if (req.query.eventId && !events.length) return res.status(404).json({error:'Event not found'});
   const icsContent = buildICS(events);
-  res.setHeader('Content-Type', 'text/calendar');
+  res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename=events.ics');
   res.send(icsContent);
 });
@@ -4078,18 +4071,7 @@ app.get('/api/events/subscribe/:userId', (req, res) => {
   res.send(icsContent);
 });
 
-function buildICS(events) {
-  let ics = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//The Potter's Mud Room//EN\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\nX-WR-CALNAME:Potter's Mud Room Events\nX-WR-TIMEZONE:UTC\nREFRESH-INTERVAL;VALUE=DURATION:PT1H\n`;
-  events.forEach(e => {
-    const dtstart = (e.event_date + (e.start_time ? 'T' + e.start_time.replace(/:/g, '') : 'T000000')).replace(/-/g, '');
-    const dtend = (e.event_date + (e.end_time ? 'T' + e.end_time.replace(/:/g, '') : 'T235959')).replace(/-/g, '');
-    const loc = [e.location, e.address].filter(Boolean).join(', ');
-    const desc = [e.description, e.website].filter(Boolean).join('\n');
-    ics += `BEGIN:VEVENT\nUID:${e.id}@pottersmudroom\nDTSTART:${dtstart}Z\nDTEND:${dtend}Z\nSUMMARY:${(e.title||'').replace(/[,;\\]/g, '\\$&')}\nDESCRIPTION:${desc.replace(/[,;\\]/g, '\\$&').replace(/\n/g, '\\n')}\nLOCATION:${loc.replace(/[,;\\]/g, '\\$&')}\n${e.website ? 'URL:' + e.website + '\n' : ''}END:VEVENT\n`;
-  });
-  ics += 'END:VCALENDAR';
-  return ics;
-}
+const { buildICS } = require('./calendar-export');
 
 // ============ CONTACTS ============
 app.get('/api/contacts', auth, (req, res) => {
@@ -4294,7 +4276,7 @@ app.put('/api/admin/blog/:id/publish', auth, (req, res) => {
 // Remote admin: upgrade a user's tier by email (password-protected)
 app.post('/api/admin/upgrade-tier/remote', (req, res) => {
   const { password, email, tier } = req.body;
-  if (password !== (process.env.ADMIN_BLOG_PASSWORD || 'mudroom-blog-2026')) return res.status(401).json({ error: 'Unauthorized' });
+  if (!process.env.ADMIN_BLOG_PASSWORD || password !== process.env.ADMIN_BLOG_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
   if (!email) return res.status(400).json({ error: 'Email required' });
   const targetTier = tier || 'starter';
   try {
@@ -4312,7 +4294,7 @@ app.post('/api/admin/upgrade-tier/remote', (req, res) => {
 // Admin blog via password (for remote management without JWT)
 app.post('/api/admin/blog/remote', (req, res) => {
   const { password, title, slug, content, excerpt, author, isPublished } = req.body;
-  if (password !== (process.env.ADMIN_BLOG_PASSWORD || 'mudroom-blog-2026')) return res.status(401).json({ error: 'Unauthorized' });
+  if (!process.env.ADMIN_BLOG_PASSWORD || password !== process.env.ADMIN_BLOG_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
   if (!title || !content) return res.status(400).json({ error: 'Title and content required' });
   const finalSlug = slug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
   const id = require('uuid').v4();
@@ -6626,7 +6608,7 @@ app.use((err, req, res, next) => {
 // === EMERGENCY PASSWORD RESET (no auth, password-protected) ===
 app.post('/api/emergency/reset-password', (req, res) => {
   const { password, email, newPassword } = req.body || {};
-  if (password !== (process.env.ADMIN_BLOG_PASSWORD || 'mudroom-blog-2026')) {
+  if (!process.env.ADMIN_BLOG_PASSWORD || password !== process.env.ADMIN_BLOG_PASSWORD) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   if (!email || !newPassword) return res.status(400).json({ error: 'email and newPassword required' });
@@ -6639,7 +6621,7 @@ app.post('/api/emergency/reset-password', (req, res) => {
 
 app.post('/api/emergency/disk-cleanup', (req, res) => {
   const { password } = req.body || {};
-  if (password !== (process.env.ADMIN_BLOG_PASSWORD || 'mudroom-blog-2026')) {
+  if (!process.env.ADMIN_BLOG_PASSWORD || password !== process.env.ADMIN_BLOG_PASSWORD) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   try {
@@ -6687,7 +6669,7 @@ app.post('/api/emergency/disk-cleanup', (req, res) => {
 // One-time migration endpoint (remove after use)
 app.post('/api/admin/run-migration-007', (req, res) => {
   const { password } = req.body;
-  if (password !== 'luce13') return res.status(401).json({ error: 'Unauthorized' });
+  if (!process.env.ADMIN_BLOG_PASSWORD || password !== process.env.ADMIN_BLOG_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
   
   try {
     console.log('[MIGRATION] Running 007-add-custom-clay-type.sql');

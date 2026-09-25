@@ -30,6 +30,9 @@ w.fetch=async (url, opts={})=>{
   else if(url==='/api/blog/posts') data=[{id:'blog-1',slug:'test-post',title:'Test post',content:'Test content'}];
   else if(url==='/api/blog/posts/test-post') data={id:'blog-1',slug:'test-post',title:'Test post',content:'Test content'};
   else if(url==='/api/profile/member-1') data={user:{id:'member-1',display_name:'Member',website:'ChristinaWorkmanPottery.com'}};
+  else if(url==='/api/events') data=[{id:'event-1',title:'Calendar test',event_date:'2099-09-25',start_time:'09:30',end_time:'10:30'}];
+  else if(url==='/api/casualties') data=[{id:'broken-1',title:'Broken bowl',status:'broken',casualty_type:'glaze_shivering'}];
+  else if(url.startsWith('/api/potters/find')) data=[];
   else if(url==='/api/shopping-list') data={clays:[],glazes:[],custom:[]};
   else if(/clay-bodies|glazes|stores|reviews|notifications|events|featured|comments/.test(url)) data=[];
   return {ok:true,status:200,json:async()=>data};
@@ -109,6 +112,26 @@ async function test(name, fn){await fn();console.log('PASS',name);}
    assert.equal(field('profileFindable').checked,false);assert.equal(field('profilePrivate').checked,true);
    w.navigate('casualties');w.openCasualtyModal();assert.equal(field('pieceStatus').value,'broken');
  });
+ await test('Casualty summary buttons filter, show empty state and reset',async()=>{
+   w.navigate('casualties');await pause();
+   let buttons=field('casualtyStats').querySelectorAll('button[data-casualty-filter]');assert.equal(buttons.length,4);
+   buttons[2].click();await pause();assert.match(field('casualtyList').textContent,/No casualties match/);
+   field('casualtyStats').querySelector('[data-casualty-filter="0"]').click();await pause();assert.match(field('casualtyList').textContent,/Broken bowl/);
+   field('casualtyStats').querySelector('[data-casualty-filter="3"]').click();await pause();assert.match(field('casualtyList').textContent,/Broken bowl/);
+ });
+ await test('Find a Potter sends selected nearby radius and keeps opt-in explicit',async()=>{
+   w.navigate('findPotter');await pause();field('findPotterNear').value='Santa Monica';field('findPotterState').value='CA';field('findPotterCountry').value='USA';field('findPotterRadius').value='5';
+   await w.loadFindPotter();assert.ok(calls.some(c=>c.url.includes('near=Santa+Monica')&&c.url.includes('radius=5')));
+   w.openFindPotterSettings();await pause();field('profileFindable').checked=true;field('profilePrivate').checked=true;
+   const before=calls.filter(c=>c.url==='/api/profile'&&c.method==='PUT').length;await w.saveProfile();assert.equal(calls.filter(c=>c.url==='/api/profile'&&c.method==='PUT').length,before);
+ });
+ await test('each event offers separate Google and Apple Calendar actions',async()=>{
+   w.navigate('events');await pause();
+   assert.match(field('eventsList').textContent,/Google Calendar/);
+   const apple=[...field('eventsList').querySelectorAll('button')].find(b=>b.textContent.includes('Apple Calendar / iCal'));
+   assert.ok(apple);assert.equal(apple.getAttribute('onclick'),"downloadEventsiCal('event-1')");
+   assert.match(field('eventsList').querySelector('a[href*="calendar.google.com"]').href,/20990925T093000/);
+ });
  await test('preview keeps real account and credentials separate',async()=>{
    w.navigate('sales');w.showGuestPreview();assert.equal(field('previewPage').style.display,'block');
    assert.equal(w.localStorage.getItem('mudlog_token'),'test-token');
@@ -116,8 +139,8 @@ async function test(name, fn){await fn();console.log('PASS',name);}
    w.exitPreviewToLanding();assert.equal(w.location.hash,'#sales');assert.equal(field('navTier').textContent,'ADMIN');
  });
  await test('root asset URLs survive nested paths; Help has only Mud Room links',async()=>{
-   assert.equal(w.document.querySelector('link[href*="style.css"]').getAttribute('href'),'/style.css?v=20260925');
-   assert.ok(w.document.querySelector('script[src="/app.js?v=20260925"]'));
+   assert.equal(w.document.querySelector('link[href*="style.css"]').getAttribute('href'),'/style.css?v=20260925b');
+   assert.ok(w.document.querySelector('script[src="/app.js?v=20260925b"]'));
    assert.equal(field('pageHelp').querySelectorAll('a[href*="lucehealing"],a[href*="christinaworkmanpottery"]').length,0);
  });
  await pause(); dom.window.close();

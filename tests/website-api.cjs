@@ -8,11 +8,13 @@ const Database = require('better-sqlite3');
 const jwt = require('jsonwebtoken');
 const root=path.resolve(__dirname,'..');
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'mudroom-master-test-'));
-for(const file of ['server.js','database.js','iap.js'])fs.copyFileSync(path.join(root,file),path.join(tmp,file));
+for(const file of ['server.js','database.js','iap.js','directory-search.js','calendar-export.js'])fs.copyFileSync(path.join(root,file),path.join(tmp,file));
+fs.cpSync(path.join(root,'geodata'),path.join(tmp,'geodata'),{recursive:true});
 fs.symlinkSync(path.join(root,'node_modules'),path.join(tmp,'node_modules'),'dir');
 fs.symlinkSync(path.join(root,'public'),path.join(tmp,'public'),'dir');
 const port=31000+Math.floor(Math.random()*10000),base='http://127.0.0.1:'+port;
-const secret='disposable-local-regression-secret';
+const secret=require('node:crypto').randomBytes(32).toString('hex');
+const adminKey=require('node:crypto').randomBytes(32).toString('hex');
 let db,server,output='';
 const fixture='website-fixture';
 const token=jwt.sign({userId:fixture,tier:'starter'},secret);
@@ -30,7 +32,7 @@ async function request(route,method='GET',body,auth=headers){
 function multipart(fields,images=[]){const f=new FormData();for(const [k,v]of Object.entries(fields))f.append(k,typeof v==='object'?JSON.stringify(v):String(v));for(const img of images)f.append(img.field||'photos',new Blob([png],{type:'image/png'}),img.name||'test.png');return f;}
 async function test(name,fn){await fn();console.log('PASS',name);}
 (async()=>{
- server=spawn(process.execPath,['server.js'],{cwd:tmp,env:{PATH:process.env.PATH,PORT:String(port),JWT_SECRET:secret,ADMIN_API_KEY:'local-fixture-key',NODE_ENV:'test'},stdio:['ignore','pipe','pipe']});
+ server=spawn(process.execPath,['server.js'],{cwd:tmp,env:{PATH:process.env.PATH,PORT:String(port),JWT_SECRET:secret,ADMIN_API_KEY:adminKey,NODE_ENV:'test'},stdio:['ignore','pipe','pipe']});
  server.stdout.on('data',c=>output+=c);server.stderr.on('data',c=>output+=c);
  for(let i=0;i<100&&!output.includes('running on');i++){if(server.exitCode!==null)throw new Error(output);await new Promise(r=>setTimeout(r,100));}
  assert.ok(output.includes('running on'),'local server starts');
@@ -103,16 +105,31 @@ async function test(name,fn){await fn();console.log('PASS',name);}
   await request('/api/user/profile','PUT',{website:'ChristinaWorkmanPottery.com',country:'United State'});
   const me=await request('/api/auth/me');assert.equal(me.user.website,'https://christinaworkmanpottery.com/');assert.equal(me.user.country,'United States');assert.equal(me.user.findable,0);assert.equal(me.user.is_private,1);assert.equal(me.user.isAdmin,false);
  });
+ await test('Profile saves persist directory settings and preserve omitted shop links',async()=>{
+  await request('/api/user/profile','PUT',{shopUrl:'https://example.com/shop'});
+  await request('/api/profile','PUT',{displayName:'Christina',city:'Santa Monica',stateRegion:'California',country:'United States',isPrivate:false,findable:true});
+  let result=await request('/api/potters/find?q=Santa%20monica&state=Ca&country=Usa');assert.equal(result[0].id,fixture);
+  result=await request('/api/potters/find?near=Santa%20Monica&state=CA&country=USA&radius=5');assert.equal(result.potters[0].id,fixture);
+  assert.equal(result.potters[0].shopUrl,'https://example.com/shop');
+  await request('/api/profile','PUT',{isPrivate:true});assert.equal((await request('/api/potters/find?q=Santa%20Monica')).length,0);
+ });
+ await test('single-event Apple Calendar export preserves time and enforces ownership',async()=>{
+  const event=await request('/api/events','POST',{title:'iCal test',eventDate:'2026-09-25',startTime:'09:30',endTime:'10:30',description:'Keep notes',location:'Studio'});
+  const res=await fetch(base+'/api/events/export/ics?eventId='+event.id,{headers});assert.equal(res.status,200);
+  const ics=await res.text();assert.ok(ics.includes('DTSTART:20260925T093000\r\n'));assert.ok(ics.includes('DESCRIPTION:Keep notes'));
+  assert.equal((ics.match(/BEGIN:VEVENT/g)||[]).length,1);
+  assert.equal((await fetch(base+'/api/events/export/ics?eventId=someone-elses-event',{headers})).status,404);
+ });
  await test('sample PDF is a real PDF; styles/scripts resolve from nested URLs',async()=>{
   const r=await fetch(base+'/shop/mud-log-preview.pdf');assert.match(r.headers.get('content-type'),/application\/pdf/);assert.equal((await r.text()).slice(0,5),'%PDF-');
-  const html=await (await fetch(base+'/nested/preview')).text();assert.match(html,/src="\/app.js\?v=20260925"/);assert.match(html,/href="\/style.css/);
+  const html=await (await fetch(base+'/nested/preview')).text();assert.match(html,/src="\/app.js\?v=20260925b"/);assert.match(html,/href="\/style.css/);
  });
  await test('server restart retains records and every saved photo',async()=>{
   const photos=fs.readdirSync(path.join(tmp,'data/uploads')).sort();
   db.close();db=null;
   const exited=new Promise(resolve=>server.once('exit',resolve));server.kill();await exited;
   output='';
-  server=spawn(process.execPath,['server.js'],{cwd:tmp,env:{PATH:process.env.PATH,PORT:String(port),JWT_SECRET:secret,ADMIN_API_KEY:'local-fixture-key',NODE_ENV:'test'},stdio:['ignore','pipe','pipe']});
+  server=spawn(process.execPath,['server.js'],{cwd:tmp,env:{PATH:process.env.PATH,PORT:String(port),JWT_SECRET:secret,ADMIN_API_KEY:adminKey,NODE_ENV:'test'},stdio:['ignore','pipe','pipe']});
   server.stdout.on('data',c=>output+=c);server.stderr.on('data',c=>output+=c);
   for(let i=0;i<100&&!output.includes('running on');i++){if(server.exitCode!==null)throw new Error(output);await new Promise(r=>setTimeout(r,100));}
   assert.ok(output.includes('running on'),'server restarts');
