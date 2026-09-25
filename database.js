@@ -562,6 +562,9 @@ function initDB() {
       `);
     }
   } catch(e) { /* migration already done or no data */ }
+  // The legacy sales table rebuild above must retain the contact link column.
+  safeAdd('sales', 'contact_id', 'TEXT');
+
 
   // Fix: piece_glazes.glaze_id was left NOT NULL after custom-named glaze support
   // (custom_name column, commit 694bd5b) started sending glaze_id=NULL for

@@ -5,7 +5,8 @@
   "description": "A tracking app for potters and ceramicists",
   "scripts": {
     "dev": "node server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "test:website": "node tests/website-api.cjs && node tests/website-dom.cjs"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -20,5 +21,8 @@
     "sharp": "^0.35.2",
     "stripe": "^14.25.0",
     "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0"
   }
 }

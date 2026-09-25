@@ -121,6 +121,9 @@ async function api(path, opts = {}) {
   const h = {};
   if (token) h['Authorization'] = 'Bearer ' + token;
   if (opts.body && !(opts.body instanceof FormData)) {
+    for (const key of ['website','url','sourceUrl','source_url','buyUrl','buy_url','shopUrl','shopUrl2','shopUrl3']) {
+      if (opts.body[key]) { const normalized = fixUrl(opts.body[key]); if (!normalized) throw new Error('Enter a valid website, such as example.com.'); opts.body[key] = normalized; }
+    }
     h['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(opts.body);
   }
@@ -137,7 +140,7 @@ function requireSignup(feature) {
   document.getElementById('authScreen').style.display = 'flex';
 }
 function isGuestPreviewPage(page) {
-  return ['blog','forum','community','communityMembers','reviews','shop','upgrade','help'].includes(page);
+  return ['blog','blogPost','forum','community','communityMembers','memberProfile','publicCombo','reviews','shop','upgrade','help'].includes(page);
 }
 function previewRibbon(message, cta = 'Sign Up Free', action = "requireSignup('unlock the full app')") {
   return '<div class="card mb-16" style="background:linear-gradient(135deg,#f7efe7 0%,#fff8f2 100%);border:1px dashed var(--primary)">' +
@@ -273,7 +276,14 @@ function showMemberGroup(filter) {
 }
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-function fixUrl(u) { if (!u) return null; u = u.trim(); if (!u) return null; u = u.replace(/^hrtp(s?):/, 'http$1:').replace(/^htp(s?):/, 'http$1:').replace(/^htps:/, 'https:'); if (!/^https?:\/\//i.test(u)) u = 'https://' + u; return u; }
+function fixUrl(u) { return WebsiteUtils.normalizeExternalUrl(u); }
+function externalHref(u) { return esc(fixUrl(u) || '#').replace(/"/g, '&quot;'); }
+function refreshAccountStatus() {
+  const badge = document.getElementById('navTier');
+  if (!badge) return;
+  badge.textContent = guestMode ? 'PREVIEW' : WebsiteUtils.accountLabel(currentUser).toUpperCase();
+  badge.className = 'tier-badge tier-' + (currentUser?.tier === 'free' ? 'free' : 'starter');
+}
 
 // Check URL params for post-checkout messages and referral codes
 function checkUrlParams() {
@@ -288,7 +298,7 @@ function checkUrlParams() {
   if (p.has('upgraded') || p.has('purchased') || p.has('cancelled') || p.has('ref')) {
     const ref = p.get('ref');
     const clean = window.location.pathname + (ref ? '?ref=' + ref : '');
-    window.history.replaceState({}, '', window.location.pathname);
+    window.history.replaceState({}, '', clean + window.location.hash);
   }
 }
 
@@ -435,6 +445,7 @@ function logout() {
 async function checkAuth() {
   // Don't override reset-password view
   if (window.location.hash.startsWith('#reset-password')) return;
+  if (!token && window.location.hash === '#preview') { showGuestPreview('community', true); return; }
   if (!token) { document.getElementById('landingPage').style.display = ''; if (!window.location.hash && window.location.pathname === '/') trackPageView('/'); return; }
   try {
     document.getElementById('landingPage').style.display = 'none';
@@ -462,9 +473,7 @@ function showApp() {
     document.getElementById('landingPage').style.display = 'none';
     document.getElementById('authScreen').style.display = 'none';
     document.getElementById('mainApp').classList.remove('hidden');
-    const badge = document.getElementById('navTier');
-    const t = currentUser?.tier || 'free';
-    if (badge) { badge.textContent = t.toUpperCase(); badge.className = 'tier-badge tier-' + t; }
+    refreshAccountStatus();
     const tier = currentUser?.tier || 'free';
     const tierLv = { free: 0, basic: 1, mid: 1, starter: 1, top: 1, unlimited: 1 };
     document.querySelectorAll('[data-min-tier]').forEach(el => {
@@ -474,15 +483,14 @@ function showApp() {
     checkUrlParams();
     const hashPage = window.location.hash.replace('#', '').split('?')[0];
     const validPages = ['dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','myStore','projects','events','contacts','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog','studioNotes','visualSearch','testTiles','findPotter'];
-    if (hashPage && hashPage.startsWith('blog/')) {
+    if (hashPage === 'preview') { showGuestPreview('community', true); } else if (hashPage === 'profile/find-potter') { navigate('profile', { fromHistory: true }); document.getElementById('findPotterSettings').scrollIntoView(); } else if (hashPage && hashPage.startsWith('blog/')) {
       const slug = hashPage.replace('blog/', '');
       if (slug) viewBlogPost(slug);
       else navigate('blog');
     } else if (hashPage && validPages.includes(hashPage)) {
       navigate(hashPage);
     } else {
-      loadDashboard();
-      trackPageView('/dashboard');
+      navigate('dashboard', { fromHistory: true });
     }
     loadClayBodies(); loadGlazes();
     pollNotificationBadges();
@@ -499,7 +507,8 @@ function showApp() {
 }
 // ---- Navigation ----
 let currentPage = 'dashboard';
-function navigate(page) {
+let restoredUrl = '';
+function navigate(page, options = {}) {
   try {
     if (!token && !guestMode) {
       if (isGuestPreviewPage(page)) {
@@ -513,12 +522,12 @@ function navigate(page) {
       requireSignup('use ' + page.replace(/([A-Z])/g, ' $1').toLowerCase());
       return;
     }
+    if (!options.fromHistory) restoredUrl = '';
     currentPage = page;
-    // Update URL hash so refresh stays on same page
-    if (page !== 'dashboard') {
-      window.location.hash = page;
-    } else {
-      window.history.replaceState({}, '', window.location.pathname);
+    // A navigation writes one history entry. Rendering a Back/Forward destination never writes one.
+    const route = options.route || page;
+    if (!options.fromHistory && window.location.hash !== '#' + route) {
+      window.history.pushState({ page, route }, '', window.location.pathname + window.location.search + '#' + route);
     }
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
@@ -584,7 +593,7 @@ async function loadDashboard() {
     document.getElementById('statClays').textContent = d.totalClays;
     document.getElementById('statGlazes').textContent = d.totalGlazes;
     const sb = document.getElementById('statSalesBox');
-    if (d.sales?.total) { document.getElementById('statSales').textContent = '$' + (d.sales.total||0).toFixed(0); sb.style.display=''; } else { sb.style.display='none'; }
+    if (d.sales?.total) { document.getElementById('statSales').textContent = '$' + (d.sales.total||0).toFixed(2); sb.style.display=''; } else { sb.style.display='none'; }
     // Build 47 parity: Forum posts count
     const fpb = document.getElementById('statForumPostsBox');
     if (fpb) {
@@ -918,7 +927,7 @@ async function savePiece(e) {
       } catch(pe) { console.warn('Photo upload failed:', pe); }
     }
     closeModal('pieceModal');
-    if (currentPage==='dashboard') loadDashboard(); else if (currentPage==='pieces') loadPieces(); else if (currentPage==='pieceDetail'&&id) viewPiece(id);
+    if (currentPage==='dashboard') loadDashboard(); else if (currentPage==='pieces') loadPieces(); else if (currentPage==='casualties') loadCasualties(); else if (currentPage==='pieceDetail'&&id) viewPiece(id);
   } catch(err) { toast(err.message,'error'); }
 }
 function togglePricingCalc() {
@@ -1042,7 +1051,6 @@ function clayCardView(cl) {
   const actions = isBulkSelectionActive('clayBodies') ? '' :
     '<div style="display:flex;gap:4px">' +
     '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();openClayPhotoUpload(\'' + cl.id + '\')" title="Add photo">📸</button>' +
-    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();duplicateClay(\'' + cl.id + '\')" title="Duplicate">📋</button>' +
     '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();editClayById(\'' + cl.id + '\')">✏️</button>' +
     '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deleteClay(\'' + cl.id + '\')">🗑️</button></div>';
   return '<div class="card" style="position:relative;cursor:pointer" onclick="' + (isBulkSelectionActive('clayBodies') ? 'toggleBulkSelect(\'clayBodies\',\''+cl.id+'\',event)' : 'viewClayById(\''+cl.id+'\')') + '">' + checkbox + '<div class="card-header"><div><div class="card-title">' + esc(cl.name) + ' ' + stockBadge + '</div>' +
@@ -1056,8 +1064,8 @@ function clayCardView(cl) {
     (cl.absorption_pct ? '<div><span class="detail-label">Absorption</span><div>' + cl.absorption_pct + '%</div></div>' : '') +
     (cl.cost_per_bag ? '<div><span class="detail-label">Cost</span><div>$' + cl.cost_per_bag + (cl.bag_weight ? ' / ' + esc(cl.bag_weight) : '') + '</div></div>' : '') +
     '</div>' +
-    (cl.source ? '<div class="text-sm mt-8">📍 ' + esc(cl.source) + (cl.source_url ? ' — <a href="' + esc(cl.source_url) + '" target="_blank" style="color:var(--primary)">visit</a>' : '') + '</div>' : '') +
-    (cl.buy_url ? '<div class="text-sm mt-4"><a href="' + esc(cl.buy_url) + '" target="_blank" class="btn btn-primary btn-sm">🛒 Buy</a></div>' : '') +
+    (cl.source ? '<div class="text-sm mt-8">📍 ' + esc(cl.source) + (cl.source_url ? ' — <a href="' + externalHref(cl.source_url) + '" target="_blank" rel="noopener" style="color:var(--primary)">visit</a>' : '') + '</div>' : '') +
+    (cl.buy_url ? '<div class="text-sm mt-4"><a href="' + externalHref(cl.buy_url) + '" target="_blank" rel="noopener" class="btn btn-primary btn-sm">🛒 Buy</a></div>' : '') +
     (cl.notes ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(cl.notes) + '</div>' : '') +
     (isBulkSelectionActive('clayBodies') ? '' : '<div class="mt-8" style="display:flex;gap:4px"><button class="btn-ghost btn-sm" onclick="toggleClayStock(\'' + cl.id + '\',' + (cl.in_stock ? 'false' : 'true') + ')" style="font-size:0.75rem">' + (cl.in_stock ? '📦 Mark Out of Stock' : '✅ Mark In Stock') + '</button></div>') +
     '</div>';
@@ -1067,7 +1075,6 @@ function clayListView(cl) {
   const stock = cl.in_stock ? '✅' : '❌';
   const actions = isBulkSelectionActive('clayBodies') ? '' :
     '<span style="margin-left:auto;display:flex;gap:4px">' +
-    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();duplicateClay(\'' + cl.id + '\')">📋</button>' +
     '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();editClayById(\'' + cl.id + '\')">✏️</button>' +
     '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deleteClay(\'' + cl.id + '\')">🗑️</button></span>';
   return '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="' + (isBulkSelectionActive('clayBodies') ? 'toggleBulkSelect(\'clayBodies\',\''+cl.id+'\',event)' : 'viewClayById(\''+cl.id+'\')') + '">' +
@@ -1117,12 +1124,13 @@ function openClayViewModal(cl) {
   if (cl.shrinkage_pct) html += '<div class="view-row"><span class="detail-label">Shrinkage</span><span>' + cl.shrinkage_pct + '%</span></div>';
   if (cl.absorption_pct) html += '<div class="view-row"><span class="detail-label">Absorption</span><span>' + cl.absorption_pct + '%</span></div>';
   if (cl.cost_per_bag) html += '<div class="view-row"><span class="detail-label">Cost</span><span>$' + cl.cost_per_bag + (cl.bag_weight ? ' / ' + esc(cl.bag_weight) : '') + '</span></div>';
-  if (cl.source) html += '<div class="view-row"><span class="detail-label">Source</span><span>' + esc(cl.source) + (cl.source_url ? ' <a href="' + esc(cl.source_url) + '" target="_blank" style="color:var(--primary)">↗</a>' : '') + '</span></div>';
-  if (cl.buy_url) html += '<div class="view-row"><span class="detail-label">Buy</span><a href="' + esc(cl.buy_url) + '" target="_blank" class="btn btn-primary btn-sm" style="display:inline-block;margin-top:2px">🛒 Buy</a></div>';
+  if (cl.source) html += '<div class="view-row"><span class="detail-label">Source</span><span>' + esc(cl.source) + (cl.source_url ? ' <a href="' + externalHref(cl.source_url) + '" target="_blank" rel="noopener" style="color:var(--primary)">↗</a>' : '') + '</span></div>';
+  if (cl.buy_url) html += '<div class="view-row"><span class="detail-label">Buy</span><a href="' + externalHref(cl.buy_url) + '" target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="display:inline-block;margin-top:2px">🛒 Buy</a></div>';
   if (cl.notes) html += '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);color:var(--text-light);font-size:0.9rem">' + esc(cl.notes) + '</div>';
   html += '<div style="margin-top:4px"><span class="piece-meta-tag" style="background:' + (cl.in_stock ? 'rgba(40,167,69,0.1);color:var(--success)' : 'rgba(220,53,69,0.1);color:var(--danger)') + '">' + (cl.in_stock ? 'In Stock' : 'Out of Stock') + '</span></div>';
   document.getElementById('clayViewTitle').textContent = cl.name;
   document.getElementById('clayViewBody').innerHTML = html;
+  document.getElementById('clayViewDuplicateBtn').onclick = () => { closeModal('clayViewModal'); duplicateClay(cl.id); };
   document.getElementById('clayViewEditBtn').onclick = () => { closeModal('clayViewModal'); editClayById(cl.id); };
   document.getElementById('clayViewPhotoBtn').onclick = () => { closeModal('clayViewModal'); openClayPhotoUpload(cl.id); };
   openModal('clayViewModal');
@@ -1195,7 +1203,6 @@ function glazeCardView(g) {
   const actions = isBulkSelectionActive('glazes') ? '' :
     '<div style="display:flex;gap:4px">' +
     '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();openGlazePhotoUpload(\'' + g.id + '\')" title="Add photo">📸</button>' +
-    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();duplicateGlaze(\'' + g.id + '\')" title="Duplicate">📋</button>' +
     '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();editGlazeById(\'' + g.id + '\')">✏️</button>' +
     '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deleteGlaze(\'' + g.id + '\')">🗑️</button></div>';
   return '<div class="card" style="position:relative;cursor:pointer" onclick="' + (isBulkSelectionActive('glazes') ? 'toggleBulkSelect(\'glazes\',\''+g.id+'\',event)' : 'viewGlazeById(\''+g.id+'\')') + '">' + checkbox + '<div class="card-header"><div><div class="card-title">' + esc(g.name) +
@@ -1208,8 +1215,8 @@ function glazeCardView(g) {
     (g.surface ? '<div><span class="detail-label">Surface</span><div>' + esc(g.surface) + '</div></div>' : '') +
     (g.opacity ? '<div><span class="detail-label">Opacity</span><div>' + esc(g.opacity) + '</div></div>' : '') +
     '</div>' +
-    (g.source ? '<div class="text-sm mt-8">📍 ' + esc(g.source) + (g.source_url ? ' — <a href="' + esc(g.source_url) + '" target="_blank" style="color:var(--primary)">visit</a>' : '') + '</div>' : '') +
-    (g.buy_url ? '<div class="text-sm mt-4"><a href="' + esc(g.buy_url) + '" target="_blank" class="btn btn-primary btn-sm">🛒 Buy</a></div>' : '') +
+    (g.source ? '<div class="text-sm mt-8">📍 ' + esc(g.source) + (g.source_url ? ' — <a href="' + externalHref(g.source_url) + '" target="_blank" rel="noopener" style="color:var(--primary)">visit</a>' : '') + '</div>' : '') +
+    (g.buy_url ? '<div class="text-sm mt-4"><a href="' + externalHref(g.buy_url) + '" target="_blank" rel="noopener" class="btn btn-primary btn-sm">🛒 Buy</a></div>' : '') +
     (g.ingredients?.length ? '<div class="mt-8"><span class="detail-label">Recipe' + ingredientTotal + '</span><div class="text-sm">' + g.ingredients.map(i=>esc(i.ingredient_name) + (i.percentage ? ' '+i.percentage+'%' : '')).join(', ') + '</div></div>' : '') +
     (g.recipe_notes ? '<div class="text-sm mt-4" style="color:var(--text-light)">📝 ' + esc(g.recipe_notes) + '</div>' : '') +
     (g.notes ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(g.notes) + '</div>' : '') +
@@ -1253,7 +1260,6 @@ function glazeListView(g) {
   const stock = g.stock_status === 'need-to-buy' ? '🛒' : (g.stock_status === 'low-stock' ? '⚠️' : (g.stock_status === 'discontinued' ? '❌' : '✅'));
   const actions = isBulkSelectionActive('glazes') ? '' :
     '<span style="margin-left:auto;display:flex;gap:4px">' +
-    '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();duplicateGlaze(\'' + g.id + '\')">📋</button>' +
     '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();editGlazeById(\'' + g.id + '\')">✏️</button>' +
     '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deleteGlaze(\'' + g.id + '\')">🗑️</button></span>';
   return '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="' + (isBulkSelectionActive('glazes') ? 'toggleBulkSelect(\'glazes\',\''+g.id+'\',event)' : 'viewGlazeById(\''+g.id+'\')') + '">' +
@@ -1306,8 +1312,8 @@ function openGlazeViewModal(g) {
   if (g.atmosphere) html += '<div class="view-row"><span class="detail-label">Atmosphere</span><span>' + esc(g.atmosphere) + '</span></div>';
   if (g.surface) html += '<div class="view-row"><span class="detail-label">Surface</span><span>' + esc(g.surface) + '</span></div>';
   if (g.opacity) html += '<div class="view-row"><span class="detail-label">Opacity</span><span>' + esc(g.opacity) + '</span></div>';
-  if (g.source) html += '<div class="view-row"><span class="detail-label">Source</span><span>' + esc(g.source) + (g.source_url ? ' <a href="' + esc(g.source_url) + '" target="_blank" style="color:var(--primary)">↗</a>' : '') + '</span></div>';
-  if (g.buy_url) html += '<div class="view-row"><span class="detail-label">Buy</span><a href="' + esc(g.buy_url) + '" target="_blank" class="btn btn-primary btn-sm" style="display:inline-block;margin-top:2px">🛒 Buy</a></div>';
+  if (g.source) html += '<div class="view-row"><span class="detail-label">Source</span><span>' + esc(g.source) + (g.source_url ? ' <a href="' + externalHref(g.source_url) + '" target="_blank" rel="noopener" style="color:var(--primary)">↗</a>' : '') + '</span></div>';
+  if (g.buy_url) html += '<div class="view-row"><span class="detail-label">Buy</span><a href="' + externalHref(g.buy_url) + '" target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="display:inline-block;margin-top:2px">🛒 Buy</a></div>';
   if (g.ingredients?.length) {
     const total = g.ingredients.reduce((s,i)=>s+(i.percentage||0),0);
     html += '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"><span class="detail-label">Recipe</span><div class="text-sm" style="margin-top:4px">' + g.ingredients.map(i=>esc(i.ingredient_name)+(i.percentage?' '+i.percentage+'%':'')).join('<br>') + '</div><div style="font-size:0.8rem;margin-top:4px;color:' + (Math.abs(total-100)<0.1?'var(--success)':(Math.abs(total-100)<5?'#F4A623':'var(--danger)')) + '">Total: ' + total.toFixed(1) + '%</div></div>';
@@ -1327,6 +1333,7 @@ function openGlazeViewModal(g) {
   }
   document.getElementById('glazeViewTitle').textContent = g.name;
   document.getElementById('glazeViewBody').innerHTML = html;
+  document.getElementById('glazeViewDuplicateBtn').onclick = () => { closeModal('glazeViewModal'); duplicateGlaze(g.id); };
   document.getElementById('glazeViewEditBtn').onclick = () => { closeModal('glazeViewModal'); editGlazeById(g.id); };
   document.getElementById('glazeViewPhotoBtn').onclick = () => { closeModal('glazeViewModal'); openGlazePhotoUpload(g.id); };
   openModal('glazeViewModal');
@@ -1403,7 +1410,7 @@ async function saveGlaze(e) {
     }
     btn.disabled = false;
     closeModal('glazeModal'); loadGlazes();
-  } catch(err) { toast(err.message,'error'); btn.disabled = false; }
+  } catch(err) { toast(err.message,'error'); } finally { btn.disabled = false; }
 }
 async function deleteGlaze(id) {
   if (!confirm('Delete this glaze?')) return;
@@ -2051,18 +2058,19 @@ async function loadSales() {
     const sum = document.getElementById('salesSummary');
     if (!sales.length) { c.innerHTML=''; sum.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
-    const total = sales.reduce((s,x) => s + ((x.price||0) * (x.quantity||1)), 0);
+    const total = sales.reduce((sum,x) => sum + WebsiteUtils.moneyCents(x.price || 0) * (x.quantity || 1), 0) / 100;
     sum.innerHTML = '<div class="stat-box"><div class="stat-number">' + sales.length + '</div><div class="stat-label">Sales</div></div>' +
-      '<div class="stat-box"><div class="stat-number">$' + total.toFixed(0) + '</div><div class="stat-label">Revenue</div></div>' +
-      '<div class="stat-box"><div class="stat-number">$' + (total/sales.length).toFixed(0) + '</div><div class="stat-label">Avg Price</div></div>';
+      '<div class="stat-box"><div class="stat-number">$' + total.toFixed(2) + '</div><div class="stat-label">Revenue</div></div>' +
+      '<div class="stat-box"><div class="stat-number">$' + (total/sales.length).toFixed(2) + '</div><div class="stat-label">Avg Price</div></div>';
     const mode = getViewMode('sales');
     c.className = mode === 'list' ? '' : 'card-grid';
     if (mode === 'list') {
       c.innerHTML = sales.map(s =>
-        '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="editSale(\'' + s.id + '\')">' +
+        '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="viewSale(\'' + s.id + '\')">' +
+        (s.image_filename ? '<img alt="Sale photo" src="/uploads/' + encodeURIComponent(s.image_filename) + '" style="width:48px;height:48px;object-fit:cover;border-radius:8px">' : '') +
         '<strong style="min-width:150px">' + esc(s.item_description || s.piece_title || 'Unknown piece') + '</strong>' +
         (s.quantity && s.quantity > 1 ? '<span class="text-sm">Qty: ' + s.quantity + '</span>' : '') +
-        '<span style="font-weight:700;color:var(--accent);min-width:60px">$' + ((s.price||0) * (s.quantity||1)).toFixed(0) + '</span>' +
+        '<span style="font-weight:700;color:var(--accent);min-width:60px">$' + ((s.price||0) * (s.quantity||1)).toFixed(2) + '</span>' +
         '<span class="text-sm" style="min-width:80px">' + fmtDate(s.date) + '</span>' +
         '<span class="text-sm" style="color:var(--text-light)">' + esc(s.venue_type||'') + '</span>' +
         '<span class="text-sm" style="color:var(--text-muted)">' + esc(s.venue||'') + '</span>' +
@@ -2072,9 +2080,10 @@ async function loadSales() {
       ).join('');
     } else {
       c.innerHTML = sales.map(s =>
-        '<div class="card" style="cursor:pointer" onclick="editSale(\'' + s.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(s.item_description || s.piece_title || 'Unknown piece') + '</div>' +
+        '<div class="card" style="cursor:pointer" onclick="viewSale(\'' + s.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(s.item_description || s.piece_title || 'Unknown piece') + '</div>' +
         '<div class="text-sm" style="color:var(--text-light)">' + fmtDate(s.date) + (s.venue ? ' \u00b7 ' + esc(s.venue) : '') + (s.event_name ? ' \u00b7 ' + esc(s.event_name) : '') + '</div></div>' +
-        '<div style="font-family:var(--font-display);font-size:1.2rem;font-weight:700;color:var(--accent)">$' + ((s.price||0) * (s.quantity||1)).toFixed(0) + (s.quantity && s.quantity > 1 ? ' (Qty: ' + s.quantity + ')' : '') + '</div></div>' +
+        '<div style="font-family:var(--font-display);font-size:1.2rem;font-weight:700;color:var(--accent)">$' + ((s.price||0) * (s.quantity||1)).toFixed(2) + (s.quantity && s.quantity > 1 ? ' (Qty: ' + s.quantity + ')' : '') + '</div></div>' +
+        (s.image_filename ? '<img alt="Sale photo" src="/uploads/' + encodeURIComponent(s.image_filename) + '" style="width:100%;max-height:180px;object-fit:contain;margin-bottom:10px">' : '') +
         (s.venue_type ? '<span class="piece-meta-tag">' + esc(s.venue_type) + '</span>' : '') +
         (s.buyer_name ? '<span class="piece-meta-tag">\uD83D\uDC64 ' + esc(s.buyer_name) + '</span>' : '') +
         '<div style="margin-top:8px;display:flex;gap:6px">' +
@@ -2085,7 +2094,26 @@ async function loadSales() {
   } catch(e) { toast(e.message,'error'); }
 }
 let _salePieces = [];
+let saleSavePending = false;
+async function viewSale(id) {
+  try {
+    const sales = await api('/api/sales');
+    const sale = sales.find(s => s.id === id);
+    if (!sale) throw new Error('Sale not found');
+    document.getElementById('saleDetailsContent').innerHTML =
+      (sale.image_filename ? '<img alt="Sale photo" src="/uploads/' + encodeURIComponent(sale.image_filename) + '" style="width:100%;max-height:300px;object-fit:contain;margin-bottom:16px">' : '') +
+      df('Item', sale.item_description || sale.piece_title) + df('Date', fmtDate(sale.date)) +
+      df('Quantity', sale.quantity ?? 1) + df('Price each', '$' + Number(sale.price || 0).toFixed(2)) +
+      df('Total', '$' + (WebsiteUtils.moneyCents(sale.price || 0) * (sale.quantity || 1) / 100).toFixed(2)) +
+      df('Event', sale.event_name) + df('Venue', sale.venue) + df('Buyer', sale.buyer_name) + df('Notes', sale.notes);
+    document.getElementById('saleDetailsEdit').onclick = () => { closeModal('saleDetailsModal'); editSale(id); };
+    openModal('saleDetailsModal');
+  } catch(e) { toast(e.message, 'error'); }
+}
+
 function openSaleModal() {
+  document.getElementById('salePhotoInput').value = '';
+  document.getElementById('saleModalTitle').textContent = 'Log Sale';
   document.getElementById('saleId').value = '';
   document.getElementById('salePrice').value = '';
   document.getElementById('saleDate').value = new Date().toISOString().split('T')[0];
@@ -2116,7 +2144,8 @@ function onSalePieceSelect(id) {
   if (!priceEl.value && p.price) priceEl.value = p.price;
   // Show piece photo if available
   const preview = document.getElementById('salePhotoPreview');
-  const photo = p.photos && p.photos[0];
+  const photo = p.primaryPhoto || (p.photos && p.photos[0]);
+  if (document.getElementById('salePhotoInput').files.length) return;
   if (photo) {
     preview.innerHTML = '<div style="margin-bottom:8px"><img src="/uploads/' + photo.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);border:2px solid var(--border)" />' +
       (p.clay_body_name ? '<div class="text-sm" style="color:var(--text-light);margin-top:4px">🪨 ' + esc(p.clay_body_name) + '</div>' : '') +
@@ -2153,6 +2182,8 @@ function removeBulkLineItem(btn) {
 
 async function saveBulkSale(e) {
   e.preventDefault();
+  const submit = e.target.querySelector('button[type=submit]');
+  if (submit.disabled) return;
   const eventName = document.getElementById('bulkEventName').value;
   const date = document.getElementById('bulkEventDate').value;
   const venueType = document.getElementById('bulkVenueType').value;
@@ -2160,53 +2191,42 @@ async function saveBulkSale(e) {
   const lineItems = [];
   items.forEach(item => {
     const desc = item.querySelector('.bulk-item-desc').value;
-    const qty = parseInt(item.querySelector('.bulk-qty').value) || 1;
-    const price = parseFloat(item.querySelector('.bulk-price-each').value) || 0;
+    const qty = Number(item.querySelector('.bulk-qty').value);
+    const price = Number(item.querySelector('.bulk-price-each').value);
     if (desc && price > 0) lineItems.push({ itemDescription: desc, quantity: qty, priceEach: price });
   });
   if (!lineItems.length) return toast('Add at least one line item', 'error');
   try {
+    submit.disabled = true;
     await api('/api/sales/bulk', { method: 'POST', body: { eventName, date, venueType, lineItems } });
     toast('Bulk sale recorded!', 'success');
     trackActivity('create_bulk_sale', 'sales');
     closeModal('bulkSaleModal');
     loadSales();
-  } catch(e) { toast(e.message, 'error'); }
+  } catch(e) { toast(e.message, 'error'); } finally { submit.disabled = false; }
 }
 
 async function saveSale(e) {
   e.preventDefault();
+  if (saleSavePending) return;
+  const btn = e.target.querySelector('button[type="submit"]');
+  saleSavePending = true; btn.disabled = true;
   const saleId = document.getElementById('saleId').value;
-  const body = {
-    pieceId: document.getElementById('salePiece').value || null,
-    price: parseFloat(document.getElementById('salePrice').value),
-    date: document.getElementById('saleDate').value || null,
-    venueType: document.getElementById('saleVenueType').value || null,
-    venue: document.getElementById('saleVenue').value || null,
-    quantity: parseInt(document.getElementById('saleQuantity').value) || 1,
-    itemDescription: document.getElementById('saleItemDescription').value || null,
-    eventName: document.getElementById('saleEventName').value || null,
-    buyerName: (document.getElementById('saleBuyerName') || {}).value || null
-  };
   try {
-    const method = saleId ? 'PUT' : 'POST';
-    const url = saleId ? '/api/sales/' + saleId : '/api/sales';
-    const result = await api(url, { method, body });
-    // Upload photo if selected
-    const photoFile = document.getElementById('salePhotoInput').files[0];
-    const targetId = saleId || result.id;
-    if (photoFile && targetId) {
-      const fd = new FormData();
-      fd.append('photo', photoFile);
-      await fetch('/api/sales/' + targetId + '/photo', { method:'POST', headers:{'Authorization':'Bearer '+token}, body:fd });
-    }
+    const fd = new FormData();
+    fd.append('price', WebsiteUtils.moneyCents(document.getElementById('salePrice').value) / 100);
+    fd.append('quantity', WebsiteUtils.saleQuantity(document.getElementById('saleQuantity').value));
+    const fields = { pieceId:'salePiece', date:'saleDate', venueType:'saleVenueType', venue:'saleVenue', itemDescription:'saleItemDescription', eventName:'saleEventName', buyerName:'saleBuyerName' };
+    for (const [key, id] of Object.entries(fields)) fd.append(key, document.getElementById(id)?.value || '');
+    const photo = document.getElementById('salePhotoInput').files[0];
+    if (photo) fd.append('photo', photo);
+    const result = await api(saleId ? '/api/sales/' + saleId : '/api/sales', { method: saleId ? 'PUT' : 'POST', body: fd });
+    document.getElementById('saleId').value = result.id || saleId;
     toast(saleId ? 'Sale updated!' : 'Sale logged!', 'success');
-    trackActivity(saleId ? 'edit_sale' : 'create_sale', 'sales');
     closeModal('saleModal');
-    document.getElementById('saleId').value = '';
-    document.getElementById('salePhotoPreview').innerHTML = '';
-    loadSales();
-  } catch(e) { toast(e.message, 'error'); }
+    await loadSales();
+  } catch(err) { toast(err.message, 'error'); }
+  finally { saleSavePending = false; btn.disabled = false; }
 }
 
 async function editSale(id) {
@@ -2215,11 +2235,15 @@ async function editSale(id) {
     const s = sales.find(x => x.id === id);
     if (!s) return toast('Sale not found', 'error');
     const pieces = await api('/api/pieces');
+    _salePieces = pieces;
+    document.getElementById('salePhotoInput').value = '';
+    document.getElementById('saleModalTitle').textContent = 'Edit Sale';
+    document.getElementById('salePhotoPreview').innerHTML = s.image_filename ? '<img alt="Sale photo" src="/uploads/' + encodeURIComponent(s.image_filename) + '" style="max-width:120px;max-height:120px;object-fit:contain">' : '';
     const sel = document.getElementById('salePiece');
     sel.innerHTML = '<option value="">No linked piece</option>' + pieces.map(p => '<option value="' + p.id + '">' + esc(p.title||'Untitled') + '</option>').join('');
     document.getElementById('saleId').value = s.id;
     document.getElementById('salePiece').value = s.piece_id || '';
-    document.getElementById('salePrice').value = s.price || '';
+    document.getElementById('salePrice').value = s.price ?? '';
     document.getElementById('saleDate').value = s.date || '';
     document.getElementById('saleVenueType').value = s.venue_type || '';
     document.getElementById('saleVenue').value = s.venue || '';
@@ -2782,10 +2806,17 @@ async function loadCombos() {
   } catch(e) { toast(e.message,'error'); }
 }
 
+let comboPhotoSlots = [null, null];
+let comboSavePending = false;
 function editCombo(id) {
   api('/api/community/combos?filter=all-my').then(combos => {
     const combo = combos.find(c => c.id === id);
     if (combo) {
+      populateComboDataLists();
+      document.getElementById('comboModalTitle').textContent = 'Edit Community Library Entry';
+      comboPhotoSlots = [combo.photo_filename || null, combo.photo_filename2 || null];
+      document.getElementById('comboPhotos').value = '';
+      renderComboPhotos();
       document.getElementById('comboId').value = combo.id;
       document.getElementById('comboName').value = combo.name;
       document.getElementById('comboClay').value = combo.clay_body_name || '';
@@ -2795,13 +2826,13 @@ function editCombo(id) {
       document.getElementById('comboShared').checked = combo.is_shared;
       document.getElementById('comboLayers').innerHTML = '';
       if (combo.layers && combo.layers.length) {
-        combo.layers.forEach(l => addComboLayer(l.glaze_name, l.brand, l.coats));
+        combo.layers.forEach(l => addComboLayer(l.glaze_name, l.brand, l.coats, l.application_method));
       } else {
         addComboLayer(); addComboLayer();
       }
       openModal('comboModal');
     }
-  });
+  }).catch(e => toast(e.message, 'error'));
 }
 
 async function deleteCombo(id) {
@@ -2812,9 +2843,10 @@ async function deleteCombo(id) {
     loadCombos();
   } catch(e) { toast(e.message, 'error'); }
 }
-function addComboLayer(name, brand, coats) {
+function addComboLayer(name, brand, coats, method) {
   const c = document.getElementById('comboLayers');
   const r = document.createElement('div'); r.className = 'combo-layer-row';
+  r.dataset.method = method || '';
   r.innerHTML = '<input type="text" class="form-input cl-name" placeholder="Glaze name" value="' + esc(name||'') + '" list="comboGlazeNameList">' +
     '<input type="text" class="form-input cl-brand" placeholder="Brand" value="' + esc(brand||'') + '" style="width:120px;flex:none" list="comboGlazeBrandList">' +
     '<input type="number" class="form-input cl-coats" placeholder="Coats" min="1" value="' + (coats||1) + '" style="width:70px;flex:none">' +
@@ -2834,6 +2866,9 @@ function populateComboDataLists() {
 }
 function openComboModal() {
   if (guestMode) { requireSignup('save your own glaze combos'); return; }
+  comboPhotoSlots = [null, null];
+  renderComboPhotos();
+  document.getElementById('comboModalTitle').textContent = 'New Community Library Entry';
   document.getElementById('comboId').value = '';
   document.getElementById('comboName').value = '';
   document.getElementById('comboClay').value = '';
@@ -2849,9 +2884,12 @@ function openComboModal() {
 }
 async function saveCombo(e) {
   e.preventDefault();
+  if (comboSavePending) return;
+  const btn = e.target.querySelector('button[type=submit]');
+  comboSavePending = true; btn.disabled = true;
   const comboId = document.getElementById('comboId').value;
   const layers = []; document.querySelectorAll('.combo-layer-row').forEach(r => {
-    const n = r.querySelector('.cl-name').value; if(n) layers.push({glazeName:n, brand:r.querySelector('.cl-brand').value||null, coats:parseInt(r.querySelector('.cl-coats').value)||1});
+    const n = r.querySelector('.cl-name').value; if(n) layers.push({glazeName:n, brand:r.querySelector('.cl-brand').value||null, coats:parseInt(r.querySelector('.cl-coats').value)||1, method:r.dataset.method || null});
   });
   const fd = new FormData();
   fd.append('name', document.getElementById('comboName').value);
@@ -2861,8 +2899,12 @@ async function saveCombo(e) {
   fd.append('description', document.getElementById('comboDesc').value || '');
   fd.append('isShared', document.getElementById('comboShared').checked);
   fd.append('layers', JSON.stringify(layers));
-  const files = document.getElementById('comboPhotos')?.files;
-  if (files) { for (let i = 0; i < Math.min(files.length, 2); i++) fd.append('photos', files[i]); }
+  let photoIndex = 0;
+  const slots = comboPhotoSlots.map(photo => {
+    if (photo instanceof File) { fd.append('photos', photo); return photoIndex++; }
+    return photo;
+  });
+  fd.append('photoSlots', JSON.stringify(slots));
   try {
     const method = comboId ? 'PUT' : 'POST';
     const url = comboId ? '/api/community/combos/' + comboId : '/api/community/combos';
@@ -2871,9 +2913,9 @@ async function saveCombo(e) {
     toast(comboId ? 'Combo updated!' : 'Combo saved!','success');
     trackActivity(comboId ? 'edit_combo' : 'create_combo', 'community');
     closeModal('comboModal');
-    document.getElementById('comboId').value = '';
-    loadCombos();
-  } catch(e) { toast(e.message,'error'); }
+    document.getElementById('comboId').value = d.id || comboId;
+    await loadCombos();
+  } catch(e) { toast(e.message,'error'); } finally { comboSavePending = false; btn.disabled = false; }
 }
 
 // ---- Forum ----
@@ -3169,7 +3211,7 @@ async function loadShop() {
     c.innerHTML = products.map(p => {
       const img = p.image_filename ? '<img src="/uploads/' + p.image_filename + '" class="shop-product-img">' : '<div class="shop-product-placeholder">' + (p.product_type === 'sticker' ? '🏷️' : p.product_type === 'journal' ? '📓' : p.product_type === 'pdf' ? '📄' : '🎁') + '</div>';
       const typeLabel = p.is_digital ? '<span class="piece-meta-tag">Digital Download</span>' : '<span class="piece-meta-tag">Physical</span>';
-      const previewLink = p.product_type === 'pdf' ? '<a href="/shop/mud-log-preview.pdf" target="_blank" class="btn btn-secondary btn-sm mt-8" style="width:100%">📖 Preview Sample Pages</a>' : '';
+      const previewLink = p.product_type === 'pdf' ? '<a href="/shop/mud-log-preview.pdf" target="_blank" rel="noopener" class="btn btn-secondary btn-sm mt-8" style="width:100%">📖 Preview Sample Pages</a>' : '';
       return '<div class="card shop-product-card">' + img +
         '<div class="card-title">' + esc(p.name) + '</div>' +
         (p.description ? '<div class="text-sm" style="color:var(--text-light);margin:6px 0">' + esc(p.description) + '</div>' : '') +
@@ -3195,6 +3237,7 @@ async function loadProfile() {
   try {
     const d = await api('/api/auth/me');
     currentUser = d.user;
+    refreshAccountStatus();
     document.getElementById('profileName').value = d.user.display_name || '';
     document.getElementById('profileUsername').value = d.user.username || '';
     document.getElementById('profileBio').value = d.user.bio || '';
@@ -3210,7 +3253,7 @@ async function loadProfile() {
     // Find a Potter fields
     document.getElementById('profileCity').value = d.user.city || '';
     document.getElementById('profileState').value = d.user.state_region || '';
-    document.getElementById('profileCountry').value = d.user.country || '';
+    document.getElementById('profileCountry').value = (d.user.country || '').replace(/^United State$/i, 'United States');
     document.getElementById('profileFindable').checked = !!d.user.findable;
 
     // Profile photo
@@ -3229,7 +3272,7 @@ async function loadProfile() {
     const tierPriceMap = { starter: '$6.95/month', 'starter-yearly': '$69.50/year', 'starter-founding': '$3.48/month', free: null, basic: null, mid: null, top: null };
     const tierDisplayName = { free: 'Free', starter: 'Unlimited', basic: 'Unlimited', mid: 'Unlimited', top: 'Unlimited' };
     const tierPrice = tierPriceMap[d.user.billing_period] || tierPriceMap[tier] || null;
-    let tierHtml = '<div style="margin-bottom:12px"><div style="font-size:0.75rem;letter-spacing:0.04em;color:var(--text-light);margin-bottom:2px">Current Plan</div><div style="font-size:1.1rem;font-weight:600;color:var(--text)">' + (tierDisplayName[tier] || (tierNames[tier] || tier)) + '</div>' + (tierPrice ? '<div style="font-size:0.85rem;color:var(--text-light);margin-top:1px">' + tierPrice + '</div>' : '') + '</div>';
+    let tierHtml = '<div style="margin-bottom:12px"><div style="font-size:0.75rem;letter-spacing:0.04em;color:var(--text-light);margin-bottom:2px">Current Plan</div><div style="font-size:1.1rem;font-weight:600;color:var(--text)">' + WebsiteUtils.accountLabel(d.user) + '</div>' + (tierPrice ? '<div style="font-size:0.85rem;color:var(--text-light);margin-top:1px">' + tierPrice + '</div>' : '') + '</div>';
     if (d.user.plan_expires_at) {
       const exp = new Date(d.user.plan_expires_at);
       const daysLeft = Math.ceil((exp - Date.now()) / 86400000);
@@ -3303,7 +3346,7 @@ async function loadProfileStores() {
             <div style="font-weight:600; color:var(--text-dark)">${esc(s.name)}</div>
             <div class="text-xs" style="color:var(--text-muted)">${esc(s.url)}</div>
           </div>
-          <button class="btn btn-secondary btn-sm" onclick="window.open('${esc(s.url)}', '_blank')">Open</button>
+          <button class="btn btn-secondary btn-sm" onclick="window.open('${externalHref(s.url)}', '_blank', 'noopener')">Open</button>
         </div>
       `;
     }).join('');
@@ -3319,13 +3362,13 @@ async function saveProfile() {
       username: document.getElementById('profileUsername').value || null,
       bio: document.getElementById('profileBio').value || null,
       location: document.getElementById('profileLocation').value || null,
-      website: document.getElementById('profileWebsite').value || null,
+      website: document.getElementById('profileWebsite').value.trim() || null,
       isPrivate: document.getElementById('profilePrivate').checked,
       unitSystem: document.getElementById('profileUnits').value,
       tempUnit: document.getElementById('profileTemp').value,
       city: document.getElementById('profileCity').value || null,
       stateRegion: document.getElementById('profileState').value || null,
-      country: document.getElementById('profileCountry').value || null,
+      country: document.getElementById('profileCountry').value.replace(/^United State$/i, 'United States') || null,
       findable: document.getElementById('profileFindable').checked
     }});
     toast('Profile saved!', 'success');
@@ -3356,7 +3399,7 @@ async function loadFindPotter() {
         : '<div style="width:48px;height:48px;border-radius:50%;background:var(--bg-light);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">🏺</div>';
       const loc = [p.city, p.stateRegion, p.country].filter(Boolean).join(', ');
       const shops = [p.shopUrl, p.shopUrl2, p.shopUrl3].filter(Boolean);
-      const shopLinks = shops.map((u, i) => '<a href="' + esc(u) + '" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="font-size:0.8rem">🛒 Shop' + (shops.length > 1 ? ' ' + (i+1) : '') + '</a>').join('');
+      const shopLinks = shops.map((u, i) => '<a href="' + externalHref(u) + '" target="_blank" rel="noopener" rel="noopener" class="btn btn-secondary btn-sm" style="font-size:0.8rem">🛒 Shop' + (shops.length > 1 ? ' ' + (i+1) : '') + '</a>').join('');
       return '<div class="card" style="display:flex;gap:12px;align-items:flex-start;cursor:pointer" onclick="navigate(\'memberProfile\',\''+p.id+'\')">' +
         avatar +
         '<div style="flex:1;min-width:0">' +
@@ -3521,6 +3564,9 @@ function trackPageView(pagePath) {
     if (!visitorKey) { visitorKey = (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : Date.now() + '-' + Math.random()); localStorage.setItem('mudlog_visitor_key', visitorKey); }
     const h = {};
     if (token) h['Authorization'] = 'Bearer ' + token;
+    for (const key of ['website','url','sourceUrl','source_url','buyUrl','buy_url','shopUrl','shopUrl2','shopUrl3']) {
+      if (opts.body[key]) { const normalized = fixUrl(opts.body[key]); if (!normalized) throw new Error('Enter a valid website, such as example.com.'); opts.body[key] = normalized; }
+    }
     h['Content-Type'] = 'application/json';
     fetch('/api/analytics/pageview', {
       method: 'POST', headers: h,
@@ -3727,7 +3773,7 @@ async function loadAdmin() {
     // Email settings section
     html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(this)">📧 Email Settings ▸ <span style="font-size:0.8rem;color:var(--text-light);font-weight:normal">tap to expand</span></h3>' +
       '<div style="display:none">' +
-      '<p class="text-sm mb-12" style="color:var(--text-light)">Configure Gmail for sending newsletters. You need a <a href="https://myaccount.google.com/apppasswords" target="_blank">Gmail App Password</a> (requires 2-Step Verification).</p>' +
+      '<p class="text-sm mb-12" style="color:var(--text-light)">Configure Gmail for sending newsletters. You need a <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">Gmail App Password</a> (requires 2-Step Verification).</p>' +
       '<div id="adminEmailSettingsContent">Loading...</div></div></div>';
 
     // Usage analytics section
@@ -4324,7 +4370,7 @@ async function loadAdminEmailSettings() {
       '<input type="email" class="form-input" id="smtpUserInput" placeholder="yourname@gmail.com" value="' + esc(settings.email || '') + '"></div>' +
       '<div class="form-group"><label>Gmail App Password</label>' +
       '<input type="password" class="form-input" id="smtpPassInput" placeholder="16-character app password">' +
-      '<div class="text-sm mt-4" style="color:var(--text-light)">Go to <a href="https://myaccount.google.com/apppasswords" target="_blank">Google App Passwords</a> to create one (2-Step Verification must be on first)</div></div>' +
+      '<div class="text-sm mt-4" style="color:var(--text-light)">Go to <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">Google App Passwords</a> to create one (2-Step Verification must be on first)</div></div>' +
       '<button class="btn btn-primary btn-sm" onclick="saveEmailSettings()">Save Email Settings</button></div>';
     
     el.innerHTML = html;
@@ -4916,7 +4962,7 @@ async function loadShoppingList() {
           (i.category && i.category !== 'general' ? '<div class="text-sm" style="color:var(--text-light)">' + esc(i.category) + (i.source ? ' · ' + esc(i.source) : '') + '</div>' : (i.source ? '<div class="text-sm" style="color:var(--text-light)">' + esc(i.source) + '</div>' : '')) +
           '</div></div>' +
           '<div style="display:flex;gap:6px;align-items:center">' +
-          (i.source_url ? '<a href="' + esc(i.source_url) + '" target="_blank" class="btn btn-primary btn-sm">Buy →</a>' : '') +
+          (i.source_url ? '<a href="' + externalHref(i.source_url) + '" target="_blank" rel="noopener" class="btn btn-primary btn-sm">Buy →</a>' : '') +
           '<button onclick="deleteShoppingItem(\'' + i.id + '\')" class="btn-ghost btn-sm" title="Remove">✕</button>' +
           '</div></div>'
         ).join('');
@@ -4940,8 +4986,8 @@ async function loadShoppingList() {
       html += d.clays.map(c =>
         '<div class="card" style="margin-bottom:8px"><div class="card-header"><div><div class="card-title">' + esc(c.name) + '</div>' +
         '<div class="text-sm" style="color:var(--text-light)">' + esc(c.brand||'') + (c.source ? ' · ' + esc(c.source) : '') + '</div></div>' +
-        (c.buy_url ? '<a href="' + esc(c.buy_url) + '" target="_blank" class="btn btn-primary btn-sm">Buy →</a>' :
-         c.source_url ? '<a href="' + esc(c.source_url) + '" target="_blank" class="btn btn-secondary btn-sm">Source →</a>' : '') +
+        (c.buy_url ? '<a href="' + externalHref(c.buy_url) + '" target="_blank" rel="noopener" class="btn btn-primary btn-sm">Buy →</a>' :
+         c.source_url ? '<a href="' + externalHref(c.source_url) + '" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Source →</a>' : '') +
         '</div></div>'
       ).join('');
     }
@@ -4950,8 +4996,8 @@ async function loadShoppingList() {
       html += d.glazes.map(g =>
         '<div class="card" style="margin-bottom:8px"><div class="card-header"><div><div class="card-title">' + esc(g.name) + '</div>' +
         '<div class="text-sm" style="color:var(--text-light)">' + esc(g.brand||'') + (g.source ? ' · ' + esc(g.source) : '') + '</div></div>' +
-        (g.buy_url ? '<a href="' + esc(g.buy_url) + '" target="_blank" class="btn btn-primary btn-sm">Buy →</a>' :
-         g.source_url ? '<a href="' + esc(g.source_url) + '" target="_blank" class="btn btn-secondary btn-sm">Source →</a>' : '') +
+        (g.buy_url ? '<a href="' + externalHref(g.buy_url) + '" target="_blank" rel="noopener" class="btn btn-primary btn-sm">Buy →</a>' :
+         g.source_url ? '<a href="' + externalHref(g.source_url) + '" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Source →</a>' : '') +
         '</div></div>'
       ).join('');
     }
@@ -5050,7 +5096,7 @@ async function loadChemicals() {
       (ch.quantity ? ch.quantity + ' ' + (ch.unit||'oz') : '') +
       (ch.source ? ' · ' + esc(ch.source) : '') + '</div></div>' +
       '<div style="display:flex;gap:4px">' +
-      (ch.source_url ? '<a href="' + esc(ch.source_url) + '" target="_blank" class="btn-ghost btn-sm" title="Source">🔗</a>' : '') +
+      (ch.source_url ? '<a href="' + externalHref(ch.source_url) + '" target="_blank" rel="noopener" class="btn-ghost btn-sm" title="Source">🔗</a>' : '') +
       '<button class="btn-ghost btn-sm" onclick="editChemical(\'' + ch.id + '\')">✏️</button>' +
       '<button class="btn-ghost btn-sm" onclick="deleteChemical(\'' + ch.id + '\')">🗑️</button></div></div>' +
       (ch.notes ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(ch.notes) + '</div>' : '') +
@@ -5061,7 +5107,7 @@ async function loadChemicals() {
 
 function openChemicalModal(ch) {
   document.getElementById('chemicalId').value = ch?.id||'';
-  document.getElementById('chemicalModalTitle').textContent = ch ? 'Edit Chemical' : 'Add Chemical';
+  document.getElementById('chemicalModalTitle').textContent = ch ? 'Edit Raw Material' : 'Add Raw Material';
   document.getElementById('chemicalName').value = ch?.name||'';
   document.getElementById('chemicalQty').value = ch?.quantity||'';
   document.getElementById('chemicalUnit').value = ch?.unit||'oz';
@@ -5085,13 +5131,13 @@ async function saveChemical(e) {
     notes: document.getElementById('chemicalNotes').value||null
   };
   try {
-    if (id) { await api('/api/glaze-chemicals/'+id, {method:'PUT',body}); toast('Chemical updated!','success'); }
-    else { await api('/api/glaze-chemicals', {method:'POST',body}); toast('Chemical added!','success'); }
+    if (id) { await api('/api/glaze-chemicals/'+id, {method:'PUT',body}); toast('Raw material updated!','success'); }
+    else { await api('/api/glaze-chemicals', {method:'POST',body}); toast('Raw material added!','success'); }
     closeModal('chemicalModal'); loadChemicals();
   } catch(e) { toast(e.message,'error'); }
 }
 async function deleteChemical(id) {
-  if (!confirm('Delete this chemical?')) return;
+  if (!confirm('Delete this raw material?')) return;
   try { await api('/api/glaze-chemicals/'+id, {method:'DELETE'}); toast('Deleted','success'); loadChemicals(); } catch(e) { toast(e.message,'error'); }
 }
 
@@ -5560,7 +5606,7 @@ async function loadMyStores() {
                 <div style="font-weight:700; font-size:1rem; color:var(--text-dark); margin-bottom:4px">${esc(s.name)}</div>
                 <div class="text-sm" style="color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${esc(s.url)}</div>
               </div>
-              <button class="btn btn-secondary btn-sm" onclick="window.open('${esc(s.url)}', '_blank')" style="flex-shrink:0">Open</button>
+              <button class="btn btn-secondary btn-sm" onclick="window.open('${externalHref(s.url)}', '_blank', 'noopener')" style="flex-shrink:0">Open</button>
               <button class="btn btn-sm" onclick="deleteStore('${s.id}')" style="color:var(--danger); flex-shrink:0" title="Remove store">
                 <span style="font-size:18px">×</span>
               </button>
@@ -5841,12 +5887,12 @@ async function loadEvents() {
       '<div class="text-sm" style="color:var(--text-light)">' + fmtDate(e.event_date) + (e.start_time ? ' at ' + e.start_time : '') + (e.end_time ? ' – ' + e.end_time : '') + '</div></div></div>' +
       (e.location ? '<div class="text-sm mt-4">📍 ' + esc(e.location) + '</div>' : '') +
       (e.address ? '<div class="text-sm mt-2" style="color:var(--text-light)">' + esc(e.address) + '</div>' : '') +
-      (e.website ? '<div class="text-sm mt-4"><a href="' + esc(e.website) + '" target="_blank" style="color:var(--primary)">🌐 ' + esc(e.website.replace(/^https?:\/\//,'')) + '</a></div>' : '') +
+      (e.website ? '<div class="text-sm mt-4"><a href="' + externalHref(e.website) + '" target="_blank" rel="noopener" style="color:var(--primary)">🌐 ' + esc(e.website.replace(/^https?:\/\//,'')) + '</a></div>' : '') +
       (e.description ? '<div class="text-sm mt-8">' + esc(e.description) + '</div>' : '') +
       '</div>' +
       '<div style="display:flex;gap:4px;margin-top:10px;flex-wrap:wrap">' +
-      (!isPast ? '<a href="' + esc(gCalUrl) + '" target="_blank" class="btn btn-sm btn-secondary" style="text-decoration:none">📅 Add to Calendar</a>' : '') +
-      ((e.address || e.location) ? '<a href="' + esc(mapsUrl) + '" target="_blank" class="btn btn-sm btn-secondary" style="text-decoration:none">🗺️ Directions</a>' : '') +
+      (!isPast ? '<a href="' + esc(gCalUrl) + '" target="_blank" rel="noopener" class="btn btn-sm btn-secondary" style="text-decoration:none">📅 Add to Calendar</a>' : '') +
+      ((e.address || e.location) ? '<a href="' + esc(mapsUrl) + '" target="_blank" rel="noopener" class="btn btn-sm btn-secondary" style="text-decoration:none">🗺️ Directions</a>' : '') +
       '<button onclick="shareEvent(\'' + e.id + '\')" class="btn btn-sm btn-secondary">📤 Share</button>' +
       '<button onclick="editEvent(\'' + e.id + '\')" class="btn-small">✎</button>' +
       '<button onclick="deleteEvent(\'' + e.id + '\')" class="btn-small">✕</button>' +
@@ -5871,7 +5917,7 @@ function shareEvent(id) {
     if (!e) return;
     const text = e.title + ' — ' + fmtDate(e.event_date) + (e.start_time ? ' at ' + e.start_time : '') + (e.location ? ' · ' + e.location : '') + (e.address ? ' · ' + e.address : '') + (e.website ? '\n' + e.website : '');
     if (navigator.share) {
-      navigator.share({ title: e.title, text: text, url: e.website || window.location.href }).catch(() => {});
+      navigator.share({ title: e.title, text: text, url: fixUrl(e.website) || window.location.href }).catch(() => {});
     } else {
       navigator.clipboard.writeText(text).then(() => toast('Event details copied!','success')).catch(() => toast('Could not copy','error'));
     }
@@ -5909,7 +5955,7 @@ async function saveEvent(e) {
     endTime: document.getElementById('eventEndTime').value || null,
     location: document.getElementById('eventLocation').value || null,
     address: document.getElementById('eventAddress').value || null,
-    website: document.getElementById('eventWebsite').value || null
+    website: document.getElementById('eventWebsite').value.trim() || null
   };
   try {
     if (id) { await api('/api/events/' + id, {method:'PUT',body}); toast('Event updated!','success'); trackActivity('edit_event', 'events'); }
@@ -5988,6 +6034,7 @@ async function loadStudioNotes() {
 }
 
 function openStudioNoteModal(n = null) {
+  document.querySelector('#studioNoteForm button[type=submit]').disabled = false;
   document.getElementById('studioNoteId').value = n?.id || '';
   document.getElementById('studioNoteTitle').value = n?.title || '';
   document.getElementById('studioNoteBody').value = n?.body || '';
@@ -6006,7 +6053,7 @@ async function saveStudioNote(e) {
     if (id) { await api('/api/studio/notes/' + id, {method:'PUT', body}); toast('Note updated ✓','success'); }
     else { await api('/api/studio/notes', {method:'POST', body}); toast('Note saved ✓','success'); }
     closeModal('studioNoteModal'); loadStudioNotes();
-  } catch(err) { toast(err.message,'error'); btn.disabled = false; }
+  } catch(err) { toast(err.message,'error'); } finally { btn.disabled = false; }
 }
 
 async function deleteStudioNote(id) {
@@ -6185,7 +6232,7 @@ async function viewMemberProfile(userId) {
         (u.location ? '<div class="text-sm" style="color:var(--text-light);margin-top:4px">📍 ' + esc(u.location) + '</div>' : '') +
         '</div></div>' +
         (u.bio ? '<p style="margin-bottom:12px">' + esc(u.bio) + '</p>' : '') +
-        (u.website ? '<p class="text-sm"><a href="' + esc(u.website) + '" target="_blank" style="color:var(--primary)">' + esc(u.website) + '</a></p>' : '') +
+        (u.website ? '<p class="text-sm"><a href="' + externalHref(u.website) + '" target="_blank" rel="noopener" style="color:var(--primary)">' + esc(u.website) + '</a></p>' : '') +
         '<div class="text-sm" style="color:var(--text-muted);margin-top:12px">Member since ' + fmtDate(u.created_at) + '</div>' +
         '<button onclick="navigate(\'messageThread\');loadMessageThread(\'' + u.id + '\')" class="btn btn-primary mt-16">✉️ Send Message</button>' +
         '</div>';
@@ -6226,7 +6273,8 @@ async function deleteAccount() {
 function openShop(inputId) {
   let url = document.getElementById(inputId)?.value?.trim();
   if (!url) { toast('Enter a shop URL first', 'error'); return; }
-  if (!url.startsWith('http://') && !url.startsWith('https://')) url = 'https://' + url;
+  url = fixUrl(url);
+  if (!url) return toast('Enter a valid website.', 'error');
   window.open(url, '_blank', 'noopener');
 }
 
@@ -6311,11 +6359,14 @@ async function loadBlog() {
   } catch(e) { toast(e.message, 'error'); }
 }
 
-async function viewBlogPost(slug) {
+async function viewBlogPost(slug, fromHistory = false) {
+  const route = 'blog/' + slug;
+  navigate('blogPost', { route, fromHistory });
+  const requestedRoute = window.location.hash;
   try {
     const post = guestMode ? await fetch('/api/blog/posts/' + slug).then(r => r.json()) : await api('/api/blog/posts/' + slug);
-    navigate('blogPost');
-    window.history.replaceState(null, '', '#blog/' + slug);
+    if (window.location.hash !== requestedRoute || currentPage !== 'blogPost') return;
+    if (post.error) throw new Error(post.error);
     const el = document.getElementById('blogPostContent');
     // Render content - if it contains HTML tags, use as-is; otherwise run through markdown renderer
     const content = post.content || '';
@@ -6391,8 +6442,11 @@ async function loadLandingBlogPosts() {
 }
 
 // Show the immersive preview page
-function showGuestPreview(page = 'community') {
-  guestMode = true;
+let previewReturnPage = 'dashboard';
+function showGuestPreview(page = 'community', fromHistory = false) {
+  previewReturnPage = currentPage;
+  if (!fromHistory) restoredUrl = '';
+  if (!fromHistory && location.hash !== '#preview') history.pushState({}, '', '#preview');
   document.getElementById('landingPage').style.display = 'none';
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('mainApp').classList.add('hidden');
@@ -6400,37 +6454,42 @@ function showGuestPreview(page = 'community') {
   window.scrollTo(0, 0);
 }
 function exitPreviewToSignup() {
+  if (token) return exitPreviewToLanding();
   document.getElementById('previewPage').style.display = 'none';
   document.getElementById('authScreen').style.display = 'flex';
   guestMode = false;
 }
 
-function showBlogFromLanding() {
-  guestMode = true;
+function showBlogFromLanding(fromHistory = false) {
+  guestMode = !token;
   document.getElementById('landingPage').style.display = 'none';
   document.getElementById('previewPage').style.display = 'none';
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('mainApp').classList.remove('hidden');
   const badge = document.getElementById('navTier');
   if (badge) { badge.textContent = 'PREVIEW'; badge.className = 'tier-badge tier-free'; }
-  navigate('blog');
+  refreshAccountStatus();
+  navigate('blog', { fromHistory });
 }
 function exitPreviewToLanding() {
   document.getElementById('previewPage').style.display = 'none';
+  if (token) { document.getElementById('mainApp').classList.remove('hidden'); guestMode = false; refreshAccountStatus(); navigate(previewReturnPage); return; }
+  if (location.hash === '#preview') history.pushState({}, '', location.pathname);
   document.getElementById('landingPage').style.display = '';
   guestMode = false;
   window.scrollTo(0, 0);
 }
 
-function showBlogPostFromLanding(slug) {
-  guestMode = true;
+function showBlogPostFromLanding(slug, fromHistory = false) {
+  guestMode = !token;
   document.getElementById('landingPage').style.display = 'none';
   document.getElementById('previewPage').style.display = 'none';
   document.getElementById('authScreen').style.display = 'none';
   document.getElementById('mainApp').classList.remove('hidden');
   const badge = document.getElementById('navTier');
   if (badge) { badge.textContent = 'PREVIEW'; badge.className = 'tier-badge tier-free'; }
-  viewBlogPost(slug);
+  refreshAccountStatus();
+  viewBlogPost(slug, fromHistory);
 }
 
 // ============ FEATURED POTTER ============
@@ -6544,21 +6603,37 @@ async function loadPublicCombo(shareId) {
   }
 })();
 
-// Handle browser back/forward
-window.addEventListener('hashchange', () => {
-  const hashPage = window.location.hash.replace('#', '').split('?')[0];
-  if (hashPage && hashPage.startsWith('reset-password')) {
-    checkResetPasswordHash();
-  } else if (hashPage && hashPage.startsWith('blog/')) {
-    const slug = hashPage.replace('blog/', '');
-    if (slug) {
-      if (token) viewBlogPost(slug);
-      else showBlogPostFromLanding(slug);
-    }
-  } else if (hashPage && hashPage !== currentPage && token) {
-    navigate(hashPage);
+// Restore history without creating another entry (including the initial empty Dashboard hash).
+function restoreRoute() {
+  if (restoredUrl === location.href) return;
+  restoredUrl = location.href;
+  const route = location.hash.slice(1).split('?')[0];
+  if (route.startsWith('reset-password')) return checkResetPasswordHash();
+  if (route === 'preview') return showGuestPreview('community', true);
+  document.getElementById('previewPage').style.display = 'none';
+  if (route.startsWith('blog/')) {
+    if (!token) showBlogPostFromLanding(route.slice(5), true);
+    else viewBlogPost(route.slice(5), true);
+  } else if (route === 'profile/find-potter' && token) {
+    navigate('profile', { fromHistory: true });
+    document.getElementById('findPotterSettings').scrollIntoView();
+  } else if (token) {
+    guestMode = false;
+    document.getElementById('mainApp').classList.remove('hidden');
+    refreshAccountStatus();
+    navigate(route || 'dashboard', { fromHistory: true });
+  } else if (route === 'blog') {
+    showBlogFromLanding(true);
+  } else if (!route) {
+    document.getElementById('mainApp').classList.add('hidden');
+    document.getElementById('landingPage').style.display = '';
+    guestMode = false;
+  } else if (guestMode && isGuestPreviewPage(route)) {
+    navigate(route, { fromHistory: true });
   }
-});
+}
+window.addEventListener('popstate', restoreRoute);
+window.addEventListener('hashchange', restoreRoute);
 
 // Load landing page features
 loadLandingBlogPosts();
@@ -6967,3 +7042,40 @@ document.addEventListener('drop', function(e) {
     }
   }
 });
+
+function openCasualtyModal() {
+  openPieceModal();
+  document.getElementById('pieceStatus').value = 'broken';
+  toggleCasualtyFields();
+}
+function openFindPotterSettings() {
+  navigate('profile', { route: 'profile/find-potter' });
+  document.getElementById('findPotterSettings').scrollIntoView({ block: 'start' });
+}
+
+let comboPhotoObjectUrls = [];
+function renderComboPhotos() {
+  comboPhotoObjectUrls.forEach(url => URL.revokeObjectURL(url));
+  comboPhotoObjectUrls = [];
+  document.getElementById('comboPhotoSlots').innerHTML = comboPhotoSlots.map((photo, i) => {
+    let src = '';
+    if (photo instanceof File) { src = URL.createObjectURL(photo); comboPhotoObjectUrls.push(src); }
+    else if (photo) src = '/uploads/' + encodeURIComponent(photo);
+    return '<div style="flex:1;min-width:120px">' +
+      (src ? '<img alt="Photo ' + (i+1) + '" src="' + src + '" style="width:100%;height:110px;object-fit:contain">' : '<p class="text-sm">Photo ' + (i+1) + '</p>') +
+      '<label class="btn btn-secondary btn-sm">' + (photo ? 'Replace' : 'Add photo') + '<input type="file" accept="image/*" hidden onchange="setComboPhoto(' + i + ', this)"></label>' +
+      (photo ? '<button type="button" class="btn btn-secondary btn-sm" onclick="comboPhotoSlots[' + i + ']=null;renderComboPhotos()">Remove</button>' : '') + '</div>';
+  }).join('');
+}
+function setComboPhoto(index, input) {
+  if (input.files[0]) comboPhotoSlots[index] = input.files[0];
+  renderComboPhotos();
+}
+function addComboPhotos(input) {
+  const files = [...input.files];
+  const available = comboPhotoSlots.filter(p => !p).length;
+  if (files.length > available) { toast('Up to two photos. Remove or replace an existing photo first.', 'error'); input.value = ''; return; }
+  files.forEach(file => { comboPhotoSlots[comboPhotoSlots.indexOf(null)] = file; });
+  input.value = '';
+  renderComboPhotos();
+}

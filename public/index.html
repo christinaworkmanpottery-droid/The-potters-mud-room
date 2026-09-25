@@ -153,7 +153,7 @@
   </script>
 
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏺</text></svg>">
-  <link rel="stylesheet" href="style.css?v=20260809a">
+  <link rel="stylesheet" href="/style.css?v=20260925">
   <style>
     .notif-badge{position:absolute;top:-4px;right:-6px;background:var(--danger);color:#fff;font-size:0.65rem;font-weight:700;border-radius:50%;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 4px}
     .notif-item{padding:12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.15s}
@@ -198,9 +198,9 @@
 <!-- LANDING PAGE (visible to search engines) -->
 <main id="landingPage">
   <!-- HERO — Clear pitch: who it's for and what it does -->
-  <div style="background:var(--bg-dark);color:#fff;padding:60px 20px;text-align:center">
+  <div style="background:var(--bg-dark);color:#fff;padding:28px 20px;text-align:center">
     <div style="max-width:800px;margin:0 auto">
-      <div style="font-size:4rem;margin-bottom:16px">🏺</div>
+      <p style="font-size:0.85rem;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:12px">The Potter’s Mud Room</p>
       <h1 style="font-family:Georgia,serif;font-size:2.4rem;margin-bottom:12px;line-height:1.2">The Pottery Tracker<br><span style="color:#C67B4E">Built for Potters</span></h1>
       <p style="font-size:1.15rem;color:rgba(255,255,255,0.85);margin-bottom:16px;line-height:1.6;max-width:600px;margin-left:auto;margin-right:auto">Track every piece, glaze, clay body, and firing — from wet clay to finished work. Built by a real potter who got tired of forgetting which glaze they used.</p>
       <p style="font-size:0.95rem;color:rgba(255,255,255,0.6);margin-bottom:32px">For wheel throwers, hand builders, ceramic students, and studio potters who want to stop guessing and start tracking.</p>
@@ -210,12 +210,12 @@
       </div>
       <p style="margin-top:12px;color:rgba(255,255,255,0.5);font-size:0.9rem">No credit card required. 10 pieces free forever.</p>
       <div style="margin-top:24px;display:flex;justify-content:center;gap:16px;align-items:center;flex-wrap:wrap">
-        <a href="https://apps.apple.com/app/potters-mud-room/id6768423564" target="_blank" rel="noopener" style="color:#fff;background:rgba(255,255,255,0.15);padding:10px 20px;border-radius:8px;text-decoration:none;font-size:1rem;display:inline-flex;align-items:center;gap:8px">🍎 Download on the App Store</a>
-        <a href="https://play.google.com/store/apps/details?id=com.pottersmudroom.app" target="_blank" rel="noopener" style="color:#fff;background:rgba(255,255,255,0.15);padding:10px 20px;border-radius:8px;text-decoration:none;font-size:1rem;display:inline-flex;align-items:center;gap:8px">▶️ Get it on Google Play</a>
+        <a href="https://apps.apple.com/app/potters-mud-room/id6768423564" target="_blank" rel="noopener" style="color:#fff;background:rgba(255,255,255,0.15);padding:10px 20px;border-radius:8px;text-decoration:none;font-size:1rem;display:inline-flex;align-items:center;gap:8px">Download for iPhone</a>
+        <a href="https://play.google.com/store/apps/details?id=com.pottersmudroom.app" target="_blank" rel="noopener" style="color:#fff;background:rgba(255,255,255,0.15);padding:10px 20px;border-radius:8px;text-decoration:none;font-size:1rem;display:inline-flex;align-items:center;gap:8px">Download for Android</a>
       </div>
       <div style="margin-top:12px;display:flex;justify-content:center;gap:16px;align-items:center;flex-wrap:wrap">
-        <a href="https://www.instagram.com/thepottersmudroom" target="_blank" rel="noopener" style="color:#fff;background:rgba(255,255,255,0.15);padding:10px 20px;border-radius:8px;text-decoration:none;font-size:1rem;display:inline-flex;align-items:center;gap:8px">📷 @thepottersmudroom</a>
-        <a href="#blog" onclick="showBlogFromLanding()" style="color:#fff;background:rgba(255,255,255,0.15);padding:10px 20px;border-radius:8px;text-decoration:none;font-size:1rem;display:inline-flex;align-items:center;gap:8px">📝 From the Studio</a>
+        <a href="https://www.instagram.com/thepottersmudroom" target="_blank" rel="noopener" style="color:#fff;background:rgba(255,255,255,0.15);padding:10px 20px;border-radius:8px;text-decoration:none;font-size:1rem;display:inline-flex;align-items:center;gap:8px">Instagram · @thepottersmudroom</a>
+        <a href="#blog" onclick="showBlogFromLanding();return false" style="color:#fff;background:rgba(255,255,255,0.15);padding:10px 20px;border-radius:8px;text-decoration:none;font-size:1rem;display:inline-flex;align-items:center;gap:8px">📝 From the Studio</a>
       </div>
     </div>
   </div>
@@ -330,7 +330,7 @@
         <h3 style="font-size:1.1rem;margin-bottom:8px"><a href="/blog/from-studio-to-sale-tracking-your-pottery-business" style="color:var(--text);text-decoration:none">From Studio to Sale: Tracking Your Pottery Business</a></h3>
       </div>
     </div>
-    <p style="text-align:center;margin-top:20px"><a href="#blog" onclick="showBlogFromLanding()" style="color:var(--primary);font-weight:600;text-decoration:none">View All Posts →</a></p>
+    <p style="text-align:center;margin-top:20px"><a href="#blog" onclick="showBlogFromLanding();return false" style="color:var(--primary);font-weight:600;text-decoration:none">View All Posts →</a></p>
   </div>
 
   <!-- PRICING — 2 Simple Plans -->
@@ -434,7 +434,7 @@
     <h2 style="font-family:Georgia,serif;font-size:1.6rem;margin-bottom:8px;color:var(--text)">Follow The Potter's Mud Room</h2>
     <p style="color:var(--text-light);margin-bottom:24px">Stay connected with the pottery community</p>
     <div style="display:flex;justify-content:center;gap:16px;flex-wrap:wrap">
-      <a href="https://www.instagram.com/thepottersmudroom" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,#833AB4,#E1306C,#F77737);color:#fff;padding:14px 28px;border-radius:12px;text-decoration:none;font-size:1.05rem;font-weight:600;min-height:48px">📷 @thepottersmudroom</a>
+      <a href="https://www.instagram.com/thepottersmudroom" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:10px;background:linear-gradient(135deg,#833AB4,#E1306C,#F77737);color:#fff;padding:14px 28px;border-radius:12px;text-decoration:none;font-size:1.05rem;font-weight:600;min-height:48px">Instagram · @thepottersmudroom</a>
     </div>
   </div>
 
@@ -463,21 +463,21 @@
 <!-- PREVIEW PAGE — The "wow, I need this" experience -->
 <div id="previewPage" style="display:none">
   <!-- Sticky mini-nav for preview -->
-  <div style="position:sticky;top:0;z-index:100;background:var(--bg-dark);color:#fff;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;box-shadow:var(--shadow-lg)">
+  <div style="position:sticky;top:0;z-index:100;background:var(--bg-dark);color:#fff;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;box-shadow:var(--shadow-lg)">
     <div style="font-family:Georgia,serif;font-size:1.2rem">🏺 The Potter's <span style="color:#C67B4E">Mud Room</span></div>
     <div style="display:flex;gap:10px;align-items:center">
-      <span style="font-size:0.8rem;color:rgba(255,255,255,0.5);background:rgba(255,255,255,0.1);padding:4px 10px;border-radius:20px">PREVIEW</span>
+      <button class="btn btn-secondary btn-sm" onclick="exitPreviewToLanding()">Back</button>
       <button class="btn btn-primary btn-sm" onclick="exitPreviewToSignup()">Sign Up Free</button>
     </div>
   </div>
 
   <!-- Preview Hero -->
-  <div style="background:linear-gradient(160deg,#2f2118 0%,#5c4033 50%,#8B5E3C 100%);color:#fff;padding:60px 20px 50px;text-align:center;position:relative;overflow:hidden">
+  <div style="background:linear-gradient(160deg,#2f2118 0%,#5c4033 50%,#8B5E3C 100%);color:#fff;padding:28px 20px;text-align:center;position:relative;overflow:hidden">
     <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:url('data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 80%22><circle cx=%2240%22 cy=%2240%22 r=%221%22 fill=%22rgba(255,255,255,0.03)%22/></svg>') repeat;pointer-events:none"></div>
     <div style="position:relative;max-width:700px;margin:0 auto">
       <h1 style="font-family:Georgia,serif;font-size:2.2rem;margin-bottom:16px;line-height:1.2">This Is What Your Pottery Studio<br>Looks Like <span style="color:#C67B4E">Organized</span></h1>
-      <p style="font-size:1.1rem;color:rgba(255,255,255,0.8);margin-bottom:8px">Scroll through a sample studio. Everything below is what you get — for free.</p>
-      <p style="font-size:0.9rem;color:rgba(255,255,255,0.5)">Real features, real data examples. Imagine your own pieces here.</p>
+      <p style="font-size:1.1rem;color:rgba(255,255,255,0.8);margin-bottom:8px">Scroll through a sample studio. Explore examples of the tools available in The Potter’s Mud Room.</p>
+      <p style="font-size:0.9rem;color:rgba(255,255,255,0.5)">Sample content only. Your account and pottery records stay separate.</p>
     </div>
   </div>
 
@@ -909,7 +909,7 @@
         <div style="display:flex;gap:8px;align-items:center">
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('glazes','card')" title="Card view">▦</button>
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('glazes','list')" title="List view">☰</button>
-          <button class="btn btn-sm btn-secondary" onclick="navigate('chemicals')">🧪 Chemicals</button>
+          <button class="btn btn-sm btn-secondary" onclick="navigate('chemicals')">🧪 Raw Materials</button>
           <button class="btn btn-sm btn-secondary" onclick="navigate('shoppingList')">🛒 Shopping List</button>
           <button class="btn btn-primary" onclick="openGlazeModal()">+ Add Glaze</button>
           <span id="bulkControlsGlazes"></span>
@@ -983,7 +983,7 @@
     <div id="pageCasualties" class="page">
       <div class="page-header">
         <h2>Pottery Casualties</h2>
-        <span id="bulkControlsCasualties"></span>
+        <div><button class="btn btn-primary" onclick="openCasualtyModal()">+ Add Casualty</button><span id="bulkControlsCasualties"></span></div>
       </div>
       <p style="color:var(--text-light);margin-bottom:16px">RIP to the pieces that didn't make it. Track what went wrong and what you learned — so you don't make the same mistake twice.</p>
       <div id="casualtyStats" class="stats-row" style="margin-bottom:20px"></div>
@@ -999,7 +999,7 @@
     <div id="pageSales" class="page">
       <div class="page-header">
         <h2>Sales</h2>
-        <div style="display:flex;gap:8px;align-items:center">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('sales','card')" title="Card view">▦</button>
           <button class="btn btn-sm btn-secondary view-toggle" onclick="toggleView('sales','list')" title="List view">☰</button>
           <button class="btn btn-sm btn-secondary" onclick="exportData('/api/sales/export?dateFrom='+document.getElementById('salesDateFrom').value+'&dateTo='+document.getElementById('salesDateTo').value)">📥 Download</button>
@@ -1203,6 +1203,11 @@
           </ul>
         </div>
 
+        <div class="card mb-16">
+          <h2>Want to appear in Find a Potter?</h2>
+          <p style="margin:12px 0">In Profile, fill in your city, state or region, and country. To make your profile public, turn off “Make my profile private.” Then enable “Show me in the Find a Potter directory” and save. Joining the directory is optional; you appear there only when you choose to opt in.</p>
+          <button class="btn btn-primary" onclick="openFindPotterSettings()">Set Up My Find a Potter Profile</button>
+        </div>
         <div class="card" style="background:var(--primary-light);border-color:var(--primary)">
           <h2 style="margin-bottom:12px">❤️ Built by a Potter, for Potters</h2>
           <p>The Potter's Mud Room was created by <strong>Christina Workman</strong>, a lifelong ceramicist and hand builder. After years of forgetting which clay and glaze she used on each piece, she built the tool she always wished existed.</p>
@@ -1211,10 +1216,7 @@
           </p>
           <p style="margin-top:12px">Questions? Post in the <strong>Mud Room Help</strong> forum category or email:</p>
           <p style="margin-top:8px"><strong>📧 <a href="mailto:thepottersmudroom@gmail.com" style="color:var(--primary)">thepottersmudroom@gmail.com</a></strong></p>
-          <p style="margin-top:12px">
-            🏺 <a href="https://christinaworkmanpottery.com" target="_blank" rel="noopener" style="color:var(--primary)"><strong>Christina Workman Pottery</strong></a> · 
-            ✨ <a href="https://lucehealing.com" target="_blank" rel="noopener" style="color:var(--primary)"><strong>Luce Healing</strong></a>
-          </p>
+
         </div>
 
         <div class="card mb-16" style="margin-top:16px">
@@ -1589,7 +1591,7 @@
           </div>
         </div>
 
-        <div class="card">
+        <div class="card" id="findPotterSettings" tabindex="-1">
           <h3 style="margin-bottom:4px">📍 Find a Potter</h3>
           <p class="text-sm" style="color:var(--text-light);margin-bottom:16px">Opt in to appear in the Find a Potter directory so other members can find you. You control this — it's off by default.</p>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -1789,7 +1791,7 @@
             <option value="clay">Clay</option>
             <option value="glaze">Glaze</option>
             <option value="kiln">Kiln Supplies</option>
-            <option value="chemicals">Chemicals</option>
+            <option value="chemicals">Raw Materials</option>
             <option value="other">Other</option>
           </select>
         </div>
@@ -1799,7 +1801,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">Buy Link (optional)</label>
-          <input type="url" class="form-input" id="shoppingItemUrl" placeholder="https://...">
+          <input type="text" inputmode="url" autocapitalize="none" class="form-input" id="shoppingItemUrl" placeholder="https://...">
         </div>
       </div>
       <div class="modal-footer">
@@ -1813,14 +1815,14 @@
     <!-- GLAZE CHEMICALS -->
     <div id="pageChemicals" class="page">
       <div class="page-header">
-        <h2>🧪 Glaze Chemicals Inventory</h2>
-        <button class="btn btn-primary" onclick="openChemicalModal()">+ Add Chemical</button>
+        <h2>🧪 Raw Materials Inventory</h2>
+        <button class="btn btn-primary" onclick="openChemicalModal()">+ Add Raw Material</button>
       </div>
       <p style="color:var(--text-light);margin-bottom:16px">Track your glaze-mixing materials. When viewing recipes, you'll see which ingredients you have on hand.</p>
       <div id="chemicalList" class="card-grid"></div>
       <div id="chemicalEmpty" class="empty-state hidden">
         <div class="empty-state-icon">🧪</div>
-        <div class="empty-state-title">No chemicals yet</div>
+        <div class="empty-state-title">No raw materials yet</div>
         <p>Add your glaze-mixing materials here.</p>
       </div>
     </div>
@@ -2487,7 +2489,7 @@
 <div id="saleModal" class="modal-overlay" onclick="if(event.target===this)closeModal('saleModal')">
   <div class="modal">
     <div class="modal-header">
-      <h2>Log Sale</h2>
+      <h2 id="saleModalTitle">Log Sale</h2>
       <button class="modal-close" onclick="closeModal('saleModal')">&times;</button>
     </div>
     <form id="saleForm" onsubmit="saveSale(event)">
@@ -2768,7 +2770,7 @@
       </div>
       <div class="form-group">
         <label>Website (Optional)</label>
-        <input type="url" class="form-input" id="eventWebsite" placeholder="https://">
+        <input type="text" inputmode="url" autocapitalize="none" class="form-input" id="eventWebsite" placeholder="https://">
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('eventModal')">Cancel</button>
@@ -2818,7 +2820,7 @@
 <div id="comboModal" class="modal-overlay" onclick="if(event.target===this)closeModal('comboModal')">
   <div class="modal">
     <div class="modal-header">
-      <h2>Share Glaze Combo</h2>
+      <h2 id="comboModalTitle">New Community Library Entry</h2>
       <button class="modal-close" onclick="closeModal('comboModal')">&times;</button>
     </div>
     <form id="comboForm" onsubmit="saveCombo(event)">
@@ -2861,13 +2863,21 @@
       </div>
       <div class="form-group">
         <label>Photos (up to 2 — show the effect!)</label>
-        <input type="file" id="comboPhotos" accept="image/*" multiple class="form-input" style="font-size:0.85rem">
+        <div id="comboPhotoSlots" style="display:flex;gap:12px;margin-bottom:12px"></div>
+        <input onchange="addComboPhotos(this)" type="file" id="comboPhotos" accept="image/*" multiple class="form-input" style="font-size:0.85rem">
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('comboModal')">Cancel</button>
         <button type="submit" class="btn btn-primary">Save Combo</button>
       </div>
     </form>
+  </div>
+</div>
+
+<div id="saleDetailsModal" class="modal-overlay" onclick="if(event.target===this)closeModal('saleDetailsModal')">
+  <div class="modal"><div class="modal-header"><h2>Sale Details</h2><button class="modal-close" onclick="closeModal('saleDetailsModal')">&times;</button></div>
+    <div id="saleDetailsContent"></div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('saleDetailsModal')">Close</button><button id="saleDetailsEdit" class="btn btn-primary">Edit Sale</button></div>
   </div>
 </div>
 
@@ -2974,7 +2984,7 @@
 <div id="chemicalModal" class="modal-overlay" onclick="if(event.target===this)closeModal('chemicalModal')">
   <div class="modal">
     <div class="modal-header">
-      <h2 id="chemicalModalTitle">Add Chemical</h2>
+      <h2 id="chemicalModalTitle">Add Raw Material</h2>
       <button class="modal-close" onclick="closeModal('chemicalModal')">&times;</button>
     </div>
     <form id="chemicalForm" onsubmit="saveChemical(event)">
@@ -3005,7 +3015,7 @@
         </div>
         <div class="form-group">
           <label>Source URL</label>
-          <input type="url" class="form-input" id="chemicalSourceUrl" placeholder="https://...">
+          <input type="text" inputmode="url" autocapitalize="none" class="form-input" id="chemicalSourceUrl" placeholder="https://...">
         </div>
       </div>
       <div class="form-group">
@@ -3017,7 +3027,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('chemicalModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary">Save Chemical</button>
+        <button type="submit" class="btn btn-primary">Save Raw Material</button>
       </div>
     </form>
   </div>
@@ -3034,6 +3044,7 @@
     <div class="modal-footer" style="gap:8px">
       <button type="button" id="clayViewPhotoBtn" class="btn btn-secondary">📸 Add Photo</button>
       <button type="button" class="btn btn-secondary" onclick="closeModal('clayViewModal')">Close</button>
+      <button id="clayViewDuplicateBtn" type="button" class="btn btn-secondary btn-sm">Duplicate</button>
       <button type="button" id="clayViewEditBtn" class="btn btn-primary">✏️ Edit</button>
     </div>
   </div>
@@ -3050,6 +3061,7 @@
     <div class="modal-footer" style="gap:8px">
       <button type="button" id="glazeViewPhotoBtn" class="btn btn-secondary">📸 Add Photo</button>
       <button type="button" class="btn btn-secondary" onclick="closeModal('glazeViewModal')">Close</button>
+      <button id="glazeViewDuplicateBtn" type="button" class="btn btn-secondary btn-sm">Duplicate</button>
       <button type="button" id="glazeViewEditBtn" class="btn btn-primary">✏️ Edit</button>
     </div>
   </div>
@@ -3334,7 +3346,8 @@
   </div>
 </div>
 
-<script src="app.js?v=20260810a"></script>
+<script src="/website-utils.js?v=20260925"></script>
+<script src="/app.js?v=20260925"></script>
 
   <!-- Studio Note Modal -->
   <div id="studioNoteModal" class="modal-overlay" onclick="if(event.target===this)closeModal('studioNoteModal')">

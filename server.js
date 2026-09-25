@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
+const { normalizeExternalUrl, moneyCents, saleQuantity } = require('./public/website-utils');
 
 // Deploy version tag — used to verify which code is actually running on Render
 const DEPLOY_VERSION = 'v12-build39-runtime-repairs-2026-08-29';
@@ -122,46 +123,10 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const UPLOADS_DIR = path.join(__dirname, 'data', 'uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
-// === STARTUP DISK CLEANUP ===
-// AGGRESSIVE: Delete ALL uploaded files on startup if disk is over 85% full
-// This frees space so SQLite can operate again after "disk full" errors
-// Also truncate WAL if it's bloated
-try {
-  const walPath2 = path.join(__dirname, 'data', 'pottery.db-wal');
-  if (fs.existsSync(walPath2)) {
-    const walSz = fs.statSync(walPath2).size;
-    if (walSz > 10 * 1024 * 1024) {
-      console.log('[DISK] WAL file is ' + (walSz/1024/1024).toFixed(1) + 'MB - deleting to free space');
-      fs.unlinkSync(walPath2);
-    }
-  }
-  const shmPath = path.join(__dirname, 'data', 'pottery.db-shm');
-  if (fs.existsSync(shmPath)) fs.unlinkSync(shmPath);
-} catch(e) { console.warn('[DISK] WAL/SHM cleanup failed:', e.message); }
-try {
-  const { execSync } = require('child_process');
-  const dfOutput = execSync('df -B1 ' + UPLOADS_DIR).toString();
-  const lines = dfOutput.trim().split('\n');
-  if (lines.length >= 2) {
-    const parts = lines[1].split(/\s+/);
-    const available = parseInt(parts[3], 10);
-    const totalSize = parseInt(parts[1], 10);
-    const usedPct = totalSize > 0 ? (totalSize - available) / totalSize : 0;
-    console.log(`[DISK] Available: ${(available / 1024 / 1024).toFixed(1)}MB, Used: ${(usedPct * 100).toFixed(1)}%`);
-    if (usedPct > 0.85) {
-      console.log('[DISK] Over 85% full — cleaning up ALL uploaded files...');
-      const files = fs.readdirSync(UPLOADS_DIR)
-        .map(f => ({ name: f, size: fs.statSync(path.join(UPLOADS_DIR, f)).size }))
-        .sort((a, b) => b.size - a.size);
-      let freed = 0;
-      for (const f of files) {
-        try { fs.unlinkSync(path.join(UPLOADS_DIR, f.name)); freed += f.size; } catch(e) {}
-        console.log(`[DISK] Deleted ${f.name} (${(f.size / 1024 / 1024).toFixed(1)}MB)`);
-      }
-      console.log(`[DISK] Freed ${(freed / 1024 / 1024).toFixed(1)}MB`);
-    }
-  }
-} catch(e) { console.warn('[DISK] Startup cleanup check failed:', e.message); }
+// Checkpoint through SQLite itself. Never unlink an open WAL/SHM file or
+// remove users' uploaded photos to reclaim disk space.
+try { db.pragma('wal_checkpoint(PASSIVE)'); }
+catch(e) { console.warn('[DISK] SQLite checkpoint deferred:', e.message); }
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOADS_DIR),
   filename: (req, file, cb) => cb(null, `${uuidv4()}${path.extname(file.originalname)}`)
@@ -301,6 +266,19 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req,
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use((req, res, next) => {
+  if (req.body && ['POST', 'PUT', 'PATCH'].includes(req.method)) {
+    for (const key of ['website', 'url', 'sourceUrl', 'source_url', 'buyUrl', 'buy_url', 'shopUrl', 'shopUrl2', 'shopUrl3']) {
+      if (!Object.prototype.hasOwnProperty.call(req.body, key)) continue;
+      const raw = req.body[key];
+      const normalized = normalizeExternalUrl(raw);
+      if (raw && String(raw).trim() && !normalized) return res.status(400).json({ error: 'Enter a valid website, such as example.com or https://example.com.' });
+      req.body[key] = normalized;
+    }
+    if (/^United State$/i.test(String(req.body.country || '').trim())) req.body.country = 'United States';
+  }
+  next();
+});
 app.use('/uploads', express.static(UPLOADS_DIR));
 
 // Version check endpoint — verify which code is actually deployed
@@ -565,12 +543,12 @@ app.post('/api/auth/login', (req, res) => {
     if (!u || !bcrypt.compareSync(password, u.password_hash)) return res.status(401).json({ error: 'Invalid email or password' });
     const token = jwt.sign({ userId: u.id, tier: u.tier }, JWT_SECRET, { expiresIn: '30d' });
     db.prepare("UPDATE users SET last_login=datetime('now') WHERE id=?").run(u.id);
-    res.json({ token, user: { id: u.id, email: u.email, displayName: u.display_name, tier: u.tier } });
+    res.json({ token, user: { id: u.id, email: u.email, displayName: u.display_name, tier: u.tier, isAdmin: u.email === ADMIN_EMAIL } });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/auth/me', auth, (req, res) => {
-  const u = db.prepare('SELECT id,email,display_name,username,bio,location,website,avatar_filename,is_private,tier,unit_system,temp_unit,referral_code,newsletter_subscribed,created_at FROM users WHERE id=?').get(req.userId);
+  const u = db.prepare('SELECT id,email,display_name,username,bio,location,website,avatar_filename,is_private,tier,unit_system,temp_unit,referral_code,newsletter_subscribed,created_at,city,state_region,country,findable,billing_period,plan_expires_at FROM users WHERE id=?').get(req.userId);
   if (!u) return res.status(404).json({ error: 'Not found' });
   // Ensure referral code exists
   if (!u.referral_code) {
@@ -580,7 +558,7 @@ app.get('/api/auth/me', auth, (req, res) => {
   }
   // Get referral stats
   const referralStats = db.prepare('SELECT COUNT(*) as count FROM referral_rewards WHERE referrer_id=?').get(req.userId);
-  res.json({ user: { ...u, displayName: u.display_name, pieceCount: getPieceCount(req.userId), referralCount: referralStats?.count || 0, freeMonthsRemaining: u.free_months_remaining || 0, newsletterSubscribed: u.newsletter_subscribed } });
+  res.json({ user: { ...u, isAdmin: isAdmin(req), displayName: u.display_name, pieceCount: getPieceCount(req.userId), referralCount: referralStats?.count || 0, freeMonthsRemaining: u.free_months_remaining || 0, newsletterSubscribed: u.newsletter_subscribed } });
 });
 
 // User subscription status (used by mobile app BillingScreen)
@@ -1098,7 +1076,7 @@ app.get('/api/user/profile', auth, (req, res) => {
   const user = db.prepare('SELECT * FROM users WHERE id=?').get(req.userId);
   if (!user) return res.status(404).json({ error: 'User not found' });
   const { password_hash, ...safe } = user;
-  res.json({ user: safe });
+  res.json({ user: { ...safe, isAdmin: isAdmin(req) } });
 });
 
 // Alias: PUT /api/user/profile
@@ -1127,7 +1105,7 @@ app.put('/api/user/profile', auth, (req, res) => {
     );
   const user = db.prepare('SELECT * FROM users WHERE id=?').get(req.userId);
   const { password_hash, ...safe } = user;
-  res.json({ user: safe });
+  res.json({ user: { ...safe, isAdmin: isAdmin(req) } });
 });
 
 // Potter demographics
@@ -1216,7 +1194,7 @@ app.get('/api/potters/find', auth, (req, res) => {
   if (q) { sql += ` AND (display_name LIKE ? OR bio LIKE ? OR city LIKE ?)`; params.push('%'+q+'%','%'+q+'%','%'+q+'%'); }
   sql += ` ORDER BY display_name ASC LIMIT 100`;
   const potters = db.prepare(sql).all(...params);
-  res.json(potters.map(p => ({ id: p.id, displayName: p.display_name, bio: p.bio, avatarFilename: p.avatar_filename, city: p.city, stateRegion: p.state_region, country: p.country, website: p.website, shopUrl: p.shop_url, shopUrl2: p.shop_url_2, shopUrl3: p.shop_url_3 })));
+  res.json(potters.map(p => ({ id: p.id, displayName: p.display_name, bio: p.bio, avatarFilename: p.avatar_filename, city: p.city, stateRegion: p.state_region, country: /^United State$/i.test(p.country || '') ? 'United States' : p.country, website: p.website, shopUrl: p.shop_url, shopUrl2: p.shop_url_2, shopUrl3: p.shop_url_3 })));
 });
 
 app.post('/api/block/:userId', auth, (req, res) => {
@@ -2869,34 +2847,65 @@ app.get('/api/sales', auth, (req, res) => {
   res.json(db.prepare(sql).all(...params));
 });
 
-app.post('/api/sales', auth, (req, res) => {
-  const { pieceId, date, price, venue, venueType, buyerName, buyerEmail, buyerPhone, notes, quantity, itemDescription, eventName, contactId } = req.body;
-
-  const user = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
-  const tier = user?.tier === 'starter' ? 'starter' : 'free';
-  if (tier === 'free') {
-    const saleCount = db.prepare('SELECT COUNT(*) as c FROM sales WHERE user_id=?').get(req.userId)?.c || 0;
-    if (saleCount >= 1) {
-      return res.status(403).json({ error: 'Free members can save 1 sale. Upgrade to Unlimited for more.' });
+function saveSaleRecord(req, res) {
+  const existing = req.params.id ? db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId) : null;
+  let copiedPhoto = null;
+  const discardNew = () => {
+    for (const filename of [req.file?.filename, copiedPhoto]) {
+      if (filename && !hasStoredPhotoReference(filename)) {
+        try { fs.unlinkSync(path.join(UPLOADS_DIR, filename)); } catch {}
+      }
     }
-  }
-
-  const id = uuidv4();
-  db.prepare('INSERT INTO sales (id,user_id,piece_id,date,price,venue,venue_type,buyer_name,buyer_email,buyer_phone,notes,quantity,item_description,event_name,contact_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-    .run(id, req.userId, pieceId || null, date, price, venue, venueType, buyerName, buyerEmail || null, buyerPhone || null, notes, quantity || 1, itemDescription || null, eventName || null, contactId || null);
-  if (pieceId) db.prepare(`UPDATE pieces SET status='sold',sale_price=?,date_sold=?,updated_at=datetime('now') WHERE id=? AND user_id=?`).run(price, date, pieceId, req.userId);
-  res.json({ id });
-});
-
-app.put('/api/sales/:id', auth, (req, res) => {
-  const { pieceId, date, price, venue, venueType, buyerName, buyerEmail, buyerPhone, notes, quantity, itemDescription, eventName, contactId } = req.body;
-  const existing = db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId);
-  if (!existing) return res.status(404).json({ error: 'Sale not found' });
-  db.prepare('UPDATE sales SET piece_id=?,date=?,price=?,venue=?,venue_type=?,buyer_name=?,buyer_email=?,buyer_phone=?,notes=?,quantity=?,item_description=?,event_name=?,contact_id=? WHERE id=? AND user_id=?')
-    .run(pieceId || null, date, price, venue, venueType, buyerName || null, buyerEmail || null, buyerPhone || null, notes || null, quantity || 1, itemDescription || null, eventName || null, contactId || null, req.params.id, req.userId);
-  if (pieceId) db.prepare(`UPDATE pieces SET status='sold',sale_price=?,date_sold=?,updated_at=datetime('now') WHERE id=? AND user_id=?`).run(price, date, pieceId, req.userId);
-  res.json({ ok: true });
-});
+  };
+  try {
+    if (req.params.id && !existing) { discardNew(); return res.status(404).json({ error: 'Sale not found' }); }
+    const user = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
+    if (!existing && user?.tier === 'free' && !isAdmin(req) && db.prepare('SELECT COUNT(*) AS c FROM sales WHERE user_id=?').get(req.userId).c >= 1) {
+      discardNew(); return res.status(403).json({ error: 'Free members can save 1 sale. Upgrade to Unlimited for more.' });
+    }
+    const value = (key, column) => req.body[key] !== undefined ? req.body[key] : existing?.[column];
+    const price = moneyCents(value('price', 'price')) / 100;
+    const quantity = saleQuantity(value('quantity', 'quantity') ?? 1);
+    const pieceId = value('pieceId', 'piece_id') || null;
+    if (pieceId && !db.prepare('SELECT id FROM pieces WHERE id=? AND user_id=?').get(pieceId, req.userId)) {
+      discardNew(); return res.status(400).json({ error: 'Choose one of your own pieces.' });
+    }
+    if (req.file && (!req.file.mimetype.startsWith('image/') || req.file.size > MAX_IMAGE_SIZE)) {
+      discardNew(); return res.status(400).json({ error: 'Choose an image under 20MB.' });
+    }
+    let photo = req.file?.filename || existing?.image_filename || null;
+    // A sale owns its copy so editing/deleting a piece photo cannot break it.
+    if (!req.file && pieceId && (!photo || pieceId !== existing?.piece_id)) {
+      const source = db.prepare('SELECT filename FROM piece_photos WHERE piece_id=? ORDER BY is_primary DESC, sort_order, created_at LIMIT 1').get(pieceId);
+      if (source) {
+        copiedPhoto = uuidv4() + path.extname(source.filename);
+        fs.copyFileSync(path.join(UPLOADS_DIR, source.filename), path.join(UPLOADS_DIR, copiedPhoto));
+        photo = copiedPhoto;
+      }
+    }
+    const id = existing?.id || uuidv4();
+    const date = value('date', 'date') || null;
+    const fields = [['venue','venue'], ['venueType','venue_type'], ['buyerName','buyer_name'], ['buyerEmail','buyer_email'], ['buyerPhone','buyer_phone'], ['notes','notes'], ['itemDescription','item_description'], ['eventName','event_name'], ['contactId','contact_id']];
+    const values = fields.map(([key, col]) => value(key, col) || null);
+    db.transaction(() => {
+      if (existing) {
+        db.prepare('UPDATE sales SET piece_id=?,date=?,price=?,quantity=?,image_filename=?,venue=?,venue_type=?,buyer_name=?,buyer_email=?,buyer_phone=?,notes=?,item_description=?,event_name=?,contact_id=? WHERE id=? AND user_id=?')
+          .run(pieceId, date, price, quantity, photo, ...values, id, req.userId);
+      } else {
+        db.prepare('INSERT INTO sales (piece_id,date,price,quantity,image_filename,venue,venue_type,buyer_name,buyer_email,buyer_phone,notes,item_description,event_name,contact_id,id,user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+          .run(pieceId, date, price, quantity, photo, ...values, id, req.userId);
+      }
+      if (pieceId) db.prepare("UPDATE pieces SET status='sold',sale_price=?,date_sold=?,updated_at=datetime('now') WHERE id=? AND user_id=?").run(price, date, pieceId, req.userId);
+    })();
+    const oldPhoto = existing?.image_filename;
+    if (oldPhoto && oldPhoto !== photo && !hasStoredPhotoReference(oldPhoto)) {
+      try { fs.unlinkSync(path.join(UPLOADS_DIR, oldPhoto)); } catch {}
+    }
+    res.json({ id, ok: true, image_filename: photo });
+  } catch (err) { discardNew(); res.status(400).json({ error: err.message }); }
+}
+app.post('/api/sales', auth, upload.single('photo'), saveSaleRecord);
+app.put('/api/sales/:id', auth, upload.single('photo'), saveSaleRecord);
 
 app.delete('/api/sales/:id', auth, (req, res) => {
   const existing = db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId);
@@ -2916,11 +2925,10 @@ app.post('/api/sales/:id/photo', auth, upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
   const sale = db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!sale) return res.status(404).json({ error: 'Sale not found' });
-  if (sale.image_filename) {
-    const old = path.join(UPLOADS_DIR, sale.image_filename);
-    if (fs.existsSync(old)) fs.unlinkSync(old);
+  db.prepare('UPDATE sales SET image_filename=? WHERE id=? AND user_id=?').run(req.file.filename, req.params.id, req.userId);
+  if (sale.image_filename && !hasStoredPhotoReference(sale.image_filename)) {
+    try { fs.unlinkSync(path.join(UPLOADS_DIR, sale.image_filename)); } catch {}
   }
-  db.prepare('UPDATE sales SET image_filename=? WHERE id=?').run(req.file.filename, req.params.id);
   res.json({ filename: req.file.filename });
 });
 
@@ -2928,14 +2936,18 @@ app.post('/api/sales/:id/photo', auth, upload.single('photo'), (req, res) => {
 app.post('/api/sales/bulk', auth, requireTier('starter'), (req, res) => {
   const { eventName, date, venueType, lineItems } = req.body;
   if (!lineItems || !Array.isArray(lineItems)) return res.status(400).json({ error: 'Invalid line items' });
-  const salesIds = [];
-  lineItems.forEach(item => {
-    const id = uuidv4();
-    db.prepare('INSERT INTO sales (id,user_id,date,price,venue_type,quantity,item_description,event_name) VALUES (?,?,?,?,?,?,?,?)')
-      .run(id, req.userId, date, item.priceEach, venueType, item.quantity, item.itemDescription, eventName);
-    salesIds.push(id);
-  });
-  res.json({ ids: salesIds });
+  try {
+    const items = lineItems.map(item => ({ ...item, priceEach: moneyCents(item.priceEach) / 100, quantity: saleQuantity(item.quantity) }));
+    if (!items.length) return res.status(400).json({ error: 'Add at least one line item.' });
+    const salesIds = db.transaction(() => items.map(item => {
+      const id = uuidv4();
+      db.prepare('INSERT INTO sales (id,user_id,date,price,venue_type,quantity,item_description,event_name) VALUES (?,?,?,?,?,?,?,?)')
+        .run(id, req.userId, date, item.priceEach, venueType, item.quantity, item.itemDescription, eventName);
+      return id;
+    }))();
+    res.json({ ids: salesIds });
+  } catch(err) { res.status(400).json({ error: err.message }); }
+
 });
 
 app.get('/api/sales/summary', auth, requireTier('starter'), (req, res) => {
@@ -2955,8 +2967,8 @@ app.get('/api/sales/export', auth, requireTier('starter'), (req, res) => {
   const sales = db.prepare(sql).all(...params);
   let csv = 'Date,Item Description,Event,Quantity,Price Each,Total,Venue Type,Venue,Buyer,Notes\n';
   sales.forEach(s => { 
-    const total = (s.quantity || 1) * (s.price || 0);
-    csv += `"${s.date||''}","${(s.item_description||s.piece_title||'').replace(/"/g,'""')}","${(s.event_name||'').replace(/"/g,'""')}","${s.quantity||1}","${s.price||0}","${total}","${s.venue_type||''}","${(s.venue||'').replace(/"/g,'""')}","${(s.buyer_name||'').replace(/"/g,'""')}","${(s.notes||'').replace(/"/g,'""')}"\n`; 
+    const total = (moneyCents(s.price || 0) * (s.quantity || 1) / 100).toFixed(2);
+    csv += `"${s.date||''}","${(s.item_description||s.piece_title||'').replace(/"/g,'""')}","${(s.event_name||'').replace(/"/g,'""')}","${s.quantity||1}","${Number(s.price||0).toFixed(2)}","${total}","${s.venue_type||''}","${(s.venue||'').replace(/"/g,'""')}","${(s.buyer_name||'').replace(/"/g,'""')}","${(s.notes||'').replace(/"/g,'""')}"\n`;
   });
   res.setHeader('Content-Type', 'text/csv');
   res.setHeader('Content-Disposition', 'attachment; filename=potters-mudroom-sales.csv');
@@ -3020,43 +3032,63 @@ app.get('/api/community/combos/:id', auth, (req, res) => {
   res.json({ combo });
 });
 
-app.post('/api/community/combos', auth, requireTier('starter'), upload.array('photos', 2), (req, res) => {
-  const { name, clayBodyName, cone, atmosphere, description, notes, isShared, layers } = req.body;
-  const parsedLayers = typeof layers === 'string' ? JSON.parse(layers) : layers;
-  const id = uuidv4();
-  const photo1 = req.files?.[0]?.filename || null;
-  const photo2 = req.files?.[1]?.filename || null;
-  db.prepare('INSERT INTO glaze_combos (id,user_id,name,clay_body_name,cone,atmosphere,description,notes,is_shared,photo_filename,photo_filename2) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
-    .run(id, req.userId, name, clayBodyName, cone, atmosphere, description, notes, isShared === 'true' || isShared === true ? 1 : 0, photo1, photo2);
-  if (parsedLayers?.length) {
-    const ins = db.prepare('INSERT INTO glaze_combo_layers (id,combo_id,glaze_name,brand,coats,application_method,layer_order) VALUES (?,?,?,?,?,?,?)');
-    parsedLayers.forEach((l, i) => ins.run(uuidv4(), id, l.glazeName, l.brand, l.coats || 1, l.method, i));
-  }
-  res.json({ id });
-});
-
-// Edit combo (owner only)
-app.put('/api/community/combos/:id', auth, upload.array('photos', 2), (req, res) => {
-  const combo = db.prepare('SELECT user_id FROM glaze_combos WHERE id=?').get(req.params.id);
-  if (!combo || combo.user_id !== req.userId) return res.status(403).json({ error: 'Not authorized' });
-  
-  const { name, clayBodyName, cone, atmosphere, description, notes, isShared, layers } = req.body;
-  const photo1 = req.files?.[0]?.filename || null;
-  const photo2 = req.files?.[1]?.filename || null;
-  
-  db.prepare('UPDATE glaze_combos SET name=?,clay_body_name=?,cone=?,atmosphere=?,description=?,notes=?,is_shared=?,photo_filename=COALESCE(?,photo_filename),photo_filename2=COALESCE(?,photo_filename2),updated_at=datetime(\'now\') WHERE id=?')
-    .run(name, clayBodyName, cone, atmosphere, description, notes, isShared === 'true' || isShared === true ? 1 : 0, photo1, photo2, req.params.id);
-  
-  if (layers) {
-    const parsedLayers = typeof layers === 'string' ? JSON.parse(layers) : layers;
-    db.prepare('DELETE FROM glaze_combo_layers WHERE combo_id=?').run(req.params.id);
-    if (parsedLayers?.length) {
-      const ins = db.prepare('INSERT INTO glaze_combo_layers (id,combo_id,glaze_name,brand,coats,application_method,layer_order) VALUES (?,?,?,?,?,?,?)');
-      parsedLayers.forEach((l, i) => ins.run(uuidv4(), req.params.id, l.glazeName, l.brand, l.coats || 1, l.method, i));
+function saveComboRecord(req, res) {
+  const existing = req.params.id ? db.prepare('SELECT * FROM glaze_combos WHERE id=? AND user_id=?').get(req.params.id, req.userId) : null;
+  try {
+    if (req.params.id && !existing) return res.status(403).json({ error: 'Not authorized' });
+    const value = (key, col) => req.body[key] !== undefined ? req.body[key] : existing?.[col];
+    const name = value('name', 'name');
+    if (!name || !name.trim()) throw new Error('Combo name is required.');
+    const layers = req.body.layers === undefined ? null : (typeof req.body.layers === 'string' ? JSON.parse(req.body.layers) : req.body.layers);
+    if (layers !== null && !Array.isArray(layers)) throw new Error('Invalid glaze layers.');
+    const oldPhotos = [existing?.photo_filename || null, existing?.photo_filename2 || null];
+    let photos = [...oldPhotos];
+    const files = req.files || [];
+    if (files.some(f => !f.mimetype.startsWith('image/') || f.size > MAX_IMAGE_SIZE)) throw new Error('Choose images under 20MB.');
+    if (req.body.photoSlots !== undefined) {
+      const slots = JSON.parse(req.body.photoSlots);
+      if (!Array.isArray(slots) || slots.length !== 2) throw new Error('Invalid photo selection.');
+      const used = new Set();
+      photos = slots.map(slot => {
+        if (slot === null) return null;
+        if (typeof slot === 'string' && oldPhotos.includes(slot)) return slot;
+        if (Number.isInteger(slot) && files[slot] && !used.has(slot)) { used.add(slot); return files[slot].filename; }
+        throw new Error('Invalid photo selection.');
+      });
+      if (used.size !== files.length) throw new Error('Every selected photo must have a slot.');
+    } else {
+      // Legacy clients: append into vacant slots, replace only when both are already full.
+      let slot = 0;
+      for (const file of files) {
+        const empty = photos.indexOf(null);
+        photos[empty >= 0 ? empty : slot++] = file.filename;
+      }
+    }
+    const id = existing?.id || uuidv4();
+    const shared = value('isShared', 'is_shared');
+    const fields = [name, value('clayBodyName','clay_body_name') || null, value('cone','cone') || null, value('atmosphere','atmosphere') || null, value('description','description') || null, value('notes','notes') || null, shared === true || shared === 'true' || shared === 1 ? 1 : 0, ...photos];
+    db.transaction(() => {
+      if (existing) db.prepare("UPDATE glaze_combos SET name=?,clay_body_name=?,cone=?,atmosphere=?,description=?,notes=?,is_shared=?,photo_filename=?,photo_filename2=?,updated_at=datetime('now') WHERE id=? AND user_id=?").run(...fields, id, req.userId);
+      else db.prepare('INSERT INTO glaze_combos (name,clay_body_name,cone,atmosphere,description,notes,is_shared,photo_filename,photo_filename2,id,user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(...fields, id, req.userId);
+      if (layers !== null) {
+        db.prepare('DELETE FROM glaze_combo_layers WHERE combo_id=?').run(id);
+        const ins = db.prepare('INSERT INTO glaze_combo_layers (id,combo_id,glaze_name,brand,coats,application_method,layer_order) VALUES (?,?,?,?,?,?,?)');
+        layers.forEach((l,i) => ins.run(uuidv4(), id, l.glazeName, l.brand || null, l.coats || 1, l.method || null, i));
+      }
+    })();
+    for (const old of oldPhotos) if (old && !photos.includes(old) && !hasStoredPhotoReference(old)) {
+      try { fs.unlinkSync(path.join(UPLOADS_DIR, old)); } catch {}
+    }
+    res.json({ id, success: true, photo_filename: photos[0], photo_filename2: photos[1] });
+  } catch(err) { res.status(400).json({ error: err.message }); }
+  finally {
+    for (const file of req.files || []) if (!hasStoredPhotoReference(file.filename)) {
+      try { fs.unlinkSync(file.path); } catch {}
     }
   }
-  res.json({ success: true });
-});
+}
+app.post('/api/community/combos', auth, requireTier('starter'), upload.array('photos', 2), saveComboRecord);
+app.put('/api/community/combos/:id', auth, upload.array('photos', 2), saveComboRecord);
 
 // Delete combo (owner only)
 app.delete('/api/community/combos/:id', auth, (req, res) => {

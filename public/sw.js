@@ -1,4 +1,4 @@
-const CACHE = 'mudroom-v2';
+const CACHE = 'mudroom-sept25-2026';
 const STATIC = ['/','style.css','app.js','/manifest.json','/assets/icon-192.png','/assets/icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -12,7 +12,12 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   // Never intercept API calls or auth — always go to network
   if (e.request.url.includes('/api/') || e.request.method !== 'GET') return;
-  // Cache first for static assets, network first for HTML
+  // Updated application code must not remain stuck in an old Safari cache.
+  if (['script', 'style'].includes(e.request.destination)) {
+    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    return;
+  }
+  // Cache images, network first for HTML
   if (e.request.destination === 'document') {
     e.respondWith(fetch(e.request).catch(() => caches.match('/')));
     return;
