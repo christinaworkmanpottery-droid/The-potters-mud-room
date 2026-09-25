@@ -12,6 +12,15 @@ assert.deepEqual(searchPotters(rows,{q:' Santa MONICA ',state:'ca',country:'Usa'
 console.log('PASS Santa Monica matches CA/California and USA/United States without exposing private or opted-out profiles');
 for(const radius of [5,10])assert.deepEqual(searchPotters(rows,{near:'Santa Monica',state:'CA',country:'USA',radius}).potters.map(x=>x.id),['self','near']);
 const p=cityPoint('Santa Monica','CA','US');
+for(const city of ['Los Angeles, California','Los Angeles, CA','Los Angeles CA','  Los Angeles,   California  ']) {
+  assert.deepEqual(cityPoint(city,'Ca',''),cityPoint('Los Angeles','CA','US'));
+  assert.deepEqual(cityPoint(city,'',''),cityPoint('Los Angeles','CA','US'));
+}
+assert.equal(cityPoint('Los Angeles, California','NY','US'),null);
+assert.equal(cityPoint('Los Angeles, California','CA','Canada'),null);
+const culver={id:'culver',display_name:'Public potter',city:'Culver City',state_region:'California',country:'US',findable:1,is_private:0};
+assert.deepEqual(searchPotters([culver,{...culver,id:'hidden',is_private:1}],{q:'Culver City',state:'Ca',near:'Los Angeles, California',radius:10}).potters.map(x=>x.id),['culver']);
+console.log('PASS screenshot city/state input, abbreviations, whitespace, conflicting regions and nearby privacy');
 assert.ok(milesBetween(p,cityPoint('Venice','California','USA'))<5);
 assert.throws(()=>searchPotters(rows,{near:'Unknown city',radius:10}),/recognized US city/);
 assert.throws(()=>searchPotters(rows,{near:'Santa Monica',state:'CA',radius:50}),/5 or 10/);
