@@ -16,7 +16,23 @@ for (const [name, state, lat, lon] of places.cities) {
 }
 function cityPoint(city, state, country) {
   if (country && countryKey(country) !== 'us') return null;
-  const matches = (cityIndex.get(clean(city)) || []).filter(p => !state || p.state === stateKey(state));
+  let cityName = clean(city);
+  let region = stateKey(state);
+  // Accept pasted city/state labels as well as separate form fields.
+  // Match the longest state suffix first (for example, West Virginia).
+  const labels = [...stateNames.keys()].sort((a, b) => b.length - a.length);
+  for (const label of labels) {
+    const suffix = ' ' + label;
+    if (!cityName.endsWith(suffix)) continue;
+    const candidate = cityName.slice(0, -suffix.length).replace(/,\s*$/, '').trim();
+    if (!cityIndex.has(candidate)) continue;
+    const embeddedRegion = stateNames.get(label);
+    if (region && region !== embeddedRegion) return null;
+    cityName = candidate;
+    region = embeddedRegion;
+    break;
+  }
+  const matches = (cityIndex.get(cityName) || []).filter(p => !region || p.state === region);
   return matches.length === 1 ? matches[0] : null;
 }
 function milesBetween(a, b) {
