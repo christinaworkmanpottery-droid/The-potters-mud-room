@@ -11,3 +11,5 @@ Verification:
 - Website/QL GitHub Actions run `36634192320`: SUCCESS.
 - This preserves the Phase 2D verifier and strict Phase 1 readiness gate, with one additional Piece-list visibility regression.
 - Mobile CI is tracked independently in the mobile repository.
+
+Mobile verification: `potters-mudroom-app` run `36634526643` SUCCESS at mobile head `2a79075a1f4b7ea03cfa7eb7692fb20c82bdc0dc`; 45/45 tests passed and shared JavaScript parse validation passed.
