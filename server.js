@@ -126,6 +126,30 @@ const { createDeletionLifecycle, hasStoredFileReference } = require('./deletion-
 const deletionLifecycle = createDeletionLifecycle(db, UPLOADS_DIR);
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
+function relationshipUnavailable() {
+  const error = new Error('Related record unavailable');
+  error.status = 400;
+  return error;
+}
+function ownedRelationship(table, userId, id) {
+  if (id === null || id === undefined || id === '') return null;
+  const row = db.prepare(`SELECT * FROM ${table} WHERE id=? AND user_id=?`).get(id, userId);
+  if (!row) throw relationshipUnavailable();
+  return row;
+}
+function validatePieceRelationships(userId, clayBodyId, glazeIds) {
+  if (clayBodyId) ownedRelationship('clay_bodies', userId, clayBodyId);
+  if (glazeIds == null) return;
+  if (!Array.isArray(glazeIds)) throw relationshipUnavailable();
+  for (const layer of glazeIds) {
+    const glazeId = layer && typeof layer === 'object' ? (layer.glazeId || layer.glaze_id || null) : null;
+    if (glazeId) ownedRelationship('glazes', userId, glazeId);
+  }
+}
+function cleanupRequestUploads(files) {
+  deletionLifecycle.cleanupFiles((files || []).filter(Boolean).map(file => file.filename));
+}
+
 // Checkpoint through SQLite itself. Never unlink an open WAL/SHM file or
 // remove users' uploaded photos to reclaim disk space.
 try { db.pragma('wal_checkpoint(PASSIVE)'); }
@@ -964,8 +988,9 @@ app.delete('/api/account', auth, (req, res) => {
     // Prevent admin from accidentally deleting their own account
     const u = db.prepare('SELECT email FROM users WHERE id=?').get(uid);
     if (u?.email === ADMIN_EMAIL) return res.status(403).json({ error: 'Admin account cannot be deleted from here' });
+    let accountFiles = [];
     db.transaction(() => {
-      deletionLifecycle.assertAccountPieceIsolation(uid);
+      accountFiles = deletionLifecycle.preflightAccountDeletion(uid);
       // Delete all user data in order (respecting foreign keys)
       db.prepare('DELETE FROM promo_redemptions WHERE user_id=?').run(uid);
       db.prepare('DELETE FROM referral_rewards WHERE referrer_id=? OR referred_id=?').run(uid, uid);
@@ -976,11 +1001,16 @@ app.delete('/api/account', auth, (req, res) => {
       db.prepare('DELETE FROM reviews WHERE user_id=?').run(uid);
       db.prepare('DELETE FROM messages WHERE from_user_id=? OR to_user_id=?').run(uid, uid);
       db.prepare('DELETE FROM notifications WHERE user_id=? OR from_user_id=?').run(uid, uid);
+      db.prepare('DELETE FROM firing_photos WHERE firing_id IN (SELECT id FROM firing_logs WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM clay_photos WHERE clay_id IN (SELECT id FROM clay_bodies WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM glaze_photos WHERE glaze_id IN (SELECT id FROM glazes WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM test_tiles WHERE user_id=?').run(uid);
       db.prepare('DELETE FROM piece_photos WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
       db.prepare('DELETE FROM piece_glazes WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
       db.prepare('DELETE FROM sales WHERE user_id=?').run(uid);
       db.prepare('DELETE FROM pricing_calculations WHERE user_id=?').run(uid);
       db.prepare('DELETE FROM glaze_clay_tests WHERE glaze_id IN (SELECT id FROM glazes WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM glaze_ingredients WHERE glaze_id IN (SELECT id FROM glazes WHERE user_id=?)').run(uid);
       db.prepare('DELETE FROM pieces WHERE user_id=?').run(uid);
       db.prepare('DELETE FROM glaze_combos WHERE user_id=?').run(uid);
       db.prepare('DELETE FROM firing_logs WHERE user_id=?').run(uid);
@@ -997,6 +1027,7 @@ app.delete('/api/account', auth, (req, res) => {
       db.prepare('DELETE FROM page_views WHERE user_id=?').run(uid);
       db.prepare('DELETE FROM users WHERE id=?').run(uid);
     }).immediate();
+    deletionLifecycle.cleanupFiles(accountFiles);
     res.json({ success: true });
   } catch (err) { res.status(err.status || 500).json({ error: err.message }); }
 });
@@ -1380,8 +1411,9 @@ app.delete('/api/admin/members/:id', auth, (req, res) => {
     const u = db.prepare('SELECT email FROM users WHERE id=?').get(uid);
     if (!u) return res.status(404).json({ error: 'User not found' });
     if (u.email === ADMIN_EMAIL) return res.status(403).json({ error: 'Cannot delete admin account' });
+    let accountFiles = [];
     db.transaction(() => {
-      deletionLifecycle.assertAccountPieceIsolation(uid);
+      accountFiles = deletionLifecycle.preflightAccountDeletion(uid);
       // Clean up all related data before deleting user
       db.prepare('DELETE FROM push_tokens WHERE user_id=?').run(uid);
       db.prepare('DELETE FROM password_reset_tokens WHERE user_id=?').run(uid);
@@ -1400,11 +1432,16 @@ app.delete('/api/admin/members/:id', auth, (req, res) => {
       db.prepare('DELETE FROM reviews WHERE user_id=?').run(uid);
       db.prepare('DELETE FROM messages WHERE from_user_id=? OR to_user_id=?').run(uid, uid);
       db.prepare('DELETE FROM notifications WHERE user_id=? OR from_user_id=?').run(uid, uid);
+      db.prepare('DELETE FROM firing_photos WHERE firing_id IN (SELECT id FROM firing_logs WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM clay_photos WHERE clay_id IN (SELECT id FROM clay_bodies WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM glaze_photos WHERE glaze_id IN (SELECT id FROM glazes WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM test_tiles WHERE user_id=?').run(uid);
       db.prepare('DELETE FROM piece_photos WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
       db.prepare('DELETE FROM piece_glazes WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
       db.prepare('DELETE FROM sales WHERE user_id=?').run(uid);
       db.prepare('DELETE FROM pricing_calculations WHERE user_id=?').run(uid);
       db.prepare('DELETE FROM glaze_clay_tests WHERE glaze_id IN (SELECT id FROM glazes WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM glaze_ingredients WHERE glaze_id IN (SELECT id FROM glazes WHERE user_id=?)').run(uid);
       db.prepare('DELETE FROM pieces WHERE user_id=?').run(uid);
       db.prepare('DELETE FROM glaze_combos WHERE user_id=?').run(uid);
       db.prepare('DELETE FROM firing_logs WHERE user_id=?').run(uid);
@@ -1421,6 +1458,7 @@ app.delete('/api/admin/members/:id', auth, (req, res) => {
       db.prepare('DELETE FROM page_views WHERE user_id=?').run(uid);
       db.prepare('DELETE FROM users WHERE id=?').run(uid);
     }).immediate();
+    deletionLifecycle.cleanupFiles(accountFiles);
     res.json({ success: true, deleted: u.email });
   } catch (err) { res.status(err.status || 500).json({ error: err.message }); }
 });
@@ -1620,7 +1658,7 @@ app.get('/api/export/clay-bodies', auth, (req, res) => {
 });
 
 app.get('/api/export/firing-logs', auth, (req, res) => {
-  const firings = db.prepare('SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id WHERE fl.user_id=? ORDER BY fl.date DESC').all(req.userId);
+  const firings = db.prepare('SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id AND p.user_id=fl.user_id WHERE fl.user_id=? ORDER BY fl.date DESC').all(req.userId);
   let csv = 'Date,Piece,Type,Cone,Temperature,Atmosphere,Kiln,Speed,Hold,Hold Duration,Results,Notes\n';
   firings.forEach(f => { csv += `"${f.date||''}","${(f.piece_title||'').replace(/"/g,'""')}","${f.firing_type||''}","${f.cone||''}","${f.temperature||''}","${f.atmosphere||''}","${(f.kiln_name||'').replace(/"/g,'""')}","${f.firing_speed||''}","${f.hold_used?'Yes':'No'}","${f.hold_duration||''}","${(f.results||'').replace(/"/g,'""')}","${(f.notes||'').replace(/"/g,'""')}"\n`; });
   res.setHeader('Content-Type', 'text/csv');
@@ -1838,17 +1876,28 @@ app.post('/api/glazes/:id/clay-tests', auth, upload.single('photo'), (req, res) 
   const { clay_body_id, clay_name, result_notes } = req.body;
   let finalClayName = clay_name || null;
   let finalClayBodyId = clay_body_id || null;
-  // If clay_body_id provided, look up the name from clay_bodies table
+  // A supplied library ID must resolve to this account. Manual text remains valid when no ID is supplied.
   if (finalClayBodyId) {
-    const clay = db.prepare('SELECT name FROM clay_bodies WHERE id=?').get(finalClayBodyId);
-    if (clay) finalClayName = clay.name;
-    else finalClayBodyId = null; // invalid clay_body_id, treat as manual
+    try {
+      finalClayName = ownedRelationship('clay_bodies', req.userId, finalClayBodyId).name;
+    } catch (error) {
+      cleanupRequestUploads([req.file]);
+      return res.status(error.status || 400).json({ error: error.message });
+    }
   }
-  if (!finalClayName) return res.status(400).json({ error: 'Clay name or clay body selection required' });
+  if (!finalClayName) {
+    cleanupRequestUploads([req.file]);
+    return res.status(400).json({ error: 'Clay name or clay body selection required' });
+  }
   const id = uuidv4();
   const photoFilename = req.file ? req.file.filename : null;
-  db.prepare('INSERT INTO glaze_clay_tests (id,glaze_id,clay_body_id,clay_name,result_notes,photo_filename) VALUES (?,?,?,?,?,?)')
-    .run(id, req.params.id, finalClayBodyId, finalClayName, result_notes || null, photoFilename);
+  try {
+    db.prepare('INSERT INTO glaze_clay_tests (id,glaze_id,clay_body_id,clay_name,result_notes,photo_filename) VALUES (?,?,?,?,?,?)')
+      .run(id, req.params.id, finalClayBodyId, finalClayName, result_notes || null, photoFilename);
+  } catch (error) {
+    cleanupRequestUploads([req.file]);
+    return res.status(400).json({ error: 'Could not save clay test.' });
+  }
   res.json({ id, clay_name: finalClayName });
 });
 
@@ -1945,7 +1994,7 @@ app.delete('/api/glaze-chemicals/:id', auth, (req, res) => {
 // ============ PIECES ============
 app.get('/api/pieces', auth, (req, res) => {
   const { status, clayBodyId, search, limit, offset, excludeCasualties } = req.query;
-  let sql = 'SELECT p.*, cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id WHERE p.user_id=?';
+  let sql = 'SELECT p.*, cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id AND cb.user_id=p.user_id WHERE p.user_id=?';
   const params = [req.userId];
   if (excludeCasualties) { sql += " AND (p.status IS NULL OR p.status NOT IN ('broken','recycled'))"; }
   if (status) { sql += ' AND p.status=?'; params.push(status); }
@@ -1955,11 +2004,11 @@ app.get('/api/pieces', auth, (req, res) => {
   if (limit) { sql += ' LIMIT ?'; params.push(parseInt(limit)); }
   if (offset) { sql += ' OFFSET ?'; params.push(parseInt(offset)); }
   const pieces = db.prepare(sql).all(...params);
-  const getGl = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order');
+  const getGl = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN pieces p ON p.id=pg.piece_id LEFT JOIN glazes g ON pg.glaze_id=g.id AND g.user_id=p.user_id WHERE pg.piece_id=? AND p.user_id=? ORDER BY pg.layer_order');
   const getPh = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order');
   const statusLabels = {'in-progress':'In Progress','bisque-fired':'Bisque Fired','glazed':'Glazed','glaze-fired':'Final Fired','done':'Complete','sold':'Sold','broken':'Broken','recycled':'Recycled'};
   pieces.forEach(p => {
-    p.glazes = getGl.all(p.id);
+    p.glazes = getGl.all(p.id, req.userId);
     p.photos = getPh.all(p.id);
     // Clean up legacy data: if studio was used to store clay body text, suppress it
     if (p.studio && p.clay_body_name && p.studio.toLowerCase() === p.clay_body_name.toLowerCase()) {
@@ -1988,11 +2037,11 @@ app.get('/api/pieces', auth, (req, res) => {
 });
 
 app.get('/api/pieces/:id', auth, (req, res) => {
-  const p = db.prepare('SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id WHERE p.id=? AND p.user_id=?').get(req.params.id, req.userId);
+  const p = db.prepare('SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id AND cb.user_id=p.user_id WHERE p.id=? AND p.user_id=?').get(req.params.id, req.userId);
   if (!p) return res.status(404).json({ error: 'Not found' });
-  p.glazes = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order').all(p.id);
+  p.glazes = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id=g.id AND g.user_id=? WHERE pg.piece_id=? ORDER BY pg.layer_order').all(req.userId, p.id);
   p.photos = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order').all(p.id);
-  p.firings = db.prepare('SELECT * FROM firing_logs WHERE piece_id=? ORDER BY date DESC').all(p.id);
+  p.firings = db.prepare('SELECT * FROM firing_logs WHERE piece_id=? AND user_id=? ORDER BY date DESC').all(p.id, req.userId);
   // Clean up legacy data: if studio was used to store clay body text, suppress it
   if (p.studio && p.clay_body_name && p.studio.toLowerCase() === p.clay_body_name.toLowerCase()) {
     p.studio = null;
@@ -2067,6 +2116,12 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
   const casualtyLesson = body.casualtyLesson || body.casualty_lesson || null;
   let glazeIds = body.glazeIds || body.glaze_ids || null;
   if (typeof glazeIds === 'string') { try { glazeIds = JSON.parse(glazeIds); } catch(e) { glazeIds = null; } }
+  try {
+    validatePieceRelationships(req.userId, clayBodyId, glazeIds);
+  } catch (error) {
+    cleanupRequestUploads([req.file]);
+    return res.status(error.status || 400).json({ error: error.message });
+  }
 
   console.log('[DEBUG] POST /api/pieces content-type:', req.headers['content-type'], 'body:', JSON.stringify(body), 'file:', req.file ? req.file.originalname : 'none', 'title:', title, 'status:', status, 'clay:', clayText, 'notes:', notes);
 
@@ -2088,6 +2143,7 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
   try {
     insertPieceAndGlazes();
   } catch (dbErr) {
+    cleanupRequestUploads([req.file]);
     console.error('[DB ERROR] Insert piece failed:', dbErr.message, { title, status, body });
     return res.status(400).json({ error: 'Could not save piece: ' + dbErr.message });
   }
@@ -2209,6 +2265,12 @@ app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
   const casualtyLesson = body.casualtyLesson || body.casualty_lesson || null;
   let glazeIds = body.glazeIds || body.glaze_ids;
   if (typeof glazeIds === 'string') { try { glazeIds = JSON.parse(glazeIds); } catch(e) { glazeIds = undefined; } }
+  try {
+    validatePieceRelationships(req.userId, clayBodyId, glazeIds);
+  } catch (error) {
+    cleanupRequestUploads([req.file]);
+    return res.status(error.status || 400).json({ error: error.message });
+  }
   const isCasualty = (status === 'broken' || status === 'recycled');
   // Piece update + glaze replace run in one transaction so a glaze insert
   // failure (e.g. NOT NULL on glaze_id) rolls back the piece update too,
@@ -2297,6 +2359,11 @@ app.post('/api/pieces/:id/photos', auth, upload.single('photo'), async (req, res
   if (!req.file) return res.status(400).json({ error: 'No photo' });
   
   console.log('[PHOTO-DIAG] File size:', req.file.size, 'mime:', req.file.mimetype);
+  const piece = db.prepare('SELECT id FROM pieces WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!piece) {
+    cleanupRequestUploads([req.file]);
+    return res.status(404).json({ error: 'Piece not found' });
+  }
   
   const u = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
   const maxPhotos = ((u?.tier || 'free') === 'free') ? 1 : 3;
@@ -2563,7 +2630,7 @@ app.put('/api/firing-logs/:id/photos/reorder', auth, (req, res) => {
 // ============ FIRING LOGS ============
 app.get('/api/firing-logs', auth, (req, res) => {
   const { sort } = req.query;
-  let sql = 'SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id WHERE fl.user_id=?';
+  let sql = 'SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id AND p.user_id=fl.user_id WHERE fl.user_id=?';
   let orderBy = 'ORDER BY fl.date DESC'; // default
   if (sort === 'created_date') orderBy = 'ORDER BY fl.created_at DESC';
   else if (sort === 'firing_type') orderBy = 'ORDER BY fl.firing_type ASC, fl.date DESC';
@@ -2597,6 +2664,11 @@ app.post('/api/firing-logs', auth, (req, res) => {
     }
   }
 
+  try {
+    if (pieceId) ownedRelationship('pieces', req.userId, pieceId);
+  } catch (error) {
+    return res.status(error.status || 400).json({ error: error.message });
+  }
   const id = uuidv4();
   db.prepare('INSERT INTO firing_logs (id,user_id,piece_id,firing_type,cone,temperature,atmosphere,kiln_name,schedule,duration,firing_speed,custom_speed_detail,hold_used,hold_duration,date,results,notes,firing_time,firing_mode,load_description,firing_mode_notes,start_time,end_time,open_temp) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
     .run(id, req.userId, pieceId, firingType || null, cone, temperature, atmosphere || null, kilnName, schedule, duration, firingSpeed || null, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null, firingModeNotes || null, startTime || null, endTime || null, openTemp || null);
@@ -2606,6 +2678,11 @@ app.post('/api/firing-logs', auth, (req, res) => {
 // Edit firing log
 app.put('/api/firing-logs/:id', auth, (req, res) => {
   const { pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail, holdUsed, holdDuration, date, results, notes, firingTime, firingMode, loadDescription, firingModeNotes, startTime, endTime, openTemp } = req.body;
+  try {
+    if (pieceId) ownedRelationship('pieces', req.userId, pieceId);
+  } catch (error) {
+    return res.status(error.status || 400).json({ error: error.message });
+  }
   db.prepare('UPDATE firing_logs SET piece_id=?,firing_type=?,cone=?,temperature=?,atmosphere=?,kiln_name=?,schedule=?,duration=?,firing_speed=?,custom_speed_detail=?,hold_used=?,hold_duration=?,date=?,results=?,notes=?,firing_time=?,firing_mode=?,load_description=?,firing_mode_notes=?,start_time=?,end_time=?,open_temp=? WHERE id=? AND user_id=?')
     .run(pieceId || null, firingType || null, cone, temperature, atmosphere || null, kilnName, schedule, duration, firingSpeed || null, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null, firingModeNotes || null, startTime || null, endTime || null, openTemp || null, req.params.id, req.userId);
   res.json({ success: true });
@@ -2620,6 +2697,11 @@ app.delete('/api/firing-logs/:id', auth, (req, res) => {
 // Firing photos upload
 app.post('/api/firing-logs/:id/photos', auth, upload.array('photos', 3), (req, res) => {
   if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
+  const log = db.prepare('SELECT id FROM firing_logs WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!log) {
+    cleanupRequestUploads(req.files);
+    return res.status(404).json({ error: 'Firing log not found' });
+  }
   const nextSortOrder = db.prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM firing_photos WHERE firing_id=?').get(req.params.id).next;
   const photos = [];
   req.files.forEach((file, idx) => {
@@ -2633,6 +2715,8 @@ app.post('/api/firing-logs/:id/photos', auth, upload.array('photos', 3), (req, r
 
 // Get firing photos
 app.get('/api/firing-logs/:id/photos', auth, (req, res) => {
+  const log = db.prepare('SELECT id FROM firing_logs WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!log) return res.status(404).json({ error: 'Firing log not found' });
   const photos = db.prepare('SELECT * FROM firing_photos WHERE firing_id=? ORDER BY sort_order').all(req.params.id);
   res.json(photos);
 });
@@ -2645,7 +2729,7 @@ app.delete('/api/firing-photos/:id', auth, (req, res) => {
 
 // Export firing logs as CSV
 app.get('/api/export/firing-logs', auth, (req, res) => {
-  const firings = db.prepare('SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id WHERE fl.user_id=? ORDER BY fl.date DESC').all(req.userId);
+  const firings = db.prepare('SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id AND p.user_id=fl.user_id WHERE fl.user_id=? ORDER BY fl.date DESC').all(req.userId);
   let csv = 'Date,Firing Type,Cone,Temperature,Kiln,Duration,Firing Time,Start Time,End Time,Open Temp,Atmosphere,Results,Load Description,Notes\n';
   firings.forEach(f => {
     csv += `"${f.date||''}","${f.firing_type||''}","${f.cone||''}","${f.temperature||''}","${(f.kiln_name||'').replace(/"/g,'""')}","${f.duration||''}","${f.firing_time||''}","${f.start_time||''}","${f.end_time||''}","${f.open_temp||''}","${f.atmosphere||''}","${(f.results||'').replace(/"/g,'""')}","${(f.load_description||'').replace(/"/g,'""')}","${(f.notes||'').replace(/"/g,'""')}"\n`;
@@ -2757,7 +2841,7 @@ app.delete('/api/pricing-calculations/:id', auth, (req, res) => {
 // ============ SALES ============
 app.get('/api/sales', auth, (req, res) => {
   const { dateFrom, dateTo } = req.query;
-  let sql = 'SELECT s.*,p.title as piece_title FROM sales s LEFT JOIN pieces p ON s.piece_id=p.id WHERE s.user_id=?';
+  let sql = 'SELECT s.*,p.title as piece_title FROM sales s LEFT JOIN pieces p ON s.piece_id=p.id AND p.user_id=s.user_id WHERE s.user_id=?';
   const params = [req.userId];
   if (dateFrom) { sql += ' AND s.date >= ?'; params.push(dateFrom); }
   if (dateTo) { sql += ' AND s.date <= ?'; params.push(dateTo); }
@@ -2877,7 +2961,7 @@ app.get('/api/sales/summary', auth, requireTier('starter'), (req, res) => {
 
 app.get('/api/sales/export', auth, requireTier('starter'), (req, res) => {
   const { dateFrom, dateTo } = req.query;
-  let sql = 'SELECT s.*,p.title as piece_title FROM sales s LEFT JOIN pieces p ON s.piece_id=p.id WHERE s.user_id=?';
+  let sql = 'SELECT s.*,p.title as piece_title FROM sales s LEFT JOIN pieces p ON s.piece_id=p.id AND p.user_id=s.user_id WHERE s.user_id=?';
   const params = [req.userId];
   if (dateFrom) { sql += ' AND s.date >= ?'; params.push(dateFrom); }
   if (dateTo) { sql += ' AND s.date <= ?'; params.push(dateTo); }
@@ -2894,7 +2978,7 @@ app.get('/api/sales/export', auth, requireTier('starter'), (req, res) => {
 });
 
 app.get('/api/export/pieces', auth, requireTier('starter'), (req, res) => {
-  const pieces = db.prepare('SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id WHERE p.user_id=? ORDER BY p.updated_at DESC').all(req.userId);
+  const pieces = db.prepare('SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id AND cb.user_id=p.user_id WHERE p.user_id=? ORDER BY p.updated_at DESC').all(req.userId);
   let csv = 'Title,Clay Body,Status,Technique,Form,Studio,Date Started,Date Completed,Material Cost,Firing Cost,Sale Price,Notes\n';
   pieces.forEach(p => { csv += `"${(p.title||'').replace(/"/g,'""')}","${(p.clay_body_name||'').replace(/"/g,'""')}","${p.status||''}","${p.technique||''}","${(p.form||'').replace(/"/g,'""')}","${(p.studio||'').replace(/"/g,'""')}","${p.date_started||''}","${p.date_completed||''}","${p.material_cost||''}","${p.firing_cost||''}","${p.sale_price||''}","${(p.notes||'').replace(/"/g,'""')}"\n`; });
   res.setHeader('Content-Type', 'text/csv');
@@ -3351,13 +3435,13 @@ app.get('/api/dashboard', auth, (req, res) => {
   const tier = u?.tier || 'free';
   const totalPieces = db.prepare('SELECT COUNT(*) as c FROM pieces WHERE user_id=?').get(req.userId).c;
   const byStatus = db.prepare('SELECT status,COUNT(*) as count FROM pieces WHERE user_id=? GROUP BY status').all(req.userId);
-  const recentPieces = db.prepare("SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id WHERE p.user_id=? AND (p.status IS NULL OR p.status NOT IN ('broken','recycled')) ORDER BY p.updated_at DESC LIMIT 5").all(req.userId);
+  const recentPieces = db.prepare("SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id AND cb.user_id=p.user_id WHERE p.user_id=? AND (p.status IS NULL OR p.status NOT IN ('broken','recycled')) ORDER BY p.updated_at DESC LIMIT 5").all(req.userId);
   const totalClays = db.prepare('SELECT COUNT(*) as c FROM clay_bodies WHERE user_id=?').get(req.userId).c;
   const totalGlazes = db.prepare('SELECT COUNT(*) as c FROM glazes WHERE user_id=?').get(req.userId).c;
 
   const getPh = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order LIMIT 1');
-  const getGl = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order');
-  recentPieces.forEach(p => { p.primaryPhoto = getPh.get(p.id) || null; p.glazes = getGl.all(p.id); });
+  const getGl = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id=g.id AND g.user_id=? WHERE pg.piece_id=? ORDER BY pg.layer_order');
+  recentPieces.forEach(p => { p.primaryPhoto = getPh.get(p.id) || null; p.glazes = getGl.all(req.userId, p.id); });
 
   const stats = { totalPieces, byStatus, recentPieces, totalClays, totalGlazes, tier };
 
@@ -3377,13 +3461,13 @@ app.get('/api/dashboard', auth, (req, res) => {
 // ============ CASUALTIES ============
 app.get('/api/casualties', auth, (req, res) => {
   const pieces = db.prepare(`SELECT p.*, cb.name as clay_body_name 
-    FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id 
+    FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id AND cb.user_id=p.user_id 
     WHERE p.user_id=? AND p.status IN ('broken','recycled') 
     ORDER BY p.updated_at DESC`).all(req.userId);
-  const getGl = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order');
+  const getGl = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id=g.id AND g.user_id=? WHERE pg.piece_id=? ORDER BY pg.layer_order');
   const getPh = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order');
   pieces.forEach(p => {
-    p.glazes = getGl.all(p.id);
+    p.glazes = getGl.all(req.userId, p.id);
     const allPhotos = getPh.all(p.id);
     p.photos = allPhotos;
     p.primaryPhoto = allPhotos[0] || null;
@@ -6149,8 +6233,8 @@ app.get('/api/test-tiles', auth, requireTier('starter'), (req, res) => {
   const tiles = db.prepare(`
     SELECT tt.*, g.name as glaze_library_name, cb.name as clay_library_name
     FROM test_tiles tt
-    LEFT JOIN glazes g ON tt.glaze_id = g.id
-    LEFT JOIN clay_bodies cb ON tt.clay_body_id = cb.id
+    LEFT JOIN glazes g ON tt.glaze_id = g.id AND g.user_id = tt.user_id
+    LEFT JOIN clay_bodies cb ON tt.clay_body_id = cb.id AND cb.user_id = tt.user_id
     WHERE tt.user_id = ?
     ORDER BY tt.created_at DESC
   `).all(req.userId);
@@ -6162,8 +6246,8 @@ app.get('/api/test-tiles/:id', auth, requireTier('starter'), (req, res) => {
   const tile = db.prepare(`
     SELECT tt.*, g.name as glaze_library_name, cb.name as clay_library_name
     FROM test_tiles tt
-    LEFT JOIN glazes g ON tt.glaze_id = g.id
-    LEFT JOIN clay_bodies cb ON tt.clay_body_id = cb.id
+    LEFT JOIN glazes g ON tt.glaze_id = g.id AND g.user_id = tt.user_id
+    LEFT JOIN clay_bodies cb ON tt.clay_body_id = cb.id AND cb.user_id = tt.user_id
     WHERE tt.id = ? AND tt.user_id = ?
   `).get(req.params.id, req.userId);
   if (!tile) return res.status(404).json({ error: 'Test tile not found' });
@@ -6179,18 +6263,15 @@ app.post('/api/test-tiles', auth, requireTier('starter'), upload.array('photos',
   const photo_filename2 = photos[1] ? photos[1].filename : null;
   const photo_filename3 = photos[2] ? photos[2].filename : null;
   
-  // Resolve clay name from library if clay_body_id provided
+  // Supplied library IDs must belong to the authenticated account.
   let finalClayName = clay_name || null;
-  if (clay_body_id) {
-    const clay = db.prepare('SELECT name FROM clay_bodies WHERE id=? AND user_id=?').get(clay_body_id, req.userId);
-    if (clay) finalClayName = clay.name;
-  }
-  
-  // Resolve glaze name from library if glaze_id provided
   let finalGlazeName = glaze_name || null;
-  if (glaze_id) {
-    const glaze = db.prepare('SELECT name FROM glazes WHERE id=? AND user_id=?').get(glaze_id, req.userId);
-    if (glaze) finalGlazeName = glaze.name;
+  try {
+    if (clay_body_id) finalClayName = ownedRelationship('clay_bodies', req.userId, clay_body_id).name;
+    if (glaze_id) finalGlazeName = ownedRelationship('glazes', req.userId, glaze_id).name;
+  } catch (error) {
+    cleanupRequestUploads(photos);
+    return res.status(error.status || 400).json({ error: error.message });
   }
 
   try {
@@ -6254,16 +6335,15 @@ app.put('/api/test-tiles/:id', auth, requireTier('starter'), upload.array('photo
   if (photos.length > photoIdx && !photo_filename2) { photo_filename2 = photos[photoIdx++].filename; }
   if (photos.length > photoIdx && !photo_filename3) { photo_filename3 = photos[photoIdx++].filename; }
   
-  // Resolve names from library
+  // Resolve only same-owner library records; manual names remain valid when no ID changes.
   let finalClayName = clay_name !== undefined ? clay_name : tile.clay_name;
-  if (clay_body_id) {
-    const clay = db.prepare('SELECT name FROM clay_bodies WHERE id=? AND user_id=?').get(clay_body_id, req.userId);
-    if (clay) finalClayName = clay.name;
-  }
   let finalGlazeName = glaze_name !== undefined ? glaze_name : tile.glaze_name;
-  if (glaze_id) {
-    const glaze = db.prepare('SELECT name FROM glazes WHERE id=? AND user_id=?').get(glaze_id, req.userId);
-    if (glaze) finalGlazeName = glaze.name;
+  try {
+    if (clay_body_id) finalClayName = ownedRelationship('clay_bodies', req.userId, clay_body_id).name;
+    if (glaze_id) finalGlazeName = ownedRelationship('glazes', req.userId, glaze_id).name;
+  } catch (error) {
+    cleanupRequestUploads(photos);
+    return res.status(error.status || 400).json({ error: error.message });
   }
 
   try {

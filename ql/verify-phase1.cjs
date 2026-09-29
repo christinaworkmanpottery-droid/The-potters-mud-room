@@ -9,6 +9,8 @@ for (const [args, extraEnv] of [
   [['tests/website-api.cjs'], { QL_TEST_MIGRATION: '1' }],
   [['--test', 'tests/ql-deletion.cjs'], {}],
   [['--test', 'tests/ql-studio-deletion.cjs'], {}],
+  [['tests/ql-relationship-safety-api.cjs'], {}],
+  [['tests/ql-relationship-safety-api.cjs'], { QL_TEST_MIGRATION: '1' }],
   [['tests/ql-studio-deletion-api.cjs'], {}],
   [['tests/ql-studio-deletion-api.cjs'], { QL_TEST_MIGRATION: '1' }],
   [['tests/ql-deletion-api.cjs'], {}],

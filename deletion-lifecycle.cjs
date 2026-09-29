@@ -214,7 +214,73 @@ function createDeletionLifecycle(db, uploadsDir, warn = console.warn) {
     }
   }
 
-  return { deletePiece, deleteFiring, deletePhoto, deleteStudioRecord, deleteClayTest, cleanupFiles, assertAccountPieceIsolation };
+  function accountConflict() {
+    const error = new Error('Account has inconsistent relationships; deletion requires review');
+    error.status = 409;
+    throw error;
+  }
+
+  function preflightAccountDeletion(userId) {
+    requireForeignKeys();
+    const bad = (sql, ...args) => { if (db.prepare(sql).get(...args)) accountConflict(); };
+    assertAccountPieceIsolation(userId);
+
+    bad(`SELECT 1 FROM pieces p WHERE p.user_id=? AND p.clay_body_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM clay_bodies c WHERE c.id=p.clay_body_id AND c.user_id=?) LIMIT 1`, userId, userId);
+    bad(`SELECT 1 FROM piece_glazes pg JOIN pieces p ON p.id=pg.piece_id
+      WHERE p.user_id=? AND pg.glaze_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM glazes g WHERE g.id=pg.glaze_id AND g.user_id=?) LIMIT 1`, userId, userId);
+    bad(`SELECT 1 FROM test_tiles t WHERE t.user_id=? AND t.clay_body_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM clay_bodies c WHERE c.id=t.clay_body_id AND c.user_id=?) LIMIT 1`, userId, userId);
+    bad(`SELECT 1 FROM test_tiles t WHERE t.user_id=? AND t.glaze_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM glazes g WHERE g.id=t.glaze_id AND g.user_id=?) LIMIT 1`, userId, userId);
+    bad(`SELECT 1 FROM firing_logs f WHERE f.user_id=? AND f.piece_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM pieces p WHERE p.id=f.piece_id AND p.user_id=?) LIMIT 1`, userId, userId);
+    bad(`SELECT 1 FROM sales s WHERE s.user_id=? AND s.piece_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM pieces p WHERE p.id=s.piece_id AND p.user_id=?) LIMIT 1`, userId, userId);
+    bad(`SELECT 1 FROM glaze_clay_tests t JOIN glazes g ON g.id=t.glaze_id
+      WHERE g.user_id=? AND t.clay_body_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM clay_bodies c WHERE c.id=t.clay_body_id AND c.user_id=?) LIMIT 1`, userId, userId);
+
+    bad(`SELECT 1 FROM pieces p JOIN clay_bodies c ON c.id=p.clay_body_id WHERE c.user_id=? AND p.user_id<>? LIMIT 1`, userId, userId);
+    bad(`SELECT 1 FROM piece_glazes pg JOIN pieces p ON p.id=pg.piece_id JOIN glazes g ON g.id=pg.glaze_id
+      WHERE g.user_id=? AND p.user_id<>? LIMIT 1`, userId, userId);
+    bad(`SELECT 1 FROM test_tiles t JOIN clay_bodies c ON c.id=t.clay_body_id WHERE c.user_id=? AND t.user_id<>? LIMIT 1`, userId, userId);
+    bad(`SELECT 1 FROM test_tiles t JOIN glazes g ON g.id=t.glaze_id WHERE g.user_id=? AND t.user_id<>? LIMIT 1`, userId, userId);
+    bad(`SELECT 1 FROM firing_logs f JOIN pieces p ON p.id=f.piece_id WHERE p.user_id=? AND f.user_id<>? LIMIT 1`, userId, userId);
+    bad(`SELECT 1 FROM sales s JOIN pieces p ON p.id=s.piece_id WHERE p.user_id=? AND s.user_id<>? LIMIT 1`, userId, userId);
+    bad(`SELECT 1 FROM glaze_clay_tests t JOIN glazes g ON g.id=t.glaze_id JOIN clay_bodies c ON c.id=t.clay_body_id
+      WHERE c.user_id=? AND g.user_id<>? LIMIT 1`, userId, userId);
+
+    for (const [table, target, column] of [
+      ['ql_piece_firings', 'firing_logs', 'firing_id'],
+      ['ql_piece_test_tiles', 'test_tiles', 'test_tile_id'],
+      ['ql_piece_pricing', 'pricing_calculations', 'pricing_id']
+    ]) {
+      if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table)) continue;
+      bad(`SELECT 1 FROM ${table} l LEFT JOIN pieces p ON p.id=l.piece_id LEFT JOIN ${target} t ON t.id=l.${column}
+        WHERE (l.user_id=? OR p.user_id=? OR t.user_id=?)
+          AND (p.id IS NULL OR t.id IS NULL OR p.user_id<>l.user_id OR t.user_id<>l.user_id) LIMIT 1`,
+        userId, userId, userId);
+    }
+
+    const files = [];
+    const add = (sql, ...args) => {
+      for (const row of db.prepare(sql).all(...args)) for (const value of Object.values(row)) if (value) files.push(value);
+    };
+    add('SELECT avatar_filename,profile_photo FROM users WHERE id=?', userId);
+    add('SELECT ph.filename FROM piece_photos ph JOIN pieces p ON p.id=ph.piece_id WHERE p.user_id=?', userId);
+    add('SELECT ph.filename FROM clay_photos ph JOIN clay_bodies c ON c.id=ph.clay_id WHERE c.user_id=?', userId);
+    add('SELECT ph.filename FROM glaze_photos ph JOIN glazes g ON g.id=ph.glaze_id WHERE g.user_id=?', userId);
+    add('SELECT ph.filename FROM firing_photos ph JOIN firing_logs f ON f.id=ph.firing_id WHERE f.user_id=?', userId);
+    add('SELECT t.photo_filename FROM glaze_clay_tests t JOIN glazes g ON g.id=t.glaze_id WHERE g.user_id=?', userId);
+    add('SELECT photo_filename,photo_filename2,photo_filename3 FROM test_tiles WHERE user_id=?', userId);
+    add('SELECT photo_filename FROM pricing_calculations WHERE user_id=?', userId);
+    add('SELECT image_filename FROM sales WHERE user_id=?', userId);
+    return files;
+  }
+
+  return { deletePiece, deleteFiring, deletePhoto, deleteStudioRecord, deleteClayTest, cleanupFiles, assertAccountPieceIsolation, preflightAccountDeletion };
 }
 
 module.exports = { createDeletionLifecycle, hasStoredFileReference, fileSlots };

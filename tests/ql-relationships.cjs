@@ -163,3 +163,19 @@ test('migration/links survive reopen and SQLite backup/restore; photo references
   assert.deepEqual(restored.pragma('foreign_key_check'), []);
   assert.equal(restored.pragma('integrity_check', { simple: true }), 'ok');
 });
+
+
+test('reader filters corrupt QL junction ownership and missing targets without leaking data', t => {
+  const db = fixture(t); migrate(db);
+  db.exec('DROP TRIGGER ql_piece_test_tiles_insert; DROP TRIGGER ql_piece_firings_insert;');
+  db.prepare("INSERT INTO ql_piece_test_tiles(id,user_id,piece_id,test_tile_id) VALUES('bad-tile','a','piece-a','tile-b')").run();
+  db.prepare("INSERT INTO ql_piece_firings(id,user_id,piece_id,firing_id) VALUES('bad-fire','a','piece-a','firing-b')").run();
+  let result = readPiece(db, 'a', 'piece-a');
+  assert.equal(result.testTiles.some(x => x.id === 'tile-b'), false);
+  assert.equal(result.firings.some(x => x.id === 'firing-b'), false);
+  db.pragma('foreign_keys=OFF');
+  db.prepare("UPDATE ql_piece_test_tiles SET test_tile_id='missing-tile' WHERE id='bad-tile'").run();
+  db.pragma('foreign_keys=ON');
+  result = readPiece(db, 'a', 'piece-a');
+  assert.equal(result.testTiles.some(x => x.id === 'missing-tile'), false);
+});
