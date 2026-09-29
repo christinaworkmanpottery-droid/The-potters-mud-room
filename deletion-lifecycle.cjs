@@ -221,7 +221,7 @@ function createDeletionLifecycle(db, uploadsDir, warn = console.warn) {
   }
 
   function preflightAccountDeletion(userId) {
-    requireForeignKeys();
+    if (db.pragma('foreign_keys', { simple: true }) !== 1) throw new Error('Account deletion requires foreign_keys=ON');
     const bad = (sql, ...args) => { if (db.prepare(sql).get(...args)) accountConflict(); };
     assertAccountPieceIsolation(userId);
 
