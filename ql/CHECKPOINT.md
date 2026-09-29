@@ -44,8 +44,8 @@ Mobile: additive subscriber to Phase 2E session rotation; Piece behavior unchang
 
 ## Verification
 
-- Complete `node ql/verify-phase1.cjs`: **430 passing executions**, comprising 266 Node test executions and 164 script PASS checks (includes one disposable-baseline integrity smoke; excludes aggregate PASS summaries).
-- New Phase 2G backend/web tests: **20/20**, included above.
+- Complete `node ql/verify-phase1.cjs`: **431 passing executions**, comprising 267 Node test executions and 164 script PASS checks (includes one disposable-baseline integrity smoke; excludes aggregate PASS summaries).
+- New Phase 2G backend/web tests: **21/21**, included above.
 - Strict readiness: **37/37**, `QL_READINESS_STRICT=1 node --test tests/ql-readiness-blockers.cjs tests/ql-safety-migrations.cjs`.
 - Complete mobile suite: **64/64**, including **14 new Clay regressions** and existing Piece tests.
 - Shared JavaScript parse: **117/117**.

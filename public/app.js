@@ -515,7 +515,7 @@ function showApp() {
 let currentPage = 'dashboard';
 let restoredUrl = '';
 function navigate(page, options = {}) {
-  if (page !== 'clayBodies') clearClayMedia();
+  if (page !== 'clayBodies') { clearClayMedia('clayList'); clearClayMedia('clayViewBody'); }
   if (page !== 'pieceDetail') clearPieceHistory();
   try {
     if (!token && !guestMode) {
