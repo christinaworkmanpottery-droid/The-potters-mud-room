@@ -60,6 +60,22 @@ function seed(owner,prefix){
   assert.equal((await request('/api/pieces','POST',{title:'bad',glaze_ids:[{glazeId:'b-g'}]})).status,400);
   assert.equal(db.prepare("SELECT count(*) n FROM pieces WHERE user_id='a'").get().n,n);
  });
+ for (const [label,body] of [['Clay',{clay_body_id:'b-c'}],['Glaze',{glaze_ids:[{glazeId:'b-g'}]}]]) {
+  await check('Piece update rejects foreign '+label+' without replacing existing history',async()=>{
+   const before=get('pieces','a-p'), layers=db.prepare("SELECT * FROM piece_glazes WHERE piece_id='a-p'").all();
+   assert.equal((await request('/api/pieces/a-p','PUT',{title:'must not persist',...body})).status,400);
+   assert.deepEqual(get('pieces','a-p'),before);
+   assert.deepEqual(db.prepare("SELECT * FROM piece_glazes WHERE piece_id='a-p'").all(),layers);
+  });
+ }
+ await check('Sale create/update rejects foreign Piece without changing sale or Piece',async()=>{
+  const sale=get('sales','a-s'), piece=get('pieces','b-p');
+  const count=db.prepare('SELECT count(*) n FROM sales').get().n;
+  assert.equal((await request('/api/sales','POST',{pieceId:'b-p',price:2,quantity:1})).status,400);
+  assert.equal((await request('/api/sales/a-s','PUT',{pieceId:'b-p',price:2,quantity:1})).status,400);
+  assert.deepEqual(get('sales','a-s'),sale);assert.deepEqual(get('pieces','b-p'),piece);
+  assert.equal(db.prepare('SELECT count(*) n FROM sales').get().n,count);
+ });
  await check('cross-account Firing to Piece rejected on create and update',async()=>{
   assert.equal((await request('/api/firing-logs','POST',{pieceId:'b-p',firingType:'bisque'})).status,400);
   assert.equal((await request('/api/firing-logs/a-f','PUT',{pieceId:'b-p',firingType:'bisque'})).status,400);

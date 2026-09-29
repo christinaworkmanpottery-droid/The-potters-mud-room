@@ -1,62 +1,75 @@
-# QL Phase 1G — resumable checkpoint
+# QL Phase 1H — resumable checkpoint
 
-September 29, 2026. Branch `ql/phase-1-relationships`.
-Starting checkpoint: `c6c321491bbeb9823f32eae5882bfe3f3359c03f` (Phase 1F).
-Nothing deployed. Production data/services/branches and mobile sources untouched.
+2026-09-29. Branch `ql/phase-1-relationships`.
+Parent checkpoint: `9c464a3cecd9d0ff6eb0656a69980e14bfcd7878` (Phase 1G).
 
-## Completed
+## Decision
 
-- Read-only deterministic relationship audit: `ql/integrity-audit.cjs`.
-- Full coverage, exact finding types, interpretation and limitations: `ql/INTEGRITY-AUDIT.md`.
-- Legacy/QL/shared/manual states classified under the existing Phase 1F union policy.
-- Missing/cross-account endpoints, stale links, duplicate/orphan rows, invalid owner/photo
-  chains, file metadata/inventory findings, migration drift and actual account preflight verdicts.
-- No repair, backfill, UI, startup hook, production database access or migration activation.
-- No schema changes. Existing migration SQL/checksum and all Phase 1A–1F behavior preserved.
-  The relationship module only adds a frozen export of existing audit metadata.
+**Phase 1 is NOT READY TO CLOSE.** Phase 1H review/runbook/test work is complete.
+No runtime source, production data/service/branch, mobile source or deployment changed.
+No Phase 2 work begun. No real-data repair or production inspection.
 
-## Recovery evidence
+## Deliverables
 
-Two full disposable rehearsals (current and historical schema) passed:
-backup → explicit Phase 1A migration → mixed service/deletion operations → audit → restore.
-Backup: quiesce the single fixture writer, checkpoint WAL/TRUNCATE, close SQLite, verify
-sidecars absent, copy the entire DB/uploads tree and verify SHA-256 manifests.
+- `ql/PHASE1-READINESS.md`: relationship/read/write/delete/bulk/account/file/migration
+  matrix, evidence references, exact survival semantics, missing coverage, risk dispositions.
+- `ql/RECOVERY-RUNBOOK.md`: coordinated writer stop, cold SQLite/WAL and paired uploads
+  backup, hashes, prerequisites, stop/rollback criteria, complete restore and trust gate.
+- `tests/ql-readiness-blockers.cjs`: nine executed failing desired safety invariants across
+  seven blocker groups, plus passing historical Tile startup rejection/preservation.
+- Focused passing coverage added for Piece update foreign Clay/Glaze and Sale create/update
+  foreign Piece rejection (each executed in legacy and QL modes). No test-count padding.
+- CI has a separate strict closure gate. It deliberately reports failure while defects remain;
+  TODO labels in the broad suite do not mean safety passed. No existing assertion was weakened.
 
-Mixed operations passed: create/read/unlink; legacy reassignment; Piece/Clay/Glaze/Test Tile/
-Firing deletion; shared-photo preservation; foreign-account rejection; surviving relationships.
-Normal operations produced zero findings. Deliberate corruption produced exact expected counts.
+## Actual final local verification
 
-Restore matched the complete intended baseline: byte-identical database and photo files,
-all table rows/schema objects, legacy relationship reads, integrity/FK checks and baseline audit.
-No QL objects remained. Post-backup files were removed; deleted originals returned. Readonly
-reopening passed. Corruption audits also proved exact database bytes unchanged.
+Node **22.16.0**, unchanged dependency lockfile; disposable data and loopback servers only.
 
-## Verification
+`node ql/verify-phase1.cjs`: **275 passing executions**, **9 known failing TODO executions**,
+no unexpected failures. Prior 268 retained; 6 owner-validation executions plus 1 safe historical
+Tile rejection added. The separate disposable baseline/schema integrity check also passes.
+Count excludes summaries, the baseline diagnostic and TODO tests.
 
-`node ql/verify-phase1.cjs`: **268 passing test executions**, zero failures, Node 22.16.0.
-This retains the prior 233 plus 33 audit tests and 2 complete recovery rehearsals. The
-existing disposable baseline database integrity/schema check also passed.
-Implementation commit: `8830ed5a674e0d192cb7887ff6fe917e8aca8dd8`.
-GitHub Actions: **successful** for that exact implementation commit (full verifier, Node 22).
-https://github.com/christinaworkmanpottery-droid/The-potters-mud-room/actions/runs/36613914143
-This documentation-only checkpoint records that verified result; code/tests are unchanged.
+`QL_READINESS_STRICT=1 node --test tests/ql-readiness-blockers.cjs`:
+**1 pass, 9 failures, 0 TODO**, nonzero exit. This is the required closure gate, not an optional
+warning. Full-suite green alone cannot authorize closure. GitHub Actions runs both commands;
+its strict step is expected to fail until the repairs pass. Remote run status must be checked
+for the resulting commit after push; do not reuse Phase 1G's successful status.
 
-## Newly documented risks
+## Remaining blocking work / exact Phase 1I
 
-- Cold synthetic recovery is not a live Render recovery certification; coordinate DB/uploads
-  writers before a future backup. No real customer data was inspected.
-- Inventory presence does not verify photo content, permissions, symlinks or safe path opening.
-- Audit buffers tables in memory; large-dataset sizing remains unmeasured.
-- Valid multi-Piece links cannot reveal stale-client intent; Phase 1F last-write-wins remains.
-- Known historical fixtures are not exhaustive. Preflight unavailable/schema findings block
-  a clean verdict. Current preflight success does not certify downstream deletion on all schemas.
-- Ledger/manifest checks detect drift, not adversarial rewriting of both schema and ledger.
+Repair only the enumerated safety gaps and equivalent existing bypasses, website service/API
+and focused tests, on this isolated branch:
 
-## Exact recommended Phase 1H — not started
+1. H1: globally reference-aware, safe-path post-commit cleanup for Pricing and other reachable
+   shared-file deletion/replacement bypasses (avatar/profile/Event/forum included).
+2. H2: owner-filter Gallery and existing Photo Lookup related Clay/Glaze reads; guard the missing
+   baseline `hide_from_photo_search` prerequisite without upgrading search functionality.
+3. H3: prevent admin size/video cleanup from deleting referenced assets; guard unsafe legacy
+   migration order/invocation and keep dormant emergency WAL/upload deletion unreachable.
+4. H4: atomic Sale deletion + Piece status change; prove surviving Sale history.
+5. H5: Sale Contact same-owner validation, safe Contact detach and invalid-pointer account coverage.
+6. H6: shared-image edit isolation (currently an authorized JPEG edit changes another account's
+   referenced bytes); include Pricing slots/parent ownership semantics.
+7. H7: historical startup/manual migration ordering must preserve or reject before mutation;
+   pre-lustre Firing startup after QL currently removes the parent table. Old Tile rejects safely.
 
-**Phase 1 readiness/coverage review and operator recovery runbook.** Map every relationship,
-write and delete path to its tests; document coordinated DB/uploads backup, stop/go and rollback
-criteria; disposition remaining risks against the master plan; record whether Phase 1 is ready
-for a separately approved next phase. Keep documentation/test-only, isolated and resumable.
-No production access, opt-in migration activation, repair, deployment, UI, reverse APIs or
-higher-level features. Do not start Phase 2 automatically.
+Remove TODO only after genuine repairs. Rerun broad suite and strict gate; add focused coverage
+for equivalent bypasses, populated shared account dependencies and migration ordering. Repeat
+readiness decision, commit/push, verify CI. No UI/new relations/Esme/voice/advanced search/redesign/
+community expansion/production access/migration/deployment. Do not begin Phase 2.
+
+## Risk classifications
+
+- **Before Phase 1 closes:** H1–H7 and their safety regression gaps above.
+- **Before production migration:** coordinated live DB/photo writer freeze and restore rehearsal;
+  image content/path/permission checks beyond inventory; representative large-data audit memory/
+  latency; actual authorized historical-schema compatibility. No live claims were made.
+- **Later QL phase:** stale-client revision/conflict handling (current last-write-wins documented);
+  platform/device/purchase/source mapping gates before native release; non-destructive leftover-file
+  retention and unrelated manual workflow coverage. See review for precise boundaries.
+
+Unsafe behavior was identified and preserved as reproducible tests, **not repaired** in this
+explicit documentation/audit/test-only chunk. Readiness/coverage overclaims and stale navigation
+documentation were corrected. No approval to deploy or work ahead is implied.

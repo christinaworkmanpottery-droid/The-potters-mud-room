@@ -9,6 +9,7 @@ for (const [args, extraEnv] of [
   [['--test', 'tests/ql-firing-compatibility.cjs'], {}],
   [['--test', 'tests/ql-integrity-audit.cjs'], {}],
   [['--test', 'tests/ql-recovery-rehearsal.cjs'], {}],
+  [['--test', 'tests/ql-readiness-blockers.cjs'], {}],
   [['tests/website-api.cjs'], { QL_TEST_MIGRATION: '1' }],
   [['--test', 'tests/ql-deletion.cjs'], {}],
   [['--test', 'tests/ql-studio-deletion.cjs'], {}],
@@ -25,4 +26,4 @@ for (const [args, extraEnv] of [
   const result = spawnSync(process.execPath, args, { cwd: root, env: { ...cleanEnv, ...extraEnv }, stdio: 'inherit' });
   if (result.status !== 0) process.exit(result.status || 1);
 }
-console.log('PASS Phase 1G: baseline + relationships + ownership-safe writes/reads + deletion lifecycle (legacy and QL) + read-only audit + exact fixture restore');
+console.log('PASS established Phase 1 regressions (Phase 1H is NOT READY TO CLOSE; see TODO blockers): baseline + relationships + ownership-safe writes/reads + deletion lifecycle (legacy and QL) + read-only audit + exact fixture restore');

@@ -1,3 +1,7 @@
+> Current gate: Phase 1H is **NOT READY TO CLOSE**; see `PHASE1-READINESS.md` and
+> `RECOVERY-RUNBOOK.md`. Historical Phase 1B proposals at the end are completed history,
+> not the next task. The next recommended chunk is the narrowly scoped Phase 1I safety repairs.
+
 # Phase 1A relationship contract — September 29, 2026
 
 Phase 1B/1C lifecycle update: see `CHECKPOINT.md`. The schema/helper contract below remains intact;
