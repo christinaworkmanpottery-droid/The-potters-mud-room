@@ -5,18 +5,18 @@ Branch: `ql/phase-2c-history-validation`.
 
 ## Validation actually performed
 
-- Real headless Chromium using the repository's actual `public/app.js` and `public/style.css`,
-  at 1280×900 desktop and 390×844 iPhone-like narrow viewport.
+- A real Chromium binary was available in the work container, but headless execution did not complete reliably there; it is not counted as a successful browser/device run. The repository now includes a self-contained Chromium check using the exact History renderer/CSS at 1280×900 and 390×844; it runs when Chromium is available and otherwise reports an explicit skip.
 - Automated DOM/service and loopback HTTP validation with disposable data/accounts/files.
 - Static source audit of website upload delivery and the current mobile repository's direct
   `/uploads/<filename>` dependencies.
 - No actual Safari/WebKit or physical iPhone was available. Chromium at an iPhone-like viewport is
   responsive-layout evidence, not Safari certification.
 
-Browser fixtures include long labels, long History, undated records, Clay, manual glaze, Firings,
-Test Tiles, Pricing and Sales. They assert no horizontal overflow, History stays within viewport,
-headings/groups remain present, long content remains rendered and retry is at least 44px high.
-Existing Phase 2B tests retain Piece-detail/edit controls, image behavior and ordering coverage.
+The browser fixture includes long labels, long History, undated records, Clay, manual glaze, Firings,
+Test Tiles, Pricing and Sales. When a usable Chromium is present it asserts no horizontal overflow,
+History stays within viewport, headings/groups remain present, long content remains rendered and retry
+is at least 44px high. DOM/CSS review covers the same narrow-width wrapping constraints. Existing
+Phase 2B tests retain Piece-detail/edit controls, image behavior and ordering coverage.
 
 ## Accessibility / resilience findings and narrow repairs
 
