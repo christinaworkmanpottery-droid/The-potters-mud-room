@@ -95,10 +95,13 @@ function link(db, { userId, pieceId, kind, targetId }) {
 }
 
 function unlink(db, { userId, pieceId, kind, targetId }) {
-  const { table, column } = kindConfig(kind);
-  requireOwned(db, 'pieces', userId, pieceId);
-  return db.prepare(`DELETE FROM ${table} WHERE user_id=? AND piece_id=? AND ${column}=?`)
-    .run(userId, pieceId, targetId).changes;
+  const { table, target, column } = kindConfig(kind);
+  return db.transaction(() => {
+    requireOwned(db, 'pieces', userId, pieceId);
+    requireOwned(db, target, userId, targetId);
+    return db.prepare(`DELETE FROM ${table} WHERE user_id=? AND piece_id=? AND ${column}=?`)
+      .run(userId, pieceId, targetId).changes;
+  }).immediate();
 }
 
 function related(db, userId, pieceId, kind) {
@@ -134,4 +137,42 @@ function readPiece(db, userId, pieceId) {
   })();
 }
 
-module.exports = { migrate, link, unlink, readPiece };
+function relationshipTablesInstalled(db) {
+  return Object.values(links).every(({ table }) =>
+    db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table));
+}
+
+function serviceUnavailable() {
+  const error = new Error('QL relationships unavailable');
+  error.code = 'QL_RELATIONSHIPS_UNAVAILABLE';
+  error.status = 409;
+  return error;
+}
+
+function createRelationshipService(db) {
+  function ensureInstalled() {
+    if (!relationshipTablesInstalled(db)) throw serviceUnavailable();
+  }
+  return Object.freeze({
+    create({ userId, pieceId, kind, targetId }) {
+      ensureInstalled();
+      return link(db, { userId, pieceId, kind, targetId });
+    },
+    remove({ userId, pieceId, kind, targetId }) {
+      ensureInstalled();
+      return unlink(db, { userId, pieceId, kind, targetId });
+    },
+    list({ userId, pieceId, kind }) {
+      requireOwned(db, 'pieces', userId, pieceId);
+      if (kind === 'firing') {
+        const legacy = db.prepare('SELECT * FROM firing_logs WHERE piece_id=? AND user_id=? ORDER BY id').all(pieceId, userId);
+        const explicit = related(db, userId, pieceId, kind);
+        return [...new Map([...legacy, ...explicit].map(row => [row.id, row])).values()]
+          .sort((a, b) => a.id.localeCompare(b.id));
+      }
+      return related(db, userId, pieceId, kind);
+    }
+  });
+}
+
+module.exports = { migrate, link, unlink, readPiece, createRelationshipService };
