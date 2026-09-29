@@ -167,7 +167,7 @@ test('migration/links survive reopen and SQLite backup/restore; photo references
 
 test('reader filters corrupt QL junction ownership and missing targets without leaking data', t => {
   const db = fixture(t); migrate(db);
-  db.exec('DROP TRIGGER ql_piece_test_tiles_insert; DROP TRIGGER ql_piece_firings_insert;');
+  db.exec('DROP TRIGGER ql_piece_test_tiles_insert; DROP TRIGGER ql_piece_test_tiles_update; DROP TRIGGER ql_piece_firings_insert; DROP TRIGGER ql_piece_firings_update;');
   db.prepare("INSERT INTO ql_piece_test_tiles(id,user_id,piece_id,test_tile_id) VALUES('bad-tile','a','piece-a','tile-b')").run();
   db.prepare("INSERT INTO ql_piece_firings(id,user_id,piece_id,firing_id) VALUES('bad-fire','a','piece-a','firing-b')").run();
   let result = readPiece(db, 'a', 'piece-a');
