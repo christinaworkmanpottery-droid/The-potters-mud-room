@@ -1916,6 +1916,12 @@ function glazeMediaContract(glaze) {
   glaze.photoVisibility = 'legacy-ambiguous';
   return glaze;
 }
+function glazeClayTestMediaContract(test) {
+  if (!test) return test;
+  test.photoDelivery = test.photo_filename ? 'owner-protected' : 'legacy-ambiguous';
+  test.photoVisibility = 'legacy-ambiguous';
+  return test;
+}
 app.get('/api/ql/glazes/:glazeId/photos/:photoId', auth, (req, res) => {
   res.set('Cache-Control', 'private, no-store');
   const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
@@ -1939,12 +1945,35 @@ app.get('/api/ql/glazes/:glazeId/photos/:photoId', auth, (req, res) => {
   } catch (_) { if (!res.headersSent) unavailable(); }
 });
 
+app.get('/api/ql/glazes/:glazeId/clay-tests/:testId/photo', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const test = db.prepare(`SELECT t.* FROM glaze_clay_tests t JOIN glazes g ON g.id=t.glaze_id
+      WHERE t.id=? AND t.glaze_id=? AND g.user_id=?`).get(req.params.testId, req.params.glazeId, req.userId);
+    if (!test?.photo_filename) return unavailable();
+    const target = safeStoredUpload(test.photo_filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(test.photo_filename)) return unavailable();
+    const owned = ownedPhotoSlots(test.photo_filename, req.userId);
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const tableColumns = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(column => column.name));
+      for (const column of columns.filter(column => tableColumns.has(column))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(test.photo_filename);
+        if (rows.some(row => !owned.some(slot => slot.table === table && slot.column === column && slot.id === row.id))) return unavailable();
+      }
+    }
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
+
 app.get('/api/glazes', auth, (req, res) => {
   const glazes = db.prepare('SELECT * FROM glazes WHERE user_id=? ORDER BY name').all(req.userId);
   const getIng = db.prepare('SELECT * FROM glaze_ingredients WHERE glaze_id=? ORDER BY sort_order');
   const getPhotos = db.prepare('SELECT * FROM glaze_photos WHERE glaze_id=? ORDER BY sort_order');
   const getClayTests = db.prepare('SELECT * FROM glaze_clay_tests WHERE glaze_id=? ORDER BY created_at DESC');
-  glazes.forEach(g => { if (g.glaze_type === 'recipe') g.ingredients = getIng.all(g.id); g.photos = getPhotos.all(g.id); glazeMediaContract(g); g.clay_tests = getClayTests.all(g.id); });
+  glazes.forEach(g => { if (g.glaze_type === 'recipe') g.ingredients = getIng.all(g.id); g.photos = getPhotos.all(g.id); glazeMediaContract(g); g.clay_tests = getClayTests.all(g.id).map(glazeClayTestMediaContract); });
   res.json(glazes);
 });
 
@@ -2047,7 +2076,7 @@ app.get('/api/glazes/:id/clay-tests', auth, (req, res) => {
   const glaze = db.prepare('SELECT id FROM glazes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!glaze) return res.status(404).json({ error: 'Glaze not found' });
   const tests = db.prepare('SELECT * FROM glaze_clay_tests WHERE glaze_id=? ORDER BY created_at DESC').all(req.params.id);
-  res.json(tests);
+  res.json(tests.map(glazeClayTestMediaContract));
 });
 
 app.post('/api/glazes/:id/clay-tests', auth, upload.single('photo'), (req, res) => {
@@ -2079,6 +2108,31 @@ app.post('/api/glazes/:id/clay-tests', auth, upload.single('photo'), (req, res) 
     return res.status(400).json({ error: 'Could not save clay test.' });
   }
   res.json({ id, clay_name: finalClayName });
+});
+
+app.put('/api/glazes/:id/clay-tests/:testId/photo', auth, upload.single('photo'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Photo required' });
+  const existing = db.prepare(`SELECT t.* FROM glaze_clay_tests t JOIN glazes g ON g.id=t.glaze_id
+    WHERE t.id=? AND t.glaze_id=? AND g.user_id=?`).get(req.params.testId, req.params.id, req.userId);
+  if (!existing) {
+    cleanupRequestUploads([req.file]);
+    return res.status(404).json({ error: 'Test not found' });
+  }
+  try {
+    db.transaction(() => {
+      const current = db.prepare(`SELECT t.id FROM glaze_clay_tests t JOIN glazes g ON g.id=t.glaze_id
+        WHERE t.id=? AND t.glaze_id=? AND g.user_id=?`).get(req.params.testId, req.params.id, req.userId);
+      if (!current) { const error = new Error('Test not found'); error.status = 404; throw error; }
+      db.prepare('UPDATE glaze_clay_tests SET photo_filename=? WHERE id=? AND glaze_id=?')
+        .run(req.file.filename, req.params.testId, req.params.id);
+    }).immediate();
+  } catch (error) {
+    cleanupRequestUploads([req.file]);
+    return res.status(error.status || 500).json({ error: error.status === 404 ? 'Test not found' : 'Could not replace clay test photo.' });
+  }
+  if (existing.photo_filename && existing.photo_filename !== req.file.filename) deletionLifecycle.cleanupFiles([existing.photo_filename]);
+  const updated = db.prepare('SELECT * FROM glaze_clay_tests WHERE id=? AND glaze_id=?').get(req.params.testId, req.params.id);
+  res.json(glazeClayTestMediaContract(updated));
 });
 
 app.delete('/api/glazes/:id/clay-tests/:testId', auth, (req, res) => {
