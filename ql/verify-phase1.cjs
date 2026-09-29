@@ -28,9 +28,10 @@ for (const [args, extraEnv] of [
   [['tests/ql-piece-history-api.cjs'], {}],
   [['--test', 'tests/ql-piece-history-dom.cjs'], {}],
   [['tests/ql-piece-history-web-api.cjs'], {}],
-  [['--test', 'tests/ql-piece-media.cjs'], {}]
+  [['--test', 'tests/ql-piece-media.cjs'], {}],
+  [['--test', 'tests/ql-upload-restriction-readiness.cjs'], {}]
 ]) {
   const result = spawnSync(process.execPath, args, { cwd: root, env: { ...cleanEnv, ...extraEnv }, stdio: 'inherit' });
   if (result.status !== 0) process.exit(result.status || 1);
 }
-console.log('PASS Phase 1 regressions/readiness unchanged plus Phase 2A-2D protected Piece media validation');
+console.log('PASS Phase 1 regressions/readiness unchanged plus Phase 2A-2F protected Piece media and upload restriction-readiness validation');
