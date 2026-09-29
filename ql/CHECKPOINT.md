@@ -33,9 +33,11 @@ Cover legacy-only, QL-only, dual/different Pieces, create/retry/remove, stale/cr
 corruption, selection replace/clear/omission, preservation of unrelated pairs, identical
 foreign/missing failures, injected transactional rollback, Piece deletion and Firing history.
 
-GitHub Actions: branch-only `QL Phase 1 Verify` runs on push using Node 22 and `npm ci`.
-Local verification is complete; remote status is attached to the checkpoint commit's run
-and must be checked after push. The workflow does not deploy.
+Implementation commit: `b173793ebd860648db7a5e5451a5288effe177b7`.
+GitHub Actions **successful** for that exact implementation commit:
+https://github.com/christinaworkmanpottery-droid/The-potters-mud-room/actions/runs/36612180084
+The branch-only workflow used Node 22, `npm ci`, and the full Phase 1 verifier. No deploy.
+This checkpoint-only follow-up records the confirmed remote result; runtime/test code is unchanged.
 
 ## Newly clarified risks
 
