@@ -514,7 +514,7 @@ function getQlPieceHistoryService() {
 app.get('/api/ql/pieces/:pieceId/history', auth, (req, res) => {
   res.set('Cache-Control', 'private, no-store');
   try {
-    res.json(getQlPieceHistoryService().get({ userId: req.userId, pieceId: req.params.pieceId }));
+    res.json(protectPieceHistoryTestTileMedia(getQlPieceHistoryService().get({ userId: req.userId, pieceId: req.params.pieceId })));
   } catch (error) {
     if (error?.status === 404) return res.status(404).json({ error: 'Piece unavailable' });
     console.error('[QL Piece history]', error?.message || error);
@@ -1921,6 +1921,22 @@ function glazeClayTestMediaContract(test) {
   test.photoDelivery = test.photo_filename ? 'owner-protected' : 'legacy-ambiguous';
   test.photoVisibility = 'legacy-ambiguous';
   return test;
+}
+function testTileMediaContract(tile) {
+  if (!tile) return tile;
+  const fields = ['photo_filename', 'photo_filename2', 'photo_filename3'];
+  fields.forEach((field, index) => {
+    const suffix = index === 0 ? '' : String(index + 1);
+    tile['photoDelivery' + suffix] = tile[field] ? 'owner-protected' : 'legacy-ambiguous';
+    tile['photoVisibility' + suffix] = 'legacy-ambiguous';
+  });
+  return tile;
+}
+function protectPieceHistoryTestTileMedia(history) {
+  if (!history) return history;
+  for (const entry of history.testTiles || []) if (entry?.values) testTileMediaContract(entry.values);
+  for (const entry of history.history || []) if (entry?.recordType === 'test-tile' && entry.values) testTileMediaContract(entry.values);
+  return history;
 }
 app.get('/api/ql/glazes/:glazeId/photos/:photoId', auth, (req, res) => {
   res.set('Cache-Control', 'private, no-store');
@@ -6427,7 +6443,7 @@ app.get('/api/test-tiles', auth, requireTier('starter'), (req, res) => {
     WHERE tt.user_id = ?
     ORDER BY tt.created_at DESC
   `).all(req.userId);
-  res.json(tiles);
+  res.json(tiles.map(testTileMediaContract));
 });
 
 // GET single test tile
@@ -6440,7 +6456,34 @@ app.get('/api/test-tiles/:id', auth, requireTier('starter'), (req, res) => {
     WHERE tt.id = ? AND tt.user_id = ?
   `).get(req.params.id, req.userId);
   if (!tile) return res.status(404).json({ error: 'Test tile not found' });
-  res.json(tile);
+  res.json(testTileMediaContract(tile));
+});
+
+// Protected Test Tile photo delivery. Slot is 1..3 and maps exactly to the stored field.
+app.get('/api/ql/test-tiles/:tileId/photos/:slot', auth, requireTier('starter'), (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const slot = Number(req.params.slot);
+    if (![1, 2, 3].includes(slot)) return unavailable();
+    const field = slot === 1 ? 'photo_filename' : `photo_filename${slot}`;
+    const tile = db.prepare('SELECT * FROM test_tiles WHERE id=? AND user_id=?').get(req.params.tileId, req.userId);
+    const filename = tile?.[field];
+    if (!filename) return unavailable();
+    const target = safeStoredUpload(filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(filename)) return unavailable();
+    const owned = ownedPhotoSlots(filename, req.userId);
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(filename);
+        if (rows.some(row => !owned.some(ref => ref.table === table && ref.column === column && ref.id === row.id))) return unavailable();
+      }
+    }
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
 });
 
 // CREATE test tile
@@ -6501,22 +6544,31 @@ app.put('/api/test-tiles/:id', auth, requireTier('starter'), upload.array('photo
   const removedExistingPhotos = originalSlots.filter((filename, index) => filename && removeFlags[index] === 'true');
   removedExistingPhotos.forEach(filename => photosToDelete.push(filename));
 
-  let orderedPhotos = originalPhotos.filter(filename => !removedExistingPhotos.includes(filename));
+  // Preserve slot identity even when two slots reference the same filename.
+  const remainingEntries = originalSlots
+    .map((filename, index) => ({ filename, index }))
+    .filter(entry => entry.filename && removeFlags[entry.index] !== 'true');
+  let orderedEntries = [...remainingEntries];
   if (photo_order) {
     try {
       const requestedOrder = JSON.parse(photo_order);
       if (Array.isArray(requestedOrder)) {
-        orderedPhotos = requestedOrder.filter(filename => orderedPhotos.includes(filename));
-        orderedPhotos.push(...originalPhotos.filter(filename => !removedExistingPhotos.includes(filename) && !orderedPhotos.includes(filename)));
+        const pool = [...remainingEntries];
+        const requested = [];
+        for (const filename of requestedOrder) {
+          const match = pool.findIndex(entry => entry.filename === filename);
+          if (match >= 0) requested.push(pool.splice(match, 1)[0]);
+        }
+        orderedEntries = [...requested, ...pool];
       }
     } catch (error) {
-      // Keep the existing order if an older or malformed client sends no usable order.
+      // Keep exact surviving slot order if an older or malformed client sends no usable order.
     }
   }
 
-  let photo_filename = orderedPhotos[0] || null;
-  let photo_filename2 = orderedPhotos[1] || null;
-  let photo_filename3 = orderedPhotos[2] || null;
+  let photo_filename = orderedEntries[0]?.filename || null;
+  let photo_filename2 = orderedEntries[1]?.filename || null;
+  let photo_filename3 = orderedEntries[2]?.filename || null;
 
   // Handle new photo uploads (fill empty slots)
   let photoIdx = 0;
@@ -6568,13 +6620,13 @@ app.delete('/api/test-tiles/:id', auth, requireTier('starter'), (req, res) => {
 // GET test tiles filtered by glaze
 app.get('/api/glazes/:id/test-tiles', auth, requireTier('starter'), (req, res) => {
   const tiles = db.prepare('SELECT * FROM test_tiles WHERE glaze_id=? AND user_id=? ORDER BY created_at DESC').all(req.params.id, req.userId);
-  res.json(tiles);
+  res.json(tiles.map(testTileMediaContract));
 });
 
 // GET test tiles filtered by clay body
 app.get('/api/clay-bodies/:id/test-tiles', auth, requireTier('starter'), (req, res) => {
   const tiles = db.prepare('SELECT * FROM test_tiles WHERE clay_body_id=? AND user_id=? ORDER BY created_at DESC').all(req.params.id, req.userId);
-  res.json(tiles);
+  res.json(tiles.map(testTileMediaContract));
 });
 
 // Free tier: can see that the feature exists but gets upgrade prompt
