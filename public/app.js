@@ -420,6 +420,9 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     });
     dbg('Got response, saving token...');
     if (isSignUp && referredBy) sessionStorage.removeItem('referral_code');
+    // A successful auth response may replace an existing session without an explicit logout.
+    // Clear any private History DOM/blob URLs before installing the new account token.
+    clearPieceHistory();
     token = data.token;
     localStorage.setItem('mudlog_token', token);
     currentUser = data.user;
@@ -767,6 +770,8 @@ function renderPieceHistory(container, data) {
       item.append(historyElement('div', dateLabel, 'text-sm piece-history-date'));
       if (e.recordType === 'piece-photo') {
         const placeholder = historyElement('div', 'Loading photo…', 'text-sm');
+        placeholder.setAttribute('role', 'status');
+        placeholder.setAttribute('aria-live', 'polite');
         placeholder.dataset.historyPhoto = e.sourceRecordId;
         item.append(placeholder);
       }
@@ -796,7 +801,8 @@ async function loadPieceHistory(id, container, generation, sessionToken) {
         const url = URL.createObjectURL(blob);
         pieceHistoryUrls.push(url);
         const img = historyElement('img', null, 'piece-history-photo');
-        img.alt = placeholder.parentElement.querySelector('strong').textContent;
+        const photoLabel = placeholder.parentElement.querySelector('strong')?.textContent || '';
+        img.alt = photoLabel && photoLabel !== 'Piece photo' ? 'Piece photo — ' + photoLabel : 'Piece photo';
         img.onerror = () => { if (active()) placeholder.textContent = 'Photo unavailable'; };
         img.src = url;
         placeholder.replaceChildren(img);
@@ -804,12 +810,16 @@ async function loadPieceHistory(id, container, generation, sessionToken) {
     }));
   } catch (_) {
     if (!active()) return;
-    container.replaceChildren(historyElement('h2', 'Connected History'), historyElement('p', 'History could not be loaded. Your piece details are still available.'));
+    const failure = historyElement('p', 'History could not be loaded. Your piece details are still available.');
+    failure.setAttribute('role', 'alert');
+    container.replaceChildren(historyElement('h2', 'Connected History'), failure);
     container.setAttribute('aria-busy', 'false');
     const retry = historyElement('button', 'Try again', 'btn btn-secondary btn-sm');
     retry.type = 'button';
     retry.onclick = () => {
-      container.replaceChildren(historyElement('h2', 'Connected History'), historyElement('p', 'Loading connected history…'));
+      const loading = historyElement('p', 'Loading connected history…');
+      loading.setAttribute('role', 'status');
+      container.replaceChildren(historyElement('h2', 'Connected History'), loading);
       container.setAttribute('aria-busy', 'true');
       loadPieceHistory(id, container, generation, sessionToken);
     };
@@ -899,9 +909,10 @@ async function viewPiece(id) {
     const history = historyElement('section', null, 'card piece-history');
     history.id = 'pieceHistory';
     history.setAttribute('aria-label', 'Connected History');
-    history.setAttribute('aria-live', 'polite');
     history.setAttribute('aria-busy', 'true');
-    history.append(historyElement('h2', 'Connected History'), historyElement('p', 'Loading connected history…'));
+    const loading = historyElement('p', 'Loading connected history…');
+    loading.setAttribute('role', 'status');
+    history.append(historyElement('h2', 'Connected History'), loading);
     document.getElementById('pieceDetailContent').append(history);
     void loadPieceHistory(p.id, history, generation, sessionToken);
   } catch (err) { toast(err.message, 'error'); }
