@@ -27,9 +27,10 @@ for (const [args, extraEnv] of [
   [['--test', 'tests/ql-piece-history.cjs'], {}],
   [['tests/ql-piece-history-api.cjs'], {}],
   [['--test', 'tests/ql-piece-history-dom.cjs'], {}],
-  [['tests/ql-piece-history-web-api.cjs'], {}]
+  [['tests/ql-piece-history-web-api.cjs'], {}],
+  [['tests/ql-piece-history-browser.cjs'], {}]
 ]) {
   const result = spawnSync(process.execPath, args, { cwd: root, env: { ...cleanEnv, ...extraEnv }, stdio: 'inherit' });
   if (result.status !== 0) process.exit(result.status || 1);
 }
-console.log('PASS Phase 1 regressions/readiness unchanged plus Phase 2A service/API and Phase 2B website History');
+console.log('PASS Phase 1 regressions/readiness unchanged plus Phase 2A/2B and Phase 2C History validation');
