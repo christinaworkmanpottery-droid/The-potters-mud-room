@@ -2109,6 +2109,7 @@ app.get('/api/pieces', auth, (req, res) => {
   pieces.forEach(p => {
     p.glazes = getGl.all(p.id, req.userId);
     p.photos = getPh.all(p.id);
+    p.photoVisibility = classifyPiecePhotoVisibility(p);
     // Clean up legacy data: if studio was used to store clay body text, suppress it
     if (p.studio && p.clay_body_name && p.studio.toLowerCase() === p.clay_body_name.toLowerCase()) {
       p.studio = null;
