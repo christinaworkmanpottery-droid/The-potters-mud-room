@@ -1910,12 +1910,41 @@ app.put('/api/clay-bodies/:id/stock', auth, (req, res) => {
 });
 
 // ============ GLAZES ============
+// Library photos only; glaze_clay_tests deliberately excluded. No Glaze public flag.
+function glazeMediaContract(glaze) {
+  glaze.photoDelivery = glaze.user_id ? 'owner-protected' : 'legacy-ambiguous';
+  glaze.photoVisibility = 'legacy-ambiguous';
+  return glaze;
+}
+app.get('/api/ql/glazes/:glazeId/photos/:photoId', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const photo = db.prepare(`SELECT ph.* FROM glaze_photos ph JOIN glazes c ON c.id=ph.glaze_id
+      WHERE ph.id=? AND c.id=? AND c.user_id=?`).get(req.params.photoId, req.params.glazeId, req.userId);
+    if (!photo) return unavailable();
+    const target = safeStoredUpload(photo.filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(photo.filename)) return unavailable();
+    const owned = ownedPhotoSlots(photo.filename, req.userId);
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(photo.filename);
+        if (rows.some(row => !owned.some(slot => slot.table === table && slot.column === column && slot.id === row.id))) return unavailable();
+      }
+    }
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
+
 app.get('/api/glazes', auth, (req, res) => {
   const glazes = db.prepare('SELECT * FROM glazes WHERE user_id=? ORDER BY name').all(req.userId);
   const getIng = db.prepare('SELECT * FROM glaze_ingredients WHERE glaze_id=? ORDER BY sort_order');
   const getPhotos = db.prepare('SELECT * FROM glaze_photos WHERE glaze_id=? ORDER BY sort_order');
   const getClayTests = db.prepare('SELECT * FROM glaze_clay_tests WHERE glaze_id=? ORDER BY created_at DESC');
-  glazes.forEach(g => { if (g.glaze_type === 'recipe') g.ingredients = getIng.all(g.id); g.photos = getPhotos.all(g.id); g.clay_tests = getClayTests.all(g.id); });
+  glazes.forEach(g => { if (g.glaze_type === 'recipe') g.ingredients = getIng.all(g.id); g.photos = getPhotos.all(g.id); glazeMediaContract(g); g.clay_tests = getClayTests.all(g.id); });
   res.json(glazes);
 });
 
@@ -1956,14 +1985,34 @@ app.delete('/api/glazes/:id', auth, (req, res) => {
 
 app.post('/api/glazes/:id/photos', auth, upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo' });
-  const glaze = db.prepare('SELECT id FROM glazes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
-  if (!glaze) { try { fs.unlinkSync(req.file.path); } catch (e) {} return res.status(404).json({ error: 'Glaze not found' }); }
-  const maxPhotos = (req.userTier === 'free') ? 1 : 3;
-  const count = db.prepare('SELECT COUNT(*) as c FROM glaze_photos WHERE glaze_id=?').get(req.params.id).c;
-  if (count >= maxPhotos) { try { fs.unlinkSync(req.file.path); } catch (e) {} return res.status(403).json({ error: req.userTier === 'free' ? 'Free tier allows 1 photo per glaze. Upgrade to add up to 3!' : 'Max 3 photos per glaze' }); }
-  const id = uuidv4();
-  db.prepare('INSERT INTO glaze_photos (id,glaze_id,filename,original_name,photo_label,notes,sort_order) VALUES (?,?,?,?,?,?,?)').run(id, req.params.id, req.file.filename, req.file.originalname, req.body.label||null, req.body.notes||null, count);
-  res.json({ id, filename: req.file.filename });
+  try {
+    const result = db.transaction(() => {
+      if (!db.prepare('SELECT 1 FROM glazes WHERE id=? AND user_id=?').get(req.params.id, req.userId)) return null;
+      const existing = db.prepare('SELECT * FROM glaze_photos WHERE glaze_id=? ORDER BY sort_order').all(req.params.id);
+      const target = req.body.replacePhotoId ? existing.find(photo => photo.id === req.body.replacePhotoId) : null;
+      if (req.body.replacePhotoId && !target) return null;
+      const maxPhotos = req.userTier === 'free' ? 1 : 3;
+      if (!target && existing.length >= maxPhotos) return { limit: true };
+      const id = target ? target.id : uuidv4();
+      if (target) {
+        db.prepare('UPDATE glaze_photos SET filename=?,original_name=? WHERE id=? AND glaze_id=?')
+          .run(req.file.filename, req.file.originalname, id, req.params.id);
+      } else {
+        db.prepare('INSERT INTO glaze_photos (id,glaze_id,filename,original_name,photo_label,notes,sort_order) VALUES (?,?,?,?,?,?,?)')
+          .run(id, req.params.id, req.file.filename, req.file.originalname, req.body.label||null, req.body.notes||null, existing.length);
+      }
+      return { id, files: target ? [target.filename] : [] };
+    }).immediate();
+    if (!result || result.limit) {
+      deletionLifecycle.cleanupFiles([req.file.filename]);
+      return res.status(result ? 403 : 404).json({ error: result ? (req.userTier === 'free' ? 'Free tier allows 1 photo per glaze. Upgrade to add up to 3!' : 'Max 3 photos per glaze') : 'Not found' });
+    }
+    deletionLifecycle.cleanupFiles(result.files);
+    res.json({ id: result.id, filename: req.file.filename });
+  } catch (_) {
+    deletionLifecycle.cleanupFiles([req.file.filename]);
+    res.status(500).json({ error: 'Could not save glaze photo.' });
+  }
 });
 
 app.put('/api/glazes/:id/photos/reorder', auth, (req, res) => {
@@ -1972,7 +2021,7 @@ app.put('/api/glazes/:id/photos/reorder', auth, (req, res) => {
   const glaze = db.prepare('SELECT id FROM glazes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!glaze) return res.status(404).json({ error: 'Glaze not found' });
   const owned = db.prepare('SELECT id FROM glaze_photos WHERE glaze_id=?').all(req.params.id).map(row => row.id);
-  if (photoIds.length !== owned.length || photoIds.some(id => !owned.includes(id))) return res.status(400).json({ error: 'Invalid glaze photo order.' });
+  if (new Set(photoIds).size !== photoIds.length || photoIds.length !== owned.length || photoIds.some(id => !owned.includes(id))) return res.status(400).json({ error: 'Invalid glaze photo order.' });
   const update = db.prepare('UPDATE glaze_photos SET sort_order=? WHERE id=? AND glaze_id=?');
   db.transaction(() => photoIds.forEach((photoId, index) => update.run(index, photoId, req.params.id)))();
   res.json({ success: true });

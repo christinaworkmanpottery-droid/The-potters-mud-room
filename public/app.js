@@ -201,7 +201,7 @@ const STATUS_LABELS = { 'in-progress':'In Progress','leather-hard':'Leather Hard
 const CASUALTY_LABELS = { 'cracked':'Cracked','exploded':'Exploded / Blowout','warped':'Warped','s-crack':'S-Crack','glaze-crawl':'Glaze Crawl','glaze-pinhole':'Glaze Pinholing','glaze-shiver':'Glaze Shivering','glaze-crazing':'Glaze Crazing','glaze-runoff':'Glaze Ran Off','thermal-shock':'Thermal Shock','broke-trimming':'Broke While Trimming','broke-handling':'Broke While Handling','collapsed':'Collapsed','dunting':'Dunting','wrong-color':'Unexpected Color Result','other':'Other' };
 function fmtStatus(s) { return s ? '<span class="status-badge status-' + s + '">' + (STATUS_LABELS[s]||s) + '</span>' : ''; }
 function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { if (id === 'clayViewModal') clearClayMedia('clayViewBody'); document.getElementById(id).classList.remove('open'); }
+function closeModal(id) { if (id === 'glazeViewModal') clearGlazeMedia('glazeViewBody'); if (id === 'clayViewModal') clearClayMedia('clayViewBody'); document.getElementById(id).classList.remove('open'); }
 
 // iOS decimal keyboards have no native Done key. Give every numeric field a
 // consistent way to dismiss the keyboard so form buttons remain reachable.
@@ -423,6 +423,7 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     // A successful auth response may replace an existing session without an explicit logout.
     // Clear any private History DOM/blob URLs before installing the new account token.
     clearClayMedia();
+    clearGlazeMedia();
     clearPieceHistory();
     token = data.token;
     localStorage.setItem('mudlog_token', token);
@@ -440,6 +441,7 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
 });
 function logout() {
   clearClayMedia();
+  clearGlazeMedia();
   clearPieceHistory();
   token = null; currentUser = null;
   localStorage.removeItem('mudlog_token');
@@ -515,6 +517,7 @@ function showApp() {
 let currentPage = 'dashboard';
 let restoredUrl = '';
 function navigate(page, options = {}) {
+  if (page !== 'glazes') { clearGlazeMedia('glazeList'); clearGlazeMedia('glazeViewBody'); }
   if (page !== 'clayBodies') { clearClayMedia('clayList'); clearClayMedia('clayViewBody'); }
   if (page !== 'pieceDetail') clearPieceHistory();
   try {
@@ -1429,13 +1432,66 @@ async function deleteClay(id) {
 }
 
 // ---- Glazes ----
+let glazeMediaGeneration = 0;
+const glazeMediaViews = new Map();
+function clearGlazeMedia(scope) {
+  if (!scope) glazeMediaGeneration++;
+  const lightbox = document.getElementById('lightboxImg');
+  for (const [key, view] of glazeMediaViews) {
+    if (scope && key !== scope) continue;
+    view.active = false;
+    view.controller.abort();
+    if (view.urls.includes(lightbox?.src)) { lightbox.removeAttribute('src'); closeLightbox(); }
+    view.urls.forEach(url => URL.revokeObjectURL(url));
+    view.images.forEach(img => { img.removeAttribute('src'); img.dataset.protectedReady = '0'; });
+    glazeMediaViews.delete(key);
+  }
+  if (!scope) {
+    glazes = [];
+    ['glazeList', 'glazeViewBody'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+    document.getElementById('glazeViewModal')?.classList.remove('open');
+  }
+}
+function glazePhotoMarkup(glaze, photo, style = '') {
+  const protectedPhoto = glaze.photoDelivery === 'owner-protected';
+  const attrs = protectedPhoto
+    ? 'data-private-glaze-photo="' + esc(photo.id) + '" data-glaze-id="' + esc(glaze.id) + '" data-protected-ready="0"'
+    : 'src="/uploads/' + encodeURIComponent(photo.filename) + '"';
+  return '<img ' + attrs + ' class="glaze-thumb" alt="Glaze photo" style="' + style + '" onclick="event.stopPropagation();if(this.src)openLightbox(this.src)">';
+}
+async function loadGlazeMedia(scope) {
+  clearGlazeMedia(scope);
+  const root = document.getElementById(scope);
+  if (!root) return;
+  const generation = glazeMediaGeneration, sessionToken = token;
+  const view = { active: true, controller: new AbortController(), urls: [], images: [...root.querySelectorAll('[data-private-glaze-photo]')] };
+  glazeMediaViews.set(scope, view);
+  const active = img => view.active && generation === glazeMediaGeneration && token === sessionToken && img.isConnected;
+  await Promise.all(view.images.map(async img => {
+    try {
+      const response = await fetch(API + '/api/ql/glazes/' + encodeURIComponent(img.dataset.glazeId) + '/photos/' + encodeURIComponent(img.dataset.privateGlazePhoto), {
+        headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store', signal: view.controller.signal
+      });
+      if (!response.ok) throw new Error('Photo unavailable');
+      const blob = await response.blob();
+      if (!active(img)) return;
+      const url = URL.createObjectURL(blob);
+      view.urls.push(url);
+      img.src = url;
+      img.dataset.protectedReady = '1';
+      img.onerror = () => { img.removeAttribute('src'); img.alt = 'Photo unavailable'; };
+    } catch (_) { if (active(img)) { img.removeAttribute('src'); img.alt = 'Photo unavailable'; } }
+  }));
+}
+
+
 const RECIPE_STATUS_LABELS = {'not-tested':'Not Tested','testing':'Testing','production':'Production','retired':'Retired','archived':'Archived'};
 const STOCK_STATUS_LABELS = {'in-stock':'In Stock','need-to-buy':'Need to Buy','low-stock':'Low Stock','discontinued':'Discontinued'};
 
 function glazeCardView(g) {
   const photos = (g.photos||[]).map(p =>
     '<div style="position:relative;display:inline-block">' +
-    '<img src="/uploads/' + p.filename + '" class="glaze-thumb" loading="lazy" onclick="openLightbox(\'/uploads/' + p.filename + '\')" style="cursor:zoom-in">' +
+    glazePhotoMarkup(g, p, 'cursor:zoom-in') +
     (p.photo_label ? '<div style="font-size:0.65rem;color:var(--text-muted);text-align:center">' + esc(p.photo_label) + '</div>' : '') +
     (p.notes ? '<div style="font-size:0.6rem;color:var(--text-light)">' + esc(p.notes) + '</div>' : '') +
     '<button class="btn-ghost btn-sm" style="position:absolute;top:0;right:0;font-size:0.7rem" onclick="event.stopPropagation();deleteGlazePhoto(\'' + p.id + '\')">×</button></div>'
@@ -1524,7 +1580,10 @@ function glazeListView(g) {
 }
 async function loadGlazes() {
   try {
-    glazes = await api('/api/glazes');
+    const generation = glazeMediaGeneration, sessionToken = token;
+    const records = await api('/api/glazes');
+    if (generation !== glazeMediaGeneration || sessionToken !== token) return;
+    glazes = records;
     if (currentPage !== 'glazes') return;
     const c = document.getElementById('glazeList'), em = document.getElementById('glazeEmpty');
     
@@ -1532,11 +1591,13 @@ async function loadGlazes() {
     const bulkControls = document.getElementById('bulkControlsGlazes');
     if (bulkControls) bulkControls.innerHTML = renderBulkSelectionControls('glazes', 'glaze');
     
+    clearGlazeMedia('glazeList');
     if (!glazes.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
     const mode = getViewMode('glazes');
     c.className = mode === 'list' ? '' : 'card-grid';
     c.innerHTML = glazes.map(g => mode === 'list' ? glazeListView(g) : glazeCardView(g)).join('');
+    loadGlazeMedia('glazeList');
     updateBulkSelectionUI('glazes');
   } catch(e) { toast(e.message,'error'); }
 }
@@ -1546,7 +1607,7 @@ function viewGlazeById(id) { const g = glazes.find(x=>x.id===id); if(g) openGlaz
 function openGlazeViewModal(g) {
   const photos = (g.photos||[]).map(p =>
     '<div style="display:inline-block;margin-right:8px;text-align:center">' +
-    '<img src="/uploads/' + p.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')"><br>' +
+    glazePhotoMarkup(g, p, 'width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in') + '<br>' +
     (p.photo_label ? '<span style="font-size:0.7rem;color:var(--text-muted)">' + esc(p.photo_label) + '</span>' : '') +
     (p.notes ? '<br><span style="font-size:0.65rem;color:var(--text-light)">' + esc(p.notes) + '</span>' : '') +
     '</div>'
@@ -1586,6 +1647,7 @@ function openGlazeViewModal(g) {
   document.getElementById('glazeViewEditBtn').onclick = () => { closeModal('glazeViewModal'); editGlazeById(g.id); };
   document.getElementById('glazeViewPhotoBtn').onclick = () => { closeModal('glazeViewModal'); openGlazePhotoUpload(g.id); };
   openModal('glazeViewModal');
+  loadGlazeMedia('glazeViewBody');
 }
 function openGlazeModal(g) {
   document.getElementById('glazeId').value = g?.id||'';
