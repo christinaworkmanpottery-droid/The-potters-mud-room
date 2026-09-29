@@ -1,8 +1,10 @@
 # Phase 1A relationship contract — September 29, 2026
 
-Phase 1B lifecycle update: see `CHECKPOINT.md`. The schema/helper contract below remains intact;
+Phase 1B/1C lifecycle update: see `CHECKPOINT.md`. The schema/helper contract below remains intact;
 the final Phase 1B proposal below is historical and has now been completed. Piece deletion retains
-all firing history, including legacy and last-association firings. Runtime deletion guards are now
+all firing history, including legacy and last-association firings. Clay/Glaze/Tile deletion now
+preserves independent history, detaches same-owner references and checks shared files after commit.
+Glaze layers survive as manual entries; see the current checkpoint for old-schema rejection. Runtime deletion guards are now
 wired on the isolated branch only; migrations remain explicitly opt-in and nothing is deployed.
 
 Website baseline: `70c852d366e5ef193a1b3d882964e85628afa800`. Reviewed mobile QL tree

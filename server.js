@@ -1691,44 +1691,46 @@ app.put('/api/clay-bodies/:id', auth, (req, res) => {
 });
 
 app.delete('/api/clay-bodies/:id', auth, (req, res) => {
-  // Delete clay photos files
-  const photos = db.prepare('SELECT filename FROM clay_photos WHERE clay_id=?').all(req.params.id);
-  photos.forEach(p => { const f = path.join(UPLOADS_DIR, p.filename); if (fs.existsSync(f)) fs.unlinkSync(f); });
-  db.prepare('DELETE FROM clay_photos WHERE clay_id=?').run(req.params.id);
-  const r = db.prepare('DELETE FROM clay_bodies WHERE id=? AND user_id=?').run(req.params.id, req.userId);
-  if (r.changes === 0) return res.status(404).json({ error: 'Not found' });
-  res.json({ success: true });
+  try {
+    if (!deletionLifecycle.deleteStudioRecord(req.userId, req.params.id, 'clay')) return res.status(404).json({ error: 'Not found' });
+    res.json({ success: true });
+  } catch (error) { res.status(error.status || 500).json({ error: error.message }); }
 });
 
 // Clay photo upload (replaces existing photo if at max, so edits always persist)
 app.post('/api/clay-bodies/:id/photos', auth, upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo' });
-  const maxPhotos = (req.userTier === 'free') ? 1 : 3;
-  const existing = db.prepare('SELECT * FROM clay_photos WHERE clay_id=? ORDER BY sort_order').all(req.params.id);
-  // An edit explicitly replaces the current Clay photo. New Clay photos and
-  // additional paid-tier photos retain the existing max-photo behavior.
-  if (req.body.replace === 'true' || existing.length >= maxPhotos) {
-    const photosToDelete = req.body.replace === 'true' ? existing : [existing[0]];
-    photosToDelete.forEach(photo => {
-      const oldFile = path.join(UPLOADS_DIR, photo.filename);
-      if (fs.existsSync(oldFile)) fs.unlinkSync(oldFile);
-      db.prepare('DELETE FROM clay_photos WHERE id=?').run(photo.id);
-    });
+  try {
+    const result = db.transaction(() => {
+      if (!db.prepare('SELECT 1 FROM clay_bodies WHERE id=? AND user_id=?').get(req.params.id, req.userId)) return null;
+      const maxPhotos = req.userTier === 'free' ? 1 : 3;
+      const existing = db.prepare('SELECT * FROM clay_photos WHERE clay_id=? ORDER BY sort_order').all(req.params.id);
+      const removed = req.body.replace === 'true' ? existing : existing.length >= maxPhotos ? [existing[0]] : [];
+      for (const photo of removed) db.prepare('DELETE FROM clay_photos WHERE id=?').run(photo.id);
+      const count = db.prepare('SELECT COUNT(*) as c FROM clay_photos WHERE clay_id=?').get(req.params.id).c;
+      const id = uuidv4();
+      db.prepare('INSERT INTO clay_photos (id,clay_id,filename,original_name,photo_label,notes,sort_order) VALUES (?,?,?,?,?,?,?)')
+        .run(id, req.params.id, req.file.filename, req.file.originalname, req.body.label||null, req.body.notes||null, count);
+      return { id, files: removed.map(p => p.filename) };
+    }).immediate();
+    if (!result) {
+      deletionLifecycle.cleanupFiles([req.file.filename]);
+      return res.status(404).json({ error: 'Not found' });
+    }
+    deletionLifecycle.cleanupFiles(result.files);
+    res.json({ id: result.id, filename: req.file.filename });
+  } catch (error) {
+    deletionLifecycle.cleanupFiles([req.file.filename]);
+    res.status(500).json({ error: 'Could not save clay photo. Existing photos were not changed.' });
   }
-  const count = db.prepare('SELECT COUNT(*) as c FROM clay_photos WHERE clay_id=?').get(req.params.id).c;
-  const id = uuidv4();
-  const insertResult = db.prepare('INSERT INTO clay_photos (id,clay_id,filename,original_name,photo_label,notes,sort_order) VALUES (?,?,?,?,?,?,?)')
-    .run(id, req.params.id, req.file.filename, req.file.originalname, req.body.label||null, req.body.notes||null, count);
-  res.json({ id, filename: req.file.filename });
 });
 
 // Clay photo delete
 app.delete('/api/clay-photos/:id', auth, (req, res) => {
-  const ph = db.prepare('SELECT cp.* FROM clay_photos cp JOIN clay_bodies cb ON cp.clay_id=cb.id WHERE cp.id=? AND cb.user_id=?').get(req.params.id, req.userId);
-  if (!ph) return res.status(404).json({ error: 'Not found' });
-  const f = path.join(UPLOADS_DIR, ph.filename); if (fs.existsSync(f)) fs.unlinkSync(f);
-  db.prepare('DELETE FROM clay_photos WHERE id=?').run(req.params.id);
-  res.json({ success: true });
+  try {
+    if (!deletionLifecycle.deletePhoto(req.userId, req.params.id, 'clay')) return res.status(404).json({ error: 'Not found' });
+    res.json({ success: true });
+  } catch (error) { res.status(error.status || 500).json({ error: error.message }); }
 });
 
 // Clay stock toggle
@@ -1777,12 +1779,10 @@ app.put('/api/glazes/:id', auth, (req, res) => {
 });
 
 app.delete('/api/glazes/:id', auth, (req, res) => {
-  const glaze = db.prepare('SELECT id FROM glazes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
-  if (!glaze) return res.status(404).json({ error: 'Not found' });
-  db.prepare('DELETE FROM glaze_ingredients WHERE glaze_id=?').run(req.params.id);
-  db.prepare('DELETE FROM glaze_photos WHERE glaze_id=?').run(req.params.id);
-  db.prepare('DELETE FROM glazes WHERE id=? AND user_id=?').run(req.params.id, req.userId);
-  res.json({ success: true });
+  try {
+    if (!deletionLifecycle.deleteStudioRecord(req.userId, req.params.id, 'glaze')) return res.status(404).json({ error: 'Not found' });
+    res.json({ success: true });
+  } catch (error) { res.status(error.status || 500).json({ error: error.message }); }
 });
 
 app.post('/api/glazes/:id/photos', auth, upload.single('photo'), (req, res) => {
@@ -1811,11 +1811,10 @@ app.put('/api/glazes/:id/photos/reorder', auth, (req, res) => {
 
 // Glaze photo delete
 app.delete('/api/glaze-photos/:id', auth, (req, res) => {
-  const ph = db.prepare('SELECT gp.* FROM glaze_photos gp JOIN glazes g ON gp.glaze_id=g.id WHERE gp.id=? AND g.user_id=?').get(req.params.id, req.userId);
-  if (!ph) return res.status(404).json({ error: 'Not found' });
-  const f = path.join(UPLOADS_DIR, ph.filename); if (fs.existsSync(f)) fs.unlinkSync(f);
-  db.prepare('DELETE FROM glaze_photos WHERE id=?').run(req.params.id);
-  res.json({ success: true });
+  try {
+    if (!deletionLifecycle.deletePhoto(req.userId, req.params.id, 'glaze')) return res.status(404).json({ error: 'Not found' });
+    res.json({ success: true });
+  } catch (error) { res.status(error.status || 500).json({ error: error.message }); }
 });
 
 // Glaze stock toggle
@@ -1854,16 +1853,12 @@ app.post('/api/glazes/:id/clay-tests', auth, upload.single('photo'), (req, res) 
 });
 
 app.delete('/api/glazes/:id/clay-tests/:testId', auth, (req, res) => {
-  const glaze = db.prepare('SELECT id FROM glazes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
-  if (!glaze) return res.status(404).json({ error: 'Glaze not found' });
-  const test = db.prepare('SELECT photo_filename FROM glaze_clay_tests WHERE id=? AND glaze_id=?').get(req.params.testId, req.params.id);
-  if (!test) return res.status(404).json({ error: 'Test not found' });
-  if (test.photo_filename) {
-    const f = path.join(UPLOADS_DIR, test.photo_filename);
-    if (fs.existsSync(f)) fs.unlinkSync(f);
-  }
-  db.prepare('DELETE FROM glaze_clay_tests WHERE id=?').run(req.params.testId);
-  res.json({ success: true });
+  try {
+    const glaze = db.prepare('SELECT id FROM glazes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+    if (!glaze) return res.status(404).json({ error: 'Glaze not found' });
+    if (!deletionLifecycle.deleteClayTest(req.userId, req.params.id, req.params.testId)) return res.status(404).json({ error: 'Test not found' });
+    res.json({ success: true });
+  } catch (error) { res.status(error.status || 500).json({ error: error.message }); }
 });
 
 // Shopping list — all out-of-stock clays and glazes + custom items
@@ -2269,35 +2264,13 @@ app.post('/api/bulk-delete', auth, (req, res) => {
             break;
 
           case 'clay-bodies':
-            // Reuse clay deletion logic
-            const clayPhotos = db.prepare('SELECT filename FROM clay_photos WHERE clay_id=?').all(id);
-            clayPhotos.forEach(p => { const f = path.join(UPLOADS_DIR, p.filename); if (fs.existsSync(f)) fs.unlinkSync(f); });
-            db.prepare('DELETE FROM clay_photos WHERE clay_id=?').run(id);
-            const cr = db.prepare('DELETE FROM clay_bodies WHERE id=? AND user_id=?').run(id, req.userId);
-            if (cr.changes > 0) deleted++;
+            deleted += deletionLifecycle.deleteStudioRecord(req.userId, id, 'clay');
             break;
-
           case 'glazes':
-            // Reuse glaze deletion logic
-            db.prepare('DELETE FROM glaze_ingredients WHERE glaze_id=?').run(id);
-            db.prepare('DELETE FROM glaze_photos WHERE glaze_id=?').run(id);
-            const gr = db.prepare('DELETE FROM glazes WHERE id=? AND user_id=?').run(id, req.userId);
-            if (gr.changes > 0) deleted++;
+            deleted += deletionLifecycle.deleteStudioRecord(req.userId, id, 'glaze');
             break;
-
           case 'test-tiles':
-            // Reuse test tile deletion logic (requires tier check)
-            const tile = db.prepare('SELECT * FROM test_tiles WHERE id=? AND user_id=?').get(id, req.userId);
-            if (tile) {
-              [tile.photo_filename, tile.photo_filename2, tile.photo_filename3].forEach(f => {
-                if (f) {
-                  const fp = path.join(UPLOADS_DIR, f);
-                  if (fs.existsSync(fp)) fs.unlinkSync(fp);
-                }
-              });
-              db.prepare('DELETE FROM test_tiles WHERE id=?').run(id);
-              deleted++;
-            }
+            deleted += deletionLifecycle.deleteStudioRecord(req.userId, id, 'testTile');
             break;
 
           case 'firing-logs':
@@ -6256,7 +6229,7 @@ app.put('/api/test-tiles/:id', auth, requireTier('starter'), upload.array('photo
   const originalPhotos = originalSlots.filter(Boolean);
   const removeFlags = [remove_photo, remove_photo2, remove_photo3];
   const removedExistingPhotos = originalSlots.filter((filename, index) => filename && removeFlags[index] === 'true');
-  removedExistingPhotos.forEach(filename => photosToDelete.push(path.join(UPLOADS_DIR, filename)));
+  removedExistingPhotos.forEach(filename => photosToDelete.push(filename));
 
   let orderedPhotos = originalPhotos.filter(filename => !removedExistingPhotos.includes(filename));
   if (photo_order) {
@@ -6310,28 +6283,17 @@ app.put('/api/test-tiles/:id', auth, requireTier('starter'), upload.array('photo
     return res.status(500).json({ error: 'Could not update test tile. Your existing tile was not changed.' });
   }
 
-  photosToDelete.forEach(photoPath => {
-    if (fs.existsSync(photoPath)) fs.unlinkSync(photoPath);
-  });
+  deletionLifecycle.cleanupFiles(photosToDelete);
   console.log('[Test Tiles] Updated', { userId: req.userId, tileId: req.params.id, photoCount: photos.length });
   res.json({ success: true });
 });
 
 // DELETE test tile
 app.delete('/api/test-tiles/:id', auth, requireTier('starter'), (req, res) => {
-  const tile = db.prepare('SELECT * FROM test_tiles WHERE id=? AND user_id=?').get(req.params.id, req.userId);
-  if (!tile) return res.status(404).json({ error: 'Test tile not found' });
-  
-  // Clean up photos
-  [tile.photo_filename, tile.photo_filename2, tile.photo_filename3].forEach(f => {
-    if (f) {
-      const fp = path.join(UPLOADS_DIR, f);
-      if (fs.existsSync(fp)) fs.unlinkSync(fp);
-    }
-  });
-  
-  db.prepare('DELETE FROM test_tiles WHERE id=?').run(req.params.id);
-  res.json({ success: true });
+  try {
+    if (!deletionLifecycle.deleteStudioRecord(req.userId, req.params.id, 'testTile')) return res.status(404).json({ error: 'Test tile not found' });
+    res.json({ success: true });
+  } catch (error) { res.status(error.status || 500).json({ error: error.message }); }
 });
 
 // GET test tiles filtered by glaze

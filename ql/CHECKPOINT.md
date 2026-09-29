@@ -1,92 +1,94 @@
-# QL Phase 1B — resumable checkpoint
+# QL Phase 1C — resumable checkpoint
 
-September 29, 2026. Phase 1B complete; Phase 1 overall remains in progress.
+September 29, 2026. Phase 1C complete; Phase 1 overall remains in progress.
 Branch: `ql/phase-1-relationships`. This checkpoint commit: `git log -1 -- ql/CHECKPOINT.md`.
-Parent checkpoint: `e69e0f8df860e2d962fd2ab84848da06e29da783` (Phase 1A; not rebuilt).
-Christina authorized this contained change and commit/push to the QL branch, with no deployment.
+Parent: `c700a19df8da0b5215add48fc7db94b58ceb2fb4` (Phase 1B). Neither 1A nor 1B rebuilt.
+Authorized scope: Clay, Glaze and Test Tile deletion safety; commit/push only, no deployment.
 
-## Changed / exact behavior
+## Changes and behavior
 
-- Added `deletion-lifecycle.cjs` and wired existing single-Piece, bulk Piece/casualty,
-  firing-delete and Piece/firing-photo-delete routes to it. API URLs/success shapes unchanged.
-- Ownership is checked before any child metadata or file access for deletion. Missing/foreign
-  Piece IDs remain successful no-ops; bulk counts only actual owned deletions.
-- Piece deletion is an immediate SQLite transaction: remove its photo metadata/glaze layers,
-  detach its owned legacy firing/sale links, delete Piece, and let existing foreign keys remove
-  its QL firing/test-tile/pricing junctions. Other endpoints and their metadata survive.
-- **All firings remain independent history, even after the last associated Piece is deleted.**
-  Only `firing_logs.piece_id` becomes NULL when it names the deleted Piece. Surviving QL links,
-  firing IDs, notes, dates, results and photo rows/files remain intact. No guessed reassignment.
-  This intentionally replaces legacy implicit firing deletion: the current user instruction to
-  preserve firing history takes precedence over Phase 1A's tentative legacy-only deletion rule.
-  Explicit firing deletion still removes the owned firing, its photo rows and QL junctions;
-  it never deletes Pieces. Account deletion still removes that account's firing history.
-- Candidate files are checked only after metadata commits. An immediate transaction serializes
-  the final global reference check with SQLite writers. Any reference in any account retains
-  the file. The registry covers every baseline stored-file column, including previously omitted
-  pricing photos, inline slots, avatars and merchant files. Orphan metadata is conservative protection.
-- Unreferenced Piece-only files are removed; shared files survive. Direct Piece/firing-photo
-  removal follows the same rule. No renaming, copying, blanket orphan sweep or ownership inference
-  from filenames. Invalid paths/symlinks are skipped. SQL rollback never removes files; cleanup
-  errors retain unused files and log a warning rather than undo committed metadata.
-- Existing cross-owner legacy firing/sale references cause deletion to fail before mutations
-  (single Piece/account HTTP 409, bulk per-ID error). No automatic history repair. Self/admin
-  account cleanup now runs atomically with this preflight; existing account file-retention policy
-  remains unchanged (no filesystem sweep).
+- Reused `deletion-lifecycle.cjs`; single and bulk Clay/Glaze/Test Tile routes now share
+  owner-first immediate transactions. Missing/foreign single IDs return 404 with no mutations;
+  missing/foreign/duplicate bulk IDs count zero. Bulk preserves its existing partial-success
+  contract: each ID is atomic, failures enter `errors`, other valid IDs continue.
+- Clay: remove only owned Clay and its photo metadata. Detach Piece, standalone Test Tile and
+  glaze-embedded clay-test references. Keep Pieces, tests, firing/sale/pricing history, names,
+  results and photos. Standalone tiles with no saved clay name receive the deleted Clay's name.
+  Pieces have no clay-name snapshot column: their existing nullable link becomes NULL, not a
+  fabricated replacement or modification of user notes. No schema added to archive that name.
+- Glaze: keep Piece glaze layers with their IDs, coats, application, order and notes; change
+  the reference to NULL and retain an existing custom name or snapshot the Glaze name, using
+  the existing manual-glaze workflow. Standalone tiles survive with a NULL glaze link and
+  preserved/fallback name. Delete only the Glaze's own photos, recipe ingredients and embedded
+  `glaze_clay_tests` children. Embedded tests require a parent Glaze and are distinct from
+  independent `test_tiles`; their files are candidates for reference-checked cleanup.
+- Test Tile: remove only the owned tile, its inline file references and its QL Piece junctions.
+  All associated Pieces, Clay, Glazes, firing records/photos and other QL junctions survive.
+  No direct tile-to-firing relationship exists; firing_schedule is historical text, unchanged
+  on surviving tiles. Combo clay/glaze names and recipe ingredient names are text, not IDs;
+  no name-based or JSON-based cascading/inference was introduced.
+- Preflight rejects invalid cross-account incoming references, invalid outgoing test references,
+  orphan dependent ownership and corrupt QL tile junction ownership (409 single; per-ID bulk
+  error). No silent repair of another account. Old NOT NULL glaze-layer schemas reject deletion
+  of a used Glaze rather than losing layer history; unused Glazes still delete normally.
+- Direct Clay/Glaze photo deletion and embedded clay-test removal use the same commit-first
+  global file registry. Clay photo replacement now verifies ownership and atomically replaces
+  metadata; failed inserts preserve old rows/files. Test Tile edit photo removal now uses the
+  registry instead of an unconditional unlink. Existing API URLs, success shapes, photo limits,
+  and entitlement behavior are retained.
 
-## Schema / compatibility
+## File safety
 
-No new migration, schema alteration, backfill, package/lockfile change or QL migration activation.
-The Phase 1A migration/checksum/manifest remain unchanged. Fresh startup schema still matches all
-61 baseline tables. Helper works with/without QL tables and older optional photo columns.
-Existing user/provider IDs, accounts, subscriptions, pricing/sale values and mobile source untouched.
+Only after database commit, recheck candidate filenames across every baseline stored-file slot,
+across all accounts, under the existing serialized check. Any surviving reference (including
+orphan metadata) retains the file. Only genuinely unreferenced flat upload files are removed;
+invalid paths/symlinks are skipped. Failed metadata changes roll back without removing old files.
+Cleanup errors retain unused files and warn; they do not undo or corrupt committed metadata.
+No blanket orphan sweep, file renames, copies or inference of ownership from filenames.
+
+## Schema and production boundary
+
+No migrations, schema changes, backfills, startup activation, dependency/lockfile, UI, native,
+account, billing or subscription changes. Existing Phase 1A migration/checksum unchanged.
+Fresh schema still matches 61 baseline tables. Tests are synthetic and disposable, loopback only.
+Production `main` verified at `b818122c88b8ca037866f2fd35eaa11690759169`.
+No deployment, merge, production data access, hosted preview, mobile build or cloud resources.
 
 ## Verification
 
-Node **22.16.0**, unchanged installed dependencies; command: `node ql/verify-phase1.cjs`.
-All data and photo files were synthetic and disposable, with clean child-process environments.
+Node 22.16.0, unchanged installed dependencies. `node ql/verify-phase1.cjs` passed, exit 0.
+**168 passing executions:** all 102 Phase 1B checks plus 36 new lifecycle tests and 15 new
+HTTP checks run twice (legacy and QL = 30). Includes every requested single/bulk type,
+shared/last-reference cleanup, ownership, corrupt relationships, Piece layer/name preservation,
+QL junction/firing retention, injected SQL rollback, cleanup failure, old schema rejection,
+direct photo deletes, Clay replacement, and Test Tile photo-removal edits.
+Baseline schema, integrity and foreign-key checks passed. `git diff --check` and syntax checks passed.
+Not a real-device/store or production restore certification.
 
-**102 passing test executions:**
+## Newly discovered risks / remaining gates
 
-- 31 existing website regression checks.
-- 17 existing Phase 1A relationship/migration tests.
-- 15 existing migrated old-client API checks.
-- 19 new lifecycle tests: both schemas, shared/last firing associations in both orders,
-  shared/Piece-only/cross-account files, metadata preservation, junction cleanup, sale history,
-  bad legacy links, rollback, missing files, invalid paths/symlinks, cleanup failure,
-  orphan conservatism, all file slots and foreign-key/transaction preconditions.
-- 10 new HTTP deletion checks repeated with and without QL migration (20 total): single/repeat,
-  bulk/casualties, cross-account IDs, Piece-only/shared photos, direct photo/firing deletes,
-  invalid references, account rollback and both self/admin account deletion.
+- Very old required-glaze-ID schemas cannot retain a detached layer without a migration;
+  deletion safely returns 409. No migration is justified for this contained chunk.
+- Legacy relationship writers still accept some cross-account IDs; existing bad references
+  now intentionally block affected deletions pending review. They are not silently repaired.
+- Account-wide deletion remains the Phase 1B implementation: its Piece preflight is verified,
+  but Clay/Glaze cross-account cascades in account teardown are not certified by this chunk.
+- Other out-of-scope file writers/deleters (e.g. sales, avatars, community) still have independent
+  cleanup logic. Global sharing must not be enabled until remaining lifecycle paths are audited.
+- Filesystem and SQLite cannot commit atomically: crashes/cleanup failures may leave unused
+  files. New stale-reference writes after cleanup remain a write-side integration risk. Registry
+  scans favor safety over scale and must track future file-bearing columns.
+- All prior Phase 0 platform, entitlement, migration/restore and live iOS source-mapping gates
+  remain open. Bulk Test Tile deletion retains the existing auth-only gate while single deletion
+  retains starter-tier gating; entitlement harmonization is separate from this safety work.
 
-Additional integrity/FK checks and baseline schema comparison passed. No production database,
-photos, backup/restore or native/device/store tests performed. Not a production release certification.
+## Exact recommended Phase 1D task — not started
 
-## Safety / newly identified risks
-
-- Production `main` remains `b818122c88b8ca037866f2fd35eaa11690759169` on remote inspection.
-  No deploy, merge, production data access, hosted preview, billing change or mobile changes.
-- Other pre-existing deletion paths remain outside this chunk: bulk Clay/Glaze cleanup can touch
-  children before verifying the parent owner; Clay/Glaze/Test Tile and other photo writers/deleters
-  still have unconditional unlinks. Do not enable general QL sharing until these are hardened.
-  These are source findings, not evidence of customer data loss or a production exploit test.
-- Legacy APIs can still accept invalid cross-account relationship IDs. This chunk blocks unsafe
-  Piece/account deletion rather than silently repairing such history; write/read ownership validation
-  remains an integration gate. Account deletion across other legacy relationship types is not certified.
-- File/SQLite operations are not one atomic resource: crash or unlink failure can retain unused
-  files. Safe retry/orphan maintenance is deferred. Registry scans favor safety over scale; future
-  file-bearing columns must be added. New stale-reference writes after file cleanup are not prevented
-  by this lifecycle helper; write-side validation remains needed before expanded sharing.
-- Retained firings may continue counting toward the existing firing allowance until explicitly
-  deleted. Last-association retention is intentional and applies to legacy per-Piece firings too.
-- Phase 0 startup migration, entitlement, mobile cache/account isolation, iOS source mapping and
-  production restore gates remain open. Existing dirty checkouts were not changed.
-
-## Exact recommended Phase 1C task — not started
-
-**Extend owner-scoped, shared-photo-safe deletion to Clay, Glazes and Test Tiles, including their
-bulk routes.** Verify ownership before touching children, preserve files referenced by surviving
-records/accounts, explicitly define relationship cleanup/history retention, add legacy + QL API
-regressions and rollback tests, then commit/push/checkpoint. Keep QL migration activation, new public
-endpoints, UI, AI/voice, mobile changes and deployment outside that chunk. Obtain the next chunk's
-instruction before starting; remaining relationship-write validation stays on the integration backlog.
+**Enforce same-owner legacy relationship writes and safe reads for Pieces, Clay, Glazes and
+Test Tiles, and extend account-delete preflight to these relationships.** Audit create/update/
+import routes for Piece clay/glaze links, embedded glaze-clay tests and standalone tile clay/glaze
+links; reject missing/foreign endpoints before mutation, filter unsafe legacy joins, and reject
+account deletion if its Clay/Glaze cascades would alter another account. Preserve manual names
+and nullable links; do not scrub existing data automatically. Add legacy/QL API rollback and
+cross-account tests, run the full suite, commit/push/checkpoint. No new schema, sharing UI,
+QL migration activation, mobile changes, AI/voice or deployment. Wait for the next instruction.
