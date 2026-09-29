@@ -182,7 +182,9 @@ function readPiece(db, userId, pieceId) {
       firings,
       testTiles: related(db, userId, pieceId, 'testTile'),
       pricing: related(db, userId, pieceId, 'pricing'),
-      sales: db.prepare('SELECT * FROM sales WHERE piece_id=? AND user_id=? ORDER BY id').all(pieceId, userId)
+      sales: db.prepare('SELECT * FROM sales WHERE piece_id=? AND user_id=? ORDER BY id').all(pieceId, userId).map(sale =>
+        sale.contact_id && !db.prepare('SELECT 1 FROM contacts WHERE id=? AND user_id=?').get(sale.contact_id, userId)
+          ? { ...sale, contact_id: null } : sale)
     };
   })();
 }

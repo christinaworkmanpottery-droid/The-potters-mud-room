@@ -122,7 +122,7 @@ if (STRIPE_SECRET) {
 // OpenAI for Pottery AI assistant
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const UPLOADS_DIR = path.join(__dirname, 'data', 'uploads');
-const { createDeletionLifecycle, hasStoredFileReference } = require('./deletion-lifecycle.cjs');
+const { createDeletionLifecycle } = require('./deletion-lifecycle.cjs');
 const deletionLifecycle = createDeletionLifecycle(db, UPLOADS_DIR);
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
@@ -145,6 +145,11 @@ function validatePieceRelationships(userId, clayBodyId, glazeIds) {
     const glazeId = layer && typeof layer === 'object' ? (layer.glazeId || layer.glaze_id || null) : null;
     if (glazeId) ownedRelationship('glazes', userId, glazeId);
   }
+}
+function safeStoredUpload(filename) {
+  if (typeof filename !== 'string' || !filename || filename === '.' || filename === '..' || /[/\\\0]/.test(filename)) return null;
+  const target = path.join(UPLOADS_DIR, filename);
+  try { return fs.lstatSync(target).isFile() ? target : null; } catch { return null; }
 }
 function cleanupRequestUploads(files) {
   deletionLifecycle.cleanupFiles((files || []).filter(Boolean).map(file => file.filename));
@@ -1234,8 +1239,8 @@ app.put('/api/profile/newsletter', auth, (req, res) => {
 app.post('/api/profile/avatar', auth, upload.single('avatar'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file' });
   const old = db.prepare('SELECT avatar_filename FROM users WHERE id=?').get(req.userId);
-  if (old?.avatar_filename) { const p = path.join(UPLOADS_DIR, old.avatar_filename); if (fs.existsSync(p)) fs.unlinkSync(p); }
   db.prepare('UPDATE users SET avatar_filename=? WHERE id=?').run(req.file.filename, req.userId);
+  deletionLifecycle.cleanupFiles([old?.avatar_filename]);
   res.json({ filename: req.file.filename });
 });
 
@@ -1668,9 +1673,9 @@ app.post('/api/shop/apply-discount', auth, (req, res) => {
 // ============ PROFILE PHOTO ============
 app.post('/api/profile/photo', auth, upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No file' });
-  const old = db.prepare('SELECT profile_photo FROM users WHERE id=?').get(req.userId);
-  if (old?.profile_photo) { const p = path.join(UPLOADS_DIR, old.profile_photo); if (fs.existsSync(p)) fs.unlinkSync(p); }
+  const old = db.prepare('SELECT profile_photo,avatar_filename FROM users WHERE id=?').get(req.userId);
   db.prepare('UPDATE users SET profile_photo=?, avatar_filename=? WHERE id=?').run(req.file.filename, req.file.filename, req.userId);
+  deletionLifecycle.cleanupFiles([old?.profile_photo, old?.avatar_filename]);
   res.json({ filename: req.file.filename });
 });
 
@@ -2203,6 +2208,7 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
 app.patch('/api/pieces/:id/photo-search-visibility', auth, (req, res) => {
   const piece = db.prepare('SELECT id, user_id FROM pieces WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
   if (!piece) return res.status(404).json({ error: 'Piece not found' });
+  if (!db.prepare('PRAGMA table_info(pieces)').all().some(c => c.name === 'hide_from_photo_search')) return res.status(409).json({ error: 'Photo search visibility is unavailable for this schema.' });
   const hide = req.body.hide ? 1 : 0;
   db.prepare('UPDATE pieces SET hide_from_photo_search = ? WHERE id = ?').run(hide, piece.id);
   res.json({ success: true, hide_from_photo_search: hide });
@@ -2433,51 +2439,43 @@ app.delete('/api/photos/:id', auth, (req, res) => {
   res.json({ success: true });
 });
 
-const isStoredPhotoOwned = (filename, userId) => {
-  const ownershipChecks = [
-    ['SELECT 1 FROM users WHERE id=? AND (avatar_filename=? OR profile_photo=?)', [userId, filename, filename]],
-    ['SELECT 1 FROM piece_photos pp JOIN pieces p ON pp.piece_id=p.id WHERE pp.filename=? AND p.user_id=?', [filename, userId]],
-    ['SELECT 1 FROM clay_photos cp JOIN clay_bodies c ON cp.clay_id=c.id WHERE cp.filename=? AND c.user_id=?', [filename, userId]],
-    ['SELECT 1 FROM glaze_photos gp JOIN glazes g ON gp.glaze_id=g.id WHERE gp.filename=? AND g.user_id=?', [filename, userId]],
-    ['SELECT 1 FROM glaze_clay_tests gt JOIN glazes g ON gt.glaze_id=g.id WHERE gt.photo_filename=? AND g.user_id=?', [filename, userId]],
-    ['SELECT 1 FROM firing_photos fp JOIN firing_logs f ON fp.firing_id=f.id WHERE fp.filename=? AND f.user_id=?', [filename, userId]],
-    ['SELECT 1 FROM sales WHERE image_filename=? AND user_id=?', [filename, userId]],
-    ['SELECT 1 FROM events WHERE image_filename=? AND user_id=?', [filename, userId]],
-    ['SELECT 1 FROM project_photos pp JOIN projects p ON pp.project_id=p.id WHERE pp.filename=? AND p.user_id=?', [filename, userId]],
-    ['SELECT 1 FROM glaze_combos WHERE (photo_filename=? OR photo_filename2=?) AND user_id=?', [filename, filename, userId]],
-    ['SELECT 1 FROM test_tiles WHERE (photo_filename=? OR photo_filename2=? OR photo_filename3=?) AND user_id=?', [filename, filename, filename, userId]],
-    [`SELECT 1 FROM forum_photos fp
-       LEFT JOIN forum_posts p ON fp.post_id=p.id
-       LEFT JOIN forum_replies r ON fp.reply_id=r.id
-      WHERE fp.filename=? AND (p.user_id=? OR r.user_id=?)`, [filename, userId, userId]],
-  ];
-  return ownershipChecks.some(([sql, params]) => !!db.prepare(sql).get(...params));
-};
-
-const hasStoredPhotoReference = (filename) => hasStoredFileReference(db, filename);
-
-const replaceStoredPhotoReferences = db.transaction((oldFilename, newFilename, userId) => {
-  let changes = 0;
-  const run = (sql, ...params) => { changes += db.prepare(sql).run(...params).changes; };
-
-  run('UPDATE users SET avatar_filename=CASE WHEN avatar_filename=? THEN ? ELSE avatar_filename END, profile_photo=CASE WHEN profile_photo=? THEN ? ELSE profile_photo END WHERE id=? AND (avatar_filename=? OR profile_photo=?)', oldFilename, newFilename, oldFilename, newFilename, userId, oldFilename, oldFilename);
-  run('UPDATE piece_photos SET filename=? WHERE filename=? AND piece_id IN (SELECT id FROM pieces WHERE user_id=?)', newFilename, oldFilename, userId);
-  run('UPDATE clay_photos SET filename=? WHERE filename=? AND clay_id IN (SELECT id FROM clay_bodies WHERE user_id=?)', newFilename, oldFilename, userId);
-  run('UPDATE glaze_photos SET filename=? WHERE filename=? AND glaze_id IN (SELECT id FROM glazes WHERE user_id=?)', newFilename, oldFilename, userId);
-  run('UPDATE glaze_clay_tests SET photo_filename=? WHERE photo_filename=? AND glaze_id IN (SELECT id FROM glazes WHERE user_id=?)', newFilename, oldFilename, userId);
-  run('UPDATE firing_photos SET filename=? WHERE filename=? AND firing_id IN (SELECT id FROM firing_logs WHERE user_id=?)', newFilename, oldFilename, userId);
-  run('UPDATE sales SET image_filename=? WHERE image_filename=? AND user_id=?', newFilename, oldFilename, userId);
-  run('UPDATE events SET image_filename=? WHERE image_filename=? AND user_id=?', newFilename, oldFilename, userId);
-  run('UPDATE project_photos SET filename=? WHERE filename=? AND project_id IN (SELECT id FROM projects WHERE user_id=?)', newFilename, oldFilename, userId);
-  run('UPDATE glaze_combos SET photo_filename=CASE WHEN photo_filename=? THEN ? ELSE photo_filename END, photo_filename2=CASE WHEN photo_filename2=? THEN ? ELSE photo_filename2 END WHERE user_id=? AND (photo_filename=? OR photo_filename2=?)', oldFilename, newFilename, oldFilename, newFilename, userId, oldFilename, oldFilename);
-  run('UPDATE test_tiles SET photo_filename=CASE WHEN photo_filename=? THEN ? ELSE photo_filename END, photo_filename2=CASE WHEN photo_filename2=? THEN ? ELSE photo_filename2 END, photo_filename3=CASE WHEN photo_filename3=? THEN ? ELSE photo_filename3 END WHERE user_id=? AND (photo_filename=? OR photo_filename2=? OR photo_filename3=?)', oldFilename, newFilename, oldFilename, newFilename, oldFilename, newFilename, userId, oldFilename, oldFilename, oldFilename);
-  run(`UPDATE forum_photos SET filename=? WHERE filename=? AND (
-    post_id IN (SELECT id FROM forum_posts WHERE user_id=?) OR
-    reply_id IN (SELECT id FROM forum_replies WHERE user_id=?)
-  )`, newFilename, oldFilename, userId, userId);
-
-  return changes;
-});
+// Resolve actual editable slots, not an OR of unrelated parent owners. A
+// filename-only request cannot select between two records in the same account.
+function ownedPhotoSlots(filename, userId) {
+  const slots = [];
+  const add = (table, column, sql) => {
+    for (const row of db.prepare(sql).all(filename, userId)) slots.push({ table, column, id: row.id });
+  };
+  for (const column of ['avatar_filename', 'profile_photo']) add('users', column, `SELECT id FROM users WHERE ${column}=? AND id=?`);
+  for (const [table, parent, key] of [
+    ['piece_photos','pieces','piece_id'], ['clay_photos','clay_bodies','clay_id'],
+    ['glaze_photos','glazes','glaze_id'], ['firing_photos','firing_logs','firing_id'],
+    ['project_photos','projects','project_id'], ['glaze_clay_tests','glazes','glaze_id']
+  ]) {
+    const column = table === 'glaze_clay_tests' ? 'photo_filename' : 'filename';
+    add(table, column, `SELECT ph.id FROM ${table} ph JOIN ${parent} p ON p.id=ph.${key} WHERE ph.${column}=? AND p.user_id=?`);
+  }
+  for (const [table, columns] of Object.entries({ sales:['image_filename'], events:['image_filename'],
+    pricing_calculations:['photo_filename'], glaze_combos:['photo_filename','photo_filename2'],
+    test_tiles:['photo_filename','photo_filename2','photo_filename3'] })) {
+    for (const column of columns) add(table, column, `SELECT id FROM ${table} WHERE ${column}=? AND user_id=?`);
+  }
+  add('forum_photos', 'filename', `SELECT ph.id FROM forum_photos ph
+    LEFT JOIN forum_posts p ON p.id=ph.post_id
+    LEFT JOIN forum_replies r ON r.id=ph.reply_id
+    WHERE ph.filename=? AND CASE WHEN ph.reply_id IS NULL THEN p.user_id
+      WHEN (ph.post_id IS NULL OR ph.post_id=r.post_id) AND EXISTS (SELECT 1 FROM forum_posts WHERE id=r.post_id) THEN r.user_id END = ?`);
+  return slots;
+}
+function editablePhotoSlots(filename, userId) {
+  const slots = ownedPhotoSlots(filename, userId);
+  if (!slots.length) { const e = new Error('Photo not found.'); e.status=404; throw e; }
+  // Avatar/profile aliases in one user row are one logical profile image.
+  if (slots.length > 1 && !slots.every(s => s.table === 'users')) {
+    const e = new Error('This photo has multiple record references; replace it from the individual record.'); e.status=409; throw e;
+  }
+  return slots;
+}
 
 const replacementPhotoUpload = (req, res, next) => {
   upload.single('photo')(req, res, (error) => {
@@ -2498,7 +2496,7 @@ const replacementPhotoUpload = (req, res, next) => {
 app.put('/api/photos/by-filename/:filename', auth, replacementPhotoUpload, async (req, res) => {
   const rawFilename = String(req.params.filename || '');
   const filename = path.basename(rawFilename);
-  const invalidFilename = !rawFilename || rawFilename !== filename || filename === '.' || filename === '..' || filename.includes('\0') || filename.length > 255;
+  const invalidFilename = !rawFilename || rawFilename !== filename || filename === '.' || filename === '..' || (/[/\\\0]/.test(filename)) || filename.length > 255;
   const discardUpload = () => {
     if (req.file?.path && fs.existsSync(req.file.path)) {
       try { fs.unlinkSync(req.file.path); } catch (error) {}
@@ -2521,11 +2519,11 @@ app.put('/api/photos/by-filename/:filename', auth, replacementPhotoUpload, async
 
   let owned = false;
   try {
-    owned = isStoredPhotoOwned(filename, req.userId);
+    owned = editablePhotoSlots(filename, req.userId).length > 0;
   } catch (error) {
     discardUpload();
     console.error('[PHOTO-EDIT] Ownership check failed:', error.message);
-    return res.status(500).json({ error: 'Could not verify this photo.' });
+    return res.status(error.status || 500).json({ error: error.status ? error.message : 'Could not verify this photo.' });
   }
   if (!owned) {
     discardUpload();
@@ -2533,7 +2531,7 @@ app.put('/api/photos/by-filename/:filename', auth, replacementPhotoUpload, async
   }
 
   const target = path.join(UPLOADS_DIR, filename);
-  if (!fs.existsSync(target)) {
+  if (!fs.existsSync(target) || !fs.lstatSync(target).isFile()) {
     discardUpload();
     return res.status(404).json({ error: 'Photo file not found.' });
   }
@@ -2553,72 +2551,28 @@ app.put('/api/photos/by-filename/:filename', auth, replacementPhotoUpload, async
     return res.status(400).json({ error: 'Edited replacement must be a JPEG.' });
   }
 
-  const isLegacyHeif = new Set(['.heic', '.heif']).has(path.extname(filename).toLowerCase());
-  if (!isLegacyHeif) {
-    try {
-      // Preserve existing same-format behavior for non-legacy assets.
-      const existingMeta = await sharp(target).metadata();
-      if (!new Set(['jpeg', 'png']).has(existingMeta.format)) {
-        discardUpload();
-        return res.status(400).json({ error: 'Replacement image format is not supported.' });
-      }
-      fs.renameSync(req.file.path, target);
-
-      const piecePhoto = db.prepare('SELECT id FROM piece_photos WHERE filename=?').get(filename);
-      if (piecePhoto) {
-        try {
-          const phash = await computePHash(fs.readFileSync(target));
-          db.prepare('UPDATE piece_photos SET phash=? WHERE id=?').run(phash, piecePhoto.id);
-        } catch (error) {
-          console.warn('[PHOTO-EDIT] pHash refresh skipped:', error.message);
-        }
-      }
-      return res.json({ success: true, filename, updatedAt: Date.now() });
-    } catch (error) {
-      discardUpload();
-      console.error('[PHOTO-EDIT] Replacement failed:', error.message);
-      return res.status(500).json({ error: 'Could not save the edited photo.' });
-    }
-  }
-
   const newFilename = `${uuidv4()}.jpg`;
   const newTarget = path.join(UPLOADS_DIR, newFilename);
-  let referencesUpdated = false;
   try {
-    // Create the new JPEG first. A failed DB transaction leaves the old HEIC
-    // and its references untouched; only this unreferenced JPEG is removed.
-    fs.renameSync(req.file.path, newTarget);
-    const changed = replaceStoredPhotoReferences(filename, newFilename, req.userId);
-    if (!changed) {
-      fs.unlinkSync(newTarget);
-      return res.status(404).json({ error: 'Photo reference was not found.' });
-    }
-    referencesUpdated = true;
-
-    const piecePhoto = db.prepare('SELECT id FROM piece_photos WHERE filename=?').get(newFilename);
-    if (piecePhoto) {
-      try {
-        const phash = await computePHash(fs.readFileSync(newTarget));
-        db.prepare('UPDATE piece_photos SET phash=? WHERE id=?').run(phash, piecePhoto.id);
-      } catch (error) {
-        console.warn('[PHOTO-EDIT] pHash refresh skipped:', error.message);
+    // Never overwrite old bytes, including JPEG/PNG and a sole owned reference
+    // shared by another account. Recheck ownership after asynchronous decoding.
+    db.transaction(() => {
+      const slots = editablePhotoSlots(filename, req.userId);
+      fs.copyFileSync(req.file.path, newTarget, fs.constants.COPYFILE_EXCL);
+      for (const slot of slots) {
+        db.prepare(`UPDATE ${slot.table} SET ${slot.column}=? WHERE id=? AND ${slot.column}=?`).run(newFilename, slot.id, filename);
+        if (slot.table === 'piece_photos') db.prepare('UPDATE piece_photos SET phash=NULL,avg_color=NULL WHERE id=?').run(slot.id);
       }
-    }
-
-    // Delete the legacy file only after commit and only when no table refers to it.
-    if (!hasStoredPhotoReference(filename) && fs.existsSync(target)) {
-      try { fs.unlinkSync(target); } catch (error) {
-        console.warn('[PHOTO-EDIT] Old HEIC cleanup skipped:', error.message);
-      }
-    }
+    }).immediate();
+    deletionLifecycle.cleanupFiles([filename]);
+    discardUpload();
     return res.json({ success: true, filename: newFilename, updatedAt: Date.now() });
   } catch (error) {
-    if (!referencesUpdated && fs.existsSync(newTarget)) {
-      try { fs.unlinkSync(newTarget); } catch (cleanupError) {}
-    }
-    console.error('[PHOTO-EDIT] Replacement migration failed:', error.message);
-    return res.status(500).json({ error: 'Could not save the edited photo.' });
+    deletionLifecycle.cleanupFiles([newFilename]);
+    discardUpload();
+    return res.status(error.status || 500).json({ error: error.status ? error.message : 'Could not save the edited photo.' });
   }
+
 });
 
 // Update piece photo stage
@@ -2859,9 +2813,7 @@ app.put('/api/pricing-calculations/:id', auth, upload.single('photo'), (req, res
   db.prepare('UPDATE pricing_calculations SET name=?,description=?,inputs_json=?,result_json=?,photo_filename=? WHERE id=? AND user_id=?')
     .run(String(req.body.name || '').trim() || null, String(req.body.description || '').trim() || null, JSON.stringify(inputs), JSON.stringify(result), photoFilename, req.params.id, req.userId);
   if (req.file && oldPhotoFilename && oldPhotoFilename !== photoFilename) {
-    const referenced = db.prepare('SELECT 1 FROM pricing_calculations WHERE photo_filename=? LIMIT 1').get(oldPhotoFilename);
-    const oldPath = path.join(UPLOADS_DIR, oldPhotoFilename);
-    if (!referenced && fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    deletionLifecycle.cleanupFiles([oldPhotoFilename]);
   }
   res.json(parsePricingCalculation(db.prepare('SELECT * FROM pricing_calculations WHERE id=? AND user_id=?').get(req.params.id, req.userId)));
 });
@@ -2870,11 +2822,7 @@ app.delete('/api/pricing-calculations/:id', auth, (req, res) => {
   const row = db.prepare('SELECT * FROM pricing_calculations WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!row) return res.status(404).json({ error: 'Pricing calculation not found.' });
   db.prepare('DELETE FROM pricing_calculations WHERE id=? AND user_id=?').run(req.params.id, req.userId);
-  if (row.photo_filename) {
-    const referenced = db.prepare(`SELECT 1 FROM pricing_calculations WHERE photo_filename=? LIMIT 1`).get(row.photo_filename);
-    const target = path.join(UPLOADS_DIR, row.photo_filename);
-    if (!referenced && fs.existsSync(target)) fs.unlinkSync(target);
-  }
+  deletionLifecycle.cleanupFiles([row.photo_filename]);
   res.json({ ok: true });
 });
 
@@ -2886,18 +2834,16 @@ app.get('/api/sales', auth, (req, res) => {
   if (dateFrom) { sql += ' AND s.date >= ?'; params.push(dateFrom); }
   if (dateTo) { sql += ' AND s.date <= ?'; params.push(dateTo); }
   sql += ' ORDER BY s.date DESC';
-  res.json(db.prepare(sql).all(...params));
+  res.json(db.prepare(sql).all(...params).map(sale => ({ ...sale,
+    contact_id: sale.contact_id && db.prepare('SELECT 1 FROM contacts WHERE id=? AND user_id=?').get(sale.contact_id, req.userId) ? sale.contact_id : null
+  })));
 });
 
 function saveSaleRecord(req, res) {
   const existing = req.params.id ? db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId) : null;
   let copiedPhoto = null;
   const discardNew = () => {
-    for (const filename of [req.file?.filename, copiedPhoto]) {
-      if (filename && !hasStoredPhotoReference(filename)) {
-        try { fs.unlinkSync(path.join(UPLOADS_DIR, filename)); } catch {}
-      }
-    }
+    deletionLifecycle.cleanupFiles([req.file?.filename, copiedPhoto]);
   };
   try {
     if (req.params.id && !existing) { discardNew(); return res.status(404).json({ error: 'Sale not found' }); }
@@ -2908,6 +2854,10 @@ function saveSaleRecord(req, res) {
     const value = (key, column) => req.body[key] !== undefined ? req.body[key] : existing?.[column];
     const price = moneyCents(value('price', 'price')) / 100;
     const quantity = saleQuantity(value('quantity', 'quantity') ?? 1);
+    const contactId = value('contactId', 'contact_id') || null;
+    if (contactId && !db.prepare('SELECT 1 FROM contacts WHERE id=? AND user_id=?').get(contactId, req.userId)) {
+      discardNew(); return res.status(400).json({ error: 'Contact unavailable.' });
+    }
     const pieceId = value('pieceId', 'piece_id') || null;
     if (pieceId && !db.prepare('SELECT id FROM pieces WHERE id=? AND user_id=?').get(pieceId, req.userId)) {
       discardNew(); return res.status(400).json({ error: 'Choose one of your own pieces.' });
@@ -2921,7 +2871,9 @@ function saveSaleRecord(req, res) {
       const source = db.prepare('SELECT filename FROM piece_photos WHERE piece_id=? ORDER BY is_primary DESC, sort_order, created_at LIMIT 1').get(pieceId);
       if (source) {
         copiedPhoto = uuidv4() + path.extname(source.filename);
-        fs.copyFileSync(path.join(UPLOADS_DIR, source.filename), path.join(UPLOADS_DIR, copiedPhoto));
+        const sourcePath = safeStoredUpload(source.filename);
+        if (!sourcePath) throw new Error('Piece photo unavailable.');
+        fs.copyFileSync(sourcePath, path.join(UPLOADS_DIR, copiedPhoto), fs.constants.COPYFILE_EXCL);
         photo = copiedPhoto;
       }
     }
@@ -2930,6 +2882,8 @@ function saveSaleRecord(req, res) {
     const fields = [['venue','venue'], ['venueType','venue_type'], ['buyerName','buyer_name'], ['buyerEmail','buyer_email'], ['buyerPhone','buyer_phone'], ['notes','notes'], ['itemDescription','item_description'], ['eventName','event_name'], ['contactId','contact_id']];
     const values = fields.map(([key, col]) => value(key, col) || null);
     db.transaction(() => {
+      if (contactId && !db.prepare('SELECT 1 FROM contacts WHERE id=? AND user_id=?').get(contactId, req.userId)) throw new Error('Contact unavailable.');
+      if (pieceId && !db.prepare('SELECT 1 FROM pieces WHERE id=? AND user_id=?').get(pieceId, req.userId)) throw new Error('Choose one of your own pieces.');
       if (existing) {
         db.prepare('UPDATE sales SET piece_id=?,date=?,price=?,quantity=?,image_filename=?,venue=?,venue_type=?,buyer_name=?,buyer_email=?,buyer_phone=?,notes=?,item_description=?,event_name=?,contact_id=? WHERE id=? AND user_id=?')
           .run(pieceId, date, price, quantity, photo, ...values, id, req.userId);
@@ -2940,9 +2894,7 @@ function saveSaleRecord(req, res) {
       if (pieceId) db.prepare("UPDATE pieces SET status='sold',sale_price=?,date_sold=?,updated_at=datetime('now') WHERE id=? AND user_id=?").run(price, date, pieceId, req.userId);
     })();
     const oldPhoto = existing?.image_filename;
-    if (oldPhoto && oldPhoto !== photo && !hasStoredPhotoReference(oldPhoto)) {
-      try { fs.unlinkSync(path.join(UPLOADS_DIR, oldPhoto)); } catch {}
-    }
+    if (oldPhoto !== photo) deletionLifecycle.cleanupFiles([oldPhoto]);
     res.json({ id, ok: true, image_filename: photo });
   } catch (err) { discardNew(); res.status(400).json({ error: err.message }); }
 }
@@ -2950,16 +2902,19 @@ app.post('/api/sales', auth, upload.single('photo'), saveSaleRecord);
 app.put('/api/sales/:id', auth, upload.single('photo'), saveSaleRecord);
 
 app.delete('/api/sales/:id', auth, (req, res) => {
-  const existing = db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId);
-  if (!existing) return res.status(404).json({ error: 'Sale not found' });
-  // If the sale was linked to a piece, revert piece status from 'sold' back to 'done'
-  if (existing.piece_id) {
-    const piece = db.prepare('SELECT * FROM pieces WHERE id=? AND user_id=?').get(existing.piece_id, req.userId);
-    if (piece && piece.status === 'sold') {
-      db.prepare(`UPDATE pieces SET status='done',sale_price=NULL,date_sold=NULL,updated_at=datetime('now') WHERE id=? AND user_id=?`).run(existing.piece_id, req.userId);
+  const result = db.transaction(() => {
+    const existing = db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+    if (!existing) return null;
+    // Keep the surviving sales and the Piece's sold state intact. Only the last
+    // Sale deletion restores a sold Piece to done; never mutate a foreign Piece.
+    db.prepare('DELETE FROM sales WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+    if (existing.piece_id && !db.prepare('SELECT 1 FROM sales WHERE piece_id=?').get(existing.piece_id)) {
+      db.prepare("UPDATE pieces SET status='done',sale_price=NULL,date_sold=NULL,updated_at=datetime('now') WHERE id=? AND user_id=? AND status='sold'").run(existing.piece_id, req.userId);
     }
-  }
-  db.prepare('DELETE FROM sales WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+    return existing;
+  }).immediate();
+  if (!result) return res.status(404).json({ error: 'Sale not found' });
+  deletionLifecycle.cleanupFiles([result.image_filename]);
   res.json({ ok: true });
 });
 
@@ -2968,9 +2923,7 @@ app.post('/api/sales/:id/photo', auth, upload.single('photo'), (req, res) => {
   const sale = db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!sale) return res.status(404).json({ error: 'Sale not found' });
   db.prepare('UPDATE sales SET image_filename=? WHERE id=? AND user_id=?').run(req.file.filename, req.params.id, req.userId);
-  if (sale.image_filename && !hasStoredPhotoReference(sale.image_filename)) {
-    try { fs.unlinkSync(path.join(UPLOADS_DIR, sale.image_filename)); } catch {}
-  }
+  deletionLifecycle.cleanupFiles([sale.image_filename]);
   res.json({ filename: req.file.filename });
 });
 
@@ -3118,15 +3071,11 @@ function saveComboRecord(req, res) {
         layers.forEach((l,i) => ins.run(uuidv4(), id, l.glazeName, l.brand || null, l.coats || 1, l.method || null, i));
       }
     })();
-    for (const old of oldPhotos) if (old && !photos.includes(old) && !hasStoredPhotoReference(old)) {
-      try { fs.unlinkSync(path.join(UPLOADS_DIR, old)); } catch {}
-    }
+    deletionLifecycle.cleanupFiles(oldPhotos.filter(old => !photos.includes(old)));
     res.json({ id, success: true, photo_filename: photos[0], photo_filename2: photos[1] });
   } catch(err) { res.status(400).json({ error: err.message }); }
   finally {
-    for (const file of req.files || []) if (!hasStoredPhotoReference(file.filename)) {
-      try { fs.unlinkSync(file.path); } catch {}
-    }
+    deletionLifecycle.cleanupFiles((req.files || []).map(file => file.filename));
   }
 }
 app.post('/api/community/combos', auth, requireTier('starter'), upload.array('photos', 2), saveComboRecord);
@@ -3287,13 +3236,12 @@ app.delete('/api/forum/replies/:id', auth, (req, res) => {
 
 // Delete a single forum photo (owner or admin only)
 app.delete('/api/forum/photos/:id', auth, (req, res) => {
-  const photo = db.prepare('SELECT fp.*, fpo.user_id as post_owner FROM forum_photos fp LEFT JOIN forum_posts fpo ON fp.post_id=fpo.id WHERE fp.id=?').get(req.params.id);
+  const photo = db.prepare('SELECT fp.*, CASE WHEN fp.reply_id IS NULL THEN fpo.user_id WHEN (fp.post_id IS NULL OR fp.post_id=fr.post_id) AND EXISTS (SELECT 1 FROM forum_posts WHERE id=fr.post_id) THEN fr.user_id END as post_owner FROM forum_photos fp LEFT JOIN forum_posts fpo ON fp.post_id=fpo.id LEFT JOIN forum_replies fr ON fp.reply_id=fr.id WHERE fp.id=?').get(req.params.id);
   if (!photo) return res.status(404).json({ error: 'Not found' });
   const admin = db.prepare('SELECT email FROM users WHERE id=?').get(req.userId);
   if (photo.post_owner !== req.userId && admin?.email !== ADMIN_EMAIL) return res.status(403).json({ error: 'Not your post' });
-  const filePath = path.join(UPLOADS_DIR, photo.filename);
-  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   db.prepare('DELETE FROM forum_photos WHERE id=?').run(req.params.id);
+  deletionLifecycle.cleanupFiles([photo.filename]);
   res.json({ success: true });
 });
 
@@ -3323,11 +3271,8 @@ app.delete('/api/admin/disk/cleanup-videos', auth, (req, res) => {
       if (['.mp4', '.mov', '.webm', '.m4v', '.avi'].includes(ext)) {
         const filePath = path.join(UPLOADS_DIR, f);
         const stat = fs.statSync(filePath);
-        freedBytes += stat.size;
-        fs.unlinkSync(filePath);
-        // Remove from database too
-        db.prepare('DELETE FROM forum_photos WHERE filename=?').run(f);
-        deleted++;
+        deletionLifecycle.cleanupFiles([f]);
+        if (!fs.existsSync(filePath)) { freedBytes += stat.size; deleted++; }
       }
     });
     res.json({ deleted, freedMB: (freedBytes / 1024 / 1024).toFixed(2) });
@@ -3344,10 +3289,8 @@ app.delete('/api/admin/disk/cleanup-large', auth, (req, res) => {
       const filePath = path.join(UPLOADS_DIR, f);
       const stat = fs.statSync(filePath);
       if (stat.size > thresholdMB * 1024 * 1024) {
-        freedBytes += stat.size;
-        fs.unlinkSync(filePath);
-        db.prepare('DELETE FROM forum_photos WHERE filename=?').run(f);
-        deleted++;
+        deletionLifecycle.cleanupFiles([f]);
+        if (!fs.existsSync(filePath)) { freedBytes += stat.size; deleted++; }
       }
     });
     res.json({ deleted, freedMB: (freedBytes / 1024 / 1024).toFixed(2), threshold: thresholdMB + 'MB' });
@@ -4043,10 +3986,8 @@ app.delete('/api/project-photos/:id', auth, (req, res) => {
   const photo = db.prepare('SELECT p.project_id, pr.user_id FROM project_photos p JOIN projects pr ON p.project_id=pr.id WHERE p.id=?').get(req.params.id);
   if (!photo || photo.user_id !== req.userId) return res.status(403).json({ error: 'Unauthorized' });
   const filename = db.prepare('SELECT filename FROM project_photos WHERE id=?').get(req.params.id)?.filename;
-  if (filename) {
-    try { fs.unlinkSync(path.join(uploadsDir, filename)); } catch(e) {}
-  }
   db.prepare('DELETE FROM project_photos WHERE id=?').run(req.params.id);
+  deletionLifecycle.cleanupFiles([filename]);
   res.json({ success: true });
 });
 
@@ -4079,12 +4020,8 @@ app.post('/api/events/:id/photo', auth, upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
   const ev = db.prepare('SELECT * FROM events WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!ev) return res.status(404).json({ error: 'Event not found' });
-  // Remove old image if exists
-  if (ev.image_filename) {
-    const old = path.join(UPLOADS_DIR, ev.image_filename);
-    if (fs.existsSync(old)) fs.unlinkSync(old);
-  }
-  db.prepare('UPDATE events SET image_filename=? WHERE id=?').run(req.file.filename, req.params.id);
+  db.prepare('UPDATE events SET image_filename=? WHERE id=? AND user_id=?').run(req.file.filename, req.params.id, req.userId);
+  deletionLifecycle.cleanupFiles([ev.image_filename]);
   res.json({ filename: req.file.filename });
 });
 
@@ -4175,7 +4112,17 @@ app.put('/api/contacts/:id', auth, (req, res) => {
 });
 
 app.delete('/api/contacts/:id', auth, (req, res) => {
-  db.prepare('DELETE FROM contacts WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  db.transaction(() => {
+    if (!db.prepare('SELECT 1 FROM contacts WHERE id=? AND user_id=?').get(req.params.id, req.userId)) return;
+    for (const table of ['sales', 'events']) {
+      if (!db.prepare(`PRAGMA table_info(${table})`).all().some(c => c.name === 'contact_id')) continue;
+      if (db.prepare(`SELECT 1 FROM ${table} WHERE contact_id=? AND user_id IS NOT ?`).get(req.params.id, req.userId)) {
+        const error = new Error('Contact has inconsistent references; deletion requires review'); error.status = 409; throw error;
+      }
+      db.prepare(`UPDATE ${table} SET contact_id=NULL WHERE contact_id=? AND user_id=?`).run(req.params.id, req.userId);
+    }
+    db.prepare('DELETE FROM contacts WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  }).immediate();
   res.json({ success: true });
 });
 
@@ -5249,6 +5196,7 @@ app.post('/api/admin/run-migration', (req, res) => {
     return res.status(403).json({ error: 'Admin key required' });
   }
 
+  if (db.prepare("SELECT 1 FROM sqlite_master WHERE name GLOB 'ql_*' LIMIT 1").get()) return res.status(409).json({ error: 'Legacy migrations are disabled with QL schema installed.' });
   const { filename } = req.body;
   if (!filename) {
     return res.status(400).json({ error: 'Migration filename required' });
@@ -6037,6 +5985,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
     const searchHash = await computePHash(searchBuffer);
     const searchColor = await computeColorSignature(searchBuffer);
 
+    const visibility = db.prepare('PRAGMA table_info(pieces)').all().some(c => c.name === 'hide_from_photo_search') ? 'COALESCE(p.hide_from_photo_search,0)=0' : '1=1';
     // Get all piece photos for this user (excluding pieces hidden from photo search)
     let userPhotos = db.prepare(`
       SELECT pp.*, pp.phash, pp.avg_color, p.id as piece_id, p.title, p.status, p.notes,
@@ -6045,30 +5994,31 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
              cb.name as clay_body_name
       FROM piece_photos pp
       JOIN pieces p ON pp.piece_id = p.id
-      LEFT JOIN clay_bodies cb ON p.clay_body_id = cb.id
-      WHERE p.user_id = ? AND (p.hide_from_photo_search IS NULL OR p.hide_from_photo_search = 0)
+      LEFT JOIN clay_bodies cb ON p.clay_body_id = cb.id AND cb.user_id=p.user_id
+      WHERE p.user_id = ? AND ${visibility}
     `).all(req.userId);
 
     // Minimal inline backfill: compute up to 10 photos inline (~50-100ms total)
     // so the first search after cold start returns *something* without blocking for minutes.
     // Remaining photos are handled by the async startup backfill.
+    userPhotos = userPhotos.filter(ph => safeStoredUpload(ph.filename));
     const needsBackfill = userPhotos.filter(ph => !ph.phash || !ph.avg_color);
     const INLINE_LIMIT = 10;
     const inlineBatch = needsBackfill.slice(0, INLINE_LIMIT);
     
     for (const ph of inlineBatch) {
       try {
-        const filePath = path.join(UPLOADS_DIR, ph.filename);
-        if (!fs.existsSync(filePath)) continue;
+        const filePath = safeStoredUpload(ph.filename);
+        if (!filePath) continue;
         const buf = fs.readFileSync(filePath);
         if (!ph.phash) {
           const hash = await computePHash(buf);
-          db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ?').run(hash, ph.id);
+          db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ? AND filename = ?').run(hash, ph.id, ph.filename);
           ph.phash = hash;
         }
         if (!ph.avg_color) {
           const color = await computeColorSignature(buf);
-          db.prepare('UPDATE piece_photos SET avg_color = ? WHERE id = ?').run(color, ph.id);
+          db.prepare('UPDATE piece_photos SET avg_color = ? WHERE id = ? AND filename = ?').run(color, ph.id, ph.filename);
           ph.avg_color = color;
         }
       } catch (e) {
@@ -6227,21 +6177,25 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
     for (const best of bestByPiece.values()) {
       if (best.score < 0.45) continue; // v9: cluster-based scoring, lower threshold
 
-      const piecePhotos = db.prepare('SELECT * FROM piece_photos WHERE piece_id = ? ORDER BY sort_order').all(best.piece_id);
-      const pieceGlazes = db.prepare('SELECT pg.*, COALESCE(g.name, pg.custom_name) as glaze_name, g.brand, g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id = g.id WHERE pg.piece_id = ? ORDER BY pg.layer_order').all(best.piece_id);
+      // Re-resolve after asynchronous hashing; deleted/reassigned records cannot
+      // reuse stale candidate metadata to escape the authenticated owner boundary.
+      const current = db.prepare(`SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON cb.id=p.clay_body_id AND cb.user_id=p.user_id WHERE p.id=? AND p.user_id=? AND ${visibility}`).get(best.piece_id, req.userId);
+      if (!current) continue;
+      const piecePhotos = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order').all(current.id).filter(ph => safeStoredUpload(ph.filename));
+      const pieceGlazes = db.prepare('SELECT pg.*, COALESCE(g.name,pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON g.id=pg.glaze_id AND g.user_id=? WHERE pg.piece_id=? AND (pg.glaze_id IS NULL OR g.id IS NOT NULL) ORDER BY pg.layer_order').all(req.userId,current.id);
 
       matches.push({
         _id: best.piece_id,
         id: best.piece_id,
-        title: best.title,
-        status: best.status,
-        notes: best.notes,
-        description: best.description,
-        clay_body_name: best.clay_body_name,
-        technique: best.technique,
-        form: best.form,
-        date_started: best.date_started,
-        date_completed: best.date_completed,
+        title: current.title,
+        status: current.status,
+        notes: current.notes,
+        description: current.description,
+        clay_body_name: current.clay_body_name,
+        technique: current.technique,
+        form: current.form,
+        date_started: current.date_started,
+        date_completed: current.date_completed,
         photos: piecePhotos,
         glazes: pieceGlazes,
         matchScore: best.score,
@@ -6527,7 +6481,7 @@ app.get('/api/gallery', (req, res) => {
         (SELECT filename FROM piece_photos WHERE piece_id=p.id ORDER BY sort_order LIMIT 1) as first_photo
       FROM pieces p
       LEFT JOIN users u ON p.user_id = u.id
-      LEFT JOIN clay_bodies cb ON p.clay_body_id = cb.id
+      LEFT JOIN clay_bodies cb ON p.clay_body_id = cb.id AND cb.user_id=p.user_id
       WHERE p.is_public = 1 AND REPLACE(LOWER(REPLACE(REPLACE(TRIM(p.status), ' ', '-'), '_', '-')), 'final-fired', 'glaze-fired') IN ('glaze-fired', 'done', 'complete', 'sold')
       ORDER BY p.updated_at DESC
       LIMIT ? OFFSET ?
@@ -6563,7 +6517,7 @@ app.get('/api/gallery/:id', (req, res) => {
         cb.name as clay_body_name
       FROM pieces p
       LEFT JOIN users u ON p.user_id = u.id
-      LEFT JOIN clay_bodies cb ON p.clay_body_id = cb.id
+      LEFT JOIN clay_bodies cb ON p.clay_body_id = cb.id AND cb.user_id=p.user_id
       WHERE p.id=? AND p.is_public=1
     `).get(req.params.id);
     if (!piece) return res.status(404).json({ error: 'Piece not found or not public' });
@@ -6571,7 +6525,7 @@ app.get('/api/gallery/:id', (req, res) => {
     const photos = db.prepare('SELECT id, filename, stage FROM piece_photos WHERE piece_id=? ORDER BY sort_order').all(req.params.id);
     const glazes = db.prepare(`
       SELECT COALESCE(g.name, pg.custom_name) as glaze_name FROM piece_glazes pg
-      LEFT JOIN glazes g ON pg.glaze_id = g.id
+      LEFT JOIN glazes g ON pg.glaze_id = g.id AND g.user_id=(SELECT user_id FROM pieces WHERE id=pg.piece_id)
       WHERE pg.piece_id=?
     `).all(req.params.id);
 
@@ -6661,46 +6615,7 @@ app.post('/api/emergency/disk-cleanup', (req, res) => {
   if (!process.env.ADMIN_BLOG_PASSWORD || password !== process.env.ADMIN_BLOG_PASSWORD) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-  try {
-    let freed = 0, deleted = 0;
-    // 1. Delete WAL and SHM files
-    const walPath = path.join(__dirname, 'data', 'pottery.db-wal');
-    const shmPath = path.join(__dirname, 'data', 'pottery.db-shm');
-    if (fs.existsSync(walPath)) {
-      freed += fs.statSync(walPath).size;
-      fs.unlinkSync(walPath);
-      console.log('[EMERGENCY] Deleted WAL file');
-    }
-    if (fs.existsSync(shmPath)) {
-      freed += fs.statSync(shmPath).size;
-      fs.unlinkSync(shmPath);
-      console.log('[EMERGENCY] Deleted SHM file');
-    }
-    // 2. Delete ALL uploaded files
-    if (fs.existsSync(UPLOADS_DIR)) {
-      const files = fs.readdirSync(UPLOADS_DIR)
-        .map(f => ({ name: f, size: fs.statSync(path.join(UPLOADS_DIR, f)).size }))
-        .sort((a, b) => b.size - a.size);
-      for (const f of files) {
-        try {
-          fs.unlinkSync(path.join(UPLOADS_DIR, f.name));
-          freed += f.size;
-          deleted++;
-        } catch(e) {}
-      }
-    }
-    // 3. Run VACUUM on the database to reclaim space
-    try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch(e) {}
-    try { db.exec('VACUUM'); } catch(e) { console.log('[EMERGENCY] VACUUM failed:', e.message); }
-    res.json({
-      success: true,
-      freedMB: (freed / 1024 / 1024).toFixed(2),
-      filesDeleted: deleted,
-      message: 'Emergency cleanup complete. Uploads deleted, WAL removed, VACUUM attempted.'
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  return res.status(409).json({ error: 'Emergency file deletion disabled. Use the reviewed recovery runbook.' });
 });
 
 // One-time migration endpoint (remove after use)
@@ -6709,6 +6624,7 @@ app.post('/api/admin/run-migration-007', (req, res) => {
   if (!process.env.ADMIN_BLOG_PASSWORD || password !== process.env.ADMIN_BLOG_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
   
   try {
+  if (db.prepare("SELECT 1 FROM sqlite_master WHERE name GLOB 'ql_*' LIMIT 1").get()) return res.status(409).json({ error: 'Legacy migrations are disabled with QL schema installed.' });
     console.log('[MIGRATION] Running 007-add-custom-clay-type.sql');
     db.exec('ALTER TABLE clay_bodies ADD COLUMN custom_clay_type TEXT');
     console.log('[MIGRATION] ✓ Migration completed');
@@ -6747,16 +6663,16 @@ app.listen(PORT, '0.0.0.0', () => {
       let done = 0;
       for (const ph of needsWork) {
         try {
-          const filePath = path.join(UPLOADS_DIR, ph.filename);
-          if (!fs.existsSync(filePath)) continue;
+          const filePath = safeStoredUpload(ph.filename);
+          if (!filePath) continue;
           const buf = fs.readFileSync(filePath);
           if (!ph.phash || ph.phash.length === 32) {
             const hash = await computePHash(buf);
-            db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ?').run(hash, ph.id);
+            db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ? AND filename = ?').run(hash, ph.id, ph.filename);
           }
           if (!ph.avg_color) {
             const color = await computeColorSignature(buf);
-            db.prepare('UPDATE piece_photos SET avg_color = ? WHERE id = ?').run(color, ph.id);
+            db.prepare('UPDATE piece_photos SET avg_color = ? WHERE id = ? AND filename = ?').run(color, ph.id, ph.filename);
           }
           done++;
         } catch(e) {

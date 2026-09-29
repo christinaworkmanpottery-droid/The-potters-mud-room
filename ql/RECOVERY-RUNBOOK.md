@@ -1,7 +1,7 @@
 # QL paired database/photo recovery runbook
 
 Status: **reviewed procedure; only disposable cold recovery is verified** (Phase 1G/1H).
-Phase 1 is NOT READY TO CLOSE; see `PHASE1-READINESS.md`. This document grants no production
+Phase 1I is READY TO CLOSE; production gates remain open. See `PHASE1-READINESS.md`. This document grants no production
 access or migration/deployment authorization. Do not run the application against a backup
 just to inspect it: `database.js` and `server.js` perform startup migrations.
 
@@ -68,8 +68,8 @@ Success requires all of these:
   obey the union contract; unlink clears only its pair; old clients retain legacy projections.
   Create/update/unlink/delete/retry checks reject missing/foreign IDs and preserve other owners.
 - Run `node ql/verify-phase1.cjs` using Node 22 and the committed lockfile in an isolated checkout.
-  Also run `QL_READINESS_STRICT=1 node --test tests/ql-readiness-blockers.cjs`. **Both must pass
-  with no unresolved closure blockers.** Current Phase 1H strict gate fails; rollout is blocked.
+  Also run `QL_READINESS_STRICT=1 node --test tests/ql-readiness-blockers.cjs tests/ql-safety-migrations.cjs`. **Both must pass
+  with no unresolved closure blockers.** Phase 1I gates pass; rollout still requires the separately authorized production prerequisites.
 - Perform approved startup/restart tests on the migrated disposable copy and rerun audit,
   integrity, relationship snapshots and file manifests. Library-helper success alone is not
   startup compatibility. Validate actual historical schema, representative scale, maintenance

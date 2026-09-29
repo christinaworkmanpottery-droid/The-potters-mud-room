@@ -224,6 +224,15 @@ function createDeletionLifecycle(db, uploadsDir, warn = console.warn) {
     if (db.pragma('foreign_keys', { simple: true }) !== 1) throw new Error('Account deletion requires foreign_keys=ON');
     const bad = (sql, ...args) => { if (db.prepare(sql).get(...args)) accountConflict(); };
     assertAccountPieceIsolation(userId);
+    for (const table of ['sales', 'events']) {
+      const columns = db.prepare(`PRAGMA table_info(${table})`).all();
+      if (!columns.some(c => c.name === 'contact_id')) continue;
+      bad(`SELECT 1 FROM ${table} s WHERE s.user_id=? AND s.contact_id IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM contacts c WHERE c.id=s.contact_id AND c.user_id=?) LIMIT 1`, userId, userId);
+      bad(`SELECT 1 FROM ${table} s JOIN contacts c ON c.id=s.contact_id
+        WHERE c.user_id=? AND s.user_id IS NOT ? LIMIT 1`, userId, userId);
+    }
+
 
     bad(`SELECT 1 FROM pieces p WHERE p.user_id=? AND p.clay_body_id IS NOT NULL
       AND NOT EXISTS (SELECT 1 FROM clay_bodies c WHERE c.id=p.clay_body_id AND c.user_id=?) LIMIT 1`, userId, userId);

@@ -1,7 +1,7 @@
 # Quantum Leap — start here
 
-Phase 1H readiness review completed 2026-09-29: **Phase 1 NOT READY TO CLOSE**.
-See `PHASE1-READINESS.md` for blocking evidence and `RECOVERY-RUNBOOK.md` for recovery.
+Phase 1I safety repairs completed 2026-09-29: **Phase 1 READY TO CLOSE**.
+See `PHASE1-READINESS.md` for repair evidence and deferred production gates and `RECOVERY-RUNBOOK.md` for recovery.
 See `CHECKPOINT.md`. Runtime changes exist only on the isolated QL branch; nothing deployed.
 
 - `MASTER-PLAN.md`: consolidated approved product scope and working rules.
@@ -17,11 +17,11 @@ Branch convention: `ql/phase-0-baseline` in both repositories; future approved c
 
 ## Reproduce
 
-For Phase 1H, run `node ql/verify-phase1.cjs` with Node 22 and the unchanged lockfile.
-The full run retains all established regressions and visibly executes known blockers as TODO.
-Run `QL_READINESS_STRICT=1 node --test tests/ql-readiness-blockers.cjs` for the mandatory
-closure gate (currently fails; CI runs it separately). TODO findings are not passing tests.
-See `CHECKPOINT.md` for actual counts. No runtime changes were made in Phase 1H.
+For Phase 1I, run `node ql/verify-phase1.cjs` with Node 22 and the unchanged lockfile.
+All established and expanded safety regressions are mandatory, with no TODO waivers.
+Run `QL_READINESS_STRICT=1 node --test tests/ql-readiness-blockers.cjs tests/ql-safety-migrations.cjs`
+for the strict closure gate. See `CHECKPOINT.md` for exact counts and CI evidence.
+`PHASE1H-READINESS.md` preserves the original blocked audit for historical reference.
 
 Use Node 22 (22.23.3 verified here). In this repository run `npm ci --no-audit --no-fund`, then `node ql/verify.cjs`. This runs the existing website suite with a clean environment and creates a fresh temporary server/database for schema verification. Only with `--write-schema` does it update the committed schema inventory. No customer data or credentials are needed. Do not run `npm start` against a copied production data directory.
 

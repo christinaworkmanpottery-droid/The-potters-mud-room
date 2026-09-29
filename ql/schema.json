@@ -4619,7 +4619,7 @@
     },
     {
       "name": "sales",
-      "sql": "CREATE TABLE \"sales\" (\n          id TEXT PRIMARY KEY,\n          user_id TEXT NOT NULL,\n          piece_id TEXT,\n          date TEXT,\n          price REAL,\n          venue TEXT,\n          venue_type TEXT,\n          buyer_name TEXT,\n          notes TEXT,\n          created_at TEXT DEFAULT (datetime('now')),\n          quantity INTEGER DEFAULT 1,\n          item_description TEXT,\n          event_name TEXT,\n          buyer_email TEXT,\n          buyer_phone TEXT,\n          image_filename TEXT, contact_id TEXT,\n          FOREIGN KEY (user_id) REFERENCES users(id),\n          FOREIGN KEY (piece_id) REFERENCES pieces(id) ON DELETE SET NULL\n        )",
+      "sql": "CREATE TABLE \"sales\" (\n      id TEXT PRIMARY KEY,\n      user_id TEXT NOT NULL,\n      piece_id TEXT,\n      date TEXT,\n      price REAL,\n      venue TEXT,\n      venue_type TEXT ,\n      buyer_name TEXT,\n      notes TEXT,\n      created_at TEXT DEFAULT (datetime('now')), quantity INTEGER DEFAULT 1, item_description TEXT, event_name TEXT, buyer_email TEXT, buyer_phone TEXT, image_filename TEXT, contact_id TEXT,\n      FOREIGN KEY (user_id) REFERENCES users(id),\n      FOREIGN KEY (piece_id) REFERENCES pieces(id) ON DELETE SET NULL\n    )",
       "columns": [
         {
           "cid": 0,
