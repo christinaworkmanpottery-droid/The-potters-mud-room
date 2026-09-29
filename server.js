@@ -460,6 +460,40 @@ function requireTier(min) {
 }
 function getPieceCount(uid) { return db.prepare('SELECT COUNT(*) as c FROM pieces WHERE user_id=?').get(uid).c; }
 
+let qlRelationshipService;
+function getQlRelationshipService() {
+  if (!qlRelationshipService) qlRelationshipService = require('./ql/relationships.cjs').createRelationshipService(db);
+  return qlRelationshipService;
+}
+function qlRelationshipError(res, error) {
+  const status = error?.status === 409 ? 409 : 404;
+  return res.status(status).json({ error: status === 409 ? 'QL relationships unavailable' : 'Relationship unavailable' });
+}
+for (const [pathName, kind, bodyKey] of [
+  ['firings', 'firing', 'firingId'],
+  ['test-tiles', 'testTile', 'testTileId'],
+  ['pricing', 'pricing', 'pricingId']
+]) {
+  app.get(`/api/ql/pieces/:pieceId/${pathName}`, auth, (req, res) => {
+    try {
+      res.json(getQlRelationshipService().list({ userId: req.userId, pieceId: req.params.pieceId, kind }));
+    } catch (error) { qlRelationshipError(res, error); }
+  });
+  app.post(`/api/ql/pieces/:pieceId/${pathName}`, auth, (req, res) => {
+    try {
+      const targetId = req.body?.[bodyKey];
+      const relationship = getQlRelationshipService().create({ userId: req.userId, pieceId: req.params.pieceId, kind, targetId });
+      res.status(201).json({ relationship });
+    } catch (error) { qlRelationshipError(res, error); }
+  });
+  app.delete(`/api/ql/pieces/:pieceId/${pathName}/:targetId`, auth, (req, res) => {
+    try {
+      const removed = getQlRelationshipService().remove({ userId: req.userId, pieceId: req.params.pieceId, kind, targetId: req.params.targetId });
+      res.json({ removed: removed > 0 });
+    } catch (error) { qlRelationshipError(res, error); }
+  });
+}
+
 // Helper: generate unique referral code
 function generateReferralCode() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
