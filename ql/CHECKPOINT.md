@@ -1,37 +1,65 @@
-# QL Phase 0 — resumable checkpoint
+# QL Phase 1A — resumable checkpoint
 
-Date: 2026-09-29. Scope: audit and isolated foundation only. Phase 1 has NOT begun.
+September 29, 2026. First Phase 1 foundation chunk complete; Phase 1 overall remains in progress.
+Branch: `ql/phase-1-relationships`. Commit: `git log -1 -- ql/CHECKPOINT.md`.
 
-## Saved
+Interrupted work recovered and all 63 test executions rerun successfully.
+Christina explicitly approved publishing this checkpoint to
+`christinaworkmanpottery-droid/The-potters-mud-room`, branch
+`ql/phase-1-relationships`, on September 29. No production deployment is authorized.
+Phase 0 preserved at `70c852d366e5ef193a1b3d882964e85628afa800` and its original branch.
 
-- Both repositories have `ql/phase-0-baseline`, anchored to the exact references in `baseline.json`.
-- Consolidated approved master scope, architecture/reuse map, data relationships, risk register, safe local verification instructions and fresh synthetic schema inventory committed here.
-- No existing application runtime file, dependency/lockfile, migration, production branch or service setting changed. No hosted QL environment, store build or deployment created. No customer data copied.
-- The private mobile branch's only addition is `QL-PHASE-0.md`. Its checkpoint SHA is recorded below once published.
+## Changed
 
-## Verification
+- Reviewed all nine requested domains and mobile cache/sync; see `RELATIONSHIPS.md`.
+- Added Piece–Firing, Piece–Test Tile and Piece–Pricing junctions with stable IDs, foreign keys,
+  uniqueness, same-owner triggers, transactional migration ledger and drift checks.
+- Added owner-scoped link helpers and legacy-compatible internal reader. Existing clay/glaze,
+  photo and sale links reused; raw-material recipes, names and IDs never inferred or rewritten.
+- Migration exercised only on synthetic databases. No runtime imports, startup activation,
+  existing API response changes or mobile source changes.
 
-- Website: **31 existing checks passed**, including auth identity on synthetic fixture, sales/quantity/cents, photo create/edit/copy/restart retention, notes, community ownership/duplicate prevention, URL normalization, directory privacy/radius and calendar export/navigation/DOM checks.
-- Additional disposable baseline: **61 tables**, SQLite `integrity_check=ok`, empty `foreign_key_check`, zero users, version 47 and unauthenticated `/api/auth/me` rejected with 401. Schema inventory contains no customer rows.
-- Mobile: **36 tests passed**, **113 JavaScript source files parsed**. Purchase calls mocked. Audited pinned source via GitHub; no native release build or actual device verification in this chunk.
-- Backend dependency install and tests succeeded with **Node 22.23.3**, unchanged lockfile. Default environment Node 24 installation failed; no dependency upgrade used to hide this.
-- Render metadata confirmed the live website uses baseline commit `b818122...`, and public version endpoint returned 47. The endpoint's `deployed` field is generated at request time, not a release timestamp.
-- Production default/release branches must still match pinned refs when resuming. Only QL branch updates are authorized here.
+## Tests
 
-## Limits / open gates
+Node **22.16.0**, unchanged package/lockfile. `node ql/verify-phase1.cjs` passed:
 
-No live database export or row-by-row audit, production backup/restore rehearsal, complete customer-session test, App Store/EAS build attestation, real Stripe/Apple/Google purchase, native device test or hosted staging isolation test. These remain explicit gates before affected build/release work, not implied passes.
+- **31 existing website checks** on the unchanged runtime/schema.
+- **17 QL tests**: current/historical fixtures; all 61 original table definitions/rows retained;
+  atomic/idempotent migrations, ownership, invalid links, deletion cleanup, nullable/name-only
+  records, legacy edits, drift rejection, restart, WAL database backup/restore and photo hashes.
+- **15 API checks on migrated synthetic data**: 14 repeated existing API cases plus one old
+  Piece create/read/edit/delete compatibility case. Server restart retained QL links.
+- Additional fresh-baseline integrity/FK/schema/version/auth checks passed. Twenty synthetic
+  photo files/references preserved; user/provider IDs, pricing JSON and sale amounts retained.
 
-Important risks: startup migrations/tier writes; inconsistent entitlement paths; missing backend `googleapis` dependency; mixed inline/table photo references; ownership checks on future links; unscoped mobile cache/queue; old default mobile branch and unknown installed iOS provenance. See BASELINE.md for evidence and proposed mitigations. No fixes to these existing behaviors were smuggled into Phase 0.
+**63 passing test executions**, deliberately including baseline/migrated API repetition.
+No real production schema/data or backup tested; no native/device/store tests this chunk.
+Mobile's previous 36-test result remains Phase 0 evidence, not new Phase 1 validation.
 
-## Exact recommended first Phase 1 chunk (not started)
+## Safety/source status
 
-**Relationship contract and preservation fixtures, centered on Pieces.** Define stable owner-scoped IDs, legacy nullable/name-only cases and proposed additive links for Piece ↔ Clay/Glazes/Firings; map Test Tiles, Raw Materials, Pricing/Sales/Contacts/Events compatibility. Implement synthetic legacy/current fixture builders and preservation/ownership tests, with no production schema application, UI redesign, Esme, voice or AI. Explicitly review migration approach before adding any migration. Resolve iOS binary provenance before changing/releasing shared native behavior; isolate mobile development configuration before launching any QL mobile preview.
+Website remote main still `b818122c88b8ca037866f2fd35eaa11690759169` on inspection.
+Mobile QL tree still `6bbc77a2f33790b44029778ba4f4b39e641c1806`, inspected read-only.
+No deployment, merge, hosted environment, store build, cloud resource, account/billing change,
+production data/photo access or customer communication. Older dirty checkouts left untouched.
+Original baseline.json is immutable; its authorization field describes Phase 0. This checkpoint
+records the user's September 29 Phase 1 authorization and completed work.
 
-Then verify → commit/push → checkpoint → stop for the next approved chunk. Do not interpret this recommendation as authorization.
+## Newly discovered/refined risks
 
-## Resume references
+- Legacy Piece-delete/bulk/casualty paths delete a firing outright; shared QL firing records
+  need protection before runtime integration. Current app cannot create these QL links.
+- Old FK constraints do not ensure same-account clay/glaze joins. The new reader filters
+  foreign-owned joins; current APIs have not been expanded/repaired in this chunk.
+- Junctions are not immutable archival history; endpoint deletion removes their links.
+- Prior startup migration, entitlement, mobile cache isolation, iOS source mapping and production
+  restore gates remain open. Historical synthetic variants are not exhaustive compatibility proof.
 
-Website QL checkpoint: the commit containing this file (use `git log -1 -- ql/CHECKPOINT.md`). The machine-readable source pins remain the original pre-QL baselines, not moving branch tips.
+## Exact next Phase 1B chunk
 
-Mobile QL checkpoint: `6bbc77a2f33790b44029778ba4f4b39e641c1806` (documentation only).
+**Shared-firing-safe lifecycle compatibility in the isolated website branch.** Fixture firings
+referenced by legacy `piece_id` and QL junctions; cover single/bulk Piece deletion, casualty
+paths, firing deletion and account deletion. Preserve remaining Pieces' firing records/photos,
+enforce ownership, define the last-association rule, retain legacy-only behavior. Test, commit,
+push and checkpoint. No migration activation, public endpoints, UI, AI, voice, mobile changes
+or raw-material linking in that chunk. Full contract in `RELATIONSHIPS.md`.
