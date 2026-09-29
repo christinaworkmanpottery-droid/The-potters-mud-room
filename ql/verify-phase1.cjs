@@ -23,9 +23,11 @@ for (const [args, extraEnv] of [
   [['tests/ql-studio-deletion-api.cjs'], {}],
   [['tests/ql-studio-deletion-api.cjs'], { QL_TEST_MIGRATION: '1' }],
   [['tests/ql-deletion-api.cjs'], {}],
-  [['tests/ql-deletion-api.cjs'], { QL_TEST_MIGRATION: '1' }]
+  [['tests/ql-deletion-api.cjs'], { QL_TEST_MIGRATION: '1' }],
+  [['--test', 'tests/ql-piece-history.cjs'], {}],
+  [['tests/ql-piece-history-api.cjs'], {}]
 ]) {
   const result = spawnSync(process.execPath, args, { cwd: root, env: { ...cleanEnv, ...extraEnv }, stdio: 'inherit' });
   if (result.status !== 0) process.exit(result.status || 1);
 }
-console.log('PASS complete Phase 1 regressions and mandatory safety checks: baseline + relationships + ownership-safe writes/reads + deletion lifecycle (legacy and QL) + read-only audit + exact fixture restore');
+console.log('PASS Phase 1 regressions/readiness unchanged plus Phase 2A Piece history service and endpoint');

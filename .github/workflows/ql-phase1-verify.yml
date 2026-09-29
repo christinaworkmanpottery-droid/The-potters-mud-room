@@ -1,7 +1,7 @@
-name: QL Phase 1 Verify
+name: QL Phase 1 + Phase 2A Verify
 on:
   push:
-    branches: [ql/phase-1-relationships]
+    branches: [ql/phase-1-relationships, ql/phase-2a-piece-history]
   workflow_dispatch:
 jobs:
   verify:
