@@ -1,6 +1,8 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{spawnSync}=require('node:child_process');
 const root=path.resolve(__dirname,'..'),chromium=process.env.CHROMIUM_PATH||['/usr/bin/chromium','/usr/bin/chromium-browser','/usr/bin/google-chrome'].find(fs.existsSync);
 if(!chromium){console.log('SKIP Phase 2C real-browser validation: Chromium unavailable');process.exit(0)}
+const smoke=spawnSync(chromium,['--headless=new','--no-sandbox','--disable-gpu','--dump-dom','data:text/html,<title>ql-smoke</title>'],{encoding:'utf8',timeout:5000});
+if(smoke.status!==0||!smoke.stdout.includes('ql-smoke')){console.log('SKIP Phase 2C real-browser validation: Chromium cannot execute reliably in this environment');process.exit(0)}
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'ql-history-browser-'));
 try{
  const app=fs.readFileSync(path.join(root,'public/app.js'),'utf8'),style=fs.readFileSync(path.join(root,'public/style.css'),'utf8'),start=app.indexOf('function historyElement'),end=app.indexOf('async function loadPieceHistory');
