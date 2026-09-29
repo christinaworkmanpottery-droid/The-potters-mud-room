@@ -466,8 +466,10 @@ function getQlRelationshipService() {
   return qlRelationshipService;
 }
 function qlRelationshipError(res, error) {
-  const status = error?.status === 409 ? 409 : 404;
-  return res.status(status).json({ error: status === 409 ? 'QL relationships unavailable' : 'Relationship unavailable' });
+  if (error?.status === 409) return res.status(409).json({ error: 'QL relationships unavailable' });
+  if (error?.status === 404) return res.status(404).json({ error: 'Relationship unavailable' });
+  console.error('[QL relationship]', error?.message || error);
+  return res.status(500).json({ error: 'Relationship update failed' });
 }
 for (const [pathName, kind, bodyKey] of [
   ['firings', 'firing', 'firingId'],
