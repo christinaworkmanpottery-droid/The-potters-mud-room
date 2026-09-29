@@ -1,53 +1,71 @@
-# QL Phase 1D — resumable checkpoint
+# QL Phase 1E — resumable checkpoint
 
-September 29, 2026. Phase 1D implementation is saved on `ql/phase-1-relationships`. Nothing has been deployed; production remains unchanged.
+September 29, 2026. Phase 1E complete on `ql/phase-1-relationships`. Nothing deployed; production unchanged.
 
-## Changed
+## Phase 1D verification gate
 
-- Added owner-scoped relationship validation to legacy/current API writes before saving client-supplied IDs.
-- Piece create/edit now validates Clay and Glaze library IDs against the authenticated account while preserving manual/custom glaze layers.
-- Firing create/edit validates legacy Piece links.
-- Test Tile create/edit validates Clay and Glaze links.
-- Glaze embedded clay-test creation validates a supplied Clay ID instead of silently converting a foreign/invalid ID into a manual relationship.
-- Piece and Firing photo upload/read paths validate the parent record belongs to the authenticated account.
-- Sales already validated Piece ownership on writes; its relationship reads are now owner-scoped.
+The exact Phase 1D checkpoint was verified before Phase 1E. GitHub Actions exposed two genuine blockers that had not been visible in the prior checkpoint:
+- The new corrupt-junction test fixture dropped INSERT triggers but not UPDATE triggers, so its intentional stale-row mutation was correctly blocked. Test-only repair: `a8a6566`.
+- The Firing detail serializer had one Piece join without the same-owner predicate already used by Firing list reads. Repair: `e202d7e`.
 
-## Safe reads / compatibility
+After those repairs, `node ql/verify-phase1.cjs` passed cleanly in GitHub Actions. Phase 1D is confirmed at **195 passing executions** (Phase 1C's 168 + 27 Phase 1D executions: 26 relationship-safety API checks across legacy/QL modes + 1 corrupt-junction reader test).
 
-- Piece, dashboard, casualty, Firing, Sales and Test Tile relationship joins now require matching owners before expanding related records.
-- Foreign/stale related IDs do not expose another account's Clay, Glaze, Piece or Firing data.
-- Missing related records remain nullable so otherwise valid legacy/manual records load.
-- Manual Piece glaze fallback (`custom_name`) remains available when the library Glaze is missing/deleted.
-- QL internal readers continue to filter junctions by relationship owner and endpoint owner; focused corrupt-junction coverage was added.
-- Existing QL same-owner triggers/helpers remain unchanged and continue protecting Piece↔Firing, Piece↔Test Tile and Piece↔Pricing junctions.
+## Centralized service
 
-## Account deletion / files
+`ql/relationships.cjs` is now the single service boundary for Piece↔Firing, Piece↔Test Tile and Piece↔Pricing:
+- same-owner Piece/target validation;
+- idempotent create;
+- owner-scoped remove with target validation;
+- safe list/read;
+- immediate SQLite transaction handling for mutations;
+- generic unavailable-record errors that do not distinguish missing from foreign IDs;
+- legacy Firing read-through merged with explicit QL links;
+- stale/foreign QL junction targets filtered by owner-scoped joins.
 
-- Account deletion preflight now covers Piece↔Clay, Piece↔Glaze, Test Tile↔Clay/Glaze, Firing↔Piece, Sale↔Piece, embedded Glaze↔Clay tests, and installed QL junctions.
-- Cross-account or stale relationship corruption rejects account deletion with 409 before mutations.
-- Self-service and admin deletion remain immediate SQLite transactions; SQL failure rolls back the database.
-- Phase 1 child photo metadata and Test Tiles are explicitly cleaned with the account.
-- Candidate account files are collected before the transaction commits and physically removed only after commit.
-- Global stored-file references are rechecked before unlink, so another surviving reference preserves the file; cleanup failure can leave an unused file but cannot roll back/corrupt committed DB state.
+Existing exported `link`/`unlink` behavior now uses the same validation/transaction path. No Phase 1B–1D deletion or file lifecycle behavior was replaced.
 
-## Schema / production boundary
+## Authenticated relationship API
 
-No Phase 1D schema migration, table change, backfill, dependency change, QL activation, production merge, Render deployment, mobile build, or production-data access.
+Added only these authenticated routes:
+- `GET|POST /api/ql/pieces/:pieceId/firings`
+- `DELETE /api/ql/pieces/:pieceId/firings/:targetId`
+- `GET|POST /api/ql/pieces/:pieceId/test-tiles`
+- `DELETE /api/ql/pieces/:pieceId/test-tiles/:targetId`
+- `GET|POST /api/ql/pieces/:pieceId/pricing`
+- `DELETE /api/ql/pieces/:pieceId/pricing/:targetId`
 
-## Tests added
+POST bodies accept only the related-record ID (`firingId`, `testTileId`, or `pricingId`). Authorization always uses `req.userId` from authentication; client-supplied user/account/owner IDs are ignored. Missing and foreign records return the same 404 shape. QL relationship tables not installed return 409. Unexpected transactional failures return a generic 500 without record ownership detail.
 
-- Added `tests/ql-relationship-safety-api.cjs`, executed by the Phase 1 verifier in legacy and opt-in QL modes.
-- Added corrupt/stale QL junction safe-read coverage to `tests/ql-relationships.cjs`.
-- Coverage includes same-account creation, cross-account Piece↔Clay/Glaze/Test Tile/Firing attempts, photo-parent attempts, legacy glaze-clay writes, stale/missing reads, safe serializers, valid account deletion, corrupt-account rollback, shared-file preservation, and all prior Phase 1A–1C suites through `ql/verify-phase1.cjs`.
-- A branch-only GitHub Actions verifier was added, but GitHub reported no workflow run/status for the branch in this environment. Therefore the new 1D suite has **not been represented as passed** here. The last fully executed checkpoint remains Phase 1C's 168 passing tests. Before starting Phase 1E, run `node ql/verify-phase1.cjs` in the normal repository environment and require exit 0.
+## Safe reads and compatibility
+
+Reads require an owned Piece, scope expanded targets to the same owner, filter corrupt/stale explicit junctions, and never expand another account's target. Firing lists preserve the legacy direct `firing_logs.piece_id` read-through and deduplicate it against explicit QL links. Existing manual Piece/Test Tile data remains untouched. Existing website/mobile API URLs and response contracts were not changed.
+
+## Schema / migration / production boundary
+
+No schema migration, table change, backfill, dependency change, UI, mobile, Esme/AI, voice, search, redesign, deployment, Render change, or production-data access. Phase 1A remains the only QL relationship migration and remains opt-in.
+
+## Verification
+
+Added `tests/ql-relationship-service-api.cjs` with 9 focused checks covering:
+- unauthenticated access;
+- create/read/remove for all three relationship types;
+- duplicate/idempotent create;
+- invalid and foreign IDs;
+- cross-account Piece reads;
+- ownership spoofing;
+- stale/foreign target filtering;
+- rollback on injected mutation failure;
+- legacy Firing read-through.
+
+The complete `node ql/verify-phase1.cjs` suite passed after implementation. **204 passing executions total** (195 verified Phase 1D + 9 Phase 1E). All prior Phase 1A–1D regression suites remain wired and passing.
 
 ## Newly discovered risks
 
-- The repository has no observable GitHub Actions run/status on this branch, so connector-only work cannot certify the Node regression suite.
-- SQLite and filesystem commits cannot be atomic; the established policy intentionally favors a harmless unused file over a broken live reference.
-- File-reference registry maintenance remains required when future file-bearing columns are introduced.
-- Pre-existing non-Phase-1 account/file domains remain outside this relationship-safety chunk.
+- QL relationship API mutation is intentionally unavailable until the existing Phase 1A relationship tables are installed; this preserves the opt-in/no-startup-migration boundary.
+- Legacy Firing direct links and explicit QL links can coexist; reads deduplicate them, but later write UX must define when an old-client `piece_id` edit should also create/remove an explicit link rather than silently changing semantics.
+- The service currently exposes Piece-centered reads only. Reverse record-centered relationship APIs are deliberately not added yet.
+- GitHub Actions warns that checkout/setup-node v4 actions are being forced from deprecated Node 20 action runtime to Node 24; application verification itself runs Node 22 as configured.
 
-## Exact recommended Phase 1E task — not started
+## Exact recommended Phase 1F task — not started
 
-**Phase 1E — Centralize relationship mutation/read services and expose the minimum authenticated QL relationship API without changing existing client behavior.** Consolidate the now-verified owner-scoped validators/readers so Piece↔Firing, Piece↔Test Tile and Piece↔Pricing links use one service boundary; add authenticated add/remove/list endpoints only where needed for later connected-studio work; preserve legacy fields/read-through/manual fallbacks; keep QL optional and production behavior unchanged; add idempotency, stale-link and rollback tests. Do not begin higher-level connected-studio UI, AI/Esme, search, provenance UX, or deployment in that chunk.
+**Phase 1F — Define and verify relationship synchronization/compatibility rules between legacy direct links and the new explicit QL Piece relationships, without adding UI.** Focus on Firing↔Piece first: audit old-client create/edit/remove behavior versus explicit QL links, define one deterministic compatibility policy, centralize any synchronization in the relationship service, prevent duplicate/divergent meaning, preserve historical legacy records, add API/rollback/cross-account tests, and run the full Phase 1 verifier. Do not add reverse APIs, connected-studio UI, Esme/AI, voice, search, redesign, or deployment unless required by that compatibility policy.
