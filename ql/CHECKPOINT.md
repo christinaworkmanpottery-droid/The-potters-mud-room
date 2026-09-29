@@ -34,8 +34,13 @@ Count excludes summaries, the baseline diagnostic and TODO tests.
 `QL_READINESS_STRICT=1 node --test tests/ql-readiness-blockers.cjs`:
 **1 pass, 9 failures, 0 TODO**, nonzero exit. This is the required closure gate, not an optional
 warning. Full-suite green alone cannot authorize closure. GitHub Actions runs both commands;
-its strict step is expected to fail until the repairs pass. Remote run status must be checked
-for the resulting commit after push; do not reuse Phase 1G's successful status.
+its strict step fails until the repairs pass.
+
+GitHub Actions verified implementation commit `4499fab29e221a7599bf080d312223d04fd9a4b6`:
+full verifier **successful**, strict closure gate **failed with the same 9 safety failures**
+(1 passing historical Tile check). Overall workflow: **failure**, correctly blocking closure.
+Run: https://github.com/christinaworkmanpottery-droid/The-potters-mud-room/actions/runs/36615958639
+The subsequent documentation-only checkpoint records this observed result; code/tests unchanged.
 
 ## Remaining blocking work / exact Phase 1I
 
