@@ -1539,7 +1539,7 @@ function glazeCardView(g) {
     '<button class="btn-ghost btn-sm" onclick="toggleClayTestForm(\'' + g.id + '\')" style="font-size:0.8rem">+ Add</button></div>' +
     ((g.clay_tests||[]).length ? (g.clay_tests||[]).map(t =>
       '<div style="background:var(--bg-light);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start">' +
-      (t.photo_filename ? '<img src="/uploads/' + t.photo_filename + '" style="width:48px;height:48px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in;flex-shrink:0" onclick="openLightbox(\'/uploads/' + t.photo_filename + '\')">' : '') +
+      (t.photo_filename ? glazeClayTestPhotoMarkup(g.id,t,'width:48px;height:48px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in;flex-shrink:0') : '') +
       '<div style="flex:1;min-width:0">' +
       '<div style="font-weight:600;font-size:0.85rem;color:var(--text)">' +
       (t.clay_body_id ? '<a href="#" onclick="event.preventDefault();navigate(\'clays\')" style="color:var(--primary);text-decoration:none">' + esc(t.clay_name) + '</a>' : esc(t.clay_name)) +
@@ -1580,6 +1580,7 @@ function glazeListView(g) {
 }
 async function loadGlazes() {
   try {
+    clearGlazeClayTestMedia();
     const generation = glazeMediaGeneration, sessionToken = token;
     const records = await api('/api/glazes');
     if (generation !== glazeMediaGeneration || sessionToken !== token) return;
@@ -1598,6 +1599,7 @@ async function loadGlazes() {
     c.className = mode === 'list' ? '' : 'card-grid';
     c.innerHTML = glazes.map(g => mode === 'list' ? glazeListView(g) : glazeCardView(g)).join('');
     loadGlazeMedia('glazeList');
+    loadGlazeClayTestMedia(c);
     updateBulkSelectionUI('glazes');
   } catch(e) { toast(e.message,'error'); }
 }
@@ -1635,7 +1637,7 @@ function openGlazeViewModal(g) {
     html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"><div class="detail-label" style="margin-bottom:8px">🪨 Clay Bodies Tested</div>' +
       g.clay_tests.map(t =>
         '<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;background:var(--bg-light);padding:8px;border-radius:var(--radius-sm)">' +
-        (t.photo_filename ? '<img src="/uploads/' + t.photo_filename + '" style="width:48px;height:48px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in;flex-shrink:0" onclick="openLightbox(\'/uploads/' + t.photo_filename + '\')">': '') +
+        (t.photo_filename ? glazeClayTestPhotoMarkup(g.id,t,'width:48px;height:48px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in;flex-shrink:0') : '') +
         '<div><div style="font-weight:600;font-size:0.85rem">' + esc(t.clay_name) + '</div>' +
         (t.result_notes ? '<div class="text-sm" style="color:var(--text-light)">' + esc(t.result_notes) + '</div>' : '') +
         '</div></div>'
@@ -1648,6 +1650,7 @@ function openGlazeViewModal(g) {
   document.getElementById('glazeViewPhotoBtn').onclick = () => { closeModal('glazeViewModal'); openGlazePhotoUpload(g.id); };
   openModal('glazeViewModal');
   loadGlazeMedia('glazeViewBody');
+  loadGlazeClayTestMedia(document.getElementById('glazeViewBody'));
 }
 function openGlazeModal(g) {
   document.getElementById('glazeId').value = g?.id||'';
@@ -5560,6 +5563,39 @@ async function deleteClayTest(glazeId, testId) {
   } catch(e) { toast(e.message, 'error'); }
 }
 
+const glazeClayTestMediaViews = new Map();
+let glazeClayTestMediaGeneration = 0;
+function clearGlazeClayTestMedia() {
+  glazeClayTestMediaGeneration++;
+  for (const uri of glazeClayTestMediaViews.values()) if (uri.startsWith('blob:')) URL.revokeObjectURL(uri);
+  glazeClayTestMediaViews.clear();
+}
+function glazeClayTestPhotoMarkup(glazeId,test,style) {
+  const legacy=test.photoDelivery!=='owner-protected';
+  return '<img data-glaze-clay-test-id="'+esc(test.id)+'" data-glaze-id="'+esc(glazeId)+'" data-photo-delivery="'+esc(test.photoDelivery||'legacy-ambiguous')+'" data-photo-filename="'+esc(test.photo_filename)+'" '+(legacy?'src="/uploads/'+encodeURIComponent(test.photo_filename)+'" ':'')+'style="'+style+'">';
+}
+async function loadGlazeClayTestMedia(root) {
+  if (!root) return;
+  const generation=glazeClayTestMediaGeneration, sessionToken=token;
+  await Promise.all(Array.from(root.querySelectorAll('img[data-glaze-clay-test-id]')).map(async img => {
+    const {glazeId,glazeClayTestId:testId,photoFilename:filename,photoDelivery}=img.dataset;
+    if(photoDelivery!=='owner-protected'){img.onclick=()=>openLightbox(img.src);img.onerror=()=>{img.style.display='none'};return;}
+    const key=[currentUser?.id||'',glazeId,testId,filename].join(':');
+    try{
+      let uri=glazeClayTestMediaViews.get(key);
+      if(!uri){
+        const response=await fetch('/api/ql/glazes/'+encodeURIComponent(glazeId)+'/clay-tests/'+encodeURIComponent(testId)+'/photo',{headers:{Authorization:'Bearer '+sessionToken},cache:'no-store'});
+        if(!response.ok)throw new Error('Photo unavailable');
+        uri=URL.createObjectURL(await response.blob());
+        if(generation!==glazeClayTestMediaGeneration||sessionToken!==token){URL.revokeObjectURL(uri);return;}
+        glazeClayTestMediaViews.set(key,uri);
+      }
+      if(generation!==glazeClayTestMediaGeneration||sessionToken!==token||!img.isConnected)return;
+      img.src=uri;img.onclick=()=>openLightbox(uri);img.onerror=()=>{img.style.display='none'};
+    }catch(_){if(generation===glazeClayTestMediaGeneration&&sessionToken===token&&img.isConnected)img.style.display='none';}
+  }));
+}
+
 // ---- Modal clay test functions ----
 function renderModalClayTests(tests) {
   const el = document.getElementById('glazeClayTestsList');
@@ -5570,7 +5606,7 @@ function renderModalClayTests(tests) {
   }
   el.innerHTML = tests.map(t =>
     '<div style="background:var(--bg-light);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start">' +
-    (t.photo_filename ? '<img src="/uploads/' + t.photo_filename + '" style="width:40px;height:40px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in;flex-shrink:0" onclick="openLightbox(\'/uploads/' + t.photo_filename + '\')">' : '') +
+    (t.photo_filename ? glazeClayTestPhotoMarkup(document.getElementById('glazeId')?.value||'',t,'width:40px;height:40px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in;flex-shrink:0') : '') +
     '<div style="flex:1;min-width:0">' +
     '<div style="font-weight:600;font-size:0.85rem">' + esc(t.clay_name) + '</div>' +
     (t.result_notes ? '<div class="text-sm" style="color:var(--text-light)">' + esc(t.result_notes) + '</div>' : '') +
@@ -5578,6 +5614,7 @@ function renderModalClayTests(tests) {
     '<button type="button" class="btn-ghost btn-sm" onclick="deleteModalClayTest(\'' + t.id + '\')" style="color:var(--text-muted);flex-shrink:0" title="Remove">×</button>' +
     '</div>'
   ).join('');
+  loadGlazeClayTestMedia(el);
 }
 
 async function populateModalClayTestDropdown() {
