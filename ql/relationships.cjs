@@ -78,7 +78,10 @@ function requireOwned(db, table, userId, id) {
   if (typeof userId !== 'string' || !userId || typeof id !== 'string' || !id ||
       !db.prepare(`SELECT 1 FROM ${table} WHERE id=? AND user_id=?`).get(id, userId)) {
     // Same response for absent and another account's records.
-    throw new Error('Record unavailable');
+    const error = new Error('Record unavailable');
+    error.code = 'QL_RECORD_UNAVAILABLE';
+    error.status = 404;
+    throw error;
   }
 }
 
