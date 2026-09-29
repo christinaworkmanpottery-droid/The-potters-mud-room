@@ -57,7 +57,7 @@ test('Phase 2F leaves global uploads behavior unchanged',()=>{
 });
 test('Phase 2F documentation forbids automatic historical reclassification',()=>{
   assert.match(inventory,/No historical reclassification is performed in Phase 2F/);
-  assert.match(inventory,/Never infer visibility from filename\/UUID/);
+  assert.match(inventory,/No filename shape, UUID entropy, or extension is used as visibility evidence/);
   assert.match(migration,/Never infer visibility from filename\/UUID/);
 });
 test('migration and rollback plans cover required readiness controls',()=>{
