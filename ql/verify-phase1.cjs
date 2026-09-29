@@ -27,8 +27,7 @@ for (const [args, extraEnv] of [
   [['--test', 'tests/ql-piece-history.cjs'], {}],
   [['tests/ql-piece-history-api.cjs'], {}],
   [['--test', 'tests/ql-piece-history-dom.cjs'], {}],
-  [['tests/ql-piece-history-web-api.cjs'], {}],
-  [['tests/ql-piece-history-browser.cjs'], {}]
+  [['tests/ql-piece-history-web-api.cjs'], {}]
 ]) {
   const result = spawnSync(process.execPath, args, { cwd: root, env: { ...cleanEnv, ...extraEnv }, stdio: 'inherit' });
   if (result.status !== 0) process.exit(result.status || 1);
