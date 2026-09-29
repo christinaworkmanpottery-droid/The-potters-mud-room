@@ -201,7 +201,7 @@ const STATUS_LABELS = { 'in-progress':'In Progress','leather-hard':'Leather Hard
 const CASUALTY_LABELS = { 'cracked':'Cracked','exploded':'Exploded / Blowout','warped':'Warped','s-crack':'S-Crack','glaze-crawl':'Glaze Crawl','glaze-pinhole':'Glaze Pinholing','glaze-shiver':'Glaze Shivering','glaze-crazing':'Glaze Crazing','glaze-runoff':'Glaze Ran Off','thermal-shock':'Thermal Shock','broke-trimming':'Broke While Trimming','broke-handling':'Broke While Handling','collapsed':'Collapsed','dunting':'Dunting','wrong-color':'Unexpected Color Result','other':'Other' };
 function fmtStatus(s) { return s ? '<span class="status-badge status-' + s + '">' + (STATUS_LABELS[s]||s) + '</span>' : ''; }
 function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function closeModal(id) { if (id === 'clayViewModal') clearClayMedia('clayViewBody'); document.getElementById(id).classList.remove('open'); }
 
 // iOS decimal keyboards have no native Done key. Give every numeric field a
 // consistent way to dismiss the keyboard so form buttons remain reachable.
@@ -422,6 +422,7 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     if (isSignUp && referredBy) sessionStorage.removeItem('referral_code');
     // A successful auth response may replace an existing session without an explicit logout.
     // Clear any private History DOM/blob URLs before installing the new account token.
+    clearClayMedia();
     clearPieceHistory();
     token = data.token;
     localStorage.setItem('mudlog_token', token);
@@ -438,6 +439,7 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
   }
 });
 function logout() {
+  clearClayMedia();
   clearPieceHistory();
   token = null; currentUser = null;
   localStorage.removeItem('mudlog_token');
@@ -513,6 +515,7 @@ function showApp() {
 let currentPage = 'dashboard';
 let restoredUrl = '';
 function navigate(page, options = {}) {
+  if (page !== 'clayBodies') clearClayMedia();
   if (page !== 'pieceDetail') clearPieceHistory();
   try {
     if (!token && !guestMode) {
@@ -1228,10 +1231,62 @@ async function uploadPhoto(e) {
 }
 
 // ---- Clay Bodies ----
+let clayMediaGeneration = 0;
+const clayMediaViews = new Map();
+function clearClayMedia(scope) {
+  if (!scope) clayMediaGeneration++;
+  for (const [key, view] of clayMediaViews) {
+    if (scope && key !== scope) continue;
+    view.active = false;
+    view.controller.abort();
+    view.urls.forEach(url => URL.revokeObjectURL(url));
+    view.images.forEach(img => { img.removeAttribute('src'); img.dataset.protectedReady = '0'; });
+    clayMediaViews.delete(key);
+  }
+  const lightbox = document.getElementById('lightboxImg');
+  if (lightbox?.src?.startsWith('blob:')) { lightbox.removeAttribute('src'); closeLightbox(); }
+  if (!scope) {
+    clayBodies = [];
+    ['clayList', 'clayViewBody'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+    document.getElementById('clayViewModal')?.classList.remove('open');
+  }
+}
+function clayPhotoMarkup(clay, photo, style = '') {
+  const protectedPhoto = clay.photoDelivery === 'owner-protected';
+  const attrs = protectedPhoto
+    ? 'data-private-clay-photo="' + esc(photo.id) + '" data-clay-id="' + esc(clay.id) + '" data-protected-ready="0"'
+    : 'src="/uploads/' + encodeURIComponent(photo.filename) + '"';
+  return '<img ' + attrs + ' class="glaze-thumb" alt="Clay photo" style="' + style + '" onclick="event.stopPropagation();if(this.src)openLightbox(this.src)">';
+}
+async function loadClayMedia(scope) {
+  clearClayMedia(scope);
+  const root = document.getElementById(scope);
+  if (!root) return;
+  const generation = clayMediaGeneration, sessionToken = token;
+  const view = { active: true, controller: new AbortController(), urls: [], images: [...root.querySelectorAll('[data-private-clay-photo]')] };
+  clayMediaViews.set(scope, view);
+  const active = img => view.active && generation === clayMediaGeneration && token === sessionToken && img.isConnected;
+  await Promise.all(view.images.map(async img => {
+    try {
+      const response = await fetch(API + '/api/ql/clay-bodies/' + encodeURIComponent(img.dataset.clayId) + '/photos/' + encodeURIComponent(img.dataset.privateClayPhoto), {
+        headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store', signal: view.controller.signal
+      });
+      if (!response.ok) throw new Error('Photo unavailable');
+      const blob = await response.blob();
+      if (!active(img)) return;
+      const url = URL.createObjectURL(blob);
+      view.urls.push(url);
+      img.src = url;
+      img.dataset.protectedReady = '1';
+      img.onerror = () => { img.removeAttribute('src'); img.alt = 'Photo unavailable'; };
+    } catch (_) { if (active(img)) { img.removeAttribute('src'); img.alt = 'Photo unavailable'; } }
+  }));
+}
+
 function clayCardView(cl) {
   const stockBadge = cl.in_stock ? '' : '<span class="piece-meta-tag" style="background:rgba(220,53,69,0.1);color:var(--danger)">Out of Stock</span>';
   const photos = (cl.photos||[]).map(p =>
-    '<div style="position:relative;display:inline-block"><img src="/uploads/' + p.filename + '" class="glaze-thumb" loading="lazy" onclick="openLightbox(\'/uploads/' + p.filename + '\')" style="cursor:zoom-in">' +
+    '<div style="position:relative;display:inline-block">' + clayPhotoMarkup(cl, p, 'cursor:zoom-in') +
     '<div style="font-size:0.7rem;color:var(--text-muted);text-align:center">' + esc(p.photo_label||'') + '</div>' +
     (p.notes ? '<div style="font-size:0.65rem;color:var(--text-light)">' + esc(p.notes) + '</div>' : '') +
     '<button class="btn-ghost btn-sm" style="position:absolute;top:0;right:0;font-size:0.7rem" onclick="event.stopPropagation();deleteClayPhoto(\'' + p.id + '\')">×</button></div>'
@@ -1278,7 +1333,10 @@ function clayListView(cl) {
 }
 async function loadClayBodies() {
   try {
-    clayBodies = await api('/api/clay-bodies');
+    const generation = clayMediaGeneration, sessionToken = token;
+    const result = await api('/api/clay-bodies');
+    if (generation !== clayMediaGeneration || sessionToken !== token) return;
+    clayBodies = result;
     if (currentPage !== 'clayBodies') return;
     const c = document.getElementById('clayList'), em = document.getElementById('clayEmpty');
     
@@ -1291,6 +1349,7 @@ async function loadClayBodies() {
     const mode = getViewMode('clay');
     c.className = mode === 'list' ? '' : 'card-grid';
     c.innerHTML = clayBodies.map(cl => mode === 'list' ? clayListView(cl) : clayCardView(cl)).join('');
+    void loadClayMedia('clayList');
     updateBulkSelectionUI('clayBodies');
   } catch(e) { toast(e.message,'error'); }
 }
@@ -1299,7 +1358,7 @@ function viewClayById(id) { const c = clayBodies.find(x=>x.id===id); if(c) openC
 function openClayViewModal(cl) {
   const photos = (cl.photos||[]).map(p =>
     '<div style="display:inline-block;margin-right:8px;text-align:center">' +
-    '<img src="/uploads/' + p.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')"><br>' +
+    clayPhotoMarkup(cl, p, 'width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in') + '<br>' +
     (p.photo_label ? '<span style="font-size:0.7rem;color:var(--text-muted)">' + esc(p.photo_label) + '</span>' : '') +
     '</div>'
   ).join('');
@@ -1323,6 +1382,7 @@ function openClayViewModal(cl) {
   document.getElementById('clayViewEditBtn').onclick = () => { closeModal('clayViewModal'); editClayById(cl.id); };
   document.getElementById('clayViewPhotoBtn').onclick = () => { closeModal('clayViewModal'); openClayPhotoUpload(cl.id); };
   openModal('clayViewModal');
+  void loadClayMedia('clayViewBody');
 }
 function openClayModal(c) {
   document.getElementById('clayId').value = c?.id||'';

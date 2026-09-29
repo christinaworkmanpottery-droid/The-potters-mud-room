@@ -1775,10 +1775,39 @@ app.get('/api/export/contacts', auth, (req, res) => {
 });
 
 // ============ CLAY BODIES ============
+// Delivery policy, not historical publication metadata. Clay has no public flag.
+// Verify the parent owner now; never rewrite historical rows or infer publication.
+function clayMediaContract(clay) {
+  clay.photoDelivery = clay.user_id ? 'owner-protected' : 'legacy-ambiguous';
+  clay.photoVisibility = 'legacy-ambiguous';
+  return clay;
+}
+app.get('/api/ql/clay-bodies/:clayId/photos/:photoId', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const photo = db.prepare(`SELECT ph.* FROM clay_photos ph JOIN clay_bodies c ON c.id=ph.clay_id
+      WHERE ph.id=? AND c.id=? AND c.user_id=?`).get(req.params.photoId, req.params.clayId, req.userId);
+    if (!photo) return unavailable();
+    const target = safeStoredUpload(photo.filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(photo.filename)) return unavailable();
+    const owned = ownedPhotoSlots(photo.filename, req.userId);
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(photo.filename);
+        if (rows.some(row => !owned.some(slot => slot.table === table && slot.column === column && slot.id === row.id))) return unavailable();
+      }
+    }
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
 app.get('/api/clay-bodies', auth, (req, res) => {
   const clays = db.prepare('SELECT * FROM clay_bodies WHERE user_id=? ORDER BY name').all(req.userId);
   const getPhotos = db.prepare('SELECT * FROM clay_photos WHERE clay_id=? ORDER BY sort_order');
-  clays.forEach(c => { c.photos = getPhotos.all(c.id); });
+  clays.forEach(c => { c.photos = getPhotos.all(c.id); clayMediaContract(c); });
   res.json(clays);
 });
 
@@ -1786,6 +1815,7 @@ app.get('/api/clay-bodies/:id', auth, (req, res) => {
   const clay = db.prepare('SELECT * FROM clay_bodies WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!clay) return res.status(404).json({ error: 'Not found' });
   clay.photos = db.prepare('SELECT * FROM clay_photos WHERE clay_id=? ORDER BY sort_order').all(clay.id);
+  clayMediaContract(clay);
   res.json({ clay });
 });
 
@@ -1842,12 +1872,14 @@ app.post('/api/clay-bodies/:id/photos', auth, upload.single('photo'), (req, res)
       if (!db.prepare('SELECT 1 FROM clay_bodies WHERE id=? AND user_id=?').get(req.params.id, req.userId)) return null;
       const maxPhotos = req.userTier === 'free' ? 1 : 3;
       const existing = db.prepare('SELECT * FROM clay_photos WHERE clay_id=? ORDER BY sort_order').all(req.params.id);
-      const removed = req.body.replace === 'true' ? existing : existing.length >= maxPhotos ? [existing[0]] : [];
+      const targetPhoto = req.body.replacePhotoId ? existing.find(photo => photo.id === req.body.replacePhotoId) : null;
+      if (req.body.replacePhotoId && !targetPhoto) return null;
+      const removed = targetPhoto ? [targetPhoto] : req.body.replace === 'true' ? existing : existing.length >= maxPhotos ? [existing[0]] : [];
       for (const photo of removed) db.prepare('DELETE FROM clay_photos WHERE id=?').run(photo.id);
       const count = db.prepare('SELECT COUNT(*) as c FROM clay_photos WHERE clay_id=?').get(req.params.id).c;
-      const id = uuidv4();
+      const id = targetPhoto ? targetPhoto.id : uuidv4();
       db.prepare('INSERT INTO clay_photos (id,clay_id,filename,original_name,photo_label,notes,sort_order) VALUES (?,?,?,?,?,?,?)')
-        .run(id, req.params.id, req.file.filename, req.file.originalname, req.body.label||null, req.body.notes||null, count);
+        .run(id, req.params.id, req.file.filename, req.file.originalname, targetPhoto ? targetPhoto.photo_label : req.body.label||null, targetPhoto ? targetPhoto.notes : req.body.notes||null, targetPhoto ? targetPhoto.sort_order : count);
       return { id, files: removed.map(p => p.filename) };
     }).immediate();
     if (!result) {

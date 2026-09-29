@@ -115,3 +115,7 @@ No historical reclassification is performed in Phase 2F.
 **GLOBAL `/uploads` IS NOT READY FOR RESTRICTION.**
 
 The smallest next blocker-removal slice is **Phase 2G: protected delivery for Clay media only, web + shared mobile, preserving filenames and global `/uploads` compatibility.** Clay is a contained, clearly account-owned category with straightforward parent ownership and no intentional public surface. Phase 2G should add owner-scoped Clay photo delivery, protected-aware web/mobile Clay loaders, account/session cache safety consistent with Phase 2E, focused regressions, and no global static-route change.
+
+## Phase 2G addendum
+
+The inventory above is the Phase 2F historical baseline. Clay now has owner-protected web/shared-mobile delivery on the isolated Phase 2G branch, with historical visibility still unknown. See `PHASE2G-CLAY-MEDIA.md` for complete mapping, scoped edit isolation and remaining static-URL exposure. Global restriction remains NOT READY. Next implementation slice is Glaze library photos only.
