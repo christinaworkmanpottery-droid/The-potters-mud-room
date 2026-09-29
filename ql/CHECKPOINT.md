@@ -12,7 +12,11 @@ added. No mutations, inferred links, backfill or editing controls added to Histo
 
 Local complete verification: **380 passes** (342 unchanged baseline + **38 Phase 2B checks**).
 Strict Phase 1 gate: **37/37**. Final runs: zero failures, skips or TODOs. Baseline tests unchanged.
-GitHub Actions: pending push/verification; use branch HEAD and exact-head workflow as truth.
+Implementation commit: `0f09b175742c8e9faa999e2bc5ba4887f89e8c6a`.
+GitHub Actions: **SUCCESS**, run **36628329748**, on that exact implementation commit.
+Fresh npm ci, complete verifier and unchanged strict gate all passed; CI logs inspected.
+https://github.com/christinaworkmanpottery-droid/The-potters-mud-room/actions/runs/36628329748
+This follow-up checkpoint changes documentation only; its exact-head CI runs separately.
 
 No production access, migration or deployment. Phase 2C not started.
 
