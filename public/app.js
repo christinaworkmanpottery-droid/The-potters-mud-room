@@ -435,6 +435,7 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
   }
 });
 function logout() {
+  clearPieceHistory();
   token = null; currentUser = null;
   localStorage.removeItem('mudlog_token');
   document.getElementById('landingPage').style.display = '';
@@ -509,6 +510,7 @@ function showApp() {
 let currentPage = 'dashboard';
 let restoredUrl = '';
 function navigate(page, options = {}) {
+  if (page !== 'pieceDetail') clearPieceHistory();
   try {
     if (!token && !guestMode) {
       if (isGuestPreviewPage(page)) {
@@ -689,9 +691,138 @@ function pieceListRow(p) {
 function debounceLoadPieces() { clearTimeout(debounceTimer); debounceTimer = setTimeout(loadPieces, 300); }
 
 // ---- Piece Detail ----
-async function viewPiece(id) {
+// Connected History renders only the authenticated service response. No relationship assembly.
+let pieceViewGeneration = 0;
+let pieceHistoryUrls = [];
+function clearPieceHistory() {
+  pieceViewGeneration++;
+  pieceHistoryUrls.forEach(url => URL.revokeObjectURL(url));
+  pieceHistoryUrls = [];
+  document.getElementById('pieceHistory')?.remove();
+}
+function historyElement(tag, text, className) {
+  const el = document.createElement(tag);
+  if (text != null) el.textContent = String(text);
+  if (className) el.className = className;
+  return el;
+}
+function renderPieceHistory(container, data) {
+  container.replaceChildren(historyElement('h2', 'Connected History'));
+  container.append(historyElement('p', 'Saved records connected to this piece. Edit them in their usual sections.', 'text-sm'));
+  const groups = [
+    ['Clay', data.clay ? [data.clay] : []],
+    ['Glaze layers', data.glazeLayers],
+    // Filter the server timeline, retaining its established chronology within each group.
+    ['Firings', data.history?.filter(e => e?.recordType === 'firing')],
+    ['Test Tiles', data.history?.filter(e => e?.recordType === 'test-tile')],
+    ['Pricing', data.history?.filter(e => e?.recordType === 'pricing')],
+    ['Sales', data.history?.filter(e => e?.recordType === 'sale')],
+    ['Piece photos', data.photos]
+  ];
+  let count = 0;
+  for (const [label, entries] of groups) {
+    const rows = Array.isArray(entries) ? entries.filter(e => e && e.values) : [];
+    if (!rows.length) continue;
+    count += rows.length;
+    const section = historyElement('section', null, 'piece-history-group');
+    section.append(historyElement('h3', label));
+    const list = historyElement(label === 'Glaze layers' ? 'ol' : 'ul');
+    for (const e of rows) {
+      const v = e.values;
+      const layer = v.layer || {};
+      const item = historyElement('li');
+      item.dataset.recordId = e.sourceRecordId;
+      let name;
+      switch (e.recordType) {
+        case 'glaze-layer': name = e.manualLabel || v.glaze?.name || 'Unnamed glaze layer'; break;
+        case 'firing': name = v.name || [v.firing_type || 'Firing', v.kiln_name].filter(Boolean).join(' — '); break;
+        case 'sale': name = v.item_description || v.venue || 'Sale'; break;
+        case 'piece-photo': name = e.manualLabel || 'Piece photo'; break;
+        default: name = v.name || e.manualLabel || label;
+      }
+      item.append(historyElement('strong', name));
+      const details = [];
+      if (e.recordType === 'glaze-layer') {
+        if (!v.glaze) details.push('Manual glaze');
+        if (layer.coats != null) details.push(layer.coats + (Number(layer.coats) === 1 ? ' coat' : ' coats'));
+        if (layer.application_method) details.push(layer.application_method);
+        if (layer.notes) details.push(layer.notes);
+      }
+      if (e.recordType === 'clay' && v.brand) details.push(v.brand);
+      if (e.recordType === 'firing') {
+        if (v.cone != null && v.cone !== '') details.push('Cone ' + v.cone);
+        if (v.atmosphere) details.push(v.atmosphere);
+        if (v.results) details.push(v.results);
+      }
+      if (['test-tile', 'pricing'].includes(e.recordType)) details.push('Linked to this piece');
+      if (e.recordType === 'sale' && v.price != null && Number.isFinite(Number(v.price))) details.push('$' + Number(v.price).toFixed(2));
+      if (details.length) item.append(historyElement('div', details.join(' · '), 'text-sm'));
+      // Show the actual supplied date verbatim: no timezone shift or invented date.
+      let dateLabel = 'Undated';
+      if (e.recordedAt) {
+        const eventDate = ['firing', 'sale'].includes(e.recordType) && v.date;
+        dateLabel = (eventDate ? 'Date: ' : 'Record added: ') + e.recordedAt;
+      }
+      if (e.relationshipDate) dateLabel += ' · Linked: ' + e.relationshipDate;
+      item.append(historyElement('div', dateLabel, 'text-sm piece-history-date'));
+      if (e.recordType === 'piece-photo') {
+        const placeholder = historyElement('div', 'Loading photo…', 'text-sm');
+        placeholder.dataset.historyPhoto = e.sourceRecordId;
+        item.append(placeholder);
+      }
+      list.append(item);
+    }
+    section.append(list);
+    container.append(section);
+  }
+  if (!count) container.append(historyElement('p', 'No connected history recorded yet.'));
+  container.setAttribute('aria-busy', 'false');
+}
+async function loadPieceHistory(id, container, generation, sessionToken) {
+  const active = () => container.isConnected && generation === pieceViewGeneration && token === sessionToken;
   try {
-    const p = await api('/api/pieces/' + id);
+    const data = await api('/api/ql/pieces/' + encodeURIComponent(id) + '/history');
+    if (!active()) return;
+    renderPieceHistory(container, data);
+    // Photo bytes are authenticated too; never load the public filename from metadata.
+    await Promise.all(Array.from(container.querySelectorAll('[data-history-photo]')).map(async placeholder => {
+      try {
+        const response = await fetch(API + '/api/ql/pieces/' + encodeURIComponent(id) + '/history/photos/' + encodeURIComponent(placeholder.dataset.historyPhoto), {
+          headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store'
+        });
+        if (!response.ok) throw new Error('unavailable');
+        const blob = await response.blob();
+        if (!active()) return;
+        const url = URL.createObjectURL(blob);
+        pieceHistoryUrls.push(url);
+        const img = historyElement('img', null, 'piece-history-photo');
+        img.alt = placeholder.parentElement.querySelector('strong').textContent;
+        img.onerror = () => { if (active()) placeholder.textContent = 'Photo unavailable'; };
+        img.src = url;
+        placeholder.replaceChildren(img);
+      } catch (_) { if (active()) placeholder.textContent = 'Photo unavailable'; }
+    }));
+  } catch (_) {
+    if (!active()) return;
+    container.replaceChildren(historyElement('h2', 'Connected History'), historyElement('p', 'History could not be loaded. Your piece details are still available.'));
+    container.setAttribute('aria-busy', 'false');
+    const retry = historyElement('button', 'Try again', 'btn btn-secondary btn-sm');
+    retry.type = 'button';
+    retry.onclick = () => {
+      container.replaceChildren(historyElement('h2', 'Connected History'), historyElement('p', 'Loading connected history…'));
+      container.setAttribute('aria-busy', 'true');
+      loadPieceHistory(id, container, generation, sessionToken);
+    };
+    container.append(retry);
+  }
+}
+
+async function viewPiece(id) {
+  clearPieceHistory();
+  const generation = pieceViewGeneration, sessionToken = token;
+  try {
+    const p = await api('/api/pieces/' + encodeURIComponent(id));
+    if (generation !== pieceViewGeneration || token !== sessionToken) return;
     navigate('pieceDetail');
     window._currentPieceId = p.id;
     window._currentPiecePhotos = p.photos || [];
@@ -765,6 +896,14 @@ async function viewPiece(id) {
         (p.casualty_lesson ? '<div class="detail-field" style="background:rgba(40,167,69,0.08);padding:10px;border-radius:var(--radius-sm);margin-top:8px"><div class="detail-label" style="color:var(--success)">🎓 Lesson Learned</div><div class="detail-value">' + esc(p.casualty_lesson) + '</div></div>' : '') +
         '</div>' : '') +
       '</div></div>';
+    const history = historyElement('section', null, 'card piece-history');
+    history.id = 'pieceHistory';
+    history.setAttribute('aria-label', 'Connected History');
+    history.setAttribute('aria-live', 'polite');
+    history.setAttribute('aria-busy', 'true');
+    history.append(historyElement('h2', 'Connected History'), historyElement('p', 'Loading connected history…'));
+    document.getElementById('pieceDetailContent').append(history);
+    void loadPieceHistory(p.id, history, generation, sessionToken);
   } catch (err) { toast(err.message, 'error'); }
 }
 function df(label, val) {

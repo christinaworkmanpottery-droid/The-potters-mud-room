@@ -256,3 +256,13 @@ body.nav-open { overflow: hidden; }
 #clayList .card:hover, #glazeList .card:hover, #salesList .card:hover,
 #goalsList .card:hover, #projectsList .card:hover, #eventsList .card:hover,
 #contactsList .card:hover { border-color: var(--primary); }
+
+/* Read-only connected Piece history, using existing card/type/color tokens. */
+.piece-history { margin-top: 20px; overflow-wrap: anywhere; }
+.piece-history h2 { margin-bottom: 8px; }
+.piece-history-group { margin-top: 20px; min-width: 0; }
+.piece-history-group h3 { margin-bottom: 8px; }
+.piece-history-group ul, .piece-history-group ol { padding-left: 24px; }
+.piece-history-group li { padding: 8px 0; }
+.piece-history-date { color: var(--text-light); margin-top: 4px; }
+.piece-history-photo { display: block; max-width: 100%; width: 240px; max-height: 240px; object-fit: contain; margin-top: 8px; border-radius: var(--radius-sm); }

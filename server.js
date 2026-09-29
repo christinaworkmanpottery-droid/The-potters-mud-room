@@ -507,6 +507,7 @@ function getQlPieceHistoryService() {
   return qlPieceHistoryService;
 }
 app.get('/api/ql/pieces/:pieceId/history', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
   try {
     res.json(getQlPieceHistoryService().get({ userId: req.userId, pieceId: req.params.pieceId }));
   } catch (error) {
@@ -514,6 +515,33 @@ app.get('/api/ql/pieces/:pieceId/history', auth, (req, res) => {
     console.error('[QL Piece history]', error?.message || error);
     res.status(500).json({ error: 'Piece history unavailable' });
   }
+});
+
+// Read-only byte delivery for History. IDs alone never authorize a private photo.
+app.get('/api/ql/pieces/:pieceId/history/photos/:photoId', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const photo = db.prepare(`SELECT ph.* FROM piece_photos ph JOIN pieces p ON p.id=ph.piece_id
+      WHERE ph.id=? AND p.id=? AND p.user_id=?`).get(req.params.photoId, req.params.pieceId, req.userId);
+    if (!photo) return unavailable();
+    const target = safeStoredUpload(photo.filename);
+    if (!target) return unavailable();
+    // Ambiguous cross-account filenames must not expose another owner's bytes.
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    const owned = ownedPhotoSlots(photo.filename, req.userId);
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(photo.filename);
+        if (rows.some(row => !owned.some(slot => slot.table === table && slot.column === column && slot.id === row.id))) return unavailable();
+      }
+    }
+    // Only raster image formats used by Piece uploads; never execute stored SVG/HTML.
+    if (!/\.(?:jpe?g|png|webp|gif|avif)$/i.test(photo.filename)) return unavailable();
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
 });
 
 // Helper: generate unique referral code

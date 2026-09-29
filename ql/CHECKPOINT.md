@@ -1,82 +1,26 @@
-# Quantum Leap checkpoint — Phase 1I
+# Quantum Leap checkpoint — Phase 2B
 
-Date: 2026-09-29. Branch: `ql/phase-1-relationships`.
-Starting checkpoint: `d56a495bbff24b241881951bec6213b7f38746d2`.
-Verified implementation commit: `a9e680472f5d707e152b1344753f1d887770dafa`.
-This final documentation checkpoint records that CI result; code/tests are unchanged.
+Date: 2026-09-29. Branch: `ql/phase-2b-piece-history-web`.
+Base checkpoint: `7ebc4db94c2d42317483c8cdd1470124613e121f`.
 
-**Phase 1 is READY TO CLOSE.** Zero known closure blockers remain after the equivalent-bypass
-review. No production access, migration, deployment or repair. No UI, Esme, voice, advanced
-search, redesign, native/platform work or community expansion. Phase 2 has not begun.
+Read-only Connected History added to existing website Piece detail using the Phase 2A endpoint.
+Clay, ordered/manual glaze layers, multiple/shared Firings, explicitly linked Test Tiles/Pricing,
+Sales and Piece photos displayed. Server chronology/provenance retained, meaningful dates and
+labels shown without technical relationship terminology. Empty/loading/error states isolated
+from existing details and edits. Server owner checks retained; authenticated scoped photo delivery
+added. No mutations, inferred links, backfill or editing controls added to History.
 
-## Seven repairs
+Local complete verification: **380 passes** (342 unchanged baseline + **38 Phase 2B checks**).
+Strict Phase 1 gate: **37/37**. Final runs: zero failures, skips or TODOs. Baseline tests unchanged.
+GitHub Actions: pending push/verification; use branch HEAD and exact-head workflow as truth.
 
-1. **Pricing/shared files — fixed.** Globally reference-aware, safe-path cleanup after DB commit;
-   shared/Piece-only/pricing-only files, missing files, SQL failures, QL links and foreign requests tested.
-2. **Gallery/Photo Lookup — fixed.** Same-owner related library reads, private candidate scope,
-   fresh owner/visibility recheck, unsafe/stale file filtering; public Gallery behavior retained.
-3. **Admin cleanup — fixed.** Size/video paths preserve all registered and orphan-metadata file
-   references, including cross-account references. No metadata deletion to force orphan status.
-4. **Sale deletion — fixed.** Sale/required Piece changes atomic; failures roll back; surviving
-   Sales keep their history and sold Piece state; only last Sale removal resets an owned sold Piece.
-5. **Sale→Contact — fixed.** Generic unavailable rejection on create/edit; safe API/internal reads;
-   atomic Contact detach; foreign inbound rejection and self/admin account preflight coverage.
-6. **Shared-image edits — fixed.** Copy-on-write across editable photo slots, no old-byte overwrite;
-   ambiguous same-account filename edits reject safely; reply-photo ownership follows its author.
-7. **Historical Firing startup — fixed.** Supported pre-QL rebuild preserves parent/children/later
-   columns; transactional DROP failure rolls back. Unsupported post-QL rebuild order rejects before
-   any mutation. Historical Tile/Sales variants and legacy runners covered.
+No production access, migration or deployment. Phase 2C not started.
 
-Equivalent bypasses fixed: avatar/profile, Event, forum and Project cleanup; Sale and Combo cleanup;
-Pricing editor omission; forum reply/post ownership confusion; internal Sale Contact read; lossy
-legacy Sales rebuild; unsafe legacy HTTP/CLI migration invocation; dormant emergency WAL/upload
-removal; unsafe stored-file reads and stale async image-hash writes after photo replacement.
+Read `PHASE2B-HISTORY.md` for contracts, test composition, environment limitations, and risks.
+Notably: the old public known-filename upload route remains outside this History integration;
+real mobile browser visual verification remains outstanding.
 
-## Verification
-
-Node **22.16.0**, unchanged dependency lockfile. Disposable data and loopback servers only.
-
-- `node ql/verify-phase1.cjs`: **336 passing executions**, **0 failures, 0 TODO, 0 skips**.
-  Count = 187 Node test-runner passes + 149 individual manual checks; excludes summaries and
-  the separate successful disposable schema/integrity diagnostic.
-- Original **9 previously failing readiness checks: 9/9 pass**. Original historical Tile
-  preservation check also passes. No assertions weakened or marked optional.
-- Expanded readiness API suite: **25/25 in QL mode and 25/25 in legacy mode**.
-- Historical migration/cleanup/internal-read suite: **12/12**.
-- Strict gate: `QL_READINESS_STRICT=1 node --test tests/ql-readiness-blockers.cjs tests/ql-safety-migrations.cjs`
-  — **37 passed, 0 failed, 0 TODO, 0 skipped**, exit 0.
-- All Phase 1A–1H established regression behavior retained. `git diff --check` clean.
-- GitHub Actions: **successful** for `a9e680472f5d707e152b1344753f1d887770dafa`.
-  Both the complete verifier and strict closure gate succeeded in run
-  https://github.com/christinaworkmanpottery-droid/The-potters-mud-room/actions/runs/36619101717 .
-  Final checkpoint changes documentation only; the workflow also runs on that commit.
-
-Read `PHASE1-READINESS.md` for current contracts, equivalent-path review and limits.
-`PHASE1H-READINESS.md` preserves the original blocked audit; its open statuses are historical.
-The only `schema.json` delta is Sales CREATE SQL formatting from its corrected preserving rebuild;
-column/FK inventory and QL migration contract/checksum remain unchanged.
-
-## Deferred gates and limits
-
-Before production migration: authorized actual-schema inventory and exact historical fixtures;
-coordinated writer freeze and paired database/uploads backup/restore rehearsal; image decoding,
-path and permission checks; representative audit scale/memory/runtime within a maintenance budget;
-explicit release/migration approval. Current fixture success does not certify production.
-
-Later platform gates: native cache/account isolation, live iOS source mapping, real-device/store
-purchases. Firing stale writes remain last-write-wins until revision handling is approved.
-Unrelated manual/community workflow coverage and conservative unused-file retention remain deferred.
-Optional legacy Photo Lookup visibility schema is respected when present; its toggle safely returns
-409 when absent. Multiple same-account filename references reject edits until an explicit target
-can be supplied through a separately approved client/API change. No UI changed here.
-
-## Exact recommended Phase 2A — not started
-
-Read-only connected Piece-history contract and service/API, website only: aggregate the authenticated
-owner's existing Piece, Clay, Glaze applications, legacy/QL Firing union, explicit Test Tile/Pricing
-links, Sales and photos into a deterministic read model and one owner-scoped read endpoint. Include
-source IDs/types and recorded dates; preserve unknown dates/manual labels; deduplicate identical
-associations; filter inaccessible/stale references without repair or inferred links. Add contract,
-legacy compatibility and isolation regressions. No UI, new relationships, automatic backfill,
-AI/Esme, voice, advanced search/ranking changes, redesign, native work or production actions.
-Await the next assigned chunk; do not implement Phase 2A in Phase 1I.
+Exact recommended Phase 2C: isolated website History release-readiness validation on desktop and
+mobile Safari with disposable accounts/data, including visual/accessibility/performance, account
+switch/navigation and slow/offline behavior; scoped private/public photo-access remediation plan.
+Only demonstrated History fixes, no new features, production actions, migration or deployment.
