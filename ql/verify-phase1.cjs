@@ -6,9 +6,12 @@ const cleanEnv = { PATH: process.env.PATH, NODE_ENV: 'test' };
 for (const [args, extraEnv] of [
   [['ql/verify.cjs'], {}],
   [['--test', 'tests/ql-relationships.cjs'], {}],
-  [['tests/website-api.cjs'], { QL_TEST_MIGRATION: '1' }]
+  [['tests/website-api.cjs'], { QL_TEST_MIGRATION: '1' }],
+  [['--test', 'tests/ql-deletion.cjs'], {}],
+  [['tests/ql-deletion-api.cjs'], {}],
+  [['tests/ql-deletion-api.cjs'], { QL_TEST_MIGRATION: '1' }]
 ]) {
   const result = spawnSync(process.execPath, args, { cwd: root, env: { ...cleanEnv, ...extraEnv }, stdio: 'inherit' });
   if (result.status !== 0) process.exit(result.status || 1);
 }
-console.log('PASS Phase 1A: baseline + additive relationships + migrated old-client API');
+console.log('PASS Phase 1B: baseline + relationships + old-client API + deletion lifecycle (legacy and QL)');

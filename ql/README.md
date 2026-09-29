@@ -1,7 +1,7 @@
 # Quantum Leap — start here
 
-Phase 0 complete. Phase 1A relationship foundation authorized and completed 2026-09-29.
-See `CHECKPOINT.md`. Application runtime remains unchanged; QL is not deployed.
+Phase 0, Phase 1A relationships and Phase 1B deletion safety completed 2026-09-29.
+See `CHECKPOINT.md`. Runtime changes exist only on the isolated QL branch; nothing deployed.
 
 - `MASTER-PLAN.md`: consolidated approved product scope and working rules.
 - `BASELINE.md`: pinned repositories, architecture, reuse decisions, risks and boundaries.
@@ -16,9 +16,9 @@ Branch convention: `ql/phase-0-baseline` in both repositories; future approved c
 
 ## Reproduce
 
-For Phase 1A, use Node 22 and run `node ql/verify-phase1.cjs` after installing the unchanged
+For Phase 1B, use Node 22 and run `node ql/verify-phase1.cjs` after installing the unchanged
 lockfile. Active website branch: `ql/phase-1-relationships`. Mobile remains on its unchanged
-Phase 0 branch. This verification includes baseline and migrated disposable-database tests.
+Phase 0 branch. This verification includes baseline, migrated relationship, deletion lifecycle and legacy/QL HTTP tests (102 executions).
 
 Use Node 22 (22.23.3 verified here). In this repository run `npm ci --no-audit --no-fund`, then `node ql/verify.cjs`. This runs the existing website suite with a clean environment and creates a fresh temporary server/database for schema verification. Only with `--write-schema` does it update the committed schema inventory. No customer data or credentials are needed. Do not run `npm start` against a copied production data directory.
 

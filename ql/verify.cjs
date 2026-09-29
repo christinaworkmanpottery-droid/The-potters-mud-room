@@ -16,7 +16,7 @@ for (const file of ['tests/directory-calendar.cjs', 'tests/website-api.cjs', 'te
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mudroom-ql-phase0-'));
   let server, db, log = '';
   try {
-    for (const file of ['server.js', 'database.js', 'iap.js', 'directory-search.js', 'calendar-export.js']) {
+    for (const file of ['server.js', 'database.js', 'iap.js', 'directory-search.js', 'calendar-export.js','deletion-lifecycle.cjs']) {
       fs.copyFileSync(path.join(root, file), path.join(tmp, file));
     }
     fs.cpSync(path.join(root, 'geodata'), path.join(tmp, 'geodata'), { recursive: true });

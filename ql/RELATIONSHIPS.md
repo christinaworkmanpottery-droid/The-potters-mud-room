@@ -1,5 +1,10 @@
 # Phase 1A relationship contract — September 29, 2026
 
+Phase 1B lifecycle update: see `CHECKPOINT.md`. The schema/helper contract below remains intact;
+the final Phase 1B proposal below is historical and has now been completed. Piece deletion retains
+all firing history, including legacy and last-association firings. Runtime deletion guards are now
+wired on the isolated branch only; migrations remain explicitly opt-in and nothing is deployed.
+
 Website baseline: `70c852d366e5ef193a1b3d882964e85628afa800`. Reviewed mobile QL tree
 `6bbc77a2f33790b44029778ba4f4b39e641c1806`, checkpoint, SQLite cache and sync service.
 No application runtime or mobile source changes in this chunk.

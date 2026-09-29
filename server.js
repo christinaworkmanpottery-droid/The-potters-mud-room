@@ -122,6 +122,8 @@ if (STRIPE_SECRET) {
 // OpenAI for Pottery AI assistant
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const UPLOADS_DIR = path.join(__dirname, 'data', 'uploads');
+const { createDeletionLifecycle, hasStoredFileReference } = require('./deletion-lifecycle.cjs');
+const deletionLifecycle = createDeletionLifecycle(db, UPLOADS_DIR);
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 // Checkpoint through SQLite itself. Never unlink an open WAL/SHM file or
@@ -962,38 +964,41 @@ app.delete('/api/account', auth, (req, res) => {
     // Prevent admin from accidentally deleting their own account
     const u = db.prepare('SELECT email FROM users WHERE id=?').get(uid);
     if (u?.email === ADMIN_EMAIL) return res.status(403).json({ error: 'Admin account cannot be deleted from here' });
-    // Delete all user data in order (respecting foreign keys)
-    db.prepare('DELETE FROM promo_redemptions WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM referral_rewards WHERE referrer_id=? OR referred_id=?').run(uid, uid);
-    db.prepare('DELETE FROM combo_comments WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM combo_likes WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM forum_replies WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM forum_posts WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM reviews WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM messages WHERE from_user_id=? OR to_user_id=?').run(uid, uid);
-    db.prepare('DELETE FROM notifications WHERE user_id=? OR from_user_id=?').run(uid, uid);
-    db.prepare('DELETE FROM piece_photos WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
-    db.prepare('DELETE FROM piece_glazes WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
-    db.prepare('DELETE FROM sales WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM pricing_calculations WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM glaze_clay_tests WHERE glaze_id IN (SELECT id FROM glazes WHERE user_id=?)').run(uid);
-    db.prepare('DELETE FROM pieces WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM glaze_combos WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM firing_logs WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM glazes WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM glaze_chemicals WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM clay_bodies WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM goals WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM projects WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM events WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM contacts WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM blocked_users WHERE user_id=? OR blocked_user_id=?').run(uid, uid);
-    db.prepare('DELETE FROM merchant_orders WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM featured_potter WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM page_views WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM users WHERE id=?').run(uid);
+    db.transaction(() => {
+      deletionLifecycle.assertAccountPieceIsolation(uid);
+      // Delete all user data in order (respecting foreign keys)
+      db.prepare('DELETE FROM promo_redemptions WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM referral_rewards WHERE referrer_id=? OR referred_id=?').run(uid, uid);
+      db.prepare('DELETE FROM combo_comments WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM combo_likes WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM forum_replies WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM forum_posts WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM reviews WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM messages WHERE from_user_id=? OR to_user_id=?').run(uid, uid);
+      db.prepare('DELETE FROM notifications WHERE user_id=? OR from_user_id=?').run(uid, uid);
+      db.prepare('DELETE FROM piece_photos WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM piece_glazes WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM sales WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM pricing_calculations WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM glaze_clay_tests WHERE glaze_id IN (SELECT id FROM glazes WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM pieces WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM glaze_combos WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM firing_logs WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM glazes WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM glaze_chemicals WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM clay_bodies WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM goals WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM projects WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM events WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM contacts WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM blocked_users WHERE user_id=? OR blocked_user_id=?').run(uid, uid);
+      db.prepare('DELETE FROM merchant_orders WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM featured_potter WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM page_views WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM users WHERE id=?').run(uid);
+    }).immediate();
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { res.status(err.status || 500).json({ error: err.message }); }
 });
 
 // ============ MY STORE ============
@@ -1375,46 +1380,49 @@ app.delete('/api/admin/members/:id', auth, (req, res) => {
     const u = db.prepare('SELECT email FROM users WHERE id=?').get(uid);
     if (!u) return res.status(404).json({ error: 'User not found' });
     if (u.email === ADMIN_EMAIL) return res.status(403).json({ error: 'Cannot delete admin account' });
-    // Clean up all related data before deleting user
-    db.prepare('DELETE FROM push_tokens WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM password_reset_tokens WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM iap_purchases WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM token_purchases WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM promo_redemptions WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM referral_rewards WHERE referrer_id=? OR referred_id=?').run(uid, uid);
-    db.prepare('DELETE FROM studio_notes WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM user_activity WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM combo_comments WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM combo_likes WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM forum_photos WHERE post_id IN (SELECT id FROM forum_posts WHERE user_id=?)').run(uid);
-    db.prepare('DELETE FROM forum_replies WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM forum_posts WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM content_reports WHERE reporter_id=?').run(uid);
-    db.prepare('DELETE FROM reviews WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM messages WHERE from_user_id=? OR to_user_id=?').run(uid, uid);
-    db.prepare('DELETE FROM notifications WHERE user_id=? OR from_user_id=?').run(uid, uid);
-    db.prepare('DELETE FROM piece_photos WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
-    db.prepare('DELETE FROM piece_glazes WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
-    db.prepare('DELETE FROM sales WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM pricing_calculations WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM glaze_clay_tests WHERE glaze_id IN (SELECT id FROM glazes WHERE user_id=?)').run(uid);
-    db.prepare('DELETE FROM pieces WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM glaze_combos WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM firing_logs WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM glazes WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM glaze_chemicals WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM clay_bodies WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM goals WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM projects WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM events WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM contacts WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM blocked_users WHERE user_id=? OR blocked_user_id=?').run(uid, uid);
-    db.prepare('DELETE FROM merchant_orders WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM featured_potter WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM page_views WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM users WHERE id=?').run(uid);
+    db.transaction(() => {
+      deletionLifecycle.assertAccountPieceIsolation(uid);
+      // Clean up all related data before deleting user
+      db.prepare('DELETE FROM push_tokens WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM password_reset_tokens WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM iap_purchases WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM token_purchases WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM promo_redemptions WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM referral_rewards WHERE referrer_id=? OR referred_id=?').run(uid, uid);
+      db.prepare('DELETE FROM studio_notes WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM user_activity WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM combo_comments WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM combo_likes WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM forum_photos WHERE post_id IN (SELECT id FROM forum_posts WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM forum_replies WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM forum_posts WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM content_reports WHERE reporter_id=?').run(uid);
+      db.prepare('DELETE FROM reviews WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM messages WHERE from_user_id=? OR to_user_id=?').run(uid, uid);
+      db.prepare('DELETE FROM notifications WHERE user_id=? OR from_user_id=?').run(uid, uid);
+      db.prepare('DELETE FROM piece_photos WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM piece_glazes WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM sales WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM pricing_calculations WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM glaze_clay_tests WHERE glaze_id IN (SELECT id FROM glazes WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM pieces WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM glaze_combos WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM firing_logs WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM glazes WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM glaze_chemicals WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM clay_bodies WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM goals WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM projects WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM events WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM contacts WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM blocked_users WHERE user_id=? OR blocked_user_id=?').run(uid, uid);
+      db.prepare('DELETE FROM merchant_orders WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM featured_potter WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM page_views WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM users WHERE id=?').run(uid);
+    }).immediate();
     res.json({ success: true, deleted: u.email });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { res.status(err.status || 500).json({ error: err.message }); }
 });
 
 // Admin dashboard — see all members, signups, cancellations, tiers
@@ -2234,19 +2242,11 @@ app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
 });
 
 app.delete('/api/pieces/:id', auth, (req, res) => {
-  // Treat repeated deletes as successful so stale app screens do not show
-  // an error after the piece was already removed.
-  const piece = db.prepare('SELECT id FROM pieces WHERE id=? AND user_id=?').get(req.params.id, req.userId);
-  if (!piece) return res.json({ success: true });
-
-  const photos = db.prepare('SELECT filename FROM piece_photos WHERE piece_id=?').all(req.params.id);
-  photos.forEach(p => { const f = path.join(UPLOADS_DIR, p.filename); if (fs.existsSync(f)) fs.unlinkSync(f); });
-  db.prepare('DELETE FROM piece_photos WHERE piece_id=?').run(req.params.id);
-  db.prepare('DELETE FROM piece_glazes WHERE piece_id=?').run(req.params.id);
-  db.prepare('DELETE FROM firing_logs WHERE piece_id=?').run(req.params.id);
-  const r = db.prepare('DELETE FROM pieces WHERE id=? AND user_id=?').run(req.params.id, req.userId);
-  if (r.changes === 0) return res.status(404).json({ error: 'Not found' });
-  res.json({ success: true });
+  try {
+    // Missing/foreign IDs remain an idempotent no-op; no metadata is touched.
+    deletionLifecycle.deletePiece(req.userId, req.params.id);
+    res.json({ success: true });
+  } catch (err) { res.status(err.status || 500).json({ error: err.message }); }
 });
 
 // Bulk delete endpoint - reuses existing deletion logic for each type
@@ -2264,14 +2264,8 @@ app.post('/api/bulk-delete', auth, (req, res) => {
       try {
         switch(type) {
           case 'pieces':
-            // Reuse pieces deletion logic
-            const photos = db.prepare('SELECT filename FROM piece_photos WHERE piece_id=?').all(id);
-            photos.forEach(p => { const f = path.join(UPLOADS_DIR, p.filename); if (fs.existsSync(f)) fs.unlinkSync(f); });
-            db.prepare('DELETE FROM piece_photos WHERE piece_id=?').run(id);
-            db.prepare('DELETE FROM piece_glazes WHERE piece_id=?').run(id);
-            db.prepare('DELETE FROM firing_logs WHERE piece_id=?').run(id);
-            const pr = db.prepare('DELETE FROM pieces WHERE id=? AND user_id=?').run(id, req.userId);
-            if (pr.changes > 0) deleted++;
+          case 'casualties':
+            deleted += deletionLifecycle.deletePiece(req.userId, id);
             break;
 
           case 'clay-bodies':
@@ -2307,21 +2301,7 @@ app.post('/api/bulk-delete', auth, (req, res) => {
             break;
 
           case 'firing-logs':
-            // Reuse firing deletion logic
-            const fr = db.prepare('DELETE FROM firing_logs WHERE id=? AND user_id=?').run(id, req.userId);
-            if (fr.changes > 0) deleted++;
-            break;
-
-          case 'casualties':
-            // Casualties are just pieces with status='broken' or 'recycled'
-            // Use same deletion logic as pieces
-            const casualtyPhotos = db.prepare('SELECT filename FROM piece_photos WHERE piece_id=?').all(id);
-            casualtyPhotos.forEach(p => { const f = path.join(UPLOADS_DIR, p.filename); if (fs.existsSync(f)) fs.unlinkSync(f); });
-            db.prepare('DELETE FROM piece_photos WHERE piece_id=?').run(id);
-            db.prepare('DELETE FROM piece_glazes WHERE piece_id=?').run(id);
-            db.prepare('DELETE FROM firing_logs WHERE piece_id=?').run(id);
-            const casr = db.prepare('DELETE FROM pieces WHERE id=? AND user_id=?').run(id, req.userId);
-            if (casr.changes > 0) deleted++;
+            deleted += deletionLifecycle.deleteFiring(req.userId, id);
             break;
 
           default:
@@ -2373,10 +2353,7 @@ app.post('/api/pieces/:id/photos', auth, upload.single('photo'), async (req, res
 });
 
 app.delete('/api/photos/:id', auth, (req, res) => {
-  const ph = db.prepare('SELECT pp.* FROM piece_photos pp JOIN pieces p ON pp.piece_id=p.id WHERE pp.id=? AND p.user_id=?').get(req.params.id, req.userId);
-  if (!ph) return res.status(404).json({ error: 'Not found' });
-  const f = path.join(UPLOADS_DIR, ph.filename); if (fs.existsSync(f)) fs.unlinkSync(f);
-  db.prepare('DELETE FROM piece_photos WHERE id=?').run(req.params.id);
+  if (!deletionLifecycle.deletePhoto(req.userId, req.params.id, 'piece')) return res.status(404).json({ error: 'Not found' });
   res.json({ success: true });
 });
 
@@ -2401,26 +2378,7 @@ const isStoredPhotoOwned = (filename, userId) => {
   return ownershipChecks.some(([sql, params]) => !!db.prepare(sql).get(...params));
 };
 
-const storedPhotoReferenceQueries = [
-  'SELECT 1 FROM users WHERE avatar_filename=? OR profile_photo=? LIMIT 1',
-  'SELECT 1 FROM piece_photos WHERE filename=? LIMIT 1',
-  'SELECT 1 FROM clay_photos WHERE filename=? LIMIT 1',
-  'SELECT 1 FROM glaze_photos WHERE filename=? LIMIT 1',
-  'SELECT 1 FROM glaze_clay_tests WHERE photo_filename=? LIMIT 1',
-  'SELECT 1 FROM firing_photos WHERE filename=? LIMIT 1',
-  'SELECT 1 FROM sales WHERE image_filename=? LIMIT 1',
-  'SELECT 1 FROM events WHERE image_filename=? LIMIT 1',
-  'SELECT 1 FROM project_photos WHERE filename=? LIMIT 1',
-  'SELECT 1 FROM glaze_combos WHERE photo_filename=? OR photo_filename2=? LIMIT 1',
-  'SELECT 1 FROM test_tiles WHERE photo_filename=? OR photo_filename2=? OR photo_filename3=? LIMIT 1',
-  'SELECT 1 FROM forum_photos WHERE filename=? LIMIT 1',
-  'SELECT 1 FROM merchant_products WHERE image_filename=? OR download_filename=? LIMIT 1',
-];
-
-const hasStoredPhotoReference = (filename) => storedPhotoReferenceQueries.some((sql) => {
-  const parameterCount = (sql.match(/\?/g) || []).length;
-  return !!db.prepare(sql).get(...Array(parameterCount).fill(filename));
-});
+const hasStoredPhotoReference = (filename) => hasStoredFileReference(db, filename);
 
 const replaceStoredPhotoReferences = db.transaction((oldFilename, newFilename, userId) => {
   let changes = 0;
@@ -2682,7 +2640,7 @@ app.put('/api/firing-logs/:id', auth, (req, res) => {
 
 // Delete firing log
 app.delete('/api/firing-logs/:id', auth, (req, res) => {
-  db.prepare('DELETE FROM firing_logs WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  deletionLifecycle.deleteFiring(req.userId, req.params.id);
   res.json({ success: true });
 });
 
@@ -2708,10 +2666,7 @@ app.get('/api/firing-logs/:id/photos', auth, (req, res) => {
 
 // Delete firing photo
 app.delete('/api/firing-photos/:id', auth, (req, res) => {
-  const photo = db.prepare('SELECT fp.filename,fp.firing_id,fl.user_id FROM firing_photos fp JOIN firing_logs fl ON fp.firing_id=fl.id WHERE fp.id=?').get(req.params.id);
-  if (!photo || photo.user_id !== req.userId) return res.status(403).json({ error: 'Not authorized' });
-  db.prepare('DELETE FROM firing_photos WHERE id=?').run(req.params.id);
-  try { fs.unlinkSync(path.join(UPLOADS_DIR, photo.filename)); } catch(e) { /* ignore */ }
+  if (!deletionLifecycle.deletePhoto(req.userId, req.params.id, 'firing')) return res.status(403).json({ error: 'Not authorized' });
   res.json({ success: true });
 });
 

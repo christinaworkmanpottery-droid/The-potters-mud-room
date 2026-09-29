@@ -8,7 +8,7 @@ const Database = require('better-sqlite3');
 const jwt = require('jsonwebtoken');
 const root=path.resolve(__dirname,'..');
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'mudroom-master-test-'));
-for(const file of ['server.js','database.js','iap.js','directory-search.js','calendar-export.js'])fs.copyFileSync(path.join(root,file),path.join(tmp,file));
+for(const file of ['server.js','database.js','iap.js','directory-search.js','calendar-export.js','deletion-lifecycle.cjs'])fs.copyFileSync(path.join(root,file),path.join(tmp,file));
 fs.cpSync(path.join(root,'geodata'),path.join(tmp,'geodata'),{recursive:true});
 fs.symlinkSync(path.join(root,'node_modules'),path.join(tmp,'node_modules'),'dir');
 fs.symlinkSync(path.join(root,'public'),path.join(tmp,'public'),'dir');
