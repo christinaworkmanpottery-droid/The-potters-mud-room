@@ -19,4 +19,4 @@ for (const [args, extraEnv] of [
   const result = spawnSync(process.execPath, args, { cwd: root, env: { ...cleanEnv, ...extraEnv }, stdio: 'inherit' });
   if (result.status !== 0) process.exit(result.status || 1);
 }
-console.log('PASS Phase 1C: baseline + relationships + old-client API + deletion lifecycle (legacy and QL)');
+console.log('PASS Phase 1D: baseline + relationships + ownership-safe writes/reads + deletion lifecycle (legacy and QL)');
