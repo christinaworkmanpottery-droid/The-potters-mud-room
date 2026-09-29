@@ -2,7 +2,8 @@
 
 Date: 2026-09-29. Branch: `ql/phase-1-relationships`.
 Starting checkpoint: `d56a495bbff24b241881951bec6213b7f38746d2`.
-This checkpoint is committed with the Phase 1I implementation; use Git history for its SHA.
+Verified implementation commit: `a9e680472f5d707e152b1344753f1d887770dafa`.
+This final documentation checkpoint records that CI result; code/tests are unchanged.
 
 **Phase 1 is READY TO CLOSE.** Zero known closure blockers remain after the equivalent-bypass
 review. No production access, migration, deployment or repair. No UI, Esme, voice, advanced
@@ -45,8 +46,10 @@ Node **22.16.0**, unchanged dependency lockfile. Disposable data and loopback se
 - Strict gate: `QL_READINESS_STRICT=1 node --test tests/ql-readiness-blockers.cjs tests/ql-safety-migrations.cjs`
   — **37 passed, 0 failed, 0 TODO, 0 skipped**, exit 0.
 - All Phase 1A–1H established regression behavior retained. `git diff --check` clean.
-- GitHub Actions: confirmation pending push of this implementation checkpoint. CI runs the
-  complete verifier and expanded strict gate; record its observed result after push.
+- GitHub Actions: **successful** for `a9e680472f5d707e152b1344753f1d887770dafa`.
+  Both the complete verifier and strict closure gate succeeded in run
+  https://github.com/christinaworkmanpottery-droid/The-potters-mud-room/actions/runs/36619101717 .
+  Final checkpoint changes documentation only; the workflow also runs on that commit.
 
 Read `PHASE1-READINESS.md` for current contracts, equivalent-path review and limits.
 `PHASE1H-READINESS.md` preserves the original blocked audit; its open statuses are historical.
