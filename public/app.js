@@ -697,11 +697,44 @@ function debounceLoadPieces() { clearTimeout(debounceTimer); debounceTimer = set
 // Connected History renders only the authenticated service response. No relationship assembly.
 let pieceViewGeneration = 0;
 let pieceHistoryUrls = [];
+let pieceDetailPrivatePhotoUrls = [];
 function clearPieceHistory() {
   pieceViewGeneration++;
   pieceHistoryUrls.forEach(url => URL.revokeObjectURL(url));
   pieceHistoryUrls = [];
+  pieceDetailPrivatePhotoUrls.forEach(url => URL.revokeObjectURL(url));
+  pieceDetailPrivatePhotoUrls = [];
   document.getElementById('pieceHistory')?.remove();
+}
+function openPieceDetailPrivatePhoto(img) {
+  if (!window._reorderMode && !window._blockLightbox && img?.dataset?.protectedReady === '1' && img.src) openLightbox(img.src);
+}
+async function loadPrivatePieceDetailPhotos(pieceId, generation, sessionToken) {
+  const active = () => generation === pieceViewGeneration && token === sessionToken &&
+    currentPage === 'pieceDetail' && window._currentPieceId === pieceId;
+  const root = document.getElementById('photoReorderContainer');
+  if (!root) return;
+  await Promise.all(Array.from(root.querySelectorAll('[data-private-piece-photo]')).map(async img => {
+    const status = img.parentElement?.querySelector('[data-private-piece-photo-status]');
+    try {
+      const response = await fetch(API + '/api/ql/pieces/' + encodeURIComponent(pieceId) + '/photos/' + encodeURIComponent(img.dataset.privatePiecePhoto), {
+        headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store'
+      });
+      if (!response.ok) throw new Error('unavailable');
+      const blob = await response.blob();
+      if (!active()) return;
+      const url = URL.createObjectURL(blob);
+      pieceDetailPrivatePhotoUrls.push(url);
+      img.src = url;
+      img.dataset.protectedReady = '1';
+      if (status) status.hidden = true;
+    } catch (_) {
+      if (!active()) return;
+      img.removeAttribute('src');
+      img.dataset.protectedReady = '0';
+      if (status) { status.hidden = false; status.textContent = 'Photo unavailable'; }
+    }
+  }));
 }
 function historyElement(tag, text, className) {
   const el = document.createElement(tag);
@@ -837,17 +870,22 @@ async function viewPiece(id) {
     window._currentPieceId = p.id;
     window._currentPiecePhotos = p.photos || [];
     window._reorderMode = false;
-    const photos = (p.photos||[]).map((ph, idx) =>
-      '<div class="detail-photo-wrap" draggable="false" data-photo-id="' + ph.id + '" data-index="' + idx + '" style="position:relative">' +
-      '<img class="detail-photo" draggable="false" src="/uploads/' + ph.filename + '" title="' + esc(ph.stage||'') + '" onclick="if(!window._reorderMode&&!window._blockLightbox)openLightbox(\'/uploads/' + ph.filename + '\')" style="cursor:zoom-in;transform:rotate(' + (ph.rotation||0) + 'deg)">' +
+    const privatePiecePhotos = p.photoVisibility === 'private';
+    const photos = (p.photos||[]).map((ph, idx) => {
+      const image = privatePiecePhotos
+        ? '<img class="detail-photo" draggable="false" data-private-piece-photo="' + ph.id + '" data-protected-ready="0" alt="Piece photo' + (ph.stage ? ' — ' + esc(ph.stage) : '') + '" title="' + esc(ph.stage||'') + '" onclick="openPieceDetailPrivatePhoto(this)" style="cursor:zoom-in;transform:rotate(' + (ph.rotation||0) + 'deg)">' +
+          '<span class="text-sm" data-private-piece-photo-status role="status">Loading photo…</span>'
+        : '<img class="detail-photo" draggable="false" src="/uploads/' + ph.filename + '" alt="Piece photo' + (ph.stage ? ' — ' + esc(ph.stage) : '') + '" title="' + esc(ph.stage||'') + '" onclick="if(!window._reorderMode&&!window._blockLightbox)openLightbox(\'/uploads/' + ph.filename + '\')" style="cursor:zoom-in;transform:rotate(' + (ph.rotation||0) + 'deg)">';
+      return '<div class="detail-photo-wrap" draggable="false" data-photo-id="' + ph.id + '" data-index="' + idx + '" style="position:relative">' +
+      image +
       '<span class="photo-stage-label">' + esc(ph.stage||'') + '</span>' +
       '<div class="photo-controls" style="position:absolute;top:4px;right:4px;display:flex;gap:2px">' +
       '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();rotatePhoto(\'' + ph.id + '\',\'' + p.id + '\',false)" title="Rotate left">↶</button>' +
       '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();rotatePhoto(\'' + ph.id + '\',\'' + p.id + '\',true)" title="Rotate right">↷</button>' +
       '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();editPhotoStage(\'' + ph.id + '\',\'' + esc(ph.stage||'') + '\',\'' + p.id + '\')" title="Edit stage">✏️</button>' +
       '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deletePhoto(\'' + ph.id + '\',\'' + p.id + '\')" title="Delete photo">🗑️</button>' +
-      '</div></div>'
-    ).join('');
+      '</div></div>';
+    }).join('');
     const glist = (p.glazes||[]).map(g =>
       '<div style="margin-bottom:6px"><span class="glaze-tag' + (g.glaze_type==='recipe'?' recipe':'') + '">' + esc(g.glaze_name) + '</span>' +
       (g.brand ? ' <span class="text-sm" style="color:var(--text-light)">— ' + esc(g.brand) + '</span>' : '') +
@@ -914,6 +952,7 @@ async function viewPiece(id) {
     loading.setAttribute('role', 'status');
     history.append(historyElement('h2', 'Connected History'), loading);
     document.getElementById('pieceDetailContent').append(history);
+    if (privatePiecePhotos) void loadPrivatePieceDetailPhotos(p.id, generation, sessionToken);
     void loadPieceHistory(p.id, history, generation, sessionToken);
   } catch (err) { toast(err.message, 'error'); }
 }

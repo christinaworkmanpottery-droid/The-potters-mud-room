@@ -154,6 +154,11 @@ function safeStoredUpload(filename) {
 function cleanupRequestUploads(files) {
   deletionLifecycle.cleanupFiles((files || []).filter(Boolean).map(file => file.filename));
 }
+function classifyPiecePhotoVisibility(piece) {
+  if (piece && (piece.is_public === 1 || piece.is_public === '1')) return 'public';
+  if (piece && (piece.is_public === 0 || piece.is_public === '0')) return 'private';
+  return 'legacy-ambiguous';
+}
 
 // Checkpoint through SQLite itself. Never unlink an open WAL/SHM file or
 // remove users' uploaded photos to reclaim disk space.
@@ -517,17 +522,17 @@ app.get('/api/ql/pieces/:pieceId/history', auth, (req, res) => {
   }
 });
 
-// Read-only byte delivery for History. IDs alone never authorize a private photo.
-app.get('/api/ql/pieces/:pieceId/history/photos/:photoId', auth, (req, res) => {
+function sendOwnedPiecePhoto(req, res, { privateOnly = false } = {}) {
   res.set('Cache-Control', 'private, no-store');
   const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
   try {
-    const photo = db.prepare(`SELECT ph.* FROM piece_photos ph JOIN pieces p ON p.id=ph.piece_id
+    const photo = db.prepare(`SELECT ph.*,p.is_public FROM piece_photos ph JOIN pieces p ON p.id=ph.piece_id
       WHERE ph.id=? AND p.id=? AND p.user_id=?`).get(req.params.photoId, req.params.pieceId, req.userId);
     if (!photo) return unavailable();
+    if (privateOnly && classifyPiecePhotoVisibility(photo) !== 'private') return unavailable();
     const target = safeStoredUpload(photo.filename);
     if (!target) return unavailable();
-    // Ambiguous cross-account filenames must not expose another owner's bytes.
+    // A filename reused by any record outside this account is ambiguous; do not serve its bytes privately.
     const { fileSlots } = require('./deletion-lifecycle.cjs');
     const owned = ownedPhotoSlots(photo.filename, req.userId);
     for (const [table, columns] of Object.entries(fileSlots)) {
@@ -542,6 +547,16 @@ app.get('/api/ql/pieces/:pieceId/history/photos/:photoId', auth, (req, res) => {
     res.set('X-Content-Type-Options', 'nosniff');
     res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
   } catch (_) { if (!res.headersSent) unavailable(); }
+}
+
+// Private Piece-detail delivery is deliberately narrower than legacy /uploads.
+app.get('/api/ql/pieces/:pieceId/photos/:photoId', auth, (req, res) => {
+  sendOwnedPiecePhoto(req, res, { privateOnly: true });
+});
+
+// Connected History keeps its existing authenticated owner-scoped behavior.
+app.get('/api/ql/pieces/:pieceId/history/photos/:photoId', auth, (req, res) => {
+  sendOwnedPiecePhoto(req, res);
 });
 
 // Helper: generate unique referral code
@@ -2125,6 +2140,7 @@ app.get('/api/pieces/:id', auth, (req, res) => {
   if (!p) return res.status(404).json({ error: 'Not found' });
   p.glazes = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id=g.id AND g.user_id=? WHERE pg.piece_id=? ORDER BY pg.layer_order').all(req.userId, p.id);
   p.photos = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order').all(p.id);
+  p.photoVisibility = classifyPiecePhotoVisibility(p);
   p.firings = db.prepare('SELECT * FROM firing_logs WHERE piece_id=? AND user_id=? ORDER BY date DESC').all(p.id, req.userId);
   // Clean up legacy data: if studio was used to store clay body text, suppress it
   if (p.studio && p.clay_body_name && p.studio.toLowerCase() === p.clay_body_name.toLowerCase()) {
