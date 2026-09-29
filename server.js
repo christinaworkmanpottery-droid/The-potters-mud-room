@@ -501,6 +501,21 @@ for (const [pathName, kind, bodyKey] of [
   });
 }
 
+let qlPieceHistoryService;
+function getQlPieceHistoryService() {
+  if (!qlPieceHistoryService) qlPieceHistoryService = require('./ql/piece-history.cjs').createPieceHistoryService(db);
+  return qlPieceHistoryService;
+}
+app.get('/api/ql/pieces/:pieceId/history', auth, (req, res) => {
+  try {
+    res.json(getQlPieceHistoryService().get({ userId: req.userId, pieceId: req.params.pieceId }));
+  } catch (error) {
+    if (error?.status === 404) return res.status(404).json({ error: 'Piece unavailable' });
+    console.error('[QL Piece history]', error?.message || error);
+    res.status(500).json({ error: 'Piece history unavailable' });
+  }
+});
+
 // Helper: generate unique referral code
 function generateReferralCode() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
