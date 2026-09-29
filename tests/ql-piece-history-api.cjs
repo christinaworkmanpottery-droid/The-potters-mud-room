@@ -1,0 +1,13 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{spawn}=require('node:child_process'),Database=require('better-sqlite3'),jwt=require('jsonwebtoken'),crypto=require('node:crypto');
+const root=path.resolve(__dirname,'..'),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'ql-history-api-')),port=43000+crypto.randomInt(1000),base='http://127.0.0.1:'+port,secret=crypto.randomBytes(32).toString('hex');let server,db,out='';
+(async()=>{for(const n of ['server.js','database.js','iap.js','directory-search.js','calendar-export.js','deletion-lifecycle.cjs'])fs.copyFileSync(path.join(root,n),path.join(tmp,n));
+ fs.mkdirSync(path.join(tmp,'ql'));for(const n of ['relationships.cjs','piece-history.cjs'])fs.copyFileSync(path.join(root,'ql',n),path.join(tmp,'ql',n));
+ fs.cpSync(path.join(root,'geodata'),path.join(tmp,'geodata'),{recursive:true});for(const n of ['node_modules','public'])fs.symlinkSync(path.join(root,n),path.join(tmp,n),'dir');
+ server=spawn(process.execPath,['server.js'],{cwd:tmp,env:{PATH:process.env.PATH,PORT:String(port),JWT_SECRET:secret,NODE_ENV:'test'},stdio:['ignore','pipe','pipe']});server.stdout.on('data',c=>out+=c);server.stderr.on('data',c=>out+=c);
+ for(let i=0;i<100&&!out.includes('running on');i++)await new Promise(r=>setTimeout(r,100));assert.ok(out.includes('running on'),out);db=new Database(path.join(tmp,'data/pottery.db'));require('../ql/relationships.cjs').migrate(db);
+ db.prepare("INSERT INTO users(id,email,password_hash) VALUES('a','a@example.com','x'),('b','b@example.com','x')").run();db.prepare("INSERT INTO pieces(id,user_id,title) VALUES('pa','a','A'),('pb','b','B')").run();
+ const token=jwt.sign({userId:'a'},secret),headers={Authorization:'Bearer '+token};
+ let r=await fetch(base+'/api/ql/pieces/pa/history',{headers});assert.equal(r.status,200);let body=await r.json();assert.equal(body.piece.sourceRecordId,'pa');
+ r=await fetch(base+'/api/ql/pieces/pb/history',{headers});assert.equal(r.status,404);r=await fetch(base+'/api/ql/pieces/missing/history',{headers});assert.equal(r.status,404);
+ r=await fetch(base+'/api/ql/pieces/pa/history');assert.equal(r.status,401);console.log('PASS authenticated Piece history endpoint owner isolation and 404 equivalence');
+})().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>{if(db)db.close();if(server&&server.exitCode===null){const p=new Promise(r=>server.once('exit',r));server.kill();await p}fs.rmSync(tmp,{recursive:true,force:true})});
