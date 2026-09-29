@@ -50,7 +50,8 @@ these objects must explicitly evolve that manifest contract. Never replay old mi
 
 `migrate(db)` is explicitly invoked with a database handle. No startup import, migration-runner
 integration, database-path CLI or runtime enabling toggle exists. Tests use disposable databases.
-`link` is idempotent and returns the existing ID on retry. `unlink` removes only an explicit link.
+`link` is idempotent and returns the existing ID on retry. `unlink` removes a selected pair;
+for Firings this clears both its explicit QL link and its matching legacy selection atomically.
 The owner argument must eventually come from authenticated context, never a request body.
 
 `readPiece` is an internal read model, not an HTTP response replacement. It reads legacy
@@ -59,10 +60,69 @@ It works without the migration (new link lists empty). Cross-owner joined record
 not repaired. Raw Piece fields remain raw; an ID in a legacy field is not certified as a valid link.
 No relationship is inferred from a name, timestamp, photo filename or display label.
 
-Legacy firing edits remain immediately visible because there is no copied backfill. An explicit
-QL link is independent: unlink does not clear `firing_logs.piece_id`, and an old-client edit of
-that field does not remove an explicit QL link. Duplicate traversal results are deduplicated by
-firing ID. Future UI must explain which association is being edited.
+## Phase 1F: authoritative Firing ↔ Piece compatibility policy
+
+`firing_logs.piece_id` is an **optional legacy single-Piece selection**, not an exclusive
+owner and not a complete representation of a multi-Piece firing. The effective relationship
+set is the same-owner union of this selection and `ql_piece_firings`. The normalized form
+for new QL associations is the explicit junction. Absence of a junction is not a tombstone.
+No read writes data, backfills links, elects a primary Piece, or repairs history.
+
+| State/action | Contract |
+| --- | --- |
+| Legacy only | Remains valid and readable without QL installed. No automatic copy. |
+| QL only | Readable through the QL service; legacy selection stays null or keeps its other Piece. |
+| Both, same pair | One result per Firing ID. |
+| Legacy points to A, QL points to B | A and B are valid additional associations in a many-to-many model, not competing ownership claims. Preserve both; never guess which was intended. |
+| Stale/foreign legacy or QL pointer | No expansion of missing/foreign endpoints. No read-time repair. Owned Firing history remains available. |
+| QL create | Validate both endpoints against authenticated owner, insert only requested pair, preserve the legacy selection. Repeat returns stable link ID. |
+| QL remove | Validate both endpoints, remove requested QL pair AND clear legacy selection only if it is that same pair; one transaction. Return 1 if either representation existed, otherwise 0. Never delete Firing/photos. |
+| Legacy create/edit | `writeLegacyFiring` owns one immediate transaction including record persistence. Validate selection; save legacy selection; when QL installed remove the old selected QL pair if selection changed, then idempotently add the new selected pair. Preserve all additional pairs. |
+| Legacy clear | Null/empty/omitted `pieceId` retains the existing full-replacement PUT behavior. Remove the old selected pair; do not clear additional QL pairs. |
+| Same-selection edit | Add the selected pair if still legacy-only; otherwise keep the existing link ID. Only this deliberately written relationship is normalized. |
+| Piece deletion | Existing lifecycle detaches matching legacy selections and cascades only that Piece's junctions. Keep every Firing, including last-association history and its photos. |
+| Explicit Firing deletion | Existing owner-scoped lifecycle removes that Firing, its child metadata and junctions; preserve Pieces and shared files. |
+| Account deletion | Existing owner/isolation preflight and transactional whole-account deletion remain unchanged. |
+
+The service owns create/remove/synchronization and the common QL firing union reader.
+Routes are thin adapters: they supply `req.userId`, server-generated Firing IDs on create,
+and callbacks persisting non-relationship fields. Legacy successful response shapes stay
+unchanged. Legacy invalid related Piece errors stay `400 Related record unavailable` for
+both foreign/missing IDs. QL invalid endpoints remain identical 404s. A legacy PUT to a
+foreign/missing Firing now returns the same generic 404 instead of reporting a no-op success.
+No schema changes or new migration. Phase 1A installation stays explicit and optional.
+
+### Read/write path audit
+
+- `server.js` POST/PUT `/api/firing-logs`: the only live legacy relationship create/edit
+  paths; both now call the service. Website `public/app.js` saves its selected `pieceId`
+  through those same endpoints. The existing mobile API contract is unchanged for valid writes.
+- Legacy GET `/api/pieces/:id` retains its legacy-selected firing list and date ordering.
+  GET `/api/firing-logs`, GET `/api/firing-logs/:id`, and both existing registrations of
+  GET `/api/export/firing-logs` retain their legacy selection/projection and owner-scoped
+  Piece joins. They do not invent a single selected Piece from multiple QL associations.
+- QL GET/POST/DELETE `/api/ql/pieces/:pieceId/firings` use service list/create/remove;
+  exported `link`, `unlink`, `readPiece` share the same policy. No reverse API added.
+- `deletion-lifecycle.cjs` Piece deletion (single, bulk and casualties) clears legacy
+  selections and relies on existing FK junction cascades; explicit single/bulk Firing
+  deletion removes history only when the Firing itself was selected for deletion.
+  Account deletion paths retain earlier preflight protections. No lifecycle replacement.
+- `database.js` historical firing-table rebuild copies existing `piece_id`; it is schema
+  compatibility, not a new relationship write path. No migration/startup logic changed.
+- Photo routes, exports, admin counts and file-reference operations do not create or
+  reassign Firing↔Piece relationships. Tests/fixtures deliberately use raw SQL to model
+  old/corrupt states; application writers must use the service.
+
+### Limits and risks
+
+Old clients expose only the legacy selection, not all QL associations. This deliberate
+projection preserves their existing interface; full association display is future work.
+A stale old-client full PUT can still reselect a Piece after another client unlinks it:
+there is no optimistic version token in the existing API. Transactions prevent partial
+states, but successive valid writes are last-write-wins, not conflict-detected.
+Raw SQL/external writers bypass service synchronization and must not be introduced as
+application write paths. Existing corruption is filtered, not globally repaired. The
+Phase 1A migration's existing triggers/FKs still protect newly written explicit endpoints.
 
 ## Verification and recovery boundary
 

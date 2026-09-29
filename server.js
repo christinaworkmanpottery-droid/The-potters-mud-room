@@ -2700,14 +2700,16 @@ app.post('/api/firing-logs', auth, (req, res) => {
     }
   }
 
-  try {
-    if (pieceId) ownedRelationship('pieces', req.userId, pieceId);
-  } catch (error) {
-    return res.status(error.status || 400).json({ error: error.message });
-  }
   const id = uuidv4();
-  db.prepare('INSERT INTO firing_logs (id,user_id,piece_id,firing_type,cone,temperature,atmosphere,kiln_name,schedule,duration,firing_speed,custom_speed_detail,hold_used,hold_duration,date,results,notes,firing_time,firing_mode,load_description,firing_mode_notes,start_time,end_time,open_temp) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-    .run(id, req.userId, pieceId, firingType || null, cone, temperature, atmosphere || null, kilnName, schedule, duration, firingSpeed || null, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null, firingModeNotes || null, startTime || null, endTime || null, openTemp || null);
+  try {
+    getQlRelationshipService().writeLegacyFiring({ userId: req.userId, firingId: id, pieceId, create: true }, () => {
+      db.prepare('INSERT INTO firing_logs (id,user_id,firing_type,cone,temperature,atmosphere,kiln_name,schedule,duration,firing_speed,custom_speed_detail,hold_used,hold_duration,date,results,notes,firing_time,firing_mode,load_description,firing_mode_notes,start_time,end_time,open_temp) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+        .run(id, req.userId, firingType || null, cone, temperature, atmosphere || null, kilnName, schedule, duration, firingSpeed || null, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null, firingModeNotes || null, startTime || null, endTime || null, openTemp || null);
+    });
+  } catch (error) {
+    if (error.status === 400) return res.status(400).json({ error: error.message });
+    return qlRelationshipError(res, error);
+  }
   res.json({ id });
 });
 
@@ -2715,12 +2717,14 @@ app.post('/api/firing-logs', auth, (req, res) => {
 app.put('/api/firing-logs/:id', auth, (req, res) => {
   const { pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail, holdUsed, holdDuration, date, results, notes, firingTime, firingMode, loadDescription, firingModeNotes, startTime, endTime, openTemp } = req.body;
   try {
-    if (pieceId) ownedRelationship('pieces', req.userId, pieceId);
+    getQlRelationshipService().writeLegacyFiring({ userId: req.userId, firingId: req.params.id, pieceId }, () => {
+      db.prepare('UPDATE firing_logs SET firing_type=?,cone=?,temperature=?,atmosphere=?,kiln_name=?,schedule=?,duration=?,firing_speed=?,custom_speed_detail=?,hold_used=?,hold_duration=?,date=?,results=?,notes=?,firing_time=?,firing_mode=?,load_description=?,firing_mode_notes=?,start_time=?,end_time=?,open_temp=? WHERE id=? AND user_id=?')
+        .run(firingType || null, cone, temperature, atmosphere || null, kilnName, schedule, duration, firingSpeed || null, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null, firingModeNotes || null, startTime || null, endTime || null, openTemp || null, req.params.id, req.userId);
+    });
   } catch (error) {
-    return res.status(error.status || 400).json({ error: error.message });
+    if (error.status === 400) return res.status(400).json({ error: error.message });
+    return qlRelationshipError(res, error);
   }
-  db.prepare('UPDATE firing_logs SET piece_id=?,firing_type=?,cone=?,temperature=?,atmosphere=?,kiln_name=?,schedule=?,duration=?,firing_speed=?,custom_speed_detail=?,hold_used=?,hold_duration=?,date=?,results=?,notes=?,firing_time=?,firing_mode=?,load_description=?,firing_mode_notes=?,start_time=?,end_time=?,open_temp=? WHERE id=? AND user_id=?')
-    .run(pieceId || null, firingType || null, cone, temperature, atmosphere || null, kilnName, schedule, duration, firingSpeed || null, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null, firingModeNotes || null, startTime || null, endTime || null, openTemp || null, req.params.id, req.userId);
   res.json({ success: true });
 });
 

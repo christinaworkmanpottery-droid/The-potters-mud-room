@@ -102,9 +102,59 @@ function unlink(db, { userId, pieceId, kind, targetId }) {
   return db.transaction(() => {
     requireOwned(db, 'pieces', userId, pieceId);
     requireOwned(db, target, userId, targetId);
-    return db.prepare(`DELETE FROM ${table} WHERE user_id=? AND piece_id=? AND ${column}=?`)
+    const explicit = db.prepare(`DELETE FROM ${table} WHERE user_id=? AND piece_id=? AND ${column}=?`)
       .run(userId, pieceId, targetId).changes;
+    // Remove the association, not merely one storage representation. Never delete history.
+    const legacy = kind === 'firing' ? db.prepare(`UPDATE firing_logs SET piece_id=NULL
+      WHERE id=? AND user_id=? AND piece_id=?`).run(targetId, userId, pieceId).changes : 0;
+    return Number(explicit > 0 || legacy > 0);
   }).immediate();
+}
+
+// Phase 1F compatibility contract (also see RELATIONSHIPS.md):
+// A firing may belong to multiple Pieces. piece_id is an optional legacy selection,
+// NOT an exclusive owner or a mirror of the full QL set. Effective links are the
+// same-owner union. Different legacy/QL Pieces are valid additional associations.
+// QL create adds only its pair; QL remove clears both forms of only its pair.
+// A legacy selection replacement removes its old QL pair and adds the new pair;
+// all other QL pairs survive. Reads never backfill or repair historical data.
+// The trusted persistence callback writes non-relationship fields only. Keeping it
+// inside this transaction makes record creation/edit and pair synchronization atomic.
+function writeLegacyFiring(db, { userId, firingId, pieceId, create = false }, persist) {
+  return db.transaction(() => {
+    if (!create) requireOwned(db, 'firing_logs', userId, firingId);
+    const next = pieceId || null; // Preserve the existing full-replacement PUT contract.
+    if (next !== null) {
+      try { requireOwned(db, 'pieces', userId, next); }
+      catch (error) {
+        if (error.code !== 'QL_RECORD_UNAVAILABLE') throw error;
+        // Existing legacy API validation contract; foreign and absent are identical.
+        error.status = 400;
+        error.message = 'Related record unavailable';
+        throw error;
+      }
+    }
+    const previous = create ? null : db.prepare('SELECT piece_id FROM firing_logs WHERE id=? AND user_id=?')
+      .get(firingId, userId).piece_id;
+    persist();
+    requireOwned(db, 'firing_logs', userId, firingId);
+    db.prepare('UPDATE firing_logs SET piece_id=? WHERE id=? AND user_id=?').run(next, firingId, userId);
+    if (relationshipTablesInstalled(db)) {
+      // Narrow repair: only the selected old/new pair, even if old metadata is stale.
+      if (previous !== null && previous !== next) {
+        db.prepare('DELETE FROM ql_piece_firings WHERE user_id=? AND piece_id=? AND firing_id=?')
+          .run(userId, previous, firingId);
+      }
+      if (next !== null) link(db, { userId, pieceId: next, kind: 'firing', targetId: firingId });
+    }
+  }).immediate();
+}
+
+function firingRelationships(db, userId, pieceId) {
+  requireOwned(db, 'pieces', userId, pieceId);
+  const legacy = db.prepare('SELECT * FROM firing_logs WHERE piece_id=? AND user_id=? ORDER BY id').all(pieceId, userId);
+  return [...new Map([...legacy, ...related(db, userId, pieceId, 'firing')].map(row => [row.id, row])).values()]
+    .sort((a, b) => a.id.localeCompare(b.id));
 }
 
 function related(db, userId, pieceId, kind) {
@@ -125,10 +175,7 @@ function readPiece(db, userId, pieceId) {
     const clay = db.prepare('SELECT * FROM clay_bodies WHERE id=? AND user_id=?').get(piece.clay_body_id, userId) || null;
     const glazes = db.prepare(`SELECT pg.* FROM piece_glazes pg LEFT JOIN glazes g ON g.id=pg.glaze_id
       WHERE pg.piece_id=? AND (pg.glaze_id IS NULL OR g.user_id=?) ORDER BY pg.layer_order,pg.id`).all(pieceId, userId);
-    const legacyFirings = db.prepare('SELECT * FROM firing_logs WHERE piece_id=? AND user_id=? ORDER BY id').all(pieceId, userId);
-    // Read-through avoids stale copies when an old client edits firing_logs.piece_id.
-    const firings = [...new Map([...legacyFirings, ...related(db, userId, pieceId, 'firing')].map(x => [x.id, x])).values()]
-      .sort((a, b) => a.id.localeCompare(b.id));
+    const firings = firingRelationships(db, userId, pieceId);
     return {
       piece, clay, glazes,
       photos: db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order,id').all(pieceId),
@@ -157,6 +204,7 @@ function createRelationshipService(db) {
     if (!relationshipTablesInstalled(db)) throw serviceUnavailable();
   }
   return Object.freeze({
+    writeLegacyFiring(args, persist) { return writeLegacyFiring(db, args, persist); },
     create({ userId, pieceId, kind, targetId }) {
       ensureInstalled();
       return link(db, { userId, pieceId, kind, targetId });
@@ -167,12 +215,7 @@ function createRelationshipService(db) {
     },
     list({ userId, pieceId, kind }) {
       requireOwned(db, 'pieces', userId, pieceId);
-      if (kind === 'firing') {
-        const legacy = db.prepare('SELECT * FROM firing_logs WHERE piece_id=? AND user_id=? ORDER BY id').all(pieceId, userId);
-        const explicit = related(db, userId, pieceId, kind);
-        return [...new Map([...legacy, ...explicit].map(row => [row.id, row])).values()]
-          .sort((a, b) => a.id.localeCompare(b.id));
-      }
+      if (kind === 'firing') return firingRelationships(db, userId, pieceId);
       return related(db, userId, pieceId, kind);
     }
   });

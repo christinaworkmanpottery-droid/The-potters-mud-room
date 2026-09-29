@@ -46,7 +46,7 @@ test('reader works before migration and preserves nullable/name-only records', t
 });
 
 for (const [kind, prefix, table, column, target] of cases) {
-  test(`${kind}: stable/idempotent many-to-many links, owner-scoped unlink and original rows untouched`, t => {
+  test(`${kind}: stable/idempotent many-to-many links, owner-scoped unlink and only the selected legacy pair detached`, t => {
     const db = fixture(t); migrate(db);
     const before = snapshot(db);
     const first = link(db, args(kind, `${prefix}-a`));
@@ -56,7 +56,9 @@ for (const [kind, prefix, table, column, target] of cases) {
     assert.equal(unlink(db, args(kind, `${prefix}-a`)), 1);
     assert.equal(unlink(db, args(kind, `${prefix}-a`)), 0);
     assert.equal(db.prepare(`SELECT count(*) n FROM ${table}`).get().n, 1);
-    assert.deepEqual(snapshot(db), before);
+    const expected = structuredClone(before);
+    if (kind === 'firing') expected.find(t => t.name === 'firing_logs').rows.find(r => r.id === 'firing-a').piece_id = null;
+    assert.deepEqual(snapshot(db), expected);
   });
   test(`${kind}: cross-account/missing endpoints rejected through helper AND SQL insert/update`, t => {
     const db = fixture(t); migrate(db);
@@ -84,7 +86,7 @@ for (const [kind, prefix, table, column, target] of cases) {
   });
 }
 
-test('legacy firing edits remain authoritative; explicit links deduplicate and remain independent', t => {
+test('legacy direct edits read through; explicit unlink removes both forms of its pair', t => {
   const db = fixture(t); migrate(db);
   assert.equal(readPiece(db, 'a', 'piece-a').firings.length, 1);
   db.prepare("UPDATE firing_logs SET piece_id='piece-a-2' WHERE id='firing-a'").run();
@@ -95,7 +97,7 @@ test('legacy firing edits remain authoritative; explicit links deduplicate and r
   link(db, args());
   assert.equal(readPiece(db, 'a', 'piece-a').firings.length, 1);
   unlink(db, args('firing', 'firing-a', 'piece-a-2'));
-  assert.equal(readPiece(db, 'a', 'piece-a-2').firings.length, 1); // Legacy link is not erased.
+  assert.equal(readPiece(db, 'a', 'piece-a-2').firings.length, 0); // Both representations removed.
 });
 
 test('reader fails closed on foreign account and filters legacy cross-owner joins without repairing rows', t => {

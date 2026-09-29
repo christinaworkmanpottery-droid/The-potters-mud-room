@@ -6,12 +6,15 @@ const cleanEnv = { PATH: process.env.PATH, NODE_ENV: 'test' };
 for (const [args, extraEnv] of [
   [['ql/verify.cjs'], {}],
   [['--test', 'tests/ql-relationships.cjs'], {}],
+  [['--test', 'tests/ql-firing-compatibility.cjs'], {}],
   [['tests/website-api.cjs'], { QL_TEST_MIGRATION: '1' }],
   [['--test', 'tests/ql-deletion.cjs'], {}],
   [['--test', 'tests/ql-studio-deletion.cjs'], {}],
   [['tests/ql-relationship-safety-api.cjs'], {}],
   [['tests/ql-relationship-safety-api.cjs'], { QL_TEST_MIGRATION: '1' }],
   [['tests/ql-relationship-service-api.cjs'], {}],
+  [['tests/ql-firing-compatibility-api.cjs'], {}],
+  [['tests/ql-firing-compatibility-api.cjs'], { QL_TEST_MIGRATION: '1' }],
   [['tests/ql-studio-deletion-api.cjs'], {}],
   [['tests/ql-studio-deletion-api.cjs'], { QL_TEST_MIGRATION: '1' }],
   [['tests/ql-deletion-api.cjs'], {}],
@@ -20,4 +23,4 @@ for (const [args, extraEnv] of [
   const result = spawnSync(process.execPath, args, { cwd: root, env: { ...cleanEnv, ...extraEnv }, stdio: 'inherit' });
   if (result.status !== 0) process.exit(result.status || 1);
 }
-console.log('PASS Phase 1E: baseline + relationships + ownership-safe writes/reads + deletion lifecycle (legacy and QL)');
+console.log('PASS Phase 1F: baseline + relationships + ownership-safe writes/reads + deletion lifecycle (legacy and QL)');
