@@ -73,7 +73,7 @@ function seed(owner,prefix){
  await check('failed relationship mutation rolls back cleanly',async()=>{
   db.exec("CREATE TRIGGER phase1e_fail BEFORE INSERT ON ql_piece_firings BEGIN SELECT RAISE(ABORT,'synthetic failure'); END;");
   const before=db.prepare('SELECT COUNT(*) n FROM ql_piece_firings').get().n;
-  const r=await request('/api/ql/pieces/a-p/firings','POST',{firingId:'a-f'});assert.equal(r.status,404);
+  const r=await request('/api/ql/pieces/a-p/firings','POST',{firingId:'a-f'});assert.equal(r.status,500);
   assert.equal(db.prepare('SELECT COUNT(*) n FROM ql_piece_firings').get().n,before);
   db.exec('DROP TRIGGER phase1e_fail');
  });
