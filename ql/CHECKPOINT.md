@@ -36,7 +36,10 @@ reopening passed. Corruption audits also proved exact database bytes unchanged.
 `node ql/verify-phase1.cjs`: **268 passing test executions**, zero failures, Node 22.16.0.
 This retains the prior 233 plus 33 audit tests and 2 complete recovery rehearsals. The
 existing disposable baseline database integrity/schema check also passed.
-GitHub Actions: awaiting the isolated-branch push/remote result at this commit.
+Implementation commit: `8830ed5a674e0d192cb7887ff6fe917e8aca8dd8`.
+GitHub Actions: **successful** for that exact implementation commit (full verifier, Node 22).
+https://github.com/christinaworkmanpottery-droid/The-potters-mud-room/actions/runs/36613914143
+This documentation-only checkpoint records that verified result; code/tests are unchanged.
 
 ## Newly documented risks
 
