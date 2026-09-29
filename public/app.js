@@ -1447,7 +1447,7 @@ function clearGlazeMedia(scope) {
     glazeMediaViews.delete(key);
   }
   if (!scope) {
-    clearGlazeClayTestMedia();
+    if (typeof clearGlazeClayTestMedia === 'function') clearGlazeClayTestMedia();
     glazes = [];
     ['glazeList', 'glazeViewBody'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
     document.getElementById('glazeViewModal')?.classList.remove('open');
