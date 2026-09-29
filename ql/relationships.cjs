@@ -221,4 +221,6 @@ function createRelationshipService(db) {
   });
 }
 
-module.exports = { migrate, link, unlink, readPiece, createRelationshipService };
+// Read-only audit metadata; no new migration or runtime activation.
+const auditMigrationContract = Object.freeze({ migrationId, checksum, readManifest: manifest });
+module.exports = { migrate, link, unlink, readPiece, createRelationshipService, auditMigrationContract };
