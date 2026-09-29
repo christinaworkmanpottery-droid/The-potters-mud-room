@@ -7,3 +7,7 @@ Phase 2E adds private Piece-photo compatibility to the shared mobile client with
 - Piece list API now exposes the same explicit `photoVisibility` classification already used by Piece detail.
 - No migration, backfill, file rename, deployment, production-data access, native-store release, or global media rewrite.
 - Production remains untouched.
+Verification:
+- Website/QL GitHub Actions run `36634192320`: SUCCESS.
+- This preserves the Phase 2D verifier and strict Phase 1 readiness gate, with one additional Piece-list visibility regression.
+- Mobile CI is tracked independently in the mobile repository.
