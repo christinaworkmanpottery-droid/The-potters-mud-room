@@ -11,6 +11,7 @@ for (const [args, extraEnv] of [
   [['--test', 'tests/ql-studio-deletion.cjs'], {}],
   [['tests/ql-relationship-safety-api.cjs'], {}],
   [['tests/ql-relationship-safety-api.cjs'], { QL_TEST_MIGRATION: '1' }],
+  [['tests/ql-relationship-service-api.cjs'], {}],
   [['tests/ql-studio-deletion-api.cjs'], {}],
   [['tests/ql-studio-deletion-api.cjs'], { QL_TEST_MIGRATION: '1' }],
   [['tests/ql-deletion-api.cjs'], {}],
@@ -19,4 +20,4 @@ for (const [args, extraEnv] of [
   const result = spawnSync(process.execPath, args, { cwd: root, env: { ...cleanEnv, ...extraEnv }, stdio: 'inherit' });
   if (result.status !== 0) process.exit(result.status || 1);
 }
-console.log('PASS Phase 1D: baseline + relationships + ownership-safe writes/reads + deletion lifecycle (legacy and QL)');
+console.log('PASS Phase 1E: baseline + relationships + ownership-safe writes/reads + deletion lifecycle (legacy and QL)');
