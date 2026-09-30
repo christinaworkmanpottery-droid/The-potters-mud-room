@@ -32,9 +32,10 @@ for (const [args, extraEnv] of [
   [['--test', 'tests/ql-upload-restriction-readiness.cjs'], {}],
   [['--test', 'tests/ql-clay-media.cjs', 'tests/ql-clay-media-dom.cjs'], {}],
   [['--test', 'tests/ql-glaze-media.cjs', 'tests/ql-glaze-media-dom.cjs'], {}],
-  [['--test', 'tests/ql-test-tile-media.cjs'], {}]
+  [['--test', 'tests/ql-test-tile-media.cjs'], {}],
+  [['--test', 'tests/ql-glaze-combo-media.cjs'], {}]
 ]) {
   const result = spawnSync(process.execPath, args, { cwd: root, env: { ...cleanEnv, ...extraEnv }, stdio: 'inherit' });
   if (result.status !== 0) process.exit(result.status || 1);
 }
-console.log('PASS Phase 1 regressions/readiness unchanged plus Phase 2A-2J protected studio media and upload restriction-readiness validation');
+console.log('PASS Phase 1 regressions/readiness unchanged plus Phase 2A-2K protected/public-aware studio media and upload restriction-readiness validation');
