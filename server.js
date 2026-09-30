@@ -1089,7 +1089,7 @@ app.delete('/api/account', auth, (req, res) => {
     if (u?.email === ADMIN_EMAIL) return res.status(403).json({ error: 'Admin account cannot be deleted from here' });
     let accountFiles = [];
     db.transaction(() => {
-      accountFiles = deletionLifecycle.preflightAccountDeletion(uid);
+      accountFiles = deletionLifecycle.preflightAccountDeletion(uid).concat(forumAccountFiles(uid));
       // Delete all user data in order (respecting foreign keys)
       db.prepare('DELETE FROM promo_redemptions WHERE user_id=?').run(uid);
       db.prepare('DELETE FROM referral_rewards WHERE referrer_id=? OR referred_id=?').run(uid, uid);
@@ -1568,7 +1568,7 @@ app.delete('/api/admin/members/:id', auth, (req, res) => {
     if (u.email === ADMIN_EMAIL) return res.status(403).json({ error: 'Cannot delete admin account' });
     let accountFiles = [];
     db.transaction(() => {
-      accountFiles = deletionLifecycle.preflightAccountDeletion(uid);
+      accountFiles = deletionLifecycle.preflightAccountDeletion(uid).concat(forumAccountFiles(uid));
       // Clean up all related data before deleting user
       db.prepare('DELETE FROM push_tokens WHERE user_id=?').run(uid);
       db.prepare('DELETE FROM password_reset_tokens WHERE user_id=?').run(uid);
@@ -3581,6 +3581,196 @@ app.delete('/api/community/combos/:id', auth, (req, res) => {
   res.json({ success: true });
 });
 
+// Phase 2R: Forum media is authenticated community content, not anonymous publication.
+const forumMime = { '.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.gif':'image/gif','.webp':'image/webp','.heic':'image/heic','.heif':'image/heif','.avif':'image/avif','.mp4':'video/mp4','.m4v':'video/mp4','.mov':'video/quicktime','.webm':'video/webm' };
+function forumMediaRecord(id) {
+  return db.prepare(`SELECT m.*, p.user_id AS post_owner, r.user_id AS reply_owner, r.post_id AS thread_id,
+    rp.user_id AS thread_owner FROM forum_photos m LEFT JOIN forum_posts p ON p.id=m.post_id
+    LEFT JOIN forum_replies r ON r.id=m.reply_id LEFT JOIN forum_posts rp ON rp.id=r.post_id WHERE m.id=?`).get(id);
+}
+function validForumRecord(m) {
+  return !!m && (m.reply_id == null ? !!m.post_owner : !!m.reply_owner && !!m.thread_owner && (m.post_id == null || m.post_id === m.thread_id));
+}
+function forumDescriptor(m) {
+  const row = forumMediaRecord(m.id);
+  return { ...m, mediaAccess: validForumRecord(row) ? 'community-authenticated' : 'legacy-ambiguous', mediaType: (forumMime[path.extname(m.filename).toLowerCase()] || '').startsWith('video/') ? 'video' : 'image' };
+}
+function forumHeaders(res) { res.set('Cache-Control','private, no-store'); res.set('X-Content-Type-Options','nosniff'); res.set('Referrer-Policy','no-referrer'); }
+function forumUnavailable(res) { return res.status(404).json({error:'Media unavailable'}); }
+function resolveForumMedia(req) {
+  if (!db.prepare('SELECT 1 FROM users WHERE id=?').get(req.userId)) return null;
+  const m = forumMediaRecord(req.params.mediaId);
+  if (!validForumRecord(m)) return null;
+  const thread = m.reply_id == null ? m.post_id : m.thread_id;
+  if (thread !== req.params.postId || (req.params.replyId ? m.reply_id !== req.params.replyId : m.reply_id != null)) return null;
+  // Collision-safe: a filename may not resolve another media record/category, even same-owner.
+  if (db.prepare('SELECT 1 FROM forum_photos WHERE filename=? AND id<>?').get(m.filename,m.id)) return null;
+  for (const [table, columns] of Object.entries(require('./deletion-lifecycle.cjs').fileSlots)) {
+    if (table === 'forum_photos') continue;
+    const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c=>c.name));
+    for (const column of columns.filter(c=>available.has(c))) if (db.prepare(`SELECT 1 FROM ${table} WHERE ${column}=?`).get(m.filename)) return null;
+  }
+  // Feed/reply blocking is bidirectional. Apply the stricter rule to media as well.
+  for (const owner of new Set([m.post_owner,m.reply_owner,m.thread_owner].filter(Boolean))) {
+    if (db.prepare('SELECT 1 FROM blocked_users WHERE (user_id=? AND blocked_user_id=?) OR (user_id=? AND blocked_user_id=?)').get(req.userId,owner,owner,req.userId)) return null;
+  }
+  const target = safeStoredUpload(m.filename), mime = forumMime[path.extname(m.filename).toLowerCase()];
+  return target && mime ? {target,mime} : null;
+}
+function deliverForumMedia(req,res) {
+  forumHeaders(res);
+  try {
+    const media = resolveForumMedia(req);
+    if (!media) return forumUnavailable(res);
+    res.type(media.mime);
+    // sendFile streams; preserves HEAD, byte ranges, 206/416 and seeking, without buffering video.
+    res.sendFile(media.target,{cacheControl:false},error=>{
+      if (error && !res.headersSent) { if(error.status===416) return res.set('Content-Range','bytes */'+fs.statSync(media.target).size).status(416).end(); forumUnavailable(res); }
+    });
+  } catch (_) { if(!res.headersSent) forumUnavailable(res); }
+}
+const forumMediaPaths = ['/api/ql/forum/posts/:postId/media/:mediaId','/api/ql/forum/posts/:postId/replies/:replyId/media/:mediaId'];
+app.get(forumMediaPaths,auth,deliverForumMedia);
+// A random HttpOnly cookie authorizes streaming. The URL nonce is NOT a credential.
+// Grants are memory-only, revocable, bounded by JWT expiry and 15 minutes; restart fails closed.
+const forumPlaybackSessions = new Map();
+function issueForumPlayback(req,res) {
+  forumHeaders(res);
+  const nonce=req.params.session;
+  if(!/^[a-zA-Z0-9-]{16,100}$/.test(nonce) || !db.prepare('SELECT 1 FROM users WHERE id=?').get(req.userId)) return null;
+  for(const [key,value] of forumPlaybackSessions) if(value.expires<=Date.now()) forumPlaybackSessions.delete(key);
+  let s=forumPlaybackSessions.get(nonce);
+  if(s && (s.userId!==req.userId || s.revoked)) return null;
+  const bearer=req.headers.authorization?.replace('Bearer ','');
+  const decoded=jwt.decode(bearer||'');
+  if(!decoded || decoded.userId!==req.userId) return null;
+  const expires=Math.min(Date.now()+15*60*1000,decoded.exp ? decoded.exp*1000 : Infinity);
+  if(!s) { if(forumPlaybackSessions.size>=10000) return null; s={userId:req.userId,secret:require('crypto').randomBytes(32).toString('hex'),expires}; forumPlaybackSessions.set(nonce,s); }
+  s.expires=Math.min(s.expires,expires);
+  res.cookie('ql_forum',s.secret,{httpOnly:true,secure:req.secure || req.get('x-forwarded-proto')==='https',sameSite:'strict',path:'/api/ql/forum/streams/'+nonce+'/',maxAge:Math.max(0,s.expires-Date.now())});
+  return s;
+}
+app.post('/api/ql/forum/sessions/:session',auth,(req,res)=>{if(!issueForumPlayback(req,res)) return forumUnavailable(res);res.json({ok:true});});
+app.delete('/api/ql/forum/sessions/:session',auth,(req,res)=>{
+  forumHeaders(res);
+  const s=forumPlaybackSessions.get(req.params.session);
+  if(s && s.userId===req.userId) s.revoked=true;
+  // Tombstone closes the race with a late grant/player request after logout.
+  if(!s && /^[a-zA-Z0-9-]{16,100}$/.test(req.params.session) && forumPlaybackSessions.size<10000) forumPlaybackSessions.set(req.params.session,{userId:req.userId,revoked:true,expires:Date.now()+15*60*1000});
+  res.status(204).end();
+});
+const forumStreamPaths=['/api/ql/forum/streams/:session/posts/:postId/media/:mediaId','/api/ql/forum/streams/:session/posts/:postId/replies/:replyId/media/:mediaId'];
+app.get(forumStreamPaths,(req,res)=>{
+  forumHeaders(res);
+  const s=forumPlaybackSessions.get(req.params.session), cookie=(req.headers.cookie||'').split(';').map(v=>v.trim()).find(v=>v.startsWith('ql_forum='))?.slice(9);
+  if(!s || s.revoked || s.expires<=Date.now() || cookie!==s.secret) return res.status(401).json({error:'Not authenticated'});
+  req.userId=s.userId; deliverForumMedia(req,res);
+});
+// Native WebView loads this same-origin document with an Authorization header.
+// Its video subrequests use the scoped HttpOnly cookie, including Range requests.
+app.get(['/api/ql/forum/player/:session/posts/:postId/media/:mediaId','/api/ql/forum/player/:session/posts/:postId/replies/:replyId/media/:mediaId'],auth,(req,res)=>{
+  forumHeaders(res);
+  if(!resolveForumMedia(req) || !issueForumPlayback(req,res)) return forumUnavailable(res);
+  const enc=encodeURIComponent;
+  const src='/api/ql/forum/streams/'+enc(req.params.session)+'/posts/'+enc(req.params.postId)+(req.params.replyId?'/replies/'+enc(req.params.replyId):'')+'/media/'+enc(req.params.mediaId);
+  res.set('Content-Security-Policy',"default-src 'none'; media-src 'self'; style-src 'unsafe-inline'; frame-ancestors 'self'");
+  res.type('html').send('<!doctype html><meta name="viewport" content="width=device-width"><style>body{margin:0;background:#000}video{width:100%;height:100vh}</style><video controls playsinline preload="metadata" src="'+src+'"></video>');
+});
+function forumAccountFiles(userId) {
+  const rows=db.prepare(`SELECT m.* FROM forum_photos m LEFT JOIN forum_posts p ON p.id=m.post_id
+    LEFT JOIN forum_replies r ON r.id=m.reply_id LEFT JOIN forum_posts rp ON rp.id=r.post_id
+    WHERE p.user_id=? OR r.user_id=? OR rp.user_id=?`).all(userId,userId,userId);
+  forumRequire(rows.every(m=>validForumRecord(forumMediaRecord(m.id))),409,'Forum media relationships require review');
+  return rows.map(m=>m.filename);
+}
+function validForumVideo(file,mime) {
+  // Validate container boundaries without decoding, transcoding, or loading the video into memory.
+  const fd=fs.openSync(file.path,'r'),head=Buffer.alloc(16);
+  try {
+    if(fs.readSync(fd,head,0,16,0)<16)return false;
+    if(mime==='video/webm') {
+      if(!head.subarray(0,4).equals(Buffer.from([0x1a,0x45,0xdf,0xa3])))return false;
+      const header=Buffer.alloc(Math.min(4096,file.size));fs.readSync(fd,header,0,header.length,0);
+      return header.includes(Buffer.from('webm')) && header.includes(Buffer.from([0x18,0x53,0x80,0x67])) && file.size>64;
+    }
+    let offset=0,moov=false,mdat=false;
+    while(offset<file.size) {
+      if(file.size-offset<8)return false;
+      fs.readSync(fd,head,0,Math.min(16,file.size-offset),offset);
+      let size=head.readUInt32BE(0),headerSize=8;const type=head.toString('ascii',4,8);
+      if(size===1){if(file.size-offset<16)return false;size=Number(head.readBigUInt64BE(8));headerSize=16;}
+      if(size===0)size=file.size-offset;
+      if(!Number.isSafeInteger(size)||size<headerSize||offset+size>file.size)return false;
+      if(type==='moov' && size>headerSize)moov=true;
+      if(type==='mdat' && size>headerSize)mdat=true;
+      offset+=size;
+    }
+    return moov && mdat;
+  }finally{fs.closeSync(fd);}
+}
+const forumStorage=multer.diskStorage({
+  destination:(_req,_file,cb)=>cb(null,UPLOADS_DIR),
+  filename:(req,file,cb)=>{
+    if(req.aborted)return cb(Error('Upload interrupted'));
+    const filename=uuidv4()+path.extname(file.originalname);
+    req.forumUploadNames.push(filename);cb(null,filename);
+  }
+});
+const forumMultipart=multer({
+  storage:{
+    _handleFile(req,file,cb){
+      const abort=()=>file.stream.destroy(Error('Upload interrupted'));
+      req.once('aborted',abort);
+      forumStorage._handleFile(req,file,(error,result)=>{
+        req.removeListener('aborted',abort);
+        cb(error,result);
+        if(req.aborted)deletionLifecycle.cleanupFiles(req.forumUploadNames);
+      });
+    },
+    _removeFile(req,file,cb){forumStorage._removeFile(req,file,cb);}
+  },
+  limits:{fileSize:MAX_VIDEO_SIZE},
+  fileFilter:(req,file,cb)=>cb(null,true)
+});
+function forumUpload(count) {
+  return (req,res,next)=>{
+    req.forumUploadNames=[];
+    forumMultipart.array('photos',count)(req,res,async error=>{
+    const discard=()=>deletionLifecycle.cleanupFiles(req.forumUploadNames);
+    if(error){discard();return res.status(error.code==='LIMIT_FILE_SIZE'?413:400).json({error:'Could not read Forum media'});}
+    try {
+      for(const file of req.files||[]) {
+        const mime=forumMime[path.extname(file.filename).toLowerCase()];
+        if(!mime || (file.mimetype!==mime && !(mime==='image/jpeg' && file.mimetype==='image/jpg'))) throw Error('type');
+        if(mime.startsWith('image/')) { if(file.size>MAX_IMAGE_SIZE) throw Error('size'); await sharp(file.path).metadata(); }
+        else {
+          if(!validForumVideo(file,mime)) throw Error('video');
+        }
+      }
+      next();
+    }catch(_){discard();res.status(400).json({error:'Invalid Forum media'});}
+    });
+  };
+}
+function forumMutation(req,res,operation) {
+  let result;
+  try { result=db.transaction(operation).immediate(); }
+  catch(error){cleanupRequestUploads(req.files);return res.status(error.status||500).json({error:error.status?error.message:'Could not save Forum changes'});}
+  // Both cleanup and response happen AFTER commit. Never delete committed new media on failure.
+  try { deletionLifecycle.cleanupFiles(result.files||[]); } catch(_) {}
+  res.json(result.body);
+}
+function forumRequire(condition,status,message) { if(!condition) throw Object.assign(Error(message),{status}); }
+function forumOwner(req,table,id,allowAdmin=false) {
+  const row=db.prepare(`SELECT * FROM ${table} WHERE id=?`).get(id);
+  forumRequire(row,404,'Not found');
+  const admin=allowAdmin && db.prepare('SELECT email FROM users WHERE id=?').get(req.userId)?.email===ADMIN_EMAIL;
+  forumRequire(row.user_id===req.userId || admin,403,'Not authorized');return row;
+}
+function insertForumUploads(req,postId,replyId=null) {
+  for(const file of req.files||[]) db.prepare('INSERT INTO forum_photos(id,post_id,reply_id,filename,original_name) VALUES(?,?,?,?,?)').run(uuidv4(),replyId?null:postId,replyId,file.filename,file.originalname);
+}
+
 // ============ FORUM ============
 app.get('/api/forum/categories', auth, (req, res) => {
   const cats = db.prepare('SELECT * FROM forum_categories ORDER BY sort_order').all();
@@ -3603,8 +3793,8 @@ app.get('/api/forum/posts', auth, (req, res) => {
   if (limit) { sql += ' LIMIT ?'; params.push(parseInt(limit)); }
   if (offset) { sql += ' OFFSET ?'; params.push(parseInt(offset)); }
   const posts = db.prepare(sql).all(...params);
-  const getPhotos = db.prepare('SELECT * FROM forum_photos WHERE post_id=?');
-  posts.forEach(p => { p.photos = getPhotos.all(p.id); });
+  const getPhotos = db.prepare('SELECT * FROM forum_photos WHERE post_id=? AND reply_id IS NULL');
+  posts.forEach(p => { p.photos = getPhotos.all(p.id).map(forumDescriptor); });
   res.json(posts);
 });
 
@@ -3613,129 +3803,81 @@ app.get('/api/forum/posts/:id', auth, (req, res) => {
     FROM forum_posts fp JOIN users u ON fp.user_id=u.id WHERE fp.id=?`).get(req.params.id);
   if (!post) return res.status(404).json({ error: 'Not found' });
   db.prepare('UPDATE forum_posts SET view_count=view_count+1 WHERE id=?').run(req.params.id);
-  post.photos = db.prepare('SELECT * FROM forum_photos WHERE post_id=?').all(post.id);
+  post.photos = db.prepare('SELECT * FROM forum_photos WHERE post_id=? AND reply_id IS NULL').all(post.id).map(forumDescriptor);
   post.replies = db.prepare(`SELECT fr.*,u.display_name as author_name,u.avatar_filename as author_avatar
     FROM forum_replies fr JOIN users u ON fr.user_id=u.id WHERE fr.post_id=?
     AND fr.user_id NOT IN (SELECT blocked_user_id FROM blocked_users WHERE user_id=?)
     AND fr.user_id NOT IN (SELECT user_id FROM blocked_users WHERE blocked_user_id=?)
     ORDER BY fr.created_at`).all(post.id, req.userId, req.userId);
   const getReplyPhotos = db.prepare('SELECT * FROM forum_photos WHERE reply_id=?');
-  post.replies.forEach(r => { r.photos = getReplyPhotos.all(r.id); });
+  post.replies.forEach(r => { r.photos = getReplyPhotos.all(r.id).map(forumDescriptor); });
   res.json(post);
 });
 
-app.post('/api/forum/posts', auth, upload.array('photos', 5), (req, res) => {
-  const { title, body, categoryId } = req.body;
-  if (!title || !body) return res.status(400).json({ error: 'Title and body required' });
-  const id = uuidv4();
-  db.prepare('INSERT INTO forum_posts (id,user_id,category_id,title,body) VALUES (?,?,?,?,?)').run(id, req.userId, categoryId, title, body);
-  if (req.files?.length) {
-    const ins = db.prepare('INSERT INTO forum_photos (id,post_id,filename,original_name) VALUES (?,?,?,?)');
-    req.files.forEach(f => ins.run(uuidv4(), id, f.filename, f.originalname));
-  }
-  res.json({ id });
+app.post('/api/forum/posts', auth, forumUpload(5), (req,res)=>forumMutation(req,res,()=>{
+  const {title,body,categoryId}=req.body;
+  forumRequire(title && body,400,'Title and body required');const id=uuidv4();
+  db.prepare('INSERT INTO forum_posts(id,user_id,category_id,title,body) VALUES(?,?,?,?,?)').run(id,req.userId,categoryId||null,title,body);
+  insertForumUploads(req,id);return {body:{id}};
+}));
+app.post('/api/forum/posts/:id/photos',auth,forumUpload(5),(req,res)=>forumMutation(req,res,()=>{
+  forumOwner(req,'forum_posts',req.params.id);forumRequire(req.files?.length,400,'No files uploaded');insertForumUploads(req,req.params.id);return {body:{uploaded:req.files.length}};
+}));
+app.post('/api/forum/posts/:id/reply',auth,forumUpload(1),(req,res)=>{
+  forumMutation(req,res,()=>{
+    forumRequire(db.prepare('SELECT 1 FROM forum_posts WHERE id=?').get(req.params.id),404,'Not found');
+    forumRequire(req.body.body,400,'Reply body required');
+    forumRequire(!req.files?.length || db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId)?.tier==='starter',403,'Only Unlimited members can attach a photo in comments.');
+    const id=uuidv4();db.prepare('INSERT INTO forum_replies(id,post_id,user_id,body) VALUES(?,?,?,?)').run(id,req.params.id,req.userId,req.body.body);
+    db.prepare("UPDATE forum_posts SET reply_count=reply_count+1,updated_at=datetime('now') WHERE id=?").run(req.params.id);
+    insertForumUploads(req,req.params.id,id);
+    const reply=db.prepare('SELECT fr.*,u.display_name AS author_name,u.avatar_filename AS author_avatar FROM forum_replies fr JOIN users u ON u.id=fr.user_id WHERE fr.id=?').get(id);
+    reply.photos=db.prepare('SELECT * FROM forum_photos WHERE reply_id=?').all(id).map(forumDescriptor);
+    return {body:{reply}};
+  });
+  if(res.statusCode===200) notifyForumReply(req.params.id,req.userId);
 });
-
-// Add photos/videos to an existing forum post (separate upload endpoint for large files)
-app.post('/api/forum/posts/:id/photos', auth, upload.array('photos', 5), (req, res) => {
-  const post = db.prepare('SELECT user_id FROM forum_posts WHERE id=?').get(req.params.id);
-  if (!post) return res.status(404).json({ error: 'Post not found' });
-  if (post.user_id !== req.userId) return res.status(403).json({ error: 'Not your post' });
-  if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
-  const ins = db.prepare('INSERT INTO forum_photos (id,post_id,filename,original_name) VALUES (?,?,?,?)');
-  req.files.forEach(f => ins.run(uuidv4(), req.params.id, f.filename, f.originalname));
-  res.json({ uploaded: req.files.length });
-});
-
-app.post('/api/forum/posts/:id/reply', auth, upload.array('photos', 1), (req, res) => {
-  const { body } = req.body;
-  if (!body) return res.status(400).json({ error: 'Reply body required' });
-
-  const user = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
-  if (req.files?.length && user?.tier !== 'starter') {
-    return res.status(403).json({ error: 'Only Unlimited members can attach a photo in comments.' });
-  }
-
-  const id = uuidv4();
-  db.prepare('INSERT INTO forum_replies (id,post_id,user_id,body) VALUES (?,?,?,?)').run(id, req.params.id, req.userId, body);
-  db.prepare(`UPDATE forum_posts SET reply_count=reply_count+1, updated_at=datetime('now') WHERE id=?`).run(req.params.id);
-  notifyForumReply(req.params.id, req.userId);
-
-  if (req.files?.length) {
-    const ins = db.prepare('INSERT INTO forum_photos (id,reply_id,filename,original_name) VALUES (?,?,?,?)');
-    ins.run(uuidv4(), id, req.files[0].filename, req.files[0].originalname);
-  }
-
-  const fullReply = db.prepare(`SELECT fr.*, u.display_name as author_name, u.avatar_filename as author_avatar FROM forum_replies fr JOIN users u ON fr.user_id=u.id WHERE fr.id=?`).get(id);
-  fullReply.photos = db.prepare('SELECT * FROM forum_photos WHERE reply_id=?').all(id);
-  res.json({ reply: fullReply });
-});
-
-// Edit own forum post (supports multipart for photo/video uploads)
-app.put('/api/forum/posts/:id', auth, upload.array('photos', 5), (req, res) => {
-  const post = db.prepare('SELECT user_id FROM forum_posts WHERE id=?').get(req.params.id);
-  if (!post) return res.status(404).json({ error: 'Not found' });
-  if (post.user_id !== req.userId) return res.status(403).json({ error: 'You can only edit your own posts' });
-  const { title, content, body, categoryId } = req.body;
-  const postBody = content || body || '';
-  db.prepare('UPDATE forum_posts SET title=?,body=?,category_id=COALESCE(?,category_id),updated_at=datetime(\'now\') WHERE id=?')
-    .run(title, postBody, categoryId || null, req.params.id);
-  // Save any new uploaded photos/videos
-  if (req.files && req.files.length > 0) {
-    const ins = db.prepare('INSERT INTO forum_photos (id,post_id,filename,original_name) VALUES (?,?,?,?)');
-    req.files.forEach(f => ins.run(uuidv4(), req.params.id, f.filename, f.originalname));
-  }
-  const photos = db.prepare('SELECT * FROM forum_photos WHERE post_id=?').all(req.params.id);
-  res.json({ id: req.params.id, title, body: postBody, content: postBody, photos });
-});
-
-// Edit own forum reply
-app.put('/api/forum/replies/:id', auth, (req, res) => {
-  const reply = db.prepare('SELECT user_id FROM forum_replies WHERE id=?').get(req.params.id);
-  if (!reply) return res.status(404).json({ error: 'Not found' });
-  if (reply.user_id !== req.userId) return res.status(403).json({ error: 'You can only edit your own replies' });
-  const { content, body } = req.body;
-  const replyBody = content || body || '';
-  db.prepare('UPDATE forum_replies SET body=?,updated_at=datetime(\'now\') WHERE id=?')
-    .run(replyBody, req.params.id);
-  res.json({ id: req.params.id, body: replyBody, content: replyBody });
-});
-
-// Delete own forum post
-app.delete('/api/forum/posts/:id', auth, (req, res) => {
-  const post = db.prepare('SELECT user_id FROM forum_posts WHERE id=?').get(req.params.id);
-  if (!post) return res.status(404).json({ error: 'Not found' });
-  const admin = db.prepare('SELECT email FROM users WHERE id=?').get(req.userId);
-  if (post.user_id !== req.userId && admin?.email !== ADMIN_EMAIL) return res.status(403).json({ error: 'You can only delete your own posts' });
-  db.prepare('DELETE FROM forum_photos WHERE post_id=?').run(req.params.id);
-  db.prepare('DELETE FROM forum_photos WHERE reply_id IN (SELECT id FROM forum_replies WHERE post_id=?)').run(req.params.id);
-  db.prepare('DELETE FROM forum_replies WHERE post_id=?').run(req.params.id);
-  db.prepare('DELETE FROM forum_posts WHERE id=?').run(req.params.id);
-  res.json({ success: true });
-});
-
-// Delete own forum reply
-app.delete('/api/forum/replies/:id', auth, (req, res) => {
-  const reply = db.prepare('SELECT user_id,post_id FROM forum_replies WHERE id=?').get(req.params.id);
-  if (!reply) return res.status(404).json({ error: 'Not found' });
-  const admin = db.prepare('SELECT email FROM users WHERE id=?').get(req.userId);
-  if (reply.user_id !== req.userId && admin?.email !== ADMIN_EMAIL) return res.status(403).json({ error: 'You can only delete your own replies' });
-  db.prepare('DELETE FROM forum_photos WHERE reply_id=?').run(req.params.id);
-  db.prepare('DELETE FROM forum_replies WHERE id=?').run(req.params.id);
-  db.prepare('UPDATE forum_posts SET reply_count=reply_count-1 WHERE id=?').run(reply.post_id);
-  res.json({ success: true });
-});
-
-// Delete a single forum photo (owner or admin only)
-app.delete('/api/forum/photos/:id', auth, (req, res) => {
-  const photo = db.prepare('SELECT fp.*, CASE WHEN fp.reply_id IS NULL THEN fpo.user_id WHEN (fp.post_id IS NULL OR fp.post_id=fr.post_id) AND EXISTS (SELECT 1 FROM forum_posts WHERE id=fr.post_id) THEN fr.user_id END as post_owner FROM forum_photos fp LEFT JOIN forum_posts fpo ON fp.post_id=fpo.id LEFT JOIN forum_replies fr ON fp.reply_id=fr.id WHERE fp.id=?').get(req.params.id);
-  if (!photo) return res.status(404).json({ error: 'Not found' });
-  const admin = db.prepare('SELECT email FROM users WHERE id=?').get(req.userId);
-  if (photo.post_owner !== req.userId && admin?.email !== ADMIN_EMAIL) return res.status(403).json({ error: 'Not your post' });
-  db.prepare('DELETE FROM forum_photos WHERE id=?').run(req.params.id);
-  deletionLifecycle.cleanupFiles([photo.filename]);
-  res.json({ success: true });
-});
+app.put('/api/forum/posts/:id',auth,forumUpload(5),(req,res)=>forumMutation(req,res,()=>{
+  const p=forumOwner(req,'forum_posts',req.params.id);
+  const title=req.body.title??p.title, body=req.body.content??req.body.body??p.body;
+  forumRequire(title && body,400,'Title and body required');
+  db.prepare("UPDATE forum_posts SET title=?,body=?,category_id=?,updated_at=datetime('now') WHERE id=?").run(title,body,req.body.categoryId??p.category_id,p.id);
+  insertForumUploads(req,p.id);
+  return {body:{id:p.id,title,body,content:body,photos:db.prepare('SELECT * FROM forum_photos WHERE post_id=? AND reply_id IS NULL').all(p.id).map(forumDescriptor)}};
+}));
+app.put('/api/forum/replies/:id',auth,(req,res)=>forumMutation(req,res,()=>{
+  const r=forumOwner(req,'forum_replies',req.params.id),body=req.body.content??req.body.body??r.body;
+  forumRequire(body,400,'Reply body required');db.prepare("UPDATE forum_replies SET body=?,updated_at=datetime('now') WHERE id=?").run(body,r.id);return {body:{id:r.id,body,content:body}};
+}));
+app.delete('/api/forum/posts/:id',auth,(req,res)=>forumMutation(req,res,()=>{
+  const p=forumOwner(req,'forum_posts',req.params.id,true);
+  // Inconsistent dual-parent historical rows must not cascade into a different thread.
+  const rows=db.prepare('SELECT * FROM forum_photos WHERE post_id=? OR reply_id IN (SELECT id FROM forum_replies WHERE post_id=?)').all(p.id,p.id);
+  forumRequire(rows.every(m=>validForumRecord(forumMediaRecord(m.id)) && (!m.reply_id || forumMediaRecord(m.id).thread_id===p.id)),409,'Media relationships require review');
+  db.prepare('DELETE FROM forum_photos WHERE post_id=? OR reply_id IN (SELECT id FROM forum_replies WHERE post_id=?)').run(p.id,p.id);
+  db.prepare('DELETE FROM forum_replies WHERE post_id=?').run(p.id);db.prepare('DELETE FROM forum_posts WHERE id=?').run(p.id);
+  return {files:rows.map(m=>m.filename),body:{success:true}};
+}));
+app.delete('/api/forum/replies/:id',auth,(req,res)=>forumMutation(req,res,()=>{
+  const r=forumOwner(req,'forum_replies',req.params.id,true),rows=db.prepare('SELECT * FROM forum_photos WHERE reply_id=?').all(r.id);
+  forumRequire(rows.every(m=>validForumRecord(forumMediaRecord(m.id))),409,'Media relationships require review');
+  db.prepare('DELETE FROM forum_photos WHERE reply_id=?').run(r.id);db.prepare('DELETE FROM forum_replies WHERE id=?').run(r.id);
+  db.prepare('UPDATE forum_posts SET reply_count=MAX(0,reply_count-1) WHERE id=?').run(r.post_id);
+  return {files:rows.map(m=>m.filename),body:{success:true}};
+}));
+app.delete('/api/forum/photos/:id',auth,(req,res)=>forumMutation(req,res,()=>{
+  const m=forumMediaRecord(req.params.id);forumRequire(validForumRecord(m),404,'Not found');
+  forumOwner(req,m.reply_id?'forum_replies':'forum_posts',m.reply_id||m.post_id,true);
+  db.prepare('DELETE FROM forum_photos WHERE id=?').run(m.id);return {files:[m.filename],body:{success:true}};
+}));
+// Targeted image/video replacement. Text, parents, sibling media and IDs stay intact.
+app.put('/api/forum/photos/:id',auth,forumUpload(1),(req,res)=>forumMutation(req,res,()=>{
+  const m=forumMediaRecord(req.params.id);forumRequire(validForumRecord(m),404,'Not found');
+  forumOwner(req,m.reply_id?'forum_replies':'forum_posts',m.reply_id||m.post_id);
+  forumRequire(req.files?.length===1,400,'One media file required');const f=req.files[0];
+  db.prepare('UPDATE forum_photos SET filename=?,original_name=? WHERE id=?').run(f.filename,f.originalname,m.id);
+  return {files:[m.filename],body:{id:m.id,filename:f.filename}};
+}));
 
 // ============ ADMIN DISK MANAGEMENT ============
 app.get('/api/admin/disk', auth, (req, res) => {

@@ -37,11 +37,12 @@ test('at least one intentionally public community media surface remains public',
   assert.match(server,/gc\.is_public=1/);
   assert.match(web,/\/uploads\/['"]? \+ combo\.photo_filename|\/uploads\/.*combo\.photo_filename/s);
 });
-test('Clay is a private non-Piece restriction blocker with no visibility metadata',()=>{
+test('Clay remains account-owned with protected delivery and no invented publication metadata',()=>{
   assert.ok(columns('clay_bodies').has('user_id'));
   assert.ok(!columns('clay_bodies').has('is_public'));
   assert.ok(columns('clay_photos').has('filename'));
-  assert.match(web,/\/uploads\/['"]? \+ p\.filename|\/uploads\/.*p\.filename/s);
+  assert.match(web,/api\/ql\/clay-bodies/);
+  assert.match(web,/data-private-clay-photo/);
   assert.match(inventory,/Clay photos[\s\S]*private\/account-owned/);
 });
 test('other private studio media categories still lack explicit visibility fields',()=>{

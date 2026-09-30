@@ -119,6 +119,7 @@ function renderBulkCheckbox(section, id) {
 // ---- Helpers ----
 async function api(path, opts = {}) {
   const requestToken = token;
+  const requestForumGeneration = /^\/api\/forum(?:[/?]|$)/.test(path) ? forumMediaGeneration : null;
   const h = {};
   if (token) h['Authorization'] = 'Bearer ' + token;
   if (opts.body && !(opts.body instanceof FormData)) {
@@ -133,9 +134,10 @@ async function api(path, opts = {}) {
   if (res.status === 401 && /^\/api\/sales(?:[/?]|$)/.test(path) && requestToken === token) clearSaleMedia();
   if (res.status === 401 && /^\/api\/(?:ql\/)?events(?:[/?]|$)/.test(path) && requestToken === token) clearEventMedia();
   const d = await res.json();
+  if (/^\/api\/forum(?:[/?]|$)/.test(path) && requestForumGeneration !== forumMediaGeneration) throw new Error('Session changed');
   if (/^\/api\/(?:auth\/me|profile|user\/profile|users|forum|community|messages|potters)(?:[/?]|$)/.test(path)) {
     if (requestToken !== token) throw new Error('Session changed');
-    if (res.status === 401) clearProfileMedia();
+    if (res.status === 401) { clearProfileMedia(); clearForumMedia(); }
   }
   if (!res.ok) throw new Error(d.error || 'Something went wrong');
   return d;
@@ -433,7 +435,7 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     clearClayMedia();
     clearGlazeMedia();
     clearTestTileMedia();
-    clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
+    clearForumMedia(); clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
     clearPieceHistory();
     token = data.token;
     localStorage.setItem('mudlog_token', token);
@@ -453,7 +455,7 @@ function logout() {
   clearClayMedia();
   clearGlazeMedia();
   clearTestTileMedia();
-  clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
+  clearForumMedia(); clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
   clearPieceHistory();
   token = null; currentUser = null;
   localStorage.removeItem('mudlog_token');
@@ -478,7 +480,7 @@ async function checkAuth() {
     const msg = (e.message || '').toLowerCase();
     if (msg.includes('invalid token') || msg.includes('unauthorized') || msg.includes('no token') || msg.includes('invalid') || msg.includes('expired')) {
       // Token is bad — clear it and show auth screen (not landing page)
-      clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
+      clearForumMedia(); clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
       token = null;
       localStorage.removeItem('mudlog_token');
       document.getElementById('landingPage').style.display = 'none';
@@ -3658,6 +3660,65 @@ async function saveCombo(e) {
   } catch(e) { toast(e.message,'error'); } finally { comboSavePending = false; btn.disabled = false; }
 }
 
+// Phase 2R Forum media: blobs for images, cookie-authenticated streams for video.
+const forumMedia = new Map();
+let forumMediaGeneration = 0, forumMediaObserver, forumPlayback;
+function clearForumMedia() {
+  forumMediaGeneration++;
+  if(forumPlayback) {
+    fetch(API+'/api/ql/forum/sessions/'+forumPlayback.nonce,{method:'DELETE',headers:{Authorization:'Bearer '+forumPlayback.token},keepalive:true}).catch(()=>{});
+    forumPlayback=null;
+  }
+  for(const [node,e] of forumMedia) { e.controller.abort(); if(e.url) URL.revokeObjectURL(e.url); if(node.tagName==='VIDEO'){node.pause();} node.removeAttribute('src');if(node.tagName==='VIDEO')node.load(); }
+  forumMedia.clear();
+  document.querySelectorAll('[data-forum-media]').forEach(node=>{node.removeAttribute('src');node.style.visibility='hidden';});
+}
+function forumMediaRoute(photo,postId,replyId) {
+  return '/api/ql/forum/posts/'+encodeURIComponent(postId)+(replyId?'/replies/'+encodeURIComponent(replyId):'')+'/media/'+encodeURIComponent(photo.id);
+}
+function forumMediaAttributes(photo,postId,replyId) {
+  if(photo.mediaAccess==='legacy-ambiguous') return 'src="/uploads/'+encodeURIComponent(photo.filename)+'"';
+  if(!forumMediaObserver) {forumMediaObserver=new MutationObserver(()=>hydrateForumMedia(document));forumMediaObserver.observe(document.documentElement,{childList:true,subtree:true});}
+  return 'data-forum-media="'+esc(forumMediaRoute(photo,postId,replyId))+'" data-forum-generation="'+forumMediaGeneration+'" onerror="this.style.visibility=\'hidden\'"';
+}
+async function forumPlaybackSession(requestToken,generation) {
+  if(!forumPlayback) {
+    const nonce=crypto.randomUUID();
+    const entry={nonce,token:requestToken};forumPlayback=entry;
+    entry.promise=fetch(API+'/api/ql/forum/sessions/'+nonce,{method:'POST',headers:{Authorization:'Bearer '+requestToken},credentials:'same-origin',cache:'no-store'}).then(r=>{
+      if(r.status===401 && generation===forumMediaGeneration && requestToken===token) clearForumMedia();
+      if(!r.ok) throw Error('Playback unavailable');return nonce;
+    });
+  }
+  return forumPlayback.promise;
+}
+async function hydrateForumMedia(root) {
+  const generation=forumMediaGeneration,requestToken=token;
+  if(!requestToken)return;
+  for(const [node,e] of forumMedia) if(!node.isConnected){e.controller.abort();if(e.url)URL.revokeObjectURL(e.url);if(node.tagName==='VIDEO'){node.pause();node.removeAttribute('src');node.load();}forumMedia.delete(node);}
+  await Promise.all([...root.querySelectorAll('[data-forum-media]')].map(async node=>{
+    if(forumMedia.has(node) || Number(node.dataset.forumGeneration)!==generation)return;
+    const e={controller:new AbortController()};forumMedia.set(node,e);
+    const current=()=>node.isConnected && forumMedia.get(node)===e && generation===forumMediaGeneration && requestToken===token;
+    try {
+      if(node.tagName==='VIDEO') {
+        const nonce=await forumPlaybackSession(requestToken,generation);
+        if(current())node.src=API+node.dataset.forumMedia.replace('/api/ql/forum/','/api/ql/forum/streams/'+nonce+'/');
+      }else {
+        const response=await fetch(API+node.dataset.forumMedia,{headers:{Authorization:'Bearer '+requestToken},cache:'no-store',signal:e.controller.signal});
+        if(response.status===401 && current()){clearForumMedia();return;}
+        if(!response.ok)throw Error('Media unavailable');
+        const url=URL.createObjectURL(await response.blob());if(!current()){URL.revokeObjectURL(url);return;}e.url=url;node.src=url;
+      }
+    }catch(_){if(current())node.style.visibility='hidden';}
+  }));
+}
+function renderForumMedia(photo,postId,replyId,small=false) {
+  const attrs=forumMediaAttributes(photo,postId,replyId),video=photo.mediaType==='video'||/\.(mp4|mov|webm|m4v)$/i.test(photo.filename||'');
+  const style=small?'width:80px;height:80px;object-fit:cover;border-radius:8px':'max-width:100%;max-height:400px;border-radius:var(--radius-sm)';
+  return video?'<video '+attrs+' controls playsinline preload="metadata" class="forum-photo" style="'+style+'"></video>':'<img '+attrs+' alt="Forum photo" class="forum-photo" style="'+style+'">';
+}
+
 // ---- Forum ----
 function debounceLoadForum() { clearTimeout(debounceTimer); debounceTimer = setTimeout(loadForumPosts, 300); }
 function selectForumCategory(catId) {
@@ -3759,18 +3820,10 @@ async function viewForumPost(id) {
     const post = await api('/api/forum/posts/' + id);
     navigate('forumPost');
     const avatar = post.author_avatar ? '<img ' + profileAvatarAttributes(post.author_avatar, 'community') + ' class="forum-avatar-lg">' : '<div class="forum-avatar-placeholder forum-avatar-lg">' + (post.author_name||'?')[0].toUpperCase() + '</div>';
-    const photos = (post.photos||[]).map(p => {
-      const ext = (p.filename||'').split('.').pop().toLowerCase();
-      if (['mp4','mov','webm'].includes(ext)) return '<video src="/uploads/' + p.filename + '" class="forum-photo" controls style="max-width:100%;max-height:400px;border-radius:var(--radius-sm)"></video>';
-      return '<img src="/uploads/' + p.filename + '" class="forum-photo" style="max-width:100%;max-height:400px" onclick="window.open(\'/uploads/' + p.filename + '\',\'_blank\')">';
-    }).join('');
+    const photos = (post.photos||[]).map(p => renderForumMedia(p,post.id)).join('');
     const replies = (post.replies||[]).map(r => {
       const ra = r.author_avatar ? '<img ' + profileAvatarAttributes(r.author_avatar, 'community') + ' class="forum-avatar">' : '<div class="forum-avatar-placeholder">' + (r.author_name||'?')[0].toUpperCase() + '</div>';
-      const rPhotos = (r.photos||[]).map(p => {
-        const ext = (p.filename||'').split('.').pop().toLowerCase();
-        if (['mp4','mov','webm'].includes(ext)) return '<video src="/uploads/' + p.filename + '" class="forum-photo" controls style="max-width:300px;max-height:200px"></video>';
-        return '<img src="/uploads/' + p.filename + '" class="forum-photo-sm">';
-      }).join('');
+      const rPhotos = (r.photos||[]).map(p => renderForumMedia(p,post.id,r.id)).join('');
       const deleteBtn = (r.user_id === currentUser?.id || currentUser?.email === 'christinaworkmanpottery@gmail.com') ? '<button class="btn-ghost btn-sm" onclick="deleteReply(\'' + r.id + '\',\'' + post.id + '\')" title="Delete reply">🗑️</button>' : '';
       return '<div class="forum-reply">' +
         '<div style="display:flex;gap:10px">' + ra +
@@ -3808,10 +3861,10 @@ async function editForumPost(id) {
     const photos = p.photos || [];
     const existingMedia = photos.map(ph => {
       const isVideo = /\.(mp4|mov|webm|m4v)$/i.test(ph.filename || '');
-      const src = '/uploads/' + ph.filename;
+
       const xBtn = '<button onclick="deletePostPhoto(\'' + ph.id + '\',\'' + id + '\')" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;padding:0">&times;</button>';
       return '<div style="position:relative;display:inline-block;margin:4px">' +
-        (isVideo ? '<video src="' + src + '" style="width:80px;height:80px;object-fit:cover;border-radius:8px" muted></video>' : '<img src="' + src + '" style="width:80px;height:80px;object-fit:cover;border-radius:8px">') +
+        renderForumMedia(ph,id,null,true) +
         xBtn + '</div>';
     }).join('');
     document.getElementById('forumPostContent').querySelector('.card').innerHTML =
@@ -3827,6 +3880,8 @@ async function editForumPost(id) {
 }
 
 async function saveForumPost(id) {
+  const forumRequestToken = token;
+
   const title = document.getElementById('editPostTitle').value.trim();
   const body = document.getElementById('editPostBody').value.trim();
   if (!title || !body) { toast('Title and content cannot be empty', 'error'); return; }
@@ -3840,7 +3895,8 @@ async function saveForumPost(id) {
         try {
           const ffd = new FormData();
           ffd.append('photos', newFiles[i]);
-          const r = await fetch('/api/forum/posts/' + id + '/photos', { method:'POST', headers:{Authorization:'Bearer '+token}, body:ffd });
+          if(forumRequestToken!==token) throw Error('Session changed');
+          const r = await fetch('/api/forum/posts/' + id + '/photos', { method:'POST', headers:{Authorization:'Bearer '+forumRequestToken}, body:ffd });
           if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
         } catch(err) { toast('Media upload failed: ' + err.message, 'error'); }
       }
@@ -3857,7 +3913,7 @@ async function deletePostPhoto(photoId, postId) {
     // Remove from DOM
     const wrapper = document.getElementById('editPostExistingMedia');
     if (wrapper) { wrapper.querySelectorAll('div').forEach(div => { const btn = div.querySelector('button'); if (btn && btn.getAttribute('onclick') && btn.getAttribute('onclick').indexOf(photoId) !== -1) div.remove(); }); }
-    if (el) el.closest('div[style*="position:relative"]').remove();
+
   } catch(e) { toast(e.message || 'Could not remove photo', 'error'); }
 }
 async function deleteForumPost(id) {
@@ -3871,13 +3927,17 @@ async function deleteReply(id, postId) {
 }
 
 async function submitReply(postId) {
+  const forumRequestToken = token;
+
   const body = document.getElementById('replyBody').value;
   if (!body.trim()) { toast('Write something first!','error'); return; }
   const fd = new FormData();
   fd.append('body', body);
   try {
-    const r = await fetch('/api/forum/posts/' + postId + '/reply', { method:'POST', headers:{Authorization:'Bearer '+token}, body:fd });
-    const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Could not post reply');
+    const r = await fetch('/api/forum/posts/' + postId + '/reply', { method:'POST', headers:{Authorization:'Bearer '+forumRequestToken}, body:fd });
+    const d = await r.json();
+    if(forumRequestToken!==token) return;
+    if(r.status===401)clearForumMedia(); if (!r.ok) throw new Error(d.error || 'Could not post reply');
     toast('Reply posted!','success'); trackActivity('create_reply', 'forum'); viewForumPost(postId);
   } catch(e) { toast(e.message || 'Could not post reply','error'); }
 }
@@ -3893,6 +3953,8 @@ function openForumPostModal() {
 }
 
 async function createForumPost(e) {
+  const forumRequestToken = token;
+
   e.preventDefault();
   const title = document.getElementById('forumPostTitle').value.trim();
   const body = document.getElementById('forumPostBody').value.trim();
@@ -3908,8 +3970,10 @@ async function createForumPost(e) {
     fd.append('title', title);
     fd.append('body', body);
     fd.append('categoryId', categoryId);
-    const r = await fetch('/api/forum/posts', { method:'POST', headers:{Authorization:'Bearer '+token}, body:fd });
-    const d = await r.json(); if (!r.ok) throw new Error(d.error);
+    const r = await fetch('/api/forum/posts', { method:'POST', headers:{Authorization:'Bearer '+forumRequestToken}, body:fd });
+    const d = await r.json();
+    if(forumRequestToken!==token) return;
+    if(r.status===401)clearForumMedia(); if (!r.ok) throw new Error(d.error);
     postId = d.id;
   } catch(err) { toast(err.message,'error'); return; }
 
@@ -3924,7 +3988,8 @@ async function createForumPost(e) {
       try {
         const ffd = new FormData();
         ffd.append('photos', files[i]);
-        const r2 = await fetch('/api/forum/posts/' + postId + '/photos', { method:'POST', headers:{Authorization:'Bearer '+token}, body:ffd });
+        if(forumRequestToken!==token) throw Error('Session changed');
+        const r2 = await fetch('/api/forum/posts/' + postId + '/photos', { method:'POST', headers:{Authorization:'Bearer '+forumRequestToken}, body:ffd });
         if (!r2.ok) failed++;
       } catch(err) { failed++; }
     }
@@ -4433,7 +4498,7 @@ async function uploadProfilePhoto(input) {
   try {
     const r = await fetch('/api/profile/photo', { method:'POST', headers:{Authorization:'Bearer '+token}, body:fd });
     const d = await r.json(); if (requestToken !== token || generation !== profileMediaGeneration) return;
-    if (!r.ok) { if (r.status === 401) clearProfileMedia(); throw new Error(d.error); }
+    if (!r.ok) { if (r.status === 401) { clearProfileMedia(); clearForumMedia(); } throw new Error(d.error); }
     toast('Profile photo updated!','success');
     currentUser.avatar_filename = d.filename;
     loadProfilePhoto();
