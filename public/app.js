@@ -6800,6 +6800,7 @@ async function loadEvents() {
       const mapsUrl = isIOS ? appleMapsUrl : googleMapsUrl;
       const isPast = e.event_date < today;
       return '<div class="card" style="' + (isPast ? 'opacity:0.75;' : '') + '">' +
+      eventImageMarkup(e, 'photo-thumb', e.title) +
       '<div style="cursor:pointer" onclick="editEvent(\'' + e.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(e.title) + '</div>' +
       '<div class="text-sm" style="color:var(--text-light)">' + fmtDate(e.event_date) + (e.start_time ? ' at ' + e.start_time : '') + (e.end_time ? ' – ' + e.end_time : '') + '</div></div></div>' +
       (e.location ? '<div class="text-sm mt-4">📍 ' + esc(e.location) + '</div>' : '') +
@@ -6826,6 +6827,7 @@ async function loadEvents() {
       html += past.map(renderEvent).join('');
     }
     c.innerHTML = html;
+    await hydrateEventMedia(c, events);
   } catch(e) { toast(e.message,'error'); }
 }
 
