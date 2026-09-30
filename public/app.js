@@ -118,6 +118,7 @@ function renderBulkCheckbox(section, id) {
 
 // ---- Helpers ----
 async function api(path, opts = {}) {
+  const requestToken = token;
   const h = {};
   if (token) h['Authorization'] = 'Bearer ' + token;
   if (opts.body && !(opts.body instanceof FormData)) {
@@ -128,6 +129,7 @@ async function api(path, opts = {}) {
     opts.body = JSON.stringify(opts.body);
   }
   const res = await fetch(API + path, { ...opts, headers: opts.body instanceof FormData ? { Authorization: 'Bearer ' + token } : h });
+  if (res.status === 401 && /^\/api\/sales(?:[/?]|$)/.test(path) && requestToken === token) clearSaleMedia();
   const d = await res.json();
   if (!res.ok) throw new Error(d.error || 'Something went wrong');
   return d;
@@ -201,7 +203,7 @@ const STATUS_LABELS = { 'in-progress':'In Progress','leather-hard':'Leather Hard
 const CASUALTY_LABELS = { 'cracked':'Cracked','exploded':'Exploded / Blowout','warped':'Warped','s-crack':'S-Crack','glaze-crawl':'Glaze Crawl','glaze-pinhole':'Glaze Pinholing','glaze-shiver':'Glaze Shivering','glaze-crazing':'Glaze Crazing','glaze-runoff':'Glaze Ran Off','thermal-shock':'Thermal Shock','broke-trimming':'Broke While Trimming','broke-handling':'Broke While Handling','collapsed':'Collapsed','dunting':'Dunting','wrong-color':'Unexpected Color Result','other':'Other' };
 function fmtStatus(s) { return s ? '<span class="status-badge status-' + s + '">' + (STATUS_LABELS[s]||s) + '</span>' : ''; }
 function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { const firingScope = { firingModal:'firingPhotosContainer', firingViewModal:'firingViewBody', firingPhotoReorderModal:'firingPhotoReorderContent' }[id]; if (firingScope) closeFiringMediaScope(firingScope); if (id === 'glazeViewModal') clearGlazeMedia('glazeViewBody'); if (id === 'clayViewModal') clearClayMedia('clayViewBody'); document.getElementById(id).classList.remove('open'); }
+function closeModal(id) { const saleScope = {saleModal:'salePhotoPreview',saleDetailsModal:'saleDetailsContent',bulkSaleModal:'bulkSale'}[id]; if (saleScope) closeSaleMediaScope(saleScope); const firingScope = { firingModal:'firingPhotosContainer', firingViewModal:'firingViewBody', firingPhotoReorderModal:'firingPhotoReorderContent' }[id]; if (firingScope) closeFiringMediaScope(firingScope); if (id === 'glazeViewModal') clearGlazeMedia('glazeViewBody'); if (id === 'clayViewModal') clearClayMedia('clayViewBody'); document.getElementById(id).classList.remove('open'); }
 
 // iOS decimal keyboards have no native Done key. Give every numeric field a
 // consistent way to dismiss the keyboard so form buttons remain reachable.
@@ -425,7 +427,7 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     clearClayMedia();
     clearGlazeMedia();
     clearTestTileMedia();
-    clearPricingMedia(); clearFiringMedia(); clearComboMedia();
+    clearSaleMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
     clearPieceHistory();
     token = data.token;
     localStorage.setItem('mudlog_token', token);
@@ -445,7 +447,7 @@ function logout() {
   clearClayMedia();
   clearGlazeMedia();
   clearTestTileMedia();
-  clearPricingMedia(); clearFiringMedia(); clearComboMedia();
+  clearSaleMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
   clearPieceHistory();
   token = null; currentUser = null;
   localStorage.removeItem('mudlog_token');
@@ -468,7 +470,7 @@ async function checkAuth() {
     const msg = (e.message || '').toLowerCase();
     if (msg.includes('invalid token') || msg.includes('unauthorized') || msg.includes('no token') || msg.includes('invalid') || msg.includes('expired')) {
       // Token is bad — clear it and show auth screen (not landing page)
-      clearPricingMedia(); clearFiringMedia(); clearComboMedia();
+      clearSaleMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
       token = null;
       localStorage.removeItem('mudlog_token');
       document.getElementById('landingPage').style.display = 'none';
@@ -527,6 +529,7 @@ function navigate(page, options = {}) {
   if (page !== 'testTiles') clearTestTileMedia();
   if (page !== 'community') clearComboMedia();
   if (page !== 'firings') clearFiringMedia();
+  if (page !== 'sales') clearSaleMedia();
   if (page !== 'pricingCalculator') clearPricingMedia();
   if (page !== 'pieceDetail') clearPieceHistory();
   try {
@@ -2538,7 +2541,80 @@ function showSalesSummaryRecords() {
 document.addEventListener('keydown',event=>{
   if ((event.key==='Enter'||event.key===' ') && event.target.matches('.stat-box[role="button"]')) {event.preventDefault();event.target.click();}
 });
+let saleMediaGeneration = 0;
+const saleMediaViews = new Map();
+function clearSaleMedia(scope) {
+  if (!scope) saleMediaGeneration++;
+  const lightbox = document.getElementById('lightboxImg');
+  for (const [key, view] of saleMediaViews) {
+    if (scope && key !== scope) continue;
+    view.active = false;
+    view.controller.abort();
+    if (view.urls.includes(lightbox?.src)) { lightbox.removeAttribute('src'); closeLightbox(); }
+    view.urls.forEach(url => URL.revokeObjectURL(url));
+    view.images.forEach(img => { img.removeAttribute('src'); img.dataset.protectedReady = '0'; });
+    saleMediaViews.delete(key);
+  }
+  if (!scope) {
+    saleRequestSerials.clear();
+    _salePieces = []; saleSavePending = false;
+    for (const id of ['salesList', 'salesSummary', 'saleDetailsContent', 'salePhotoPreview']) {
+      const el = document.getElementById(id); if (el) el.innerHTML = '';
+    }
+    for (const id of ['saleModal','saleDetailsModal','bulkSaleModal']) {
+      const modal = document.getElementById(id); modal?.classList.remove('open');
+      modal?.querySelectorAll('input,textarea').forEach(el => { el.value = ''; });
+    }
+  }
+}
+function salePhotoMarkup(calc, style = '') {
+  const attrs = calc.photoDelivery === 'owner-protected'
+    ? 'data-private-sale-photo="' + esc(calc.image_filename) + '" data-sale-id="' + esc(calc.id) + '" data-protected-ready="0"'
+    : 'src="/uploads/' + encodeURIComponent(calc.image_filename) + '"';
+  return '<img ' + attrs + ' alt="Sale photo" style="' + style + '">';
+}
+async function loadSaleMedia(scope) {
+  clearSaleMedia(scope);
+  const root = document.getElementById(scope);
+  if (!root) return;
+  const generation = saleMediaGeneration, sessionToken = token;
+  const view = { active: true, controller: new AbortController(), urls: [], images: [...root.querySelectorAll('[data-private-sale-photo]')] };
+  saleMediaViews.set(scope, view);
+  const active = img => view.active && generation === saleMediaGeneration && token === sessionToken && img.isConnected;
+  await Promise.all(view.images.map(async img => {
+    try {
+      const response = await fetch(API + '/api/ql/sales/' + encodeURIComponent(img.dataset.saleId) + '/photos/' + encodeURIComponent(img.dataset.privateSalePhoto), {
+        headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store', signal: view.controller.signal
+      });
+      if (response.status === 401 && active(img)) { clearSaleMedia(); return; }
+      if (!response.ok) throw new Error('Photo unavailable');
+      const blob = await response.blob();
+      if (!active(img)) return;
+      const url = URL.createObjectURL(blob);
+      view.urls.push(url);
+      img.src = url;
+      img.dataset.protectedReady = '1';
+      img.onerror = () => { img.removeAttribute('src'); img.alt = 'Photo unavailable'; };
+    } catch (_) { if (active(img)) { img.removeAttribute('src'); img.alt = 'Photo unavailable'; } }
+  }));
+}
+
+const saleRequestSerials = new Map();
+function beginSaleRequest(scope) {
+  const serial = (saleRequestSerials.get(scope) || 0) + 1;
+  saleRequestSerials.set(scope, serial);
+  const generation = saleMediaGeneration, sessionToken = token;
+  return () => serial === saleRequestSerials.get(scope) && generation === saleMediaGeneration && sessionToken === token;
+}
+function closeSaleMediaScope(scope) {
+  saleRequestSerials.set(scope, (saleRequestSerials.get(scope) || 0) + 1);
+  clearSaleMedia(scope);
+  if (scope === 'salePhotoPreview') { document.getElementById('salePhotoPreview').innerHTML = ''; document.getElementById('salePhotoInput').value = ''; }
+}
+
 async function loadSales() {
+  const active = beginSaleRequest('salesList');
+  clearSaleMedia('salesList');
   try {
     const dateFrom = document.getElementById('salesDateFrom')?.value || '';
     const dateTo = document.getElementById('salesDateTo')?.value || '';
@@ -2546,6 +2622,7 @@ async function loadSales() {
     if (dateFrom) url += 'dateFrom=' + encodeURIComponent(dateFrom) + '&';
     if (dateTo) url += 'dateTo=' + encodeURIComponent(dateTo) + '&';
     const sales = await api(url);
+    if (!active()) return;
     const c = document.getElementById('salesList'), em = document.getElementById('salesEmpty');
     const sum = document.getElementById('salesSummary');
     if (!sales.length) { c.innerHTML=''; sum.innerHTML=''; em.classList.remove('hidden'); return; }
@@ -2559,7 +2636,7 @@ async function loadSales() {
     if (mode === 'list') {
       c.innerHTML = sales.map(s =>
         '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="viewSale(\'' + s.id + '\')">' +
-        (s.image_filename ? '<img alt="Sale photo" src="/uploads/' + encodeURIComponent(s.image_filename) + '" style="width:48px;height:48px;object-fit:cover;border-radius:8px">' : '') +
+        (s.image_filename ? salePhotoMarkup(s, 'width:48px;height:48px;object-fit:cover;border-radius:8px') : '') +
         '<strong style="min-width:150px">' + esc(s.item_description || s.piece_title || 'Unknown piece') + '</strong>' +
         (s.quantity && s.quantity > 1 ? '<span class="text-sm">Qty: ' + s.quantity + '</span>' : '') +
         '<span style="font-weight:700;color:var(--accent);min-width:60px">$' + ((s.price||0) * (s.quantity||1)).toFixed(2) + '</span>' +
@@ -2575,7 +2652,7 @@ async function loadSales() {
         '<div class="card" style="cursor:pointer" onclick="viewSale(\'' + s.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(s.item_description || s.piece_title || 'Unknown piece') + '</div>' +
         '<div class="text-sm" style="color:var(--text-light)">' + fmtDate(s.date) + (s.venue ? ' \u00b7 ' + esc(s.venue) : '') + (s.event_name ? ' \u00b7 ' + esc(s.event_name) : '') + '</div></div>' +
         '<div style="font-family:var(--font-display);font-size:1.2rem;font-weight:700;color:var(--accent)">$' + ((s.price||0) * (s.quantity||1)).toFixed(2) + (s.quantity && s.quantity > 1 ? ' (Qty: ' + s.quantity + ')' : '') + '</div></div>' +
-        (s.image_filename ? '<img alt="Sale photo" src="/uploads/' + encodeURIComponent(s.image_filename) + '" style="width:100%;max-height:180px;object-fit:contain;margin-bottom:10px">' : '') +
+        (s.image_filename ? salePhotoMarkup(s, 'width:100%;max-height:180px;object-fit:contain;margin-bottom:10px') : '') +
         (s.venue_type ? '<span class="piece-meta-tag">' + esc(s.venue_type) + '</span>' : '') +
         (s.buyer_name ? '<span class="piece-meta-tag">\uD83D\uDC64 ' + esc(s.buyer_name) + '</span>' : '') +
         '<div style="margin-top:8px;display:flex;gap:6px">' +
@@ -2583,27 +2660,34 @@ async function loadSales() {
         '<button onclick="event.stopPropagation();deleteSale(\'' + s.id + '\')" class="btn-small" style="color:var(--danger)">🗑️ Delete</button></div></div>'
       ).join('');
     }
-  } catch(e) { toast(e.message,'error'); }
+    await loadSaleMedia('salesList');
+  } catch(e) { if (active()) toast(e.message,'error'); }
 }
 let _salePieces = [];
 let saleSavePending = false;
 async function viewSale(id) {
+  const active = beginSaleRequest('saleDetailsContent');
+  clearSaleMedia('saleDetailsContent');
   try {
     const sales = await api('/api/sales');
+    if (!active()) return;
     const sale = sales.find(s => s.id === id);
     if (!sale) throw new Error('Sale not found');
     document.getElementById('saleDetailsContent').innerHTML =
-      (sale.image_filename ? '<img alt="Sale photo" src="/uploads/' + encodeURIComponent(sale.image_filename) + '" style="width:100%;max-height:300px;object-fit:contain;margin-bottom:16px">' : '') +
+      (sale.image_filename ? salePhotoMarkup(sale, 'width:100%;max-height:300px;object-fit:contain;margin-bottom:16px') : '') +
       df('Item', sale.item_description || sale.piece_title) + df('Date', fmtDate(sale.date)) +
       df('Quantity', sale.quantity ?? 1) + df('Price each', '$' + Number(sale.price || 0).toFixed(2)) +
       df('Total', '$' + (WebsiteUtils.moneyCents(sale.price || 0) * (sale.quantity || 1) / 100).toFixed(2)) +
       df('Event', sale.event_name) + df('Venue', sale.venue) + df('Buyer', sale.buyer_name) + df('Notes', sale.notes);
     document.getElementById('saleDetailsEdit').onclick = () => { closeModal('saleDetailsModal'); editSale(id); };
     openModal('saleDetailsModal');
-  } catch(e) { toast(e.message, 'error'); }
+    await loadSaleMedia('saleDetailsContent');
+  } catch(e) { if (active()) toast(e.message, 'error'); }
 }
 
 function openSaleModal() {
+  const active = beginSaleRequest('salePhotoPreview');
+  clearSaleMedia('salePhotoPreview');
   document.getElementById('salePhotoInput').value = '';
   document.getElementById('saleModalTitle').textContent = 'Log Sale';
   document.getElementById('saleId').value = '';
@@ -2618,6 +2702,7 @@ function openSaleModal() {
   const buyerEl = document.getElementById('saleBuyerName');
   if (buyerEl) buyerEl.value = '';
   api('/api/pieces').then(pieces => {
+    if (!active()) return;
     _salePieces = pieces;
     const s = document.getElementById('salePiece');
     s.innerHTML = '<option value="">Select piece...</option>' + pieces.map(p => '<option value="' + p.id + '">' + esc(p.title||'Untitled') + '</option>').join('');
@@ -2625,6 +2710,7 @@ function openSaleModal() {
   openModal('saleModal');
 }
 function onSalePieceSelect(id) {
+  clearSaleMedia('salePhotoPreview');
   if (!id) return;
   const p = _salePieces.find(x => x.id === id);
   if (!p) return;
@@ -2673,6 +2759,7 @@ function removeBulkLineItem(btn) {
 }
 
 async function saveBulkSale(e) {
+  const active = beginSaleRequest('bulkSale');
   e.preventDefault();
   const submit = e.target.querySelector('button[type=submit]');
   if (submit.disabled) return;
@@ -2691,16 +2778,18 @@ async function saveBulkSale(e) {
   try {
     submit.disabled = true;
     await api('/api/sales/bulk', { method: 'POST', body: { eventName, date, venueType, lineItems } });
+    if (!active()) return;
     toast('Bulk sale recorded!', 'success');
     trackActivity('create_bulk_sale', 'sales');
     closeModal('bulkSaleModal');
     loadSales();
-  } catch(e) { toast(e.message, 'error'); } finally { submit.disabled = false; }
+  } catch(e) { if (active()) toast(e.message, 'error'); } finally { submit.disabled = false; }
 }
 
 async function saveSale(e) {
   e.preventDefault();
   if (saleSavePending) return;
+  const active = beginSaleRequest('salePhotoPreview');
   const btn = e.target.querySelector('button[type="submit"]');
   saleSavePending = true; btn.disabled = true;
   const saleId = document.getElementById('saleId').value;
@@ -2713,24 +2802,29 @@ async function saveSale(e) {
     const photo = document.getElementById('salePhotoInput').files[0];
     if (photo) fd.append('photo', photo);
     const result = await api(saleId ? '/api/sales/' + saleId : '/api/sales', { method: saleId ? 'PUT' : 'POST', body: fd });
+    if (!active()) return;
     document.getElementById('saleId').value = result.id || saleId;
     toast(saleId ? 'Sale updated!' : 'Sale logged!', 'success');
     closeModal('saleModal');
     await loadSales();
-  } catch(err) { toast(err.message, 'error'); }
+  } catch(err) { if (active()) toast(err.message, 'error'); }
   finally { saleSavePending = false; btn.disabled = false; }
 }
 
 async function editSale(id) {
+  const active = beginSaleRequest('salePhotoPreview');
+  clearSaleMedia('salePhotoPreview');
   try {
     const sales = await api('/api/sales');
+    if (!active()) return;
     const s = sales.find(x => x.id === id);
     if (!s) return toast('Sale not found', 'error');
     const pieces = await api('/api/pieces');
+    if (!active()) return;
     _salePieces = pieces;
     document.getElementById('salePhotoInput').value = '';
     document.getElementById('saleModalTitle').textContent = 'Edit Sale';
-    document.getElementById('salePhotoPreview').innerHTML = s.image_filename ? '<img alt="Sale photo" src="/uploads/' + encodeURIComponent(s.image_filename) + '" style="max-width:120px;max-height:120px;object-fit:contain">' : '';
+    document.getElementById('salePhotoPreview').innerHTML = s.image_filename ? salePhotoMarkup(s, 'max-width:120px;max-height:120px;object-fit:contain') : '';
     const sel = document.getElementById('salePiece');
     sel.innerHTML = '<option value="">No linked piece</option>' + pieces.map(p => '<option value="' + p.id + '">' + esc(p.title||'Untitled') + '</option>').join('');
     document.getElementById('saleId').value = s.id;
@@ -2745,16 +2839,19 @@ async function editSale(id) {
     const buyerNameEl = document.getElementById('saleBuyerName');
     if (buyerNameEl) buyerNameEl.value = s.buyer_name || '';
     openModal('saleModal');
-  } catch(e) { toast(e.message, 'error'); }
+    await loadSaleMedia('salePhotoPreview');
+  } catch(e) { if (active()) toast(e.message, 'error'); }
 }
 
 async function deleteSale(id) {
+  const active = beginSaleRequest('delete');
   if (!confirm('Delete this sale? This cannot be undone.')) return;
   try {
     await api('/api/sales/' + id, { method: 'DELETE' });
+    if (!active()) return;
     toast('Sale deleted', 'success');
     loadSales();
-  } catch(e) { toast(e.message, 'error'); }
+  } catch(e) { if (active()) toast(e.message, 'error'); }
 }
 
 // ---- Pricing Calculator ----
@@ -5496,6 +5593,7 @@ function showPhotoPreview(input, previewId, nameId) {
   if (!f) { preview.innerHTML = ''; return; }
   const reader = new FileReader();
   reader.onload = e => {
+    if (!active()) return;
     preview.innerHTML = '<img src="' + e.target.result + '" style="max-width:100%;max-height:160px;border-radius:var(--radius-sm);object-fit:contain">';
   };
   reader.readAsDataURL(f);
@@ -7412,11 +7510,14 @@ function escapeHtml(str) {
 
 // ─── Sale Photo Preview ─────────────────────────────────────────────────────
 function previewSalePhoto(event) {
+  const active = beginSaleRequest('salePhotoPreview');
+  clearSaleMedia('salePhotoPreview');
   const file = event.target.files[0];
   const preview = document.getElementById('salePhotoPreview');
   if (!file) { preview.innerHTML = ''; return; }
   const reader = new FileReader();
   reader.onload = e => {
+    if (!active()) return;
     preview.innerHTML = '<img src="' + e.target.result + '" style="max-width:120px;max-height:120px;border-radius:8px;object-fit:cover">';
   };
   reader.readAsDataURL(file);

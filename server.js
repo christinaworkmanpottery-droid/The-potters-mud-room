@@ -1975,6 +1975,30 @@ function protectPieceHistoryTestTileMedia(history) {
   for (const entry of history.history || []) if (entry?.recordType === 'test-tile' && entry.values) testTileMediaContract(entry.values);
   return history;
 }
+app.get('/api/ql/sales/:saleId/photos/:filename', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  res.set('X-Content-Type-Options', 'nosniff');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const photo = db.prepare('SELECT image_filename AS filename FROM sales WHERE id=? AND user_id=? AND image_filename=?')
+      .get(req.params.saleId, req.userId, req.params.filename);
+    if (!photo) return unavailable();
+    const target = safeStoredUpload(photo.filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(photo.filename)) return unavailable();
+    const owned = ownedPhotoSlots(photo.filename, req.userId);
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(photo.filename);
+        if (rows.some(row => !owned.some(slot => slot.table === table && slot.column === column && slot.id === row.id))) return unavailable();
+      }
+    }
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
+
 app.get('/api/ql/pricing-calculations/:pricingId/photos/:filename', auth, (req, res) => {
   res.set('Cache-Control', 'private, no-store');
   res.set('X-Content-Type-Options', 'nosniff');
@@ -3143,6 +3167,22 @@ app.delete('/api/pricing-calculations/:id', auth, (req, res) => {
 });
 
 // ============ SALES ============
+function saleMediaContract(sale) {
+  return sale && { ...sale, photoDelivery: 'owner-protected', photoVisibility: 'legacy-ambiguous' };
+}
+// A copied Piece source must be owned across every stored reference, too.
+function saleSourceIsOwned(filename, userId) {
+  const owned = ownedPhotoSlots(filename, userId);
+  const { fileSlots } = require('./deletion-lifecycle.cjs');
+  for (const [table, columns] of Object.entries(fileSlots)) {
+    const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+    for (const column of columns.filter(c => available.has(c))) {
+      if (db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(filename)
+        .some(row => !owned.some(slot => slot.table === table && slot.column === column && slot.id === row.id))) return false;
+    }
+  }
+  return true;
+}
 app.get('/api/sales', auth, (req, res) => {
   const { dateFrom, dateTo } = req.query;
   let sql = 'SELECT s.*,p.title as piece_title FROM sales s LEFT JOIN pieces p ON s.piece_id=p.id AND p.user_id=s.user_id WHERE s.user_id=?';
@@ -3150,7 +3190,7 @@ app.get('/api/sales', auth, (req, res) => {
   if (dateFrom) { sql += ' AND s.date >= ?'; params.push(dateFrom); }
   if (dateTo) { sql += ' AND s.date <= ?'; params.push(dateTo); }
   sql += ' ORDER BY s.date DESC';
-  res.json(db.prepare(sql).all(...params).map(sale => ({ ...sale,
+  res.json(db.prepare(sql).all(...params).map(sale => ({ ...saleMediaContract(sale),
     contact_id: sale.contact_id && db.prepare('SELECT 1 FROM contacts WHERE id=? AND user_id=?').get(sale.contact_id, req.userId) ? sale.contact_id : null
   })));
 });
@@ -3188,7 +3228,7 @@ function saveSaleRecord(req, res) {
       if (source) {
         copiedPhoto = uuidv4() + path.extname(source.filename);
         const sourcePath = safeStoredUpload(source.filename);
-        if (!sourcePath) throw new Error('Piece photo unavailable.');
+        if (!sourcePath || !saleSourceIsOwned(source.filename, req.userId)) throw new Error('Piece photo unavailable.');
         fs.copyFileSync(sourcePath, path.join(UPLOADS_DIR, copiedPhoto), fs.constants.COPYFILE_EXCL);
         photo = copiedPhoto;
       }
@@ -3207,12 +3247,15 @@ function saveSaleRecord(req, res) {
         db.prepare('INSERT INTO sales (piece_id,date,price,quantity,image_filename,venue,venue_type,buyer_name,buyer_email,buyer_phone,notes,item_description,event_name,contact_id,id,user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
           .run(pieceId, date, price, quantity, photo, ...values, id, req.userId);
       }
+      if (existing?.piece_id && existing.piece_id !== pieceId && !db.prepare('SELECT 1 FROM sales WHERE piece_id=?').get(existing.piece_id)) {
+        db.prepare("UPDATE pieces SET status='done',sale_price=NULL,date_sold=NULL,updated_at=datetime('now') WHERE id=? AND user_id=? AND status='sold'").run(existing.piece_id, req.userId);
+      }
       if (pieceId) db.prepare("UPDATE pieces SET status='sold',sale_price=?,date_sold=?,updated_at=datetime('now') WHERE id=? AND user_id=?").run(price, date, pieceId, req.userId);
     })();
     const oldPhoto = existing?.image_filename;
     if (oldPhoto !== photo) deletionLifecycle.cleanupFiles([oldPhoto]);
-    res.json({ id, ok: true, image_filename: photo });
-  } catch (err) { discardNew(); res.status(400).json({ error: err.message }); }
+    res.json(saleMediaContract({ id, ok: true, image_filename: photo }));
+  } catch (err) { discardNew(); if (!res.headersSent) res.status(400).json({ error: 'Could not save sale.' }); }
 }
 app.post('/api/sales', auth, upload.single('photo'), saveSaleRecord);
 app.put('/api/sales/:id', auth, upload.single('photo'), saveSaleRecord);
@@ -3235,12 +3278,18 @@ app.delete('/api/sales/:id', auth, (req, res) => {
 });
 
 app.post('/api/sales/:id/photo', auth, upload.single('photo'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
-  const sale = db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId);
-  if (!sale) return res.status(404).json({ error: 'Sale not found' });
-  db.prepare('UPDATE sales SET image_filename=? WHERE id=? AND user_id=?').run(req.file.filename, req.params.id, req.userId);
-  deletionLifecycle.cleanupFiles([sale.image_filename]);
-  res.json({ filename: req.file.filename });
+  const discard = () => deletionLifecycle.cleanupFiles([req.file?.filename]);
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
+    const sale = db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+    if (!sale) { discard(); return res.status(404).json({ error: 'Sale not found' }); }
+    if (!String(req.file.mimetype || '').startsWith('image/') || req.file.size > MAX_IMAGE_SIZE) {
+      discard(); return res.status(400).json({ error: 'Choose an image under 20MB.' });
+    }
+    db.prepare('UPDATE sales SET image_filename=? WHERE id=? AND user_id=?').run(req.file.filename, req.params.id, req.userId);
+    deletionLifecycle.cleanupFiles([sale.image_filename]);
+    res.json(saleMediaContract({ filename: req.file.filename }));
+  } catch (_) { discard(); if (!res.headersSent) res.status(500).json({ error: 'Could not save sale photo.' }); }
 });
 
 // Bulk sale creation
