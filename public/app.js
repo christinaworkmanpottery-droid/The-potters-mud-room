@@ -131,6 +131,7 @@ async function api(path, opts = {}) {
   const res = await fetch(API + path, { ...opts, headers: opts.body instanceof FormData ? { Authorization: 'Bearer ' + token } : h });
   if (res.status === 401 && /^\/api\/projects(?:[/?]|$)/.test(path) && requestToken === token) clearProjectMedia();
   if (res.status === 401 && /^\/api\/sales(?:[/?]|$)/.test(path) && requestToken === token) clearSaleMedia();
+  if (res.status === 401 && /^\/api\/(?:ql\/)?events(?:[/?]|$)/.test(path) && requestToken === token) clearEventMedia();
   const d = await res.json();
   if (!res.ok) throw new Error(d.error || 'Something went wrong');
   return d;
@@ -428,7 +429,7 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     clearClayMedia();
     clearGlazeMedia();
     clearTestTileMedia();
-    clearProjectMedia(); clearSaleMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
+    clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
     clearPieceHistory();
     token = data.token;
     localStorage.setItem('mudlog_token', token);
@@ -448,7 +449,7 @@ function logout() {
   clearClayMedia();
   clearGlazeMedia();
   clearTestTileMedia();
-  clearProjectMedia(); clearSaleMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
+  clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
   clearPieceHistory();
   token = null; currentUser = null;
   localStorage.removeItem('mudlog_token');
@@ -471,7 +472,7 @@ async function checkAuth() {
     const msg = (e.message || '').toLowerCase();
     if (msg.includes('invalid token') || msg.includes('unauthorized') || msg.includes('no token') || msg.includes('invalid') || msg.includes('expired')) {
       // Token is bad — clear it and show auth screen (not landing page)
-      clearProjectMedia(); clearSaleMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
+      clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
       token = null;
       localStorage.removeItem('mudlog_token');
       document.getElementById('landingPage').style.display = 'none';
@@ -532,6 +533,7 @@ function navigate(page, options = {}) {
   if (page !== 'firings') clearFiringMedia();
   if (page !== 'projects') clearProjectMedia();
   if (page !== 'sales') clearSaleMedia();
+  if (page !== 'events') clearEventMedia();
   if (page !== 'pricingCalculator') clearPricingMedia();
   if (page !== 'pieceDetail') clearPieceHistory();
   try {
@@ -6730,6 +6732,51 @@ async function deleteProjectPhoto(photoId) {
     toast('Photo deleted', 'success');
     loadProjects();
   } catch(e) { toast(e.message, 'error'); }
+}
+
+const eventMedia = new Map();
+let eventMediaGeneration = 0;
+function clearEventMedia() {
+  eventMediaGeneration++;
+  for (const entry of eventMedia.values()) {
+    if (entry?.controller) entry.controller.abort();
+    if (entry?.url) URL.revokeObjectURL(entry.url);
+  }
+  eventMedia.clear();
+}
+function eventMediaVisibility(event) {
+  return event?.photoDelivery === 'owner-protected' ? 'private' : 'legacy-ambiguous';
+}
+function eventImageMarkup(event, className = 'photo-thumb', alt = '') {
+  if (!event?.image_filename) return '';
+  if (eventMediaVisibility(event) !== 'private') return `<img src="/uploads/${encodeURIComponent(event.image_filename)}" class="${className}" alt="${esc(alt)}" onerror="this.style.display='none'">`;
+  const key = String(event.id) + ':' + String(event.image_filename);
+  return `<img data-event-media="${esc(key)}" class="${className}" alt="${esc(alt)}" style="display:none" onerror="this.style.display='none'">`;
+}
+async function hydrateEventMedia(root, events) {
+  const generation = eventMediaGeneration;
+  const byKey = new Map(events.filter(e => e?.image_filename).map(e => [String(e.id)+':'+String(e.image_filename), e]));
+  for (const img of root.querySelectorAll('img[data-event-media]')) {
+    const key = img.dataset.eventMedia;
+    const event = byKey.get(key);
+    if (!event || eventMediaVisibility(event) !== 'private') continue;
+    let entry = eventMedia.get(key);
+    if (!entry) {
+      const controller = new AbortController();
+      entry = { controller, url: null };
+      eventMedia.set(key, entry);
+      try {
+        const response = await fetch(API + '/api/ql/events/' + encodeURIComponent(event.id) + '/photos/' + encodeURIComponent(event.image_filename), {
+          headers: { Authorization: 'Bearer ' + token }, cache: 'no-store', signal: controller.signal
+        });
+        if (!response.ok) throw new Error('Event photo unavailable');
+        const url = URL.createObjectURL(await response.blob());
+        if (generation !== eventMediaGeneration || eventMedia.get(key) !== entry) { URL.revokeObjectURL(url); continue; }
+        entry.url = url;
+      } catch (_) { if (eventMedia.get(key) === entry) eventMedia.delete(key); continue; }
+    }
+    if (generation === eventMediaGeneration && entry.url && img.isConnected) { img.src = entry.url; img.style.display = ''; }
+  }
 }
 
 // ============ EVENTS ============
