@@ -236,7 +236,7 @@ function returnPieceViewerFocus(id) {
   if (origin?.control?.isConnected && origin.token === token && origin.account === currentUser?.id) origin.control.focus();
 }
 let firingPieceReturn = null;
-function closeModal(id) { if (id === 'clayViewModal') { clayViewSerial++; clayViewReadOnly = false; clayViewControls(false); document.getElementById('clayViewBody')?.replaceChildren(); } if (id === 'firingModal') firingPieceReturn = null; if (id === 'firingViewModal') { viewerControl('firingViewEditBtn', false); viewerControl('firingViewDeleteBtn', false); document.getElementById('firingViewBody')?.replaceChildren(); } returnPieceViewerFocus(id); if (id === 'testTileViewModal' || id === 'testTileModal') clearTestTileMedia(); if (id === 'projectModal' || id === 'projectPhotoModal') closeProjectMediaScope(id); const saleScope = {saleModal:'salePhotoPreview',saleDetailsModal:'saleDetailsContent',bulkSaleModal:'bulkSale'}[id]; if (saleScope) closeSaleMediaScope(saleScope); const firingScope = { firingModal:'firingPhotosContainer', firingViewModal:'firingViewBody', firingPhotoReorderModal:'firingPhotoReorderContent' }[id]; if (firingScope) closeFiringMediaScope(firingScope); if (id === 'glazeViewModal') clearGlazeMedia('glazeViewBody'); if (id === 'clayViewModal') clearClayMedia('clayViewBody'); document.getElementById(id).classList.remove('open'); }
+function closeModal(id) { if (id === 'glazeViewModal') { glazeViewSerial++; glazeViewReadOnly = false; glazeViewControls(false); clearGlazeClayTestMedia(); document.getElementById('glazeViewBody')?.replaceChildren(); } if (id === 'clayViewModal') { clayViewSerial++; clayViewReadOnly = false; clayViewControls(false); document.getElementById('clayViewBody')?.replaceChildren(); } if (id === 'firingModal') firingPieceReturn = null; if (id === 'firingViewModal') { viewerControl('firingViewEditBtn', false); viewerControl('firingViewDeleteBtn', false); document.getElementById('firingViewBody')?.replaceChildren(); } returnPieceViewerFocus(id); if (id === 'testTileViewModal' || id === 'testTileModal') clearTestTileMedia(); if (id === 'projectModal' || id === 'projectPhotoModal') closeProjectMediaScope(id); const saleScope = {saleModal:'salePhotoPreview',saleDetailsModal:'saleDetailsContent',bulkSaleModal:'bulkSale'}[id]; if (saleScope) closeSaleMediaScope(saleScope); const firingScope = { firingModal:'firingPhotosContainer', firingViewModal:'firingViewBody', firingPhotoReorderModal:'firingPhotoReorderContent' }[id]; if (firingScope) closeFiringMediaScope(firingScope); if (id === 'glazeViewModal') clearGlazeMedia('glazeViewBody'); if (id === 'clayViewModal') clearClayMedia('clayViewBody'); document.getElementById(id).classList.remove('open'); }
 
 // iOS decimal keyboards have no native Done key. Give every numeric field a
 // consistent way to dismiss the keyboard so form buttons remain reachable.
@@ -818,6 +818,8 @@ function disposeHistoryPhotos() {
 }
 
 function clearPieceHistory() {
+  currentPieceGlazes = null;
+  if (glazeViewReadOnly) closeModal('glazeViewModal');
   currentPieceClay = null;
   if (clayViewReadOnly) closeModal('clayViewModal');
   pieceViewerOrigins.clear(); firingPieceReturn = null;
@@ -1051,12 +1053,12 @@ async function viewPiece(id) {
         (hasMultiplePhotos ? '<button id="reorderPhotosBtn" class="btn btn-secondary btn-sm" onclick="togglePhotoReorderMode()">↕️ Reorder Photos</button>' : '') +
         '</div><div class="detail-photos mb-16" id="photoReorderContainer">' + photos + '</div>' : '') +
       '<div class="detail-grid"><div class="card"><h3 style="margin-bottom:16px">Details</h3>' +
-      '<div id="pieceClayDisplay" style="display:flex;align-items:center;gap:8px">' + df('Clay Body', p.clay_body_name||p.clay||p.studio) + '</div>' + '<div class="detail-field"><div class="detail-label">Glaze</div><div class="detail-value">' + ((p.glazes&&p.glazes.length) ? p.glazes.map(g => {
-        let parts = [esc(g.glaze_name)];
+      '<div id="pieceClayDisplay" style="display:flex;align-items:center;gap:8px">' + df('Clay Body', p.clay_body_name||p.clay||p.studio) + '</div>' + '<div class="detail-field"><div class="detail-label">Glaze</div><div class="detail-value">' + ((p.glazes&&p.glazes.length) ? p.glazes.map((g, index) => {
+        let parts = [esc(g.glaze_name ?? 'Unnamed glaze layer')];
         if (g.coats && g.coats > 0) parts.push((g.coats === 1 ? '1 coat' : g.coats + ' coats'));
         if (g.application_method) parts.push(esc(g.application_method));
-        return parts.join(' — ');
-      }).join('<br>') : (p.glaze ? esc(p.glaze) : '—')) + '</div></div>' + df('Firing Temp', p.firingTemp) + df('Technique', p.technique) + df('Form', p.form) +
+        return '<div data-piece-glaze-index="' + index + '">' + parts.join(' — ') + '</div>';
+      }).join('') : (p.glaze ? esc(p.glaze) : '—')) + '</div></div>' + df('Firing Temp', p.firingTemp) + df('Technique', p.technique) + df('Form', p.form) +
       df('Dimensions', p.dimensions) + df('Weight', p.weight) +
       df('Date', fmtDate(p.date_started)) +
       (p.date_completed ? df('Completed', fmtDate(p.date_completed)) : '') +
@@ -1084,6 +1086,7 @@ async function viewPiece(id) {
     history.append(historyElement('h2', 'Connected History'), loading);
     document.getElementById('pieceDetailContent').append(history);
     mountPieceClay(p, generation, sessionToken);
+    mountPieceGlazes(p, generation, sessionToken);
     mountLinkedPricing(p.id, generation, sessionToken);
     mountLinkedFirings(p.id, generation, sessionToken);
     mountLinkedTestTiles(p.id, generation, sessionToken);
@@ -1621,9 +1624,81 @@ async function deleteClay(id) {
 
 // ---- Glazes ----
 let glazeMediaGeneration = 0;
+let glazeViewSerial = 0, glazeViewReadOnly = false, currentPieceGlazes = null;
+function glazeViewControls(enabled, g) {
+  viewerControl('glazeViewDuplicateBtn', enabled, () => { closeModal('glazeViewModal'); duplicateGlaze(g.id); });
+  viewerControl('glazeViewEditBtn', enabled, () => { closeModal('glazeViewModal'); editGlazeById(g.id); });
+  viewerControl('glazeViewPhotoBtn', enabled, () => { closeModal('glazeViewModal'); openGlazePhotoUpload(g.id); });
+}
+function matchesPieceGlaze(piece, context, account) {
+  const layer = piece?.glazes?.[context.index];
+  return String(piece?.id) === String(context.pieceId) && String(piece?.user_id) === String(account) &&
+    !!layer?.id && String(layer.id) === String(context.layerId) && !!layer.glaze_id &&
+    String(layer.glaze_id) === String(context.glazeId) && layer.layer_order === context.layerOrder;
+}
+async function authorizePieceGlaze(context, account, request, active) {
+  const unavailable = () => { const e = Error('Glaze unavailable'); e.status = 404; throw e; };
+  const items = await request('/api/glazes');
+  if (!active()) return null;
+  const glaze = Array.isArray(items) && items.find(g => String(g.id) === String(context.glazeId) && String(g.user_id) === String(account));
+  if (!glaze) unavailable();
+  const piece = await request('/api/pieces/' + encodeURIComponent(context.pieceId));
+  if (!active()) return null;
+  if (!matchesPieceGlaze(piece, context, account)) unavailable();
+  return glaze;
+}
+function mountPieceGlazes(piece, generation, sessionToken) {
+  const account = currentUser?.id, identity = {};
+  currentPieceGlazes = identity;
+  const originActive = () => currentPieceGlazes === identity && generation === pieceViewGeneration &&
+    token === sessionToken && currentUser?.id === account && currentPage === 'pieceDetail' && window._currentPieceId === piece.id;
+  if (!account || String(piece.user_id) !== String(account)) return;
+  (piece.glazes || []).forEach((layer, index) => {
+    const root = document.querySelector('[data-piece-glaze-index="' + index + '"]');
+    if (!root || !layer.id || !layer.glaze_id) return;
+    const context = { pieceId: piece.id, layerId: layer.id, glazeId: layer.glaze_id, layerOrder: layer.layer_order, index };
+    const active = () => originActive() && root.isConnected;
+    void authorizePieceGlaze(context, account, path => api(path, { cache: 'no-store' }), active).then(glaze => {
+      if (!glaze || !active()) return;
+      const button = historyElement('button', 'View', 'btn btn-secondary btn-sm');
+      button.type = 'button'; button.style.marginLeft = '8px'; button.setAttribute('aria-label', 'View saved Glaze layer ' + (index + 1));
+      button.onclick = () => { button.focus(); if (active()) void viewPieceGlaze(context, active, button); };
+      root.append(button);
+    }).catch(() => {});
+  });
+}
+async function viewPieceGlaze(context, originActive, launcher) {
+  if (!originActive()) return;
+  rememberPieceViewer('glazeViewModal', true);
+  if (launcher?.isConnected) pieceViewerOrigins.set('glazeViewModal', { control: launcher, token, account: currentUser?.id });
+  const serial = ++glazeViewSerial, sessionToken = token, account = currentUser?.id;
+  glazeViewReadOnly = true; glazeViewControls(false); clearGlazeMedia('glazeViewBody'); clearGlazeClayTestMedia();
+  const body = document.getElementById('glazeViewBody');
+  document.getElementById('glazeViewTitle').textContent = 'Glaze';
+  body.replaceChildren(historyElement('p', 'Loading Glaze…')); openModal('glazeViewModal');
+  const active = () => serial === glazeViewSerial && glazeViewReadOnly && originActive() && token === sessionToken && currentUser?.id === account;
+  const request = async path => {
+    const response = await fetch(API + path, { headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store' });
+    if (!response.ok) { const e = Error('Glaze unavailable'); e.status = response.status; throw e; }
+    return response.json();
+  };
+  try {
+    const glaze = await authorizePieceGlaze(context, account, request, active);
+    if (glaze && active()) openGlazeViewModal(glaze, { readOnly: true });
+  } catch (error) {
+    if (!active()) return;
+    const unavailable = [401,403,404].includes(error.status);
+    if (unavailable && launcher) { launcher.disabled = true; launcher.onclick = null; launcher.remove(); }
+    clearGlazeMedia('glazeViewBody'); clearGlazeClayTestMedia();
+    body.replaceChildren(historyElement('p', unavailable ? 'Glaze unavailable.' : 'Unable to load Glaze.'));
+    const retry = historyElement('button', 'Retry', 'btn btn-secondary btn-sm'); retry.type = 'button';
+    retry.onclick = () => { if (active()) void viewPieceGlaze(context, originActive, launcher); }; body.append(retry);
+  }
+}
+
 const glazeMediaViews = new Map();
 function clearGlazeMedia(scope) {
-  if (!scope) glazeMediaGeneration++;
+  if (!scope) { glazeMediaGeneration++; glazeViewSerial++; glazeViewReadOnly = false; currentPieceGlazes = null; glazeViewControls(false); }
   const lightbox = document.getElementById('lightboxImg');
   for (const [key, view] of glazeMediaViews) {
     if (scope && key !== scope) continue;
@@ -1795,7 +1870,9 @@ async function loadGlazes() {
 
 function editGlazeById(id) { const g = glazes.find(x=>x.id===id); if(g) openGlazeModal(g); }
 function viewGlazeById(id) { const g = glazes.find(x=>x.id===id); if(g) openGlazeViewModal(g); }
-function openGlazeViewModal(g) {
+function openGlazeViewModal(g, options = {}) {
+  if (!options.readOnly) { glazeViewSerial++; glazeViewReadOnly = false; rememberPieceViewer('glazeViewModal', false); }
+  clearGlazeMedia('glazeViewBody'); clearGlazeClayTestMedia();
   const photos = (g.photos||[]).map(p =>
     '<div style="display:inline-block;margin-right:8px;text-align:center">' +
     glazePhotoMarkup(g, p, 'width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in') + '<br>' +
@@ -1834,9 +1911,7 @@ function openGlazeViewModal(g) {
   }
   document.getElementById('glazeViewTitle').textContent = g.name;
   document.getElementById('glazeViewBody').innerHTML = html;
-  document.getElementById('glazeViewDuplicateBtn').onclick = () => { closeModal('glazeViewModal'); duplicateGlaze(g.id); };
-  document.getElementById('glazeViewEditBtn').onclick = () => { closeModal('glazeViewModal'); editGlazeById(g.id); };
-  document.getElementById('glazeViewPhotoBtn').onclick = () => { closeModal('glazeViewModal'); openGlazePhotoUpload(g.id); };
+  glazeViewControls(!options.readOnly, g);
   openModal('glazeViewModal');
   loadGlazeMedia('glazeViewBody');
   loadGlazeClayTestMedia(document.getElementById('glazeViewBody'));
@@ -6449,6 +6524,11 @@ const glazeClayTestMediaViews = new Map();
 let glazeClayTestMediaGeneration = 0;
 function clearGlazeClayTestMedia() {
   glazeClayTestMediaGeneration++;
+  const lightbox = document.getElementById('lightboxImg');
+  if ([...glazeClayTestMediaViews.values()].includes(lightbox?.src)) { lightbox.removeAttribute('src'); closeLightbox(); }
+  document.querySelectorAll('img[data-glaze-clay-test-id][data-photo-delivery="owner-protected"]').forEach(img => {
+    img.removeAttribute('src'); img.onclick = null; img.onerror = null;
+  });
   for (const uri of glazeClayTestMediaViews.values()) if (uri.startsWith('blob:')) URL.revokeObjectURL(uri);
   glazeClayTestMediaViews.clear();
 }
