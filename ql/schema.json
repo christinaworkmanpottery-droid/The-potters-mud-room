@@ -778,7 +778,7 @@
     },
     {
       "name": "contacts",
-      "sql": "CREATE TABLE contacts (\n      id TEXT PRIMARY KEY,\n      user_id TEXT NOT NULL,\n      name TEXT NOT NULL,\n      email TEXT,\n      phone TEXT,\n      notes TEXT,\n      created_at TEXT DEFAULT (datetime('now')),\n      updated_at TEXT DEFAULT (datetime('now')),\n      FOREIGN KEY (user_id) REFERENCES users(id)\n    )",
+      "sql": "CREATE TABLE contacts (\n      id TEXT PRIMARY KEY,\n      user_id TEXT NOT NULL,\n      name TEXT NOT NULL,\n      email TEXT,\n      phone TEXT,\n      notes TEXT,\n      created_at TEXT DEFAULT (datetime('now')),\n      updated_at TEXT DEFAULT (datetime('now')), role TEXT, address TEXT, instagram TEXT, website TEXT,\n      FOREIGN KEY (user_id) REFERENCES users(id)\n    )",
       "columns": [
         {
           "cid": 0,
@@ -842,6 +842,38 @@
           "type": "TEXT",
           "notnull": 0,
           "dflt_value": "datetime('now')",
+          "pk": 0
+        },
+        {
+          "cid": 8,
+          "name": "role",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 9,
+          "name": "address",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 10,
+          "name": "instagram",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 11,
+          "name": "website",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
           "pk": 0
         }
       ],
@@ -1097,7 +1129,7 @@
     },
     {
       "name": "events",
-      "sql": "CREATE TABLE events (\n      id TEXT PRIMARY KEY,\n      user_id TEXT NOT NULL,\n      title TEXT NOT NULL,\n      description TEXT,\n      event_date TEXT NOT NULL,\n      start_time TEXT,\n      end_time TEXT,\n      location TEXT,\n      created_at TEXT DEFAULT (datetime('now')),\n      updated_at TEXT DEFAULT (datetime('now')), image_filename TEXT, website TEXT DEFAULT NULL, address TEXT DEFAULT NULL, venue TEXT DEFAULT NULL,\n      FOREIGN KEY (user_id) REFERENCES users(id)\n    )",
+      "sql": "CREATE TABLE events (\n      id TEXT PRIMARY KEY,\n      user_id TEXT NOT NULL,\n      title TEXT NOT NULL,\n      description TEXT,\n      event_date TEXT NOT NULL,\n      start_time TEXT,\n      end_time TEXT,\n      location TEXT,\n      created_at TEXT DEFAULT (datetime('now')),\n      updated_at TEXT DEFAULT (datetime('now')), contact_id TEXT, image_filename TEXT, website TEXT DEFAULT NULL, address TEXT DEFAULT NULL, venue TEXT DEFAULT NULL,\n      FOREIGN KEY (user_id) REFERENCES users(id)\n    )",
       "columns": [
         {
           "cid": 0,
@@ -1181,7 +1213,7 @@
         },
         {
           "cid": 10,
-          "name": "image_filename",
+          "name": "contact_id",
           "type": "TEXT",
           "notnull": 0,
           "dflt_value": null,
@@ -1189,6 +1221,14 @@
         },
         {
           "cid": 11,
+          "name": "image_filename",
+          "type": "TEXT",
+          "notnull": 0,
+          "dflt_value": null,
+          "pk": 0
+        },
+        {
+          "cid": 12,
           "name": "website",
           "type": "TEXT",
           "notnull": 0,
@@ -1196,7 +1236,7 @@
           "pk": 0
         },
         {
-          "cid": 12,
+          "cid": 13,
           "name": "address",
           "type": "TEXT",
           "notnull": 0,
@@ -1204,7 +1244,7 @@
           "pk": 0
         },
         {
-          "cid": 13,
+          "cid": 14,
           "name": "venue",
           "type": "TEXT",
           "notnull": 0,

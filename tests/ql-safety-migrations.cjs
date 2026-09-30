@@ -22,7 +22,6 @@ function fixture(t,variant,ql=false) {
     createFixture(db,{legacy:variant==='tile'});
   }finally{[firing.sql,sale.sql]=originals;}
   db.prepare("UPDATE firing_logs SET start_time='08:00',end_time='18:00',open_temp='150' WHERE id='firing-a'").run();
-  for (const column of ['role','address','instagram','website']) db.exec(`ALTER TABLE contacts ADD COLUMN ${column} TEXT`);
   db.prepare("INSERT INTO contacts(id,user_id,name) VALUES('contact-a','a','Historical buyer')").run();
   db.prepare("UPDATE sales SET contact_id='contact-a' WHERE id='sale-a'").run();
   if(ql){migrate(db);link(db,{userId:'a',pieceId:'piece-a',kind:variant==='tile'?'testTile':'firing',targetId:variant==='tile'?'tile-a':'firing-a'});}

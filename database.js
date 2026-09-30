@@ -560,12 +560,7 @@ function initDB() {
   safeAdd('sales', 'image_filename', 'TEXT');
 
   // Contact linking (items 29-31)
-  safeAdd('contacts', 'role', 'TEXT'); // buyer, gallery, potter, venue, supplier, other
-  safeAdd('contacts', 'address', 'TEXT');
-  safeAdd('contacts', 'instagram', 'TEXT');
-  safeAdd('contacts', 'website', 'TEXT');
   safeAdd('sales', 'contact_id', 'TEXT');
-  safeAdd('events', 'contact_id', 'TEXT');
 
   // Remove venue_type CHECK constraint (allow 'website' and future values)
   const saleSchema = db.prepare("SELECT sql FROM sqlite_master WHERE name='sales'").get()?.sql;
@@ -683,6 +678,8 @@ function initDB() {
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_events_user ON events(user_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date)`);
+  // Contact linking must follow table creation on the first startup.
+  safeAdd('events', 'contact_id', 'TEXT');
   safeAdd('events', 'image_filename', 'TEXT');
 
   // Contacts table (item 40)
@@ -700,6 +697,11 @@ function initDB() {
     )
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_contacts_user ON contacts(user_id)`);
+  // Keep additive compatibility for existing databases after fresh creation.
+  safeAdd('contacts', 'role', 'TEXT'); // buyer, gallery, potter, venue, supplier, other
+  safeAdd('contacts', 'address', 'TEXT');
+  safeAdd('contacts', 'instagram', 'TEXT');
+  safeAdd('contacts', 'website', 'TEXT');
 
   // Part 1 revamp — new fields for glazes
   safeAdd('glazes', 'opacity', 'TEXT');
