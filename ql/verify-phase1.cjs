@@ -31,6 +31,7 @@ for (const [args, extraEnv] of [
   [['--test', 'tests/ql-piece-media.cjs'], {}],
   [['--test', 'tests/ql-piece-public-edges-api.cjs','tests/ql-piece-public-edges-dom.cjs'], {}],
   [['--test', 'tests/ql-casualty-sale-previews-dom.cjs'], {}],
+  [['--test', 'tests/ql-phase-2w-post-edit-media.cjs'], {}],
   [['--test', 'tests/ql-upload-restriction-readiness.cjs'], {}],
   [['--test', 'tests/ql-clay-media.cjs', 'tests/ql-clay-media-dom.cjs'], {}],
   [['--test', 'tests/ql-glaze-media.cjs', 'tests/ql-glaze-media-dom.cjs'], {}],

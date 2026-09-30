@@ -1,0 +1,7 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
+const server=fs.readFileSync('server.js','utf8'),web=fs.readFileSync('public/app.js','utf8');
+test('2W backend Test Tile protected contract remains exact three-slot owner route',()=>{assert.match(server,/api\/ql\/test-tiles\/:tileId\/photos\/:slot/);assert.match(server,/\[1, 2, 3\]\.includes\(slot\)/);assert.match(server,/photoDelivery.*owner-protected/);});
+test('2W backend Combo contract retains explicit public protected and ambiguous states',()=>{for(const v of ['public-explicit','owner-protected','legacy-static','legacy-ambiguous'])assert.ok(server.includes(v));assert.ok(server.includes('/api/ql/community/combos/:comboId/photos/:slot/public'));assert.ok(server.includes("/api/ql/community/combos/:comboId/photos/:slot', auth"));});
+test('2W global uploads deliberately remains unrestricted',()=>{assert.match(server,/app\.use\('\/uploads', express\.static\(UPLOADS_DIR\)\)/);});
+test('2W website Test Tile and Combo established loaders remain unchanged',()=>{for(const v of ['loadTestTileMedia','data-private-test-tile-photo','loadComboPrivateMedia','data-private-combo-photo'])assert.ok(web.includes(v));});
+test('2W server media classification remains metadata based and filename independent',()=>{const a=server.slice(server.indexOf('function glazeComboMediaContract'),server.indexOf('function protectPieceHistoryTestTileMedia'));assert.doesNotMatch(a,/filename.*public|public.*filename/i);});
