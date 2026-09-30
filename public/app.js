@@ -793,6 +793,7 @@ let pieceViewGeneration = 0;
 let pieceHistoryUrls = [];
 let pieceDetailPrivatePhotoUrls = [];
 function clearPieceHistory() {
+  if (document.getElementById('saleDetailsModal')?.dataset.pieceOrigin === 'true') closeModal('saleDetailsModal');
   clearPieceEdgeMedia();
   clearPricingMedia('linkedPricingViewer');
   document.getElementById('linkedPricing')?.remove();
@@ -843,6 +844,8 @@ function historyElement(tag, text, className) {
   return el;
 }
 function renderPieceHistory(container, data) {
+  const pieceId = window._currentPieceId, generation = pieceViewGeneration, sessionToken = token, account = currentUser?.id;
+  const active = () => container.isConnected && generation === pieceViewGeneration && sessionToken === token && account === currentUser?.id && currentPage === 'pieceDetail' && window._currentPieceId === pieceId;
   container.replaceChildren(historyElement('h2', 'Connected History'));
   container.append(historyElement('p', 'Saved records connected to this piece. Edit them in their usual sections.', 'text-sm'));
   const groups = [
@@ -907,6 +910,12 @@ function renderPieceHistory(container, data) {
         placeholder.setAttribute('aria-live', 'polite');
         placeholder.dataset.historyPhoto = e.sourceRecordId;
         item.append(placeholder);
+      }
+      if (e.recordType === 'sale') {
+        const view = historyElement('button', 'View', 'btn btn-secondary btn-sm');
+        view.type = 'button'; view.setAttribute('aria-label', 'View Sale ' + name);
+        view.onclick = () => { if (active()) void viewSale(e.sourceRecordId, { pieceId, active }); };
+        item.append(view);
       }
       list.append(item);
     }
@@ -2754,6 +2763,11 @@ function beginSaleRequest(scope) {
   return () => serial === saleRequestSerials.get(scope) && generation === saleMediaGeneration && sessionToken === token;
 }
 function closeSaleMediaScope(scope) {
+  if (scope === 'saleDetailsContent') {
+    document.getElementById(scope)?.replaceChildren();
+    const edit = document.getElementById('saleDetailsEdit');
+    if (edit) { edit.hidden = true; edit.onclick = null; }
+  }
   saleRequestSerials.set(scope, (saleRequestSerials.get(scope) || 0) + 1);
   clearSaleMedia(scope);
   if (scope === 'salePhotoPreview') { document.getElementById('salePhotoPreview').innerHTML = ''; document.getElementById('salePhotoInput').value = ''; }
@@ -2812,24 +2826,42 @@ async function loadSales() {
 }
 let _salePieces = [];
 let saleSavePending = false;
-async function viewSale(id) {
-  const active = beginSaleRequest('saleDetailsContent');
+async function viewSale(id, options = {}) {
+  const requestActive = beginSaleRequest('saleDetailsContent');
+  const pieceOrigin = options.pieceId != null;
+  const pieceId = options.pieceId, generation = pieceViewGeneration, account = currentUser?.id;
+  const active = () => requestActive() && account === currentUser?.id && (!pieceOrigin ||
+    (token && account && generation === pieceViewGeneration && currentPage === 'pieceDetail' &&
+      String(window._currentPieceId) === String(pieceId) && (!options.active || options.active())));
   clearSaleMedia('saleDetailsContent');
+  const body = document.getElementById('saleDetailsContent'), edit = document.getElementById('saleDetailsEdit');
+  edit.hidden = true; edit.onclick = null;
+  body.textContent = 'Loading Sale…'; body.setAttribute('aria-busy', 'true');
+  document.getElementById('saleDetailsModal').dataset.pieceOrigin = String(pieceOrigin);
+  openModal('saleDetailsModal');
   try {
-    const sales = await api('/api/sales');
+    const sales = await api('/api/sales', { cache: 'no-store' });
     if (!active()) return;
-    const sale = sales.find(s => s.id === id);
-    if (!sale) throw new Error('Sale not found');
-    document.getElementById('saleDetailsContent').innerHTML =
+    const sale = sales.find(s => String(s.id) === String(id));
+    if (!sale || (pieceOrigin && (String(sale.user_id) !== String(account) || sale.piece_id == null || String(sale.piece_id) !== String(pieceId))))
+      throw Object.assign(new Error('Sale unavailable'), { status: 404 });
+    body.innerHTML =
       (sale.image_filename ? salePhotoMarkup(sale, 'width:100%;max-height:300px;object-fit:contain;margin-bottom:16px') : '') +
       df('Item', sale.item_description || sale.piece_title) + df('Date', fmtDate(sale.date)) +
       df('Quantity', sale.quantity ?? 1) + df('Price each', '$' + Number(sale.price || 0).toFixed(2)) +
       df('Total', '$' + (WebsiteUtils.moneyCents(sale.price || 0) * (sale.quantity || 1) / 100).toFixed(2)) +
       df('Event', sale.event_name) + df('Venue', sale.venue) + df('Buyer', sale.buyer_name) + df('Notes', sale.notes);
-    document.getElementById('saleDetailsEdit').onclick = () => { closeModal('saleDetailsModal'); editSale(id); };
-    openModal('saleDetailsModal');
+    body.setAttribute('aria-busy', 'false');
+    edit.hidden = pieceOrigin;
+    edit.onclick = pieceOrigin ? null : () => { if (!active()) return; closeModal('saleDetailsModal'); editSale(id); };
     await loadSaleMedia('saleDetailsContent');
-  } catch(e) { if (active()) toast(e.message, 'error'); }
+  } catch(e) {
+    if (!active()) return;
+    body.setAttribute('aria-busy', 'false');
+    body.replaceChildren(historyElement('p', [401,403,404].includes(e.status) ? 'Sale unavailable.' : 'Unable to load Sale.'));
+    const retry = historyElement('button', 'Retry', 'btn btn-secondary'); retry.type = 'button';
+    retry.onclick = () => { if (active()) void viewSale(id, options); }; body.append(retry);
+  }
 }
 
 function openSaleModal() {
