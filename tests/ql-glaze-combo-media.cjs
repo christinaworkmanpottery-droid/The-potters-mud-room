@@ -18,7 +18,7 @@ test('runtime website clears displayed Combo blobs and rejects late downloads on
   assert.match(app,/clearComboMedia\(\);\s*clearPieceHistory\(\);\s*token = data.token/);
   assert.match(app,/function logout\(\) \{[^}]*clearComboMedia\(\);[^}]*token = null/);
   assert.match(app,/clearComboMedia\(\);\s*token = null;\s*localStorage.removeItem/);
-  assert.match(app,/if \(d.token\) \{ clearComboMedia\(\); token = d.token/);
+  assert.match(app,/if \(d.token\) \{ clearPieceHistory\(\); clearComboMedia\(\); token = d.token/);
   assert.match(app,/const combos = await api\(u\);\s*if \(requestedToken !== token \|\| requestedGeneration !== comboMediaGeneration\) return;/);
 });
 function comboHarness() {

@@ -92,5 +92,5 @@ test('Glaze Clay Test delete remains owner scoped and shared-file safe',async()=
 });
 test('website Glaze Clay Test surfaces use protected loader and preserve deferred categories',()=>{
  assert.match(appSource,/data-glaze-clay-test-id/);assert.match(appSource,/api\/ql\/glazes\/.*clay-tests/);assert.match(appSource,/glazeClayTestMediaGeneration/);assert.match(appSource,/URL\.revokeObjectURL/);
- assert.match(appSource,/\/uploads\/.*combo/);assert.match(serverSource,/test_tiles/);assert.match(serverSource,/api\/ql\/pieces/);assert.match(serverSource,/api\/ql\/clay-bodies/);
+ assert.match(appSource,/if \(meta.delivery === 'legacy-static'\) return '\/uploads\//);assert.match(serverSource,/test_tiles/);assert.match(serverSource,/api\/ql\/pieces/);assert.match(serverSource,/api\/ql\/clay-bodies/);
 });

@@ -624,8 +624,10 @@ function closeNav() {
 
 // ---- Dashboard ----
 async function loadDashboard() {
+  const edgeGeneration = pieceEdgeGeneration, edgeToken = token;
   try {
     const d = await api('/api/dashboard');
+    if (edgeGeneration !== pieceEdgeGeneration || edgeToken !== token) return;
     document.getElementById('statPieces').textContent = d.totalPieces;
     document.getElementById('statClays').textContent = d.totalClays;
     document.getElementById('statGlazes').textContent = d.totalGlazes;
@@ -641,7 +643,7 @@ async function loadDashboard() {
     if (d.tier === 'free') { ban.classList.remove('hidden'); document.getElementById('pieceCountText').textContent = d.totalPieces + '/10 pieces used'; } else { ban.classList.add('hidden'); }
     const c = document.getElementById('recentPieces'), em = document.getElementById('dashboardEmpty');
     if (!d.recentPieces.length) { c.innerHTML = ''; em.classList.remove('hidden'); }
-    else { em.classList.add('hidden'); c.innerHTML = d.recentPieces.map(pieceCard).join(''); }
+    else { em.classList.add('hidden'); c.innerHTML = d.recentPieces.map(pieceCard).join(''); void loadPieceEdgeMedia(c); }
     // Build 47 parity: Load notification bell indicator
     loadNotificationIndicator();
   } catch (err) { toast(err.message, 'error'); }
@@ -665,10 +667,52 @@ async function loadNotificationIndicator() {
   }
 }
 
+// Phase 2U Piece edge media. A request is bound to the session and originating DOM node.
+let pieceEdgeGeneration = 0;
+const pieceEdgeUrls = new Set();
+const pieceEdgeControllers = new Set();
+let pieceSearchPreviewUrl = null;
+function clearPieceEdgeMedia() {
+  pieceEdgeGeneration++;
+  pieceEdgeControllers.forEach(c => c.abort()); pieceEdgeControllers.clear();
+  pieceEdgeUrls.forEach(url => URL.revokeObjectURL(url)); pieceEdgeUrls.clear();
+  document.querySelectorAll('[data-piece-edge]').forEach(img => img.removeAttribute('src'));
+  for (const id of ['recentPieces','piecesList','casualtyList','visualSearchResults']) document.getElementById(id)?.replaceChildren();
+  if (pieceSearchPreviewUrl) URL.revokeObjectURL(pieceSearchPreviewUrl);
+  pieceSearchPreviewUrl = null;
+  document.getElementById('visualSearchImg')?.removeAttribute('src');
+}
+function pieceEdgePhotoAttrs(piece, photo) {
+  const visibility = piece.is_public === 0 || piece.is_public === '0' ? 'private' : piece.is_public === 1 || piece.is_public === '1' ? 'public' : piece.photoVisibility || 'legacy-ambiguous';
+  if (visibility === 'legacy-ambiguous') return 'src="/uploads/' + encodeURIComponent(photo.filename) + '"';
+  if (!piece.id || !photo.id) return 'data-piece-edge';
+  const base = '/api/ql/pieces/' + encodeURIComponent(piece.id);
+  const status = String(piece.status || '').trim().toLowerCase().replaceAll(' ', '-').replaceAll('_', '-').replaceAll('final-fired','glaze-fired');
+  if (visibility === 'public' && ['glaze-fired','done','complete','sold'].includes(status)) return 'data-piece-edge src="' + base + '/photos/' + encodeURIComponent(photo.id) + '/public"';
+  const route = base + (visibility === 'private' ? '/photos/' : '/history/photos/') + encodeURIComponent(photo.id);
+  return 'data-piece-edge data-piece-edge-route="' + route + '"';
+}
+async function loadPieceEdgeMedia(root=document) {
+  if (!root) return;
+  const generation = pieceEdgeGeneration, sessionToken = token;
+  await Promise.all([...root.querySelectorAll('[data-piece-edge-route]')].map(async img => {
+    const controller = new AbortController(); pieceEdgeControllers.add(controller);
+    const active = () => token === sessionToken && generation === pieceEdgeGeneration && img.isConnected;
+    try {
+      const response = await fetch(API + img.dataset.pieceEdgeRoute, {headers:{Authorization:'Bearer ' + sessionToken}, cache:'no-store', signal:controller.signal});
+      if (!response.ok) throw new Error('unavailable');
+      const blob = await response.blob();
+      if (!active()) return;
+      const url = URL.createObjectURL(blob); pieceEdgeUrls.add(url); img.src = url;
+    } catch (_) { if (active()) { img.removeAttribute('src'); img.alt = 'Photo unavailable'; } }
+    finally { pieceEdgeControllers.delete(controller); }
+  }));
+}
+
 // ---- Piece Card ----
 function pieceCard(p) {
   const ph = p.primaryPhoto || (p.photos && p.photos[0]);
-  const img = ph ? '<img class="piece-photo" src="/uploads/' + ph.filename + '" loading="lazy">' : '<div class="piece-photo-placeholder">🏺</div>';
+  const img = ph ? '<img class="piece-photo" ' + pieceEdgePhotoAttrs(p, ph) + ' loading="lazy">' : '<div class="piece-photo-placeholder">🏺</div>';
   const gl = (p.glazes||[]).map(g => '<span class="glaze-tag">' + esc(g.glaze_name) + '</span>').join('');
   const checkbox = renderBulkCheckbox('pieces', p.id);
   return '<div class="card piece-card" style="position:relative" onclick="' + (isBulkSelectionActive('pieces') ? 'toggleBulkSelect(\'pieces\',\''+p.id+'\',event)' : 'viewPiece(\''+p.id+'\')') + '">' + checkbox + img +
@@ -685,6 +729,7 @@ function pieceCard(p) {
 
 // ---- Pieces ----
 async function loadPieces() {
+  const edgeGeneration = pieceEdgeGeneration, edgeToken = token;
   try {
     const s = document.getElementById('pieceSearch')?.value||'';
     const st = document.getElementById('pieceStatusFilter')?.value||'';
@@ -696,6 +741,7 @@ async function loadPieces() {
     // Exclude casualties from main pieces list (they have their own view)
     if (!st) u += 'excludeCasualties=1&';
     const pieces = await api(u);
+    if (edgeGeneration !== pieceEdgeGeneration || edgeToken !== token) return;
     const c = document.getElementById('piecesList'), em = document.getElementById('piecesEmpty');
     
     // Render bulk controls
@@ -708,6 +754,7 @@ async function loadPieces() {
       const mode = getViewMode('pieces');
       c.className = mode === 'list' ? '' : 'card-grid';
       c.innerHTML = pieces.map(p => mode === 'list' ? pieceListRow(p) : pieceCard(p)).join('');
+      void loadPieceEdgeMedia(c);
       updateBulkSelectionUI('pieces');
     }
   } catch (err) { toast(err.message, 'error'); }
@@ -731,6 +778,7 @@ let pieceViewGeneration = 0;
 let pieceHistoryUrls = [];
 let pieceDetailPrivatePhotoUrls = [];
 function clearPieceHistory() {
+  clearPieceEdgeMedia();
   pieceViewGeneration++;
   pieceHistoryUrls.forEach(url => URL.revokeObjectURL(url));
   pieceHistoryUrls = [];
@@ -907,7 +955,7 @@ async function viewPiece(id) {
       const image = privatePiecePhotos
         ? '<img class="detail-photo" draggable="false" data-private-piece-photo="' + ph.id + '" data-protected-ready="0" alt="Piece photo' + (ph.stage ? ' — ' + esc(ph.stage) : '') + '" title="' + esc(ph.stage||'') + '" onclick="openPieceDetailPrivatePhoto(this)" style="cursor:zoom-in;transform:rotate(' + (ph.rotation||0) + 'deg)">' +
           '<span class="text-sm" data-private-piece-photo-status role="status">Loading photo…</span>'
-        : '<img class="detail-photo" draggable="false" src="/uploads/' + ph.filename + '" alt="Piece photo' + (ph.stage ? ' — ' + esc(ph.stage) : '') + '" title="' + esc(ph.stage||'') + '" onclick="if(!window._reorderMode&&!window._blockLightbox)openLightbox(\'/uploads/' + ph.filename + '\')" style="cursor:zoom-in;transform:rotate(' + (ph.rotation||0) + 'deg)">';
+        : '<img class="detail-photo" draggable="false" ' + pieceEdgePhotoAttrs(p, ph) + ' alt="Piece photo" title="' + esc(ph.stage||'') + '" onclick="if(!window._reorderMode&&!window._blockLightbox&&this.src)openLightbox(this.src)" style="cursor:zoom-in;transform:rotate(' + (ph.rotation||0) + 'deg)">';
       return '<div class="detail-photo-wrap" draggable="false" data-photo-id="' + ph.id + '" data-index="' + idx + '" style="position:relative">' +
       image +
       '<span class="photo-stage-label">' + esc(ph.stage||'') + '</span>' +
@@ -985,6 +1033,7 @@ async function viewPiece(id) {
     history.append(historyElement('h2', 'Connected History'), loading);
     document.getElementById('pieceDetailContent').append(history);
     if (privatePiecePhotos) void loadPrivatePieceDetailPhotos(p.id, generation, sessionToken);
+    else void loadPieceEdgeMedia(document.getElementById('photoReorderContainer'));
     void loadPieceHistory(p.id, history, generation, sessionToken);
   } catch (err) { toast(err.message, 'error'); }
 }
@@ -2472,7 +2521,7 @@ async function saveFiring(e) {
 // ---- Sales ----
 function casualtyCard(p) {
   const ph = p.primaryPhoto;
-  const img = ph ? '<img class="piece-photo" src="/uploads/' + ph.filename + '" loading="lazy">' : '<div class="piece-photo-placeholder">🏺</div>';
+  const img = ph ? '<img class="piece-photo" ' + pieceEdgePhotoAttrs(p, ph) + ' loading="lazy">' : '<div class="piece-photo-placeholder">🏺</div>';
   const gl = (p.glazes||[]).map(g => '<span class="glaze-tag">' + esc(g.glaze_name) + '</span>').join('');
   const typeLabel = p.casualty_type ? '<span class="piece-meta-tag" style="background:rgba(220,53,69,0.1);color:var(--danger)">⚠️ ' + esc(CASUALTY_LABELS[p.casualty_type]||p.casualty_type) + '</span>' : '';
   const checkbox = renderBulkCheckbox('casualties', p.id);
@@ -2501,8 +2550,10 @@ function clearCasualtiesFilter() {
 }
 
 async function loadCasualties() {
+  const edgeGeneration = pieceEdgeGeneration, edgeToken = token;
   try {
     const allCasualties = await api('/api/casualties');
+    if (edgeGeneration !== pieceEdgeGeneration || edgeToken !== token) return;
     const c = document.getElementById('casualtyList'), em = document.getElementById('casualtyEmpty');
     const stats = document.getElementById('casualtyStats');
     
@@ -2541,6 +2592,7 @@ async function loadCasualties() {
       c.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-title">No casualties match this filter</div></div>';
     } else {
       c.innerHTML = casualties.map(p => casualtyCard(p)).join('');
+      void loadPieceEdgeMedia(c);
     }
     updateBulkSelectionUI('casualties');
   } catch(e) { toast(e.message,'error'); }
@@ -4436,7 +4488,7 @@ async function redeemPromo() {
     const d = await api('/api/promo/redeem', { method:'POST', body: { code } });
     toast(d.message, 'success');
     if (d.token) { clearFiringMedia(); clearPricingMedia(); }
-    if (d.token) { clearComboMedia(); token = d.token; localStorage.setItem('mudlog_token', d.token); }
+    if (d.token) { clearPieceHistory(); clearComboMedia(); token = d.token; localStorage.setItem('mudlog_token', d.token); }
     const me = await api('/api/auth/me'); currentUser = me.user; showApp(); navigate('upgrade');
   } catch(e) { toast(e.message,'error'); }
 }
@@ -7204,21 +7256,25 @@ async function runVisualSearch(input) {
   const img = document.getElementById('visualSearchImg');
   const status = document.getElementById('visualSearchStatus');
   const results = document.getElementById('visualSearchResults');
+  clearPieceEdgeMedia();
+  const edgeGeneration = pieceEdgeGeneration, sessionToken = token;
+  const active = () => edgeGeneration === pieceEdgeGeneration && token === sessionToken;
   // Show preview
-  img.src = URL.createObjectURL(file);
+  pieceSearchPreviewUrl = URL.createObjectURL(file);
+  img.src = pieceSearchPreviewUrl;
   preview.style.display = 'block';
   status.textContent = 'Searching your library...';
   results.innerHTML = '';
   try {
     const formData = new FormData();
     formData.append('photo', file);
-    const token = localStorage.getItem('mudlog_token');
     const res = await fetch('/api/pieces/photo-search', {
       method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token },
+      headers: { 'Authorization': 'Bearer ' + sessionToken },
       body: formData
     });
     const data = await res.json();
+    if (!active()) return;
     if (!res.ok) throw new Error(data.error || 'Search failed');
     if (!data.matches || !data.matches.length) {
       status.textContent = 'No matches found in your library.';
@@ -7228,14 +7284,15 @@ async function runVisualSearch(input) {
     results.innerHTML = data.matches.map(m => {
       const photo = m.photos && m.photos[0];
       return '<div class="card" style="cursor:pointer;display:flex;gap:12px;align-items:center" onclick="openPieceDetail(\'' + m.id + '\')">' +
-        (photo ? '<img src="/uploads/' + photo.filename + '" style="width:64px;height:64px;object-fit:cover;border-radius:var(--radius-sm);flex-shrink:0">' : '<div style="width:64px;height:64px;background:var(--bg-dark);border-radius:var(--radius-sm);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.5rem">🏺</div>') +
+        (photo ? '<img ' + pieceEdgePhotoAttrs(m, photo) + ' style="width:64px;height:64px;object-fit:cover;border-radius:var(--radius-sm);flex-shrink:0">' : '<div style="width:64px;height:64px;background:var(--bg-dark);border-radius:var(--radius-sm);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.5rem">🏺</div>') +
         '<div><div class="card-title">' + esc(m.title || 'Untitled') + '</div>' +
         (m.clay_body_name ? '<div class="text-sm" style="color:var(--text-light)">🪨 ' + esc(m.clay_body_name) + '</div>' : '') +
         (m.status ? '<div class="text-sm" style="color:var(--text-light)">' + esc(m.status) + '</div>' : '') +
         '<div class="text-sm" style="color:var(--accent);font-weight:600">' + Math.round((m.matchScore||0)*100) + '% match</div>' +
         '</div></div>';
     }).join('');
-  } catch(err) { status.textContent = 'Error: ' + err.message; }
+    void loadPieceEdgeMedia(results);
+  } catch(err) { if (active()) status.textContent = 'Error: ' + err.message; }
 }
 
 async function loadContacts() {
@@ -7671,8 +7728,9 @@ async function loadPublicCombo(shareId) {
     if (res.status === 404) { document.getElementById('publicComboContent').innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔒</div><div class="empty-state-title">Combo not found</div><p>This combo may be private or doesn\'t exist.</p></div>'; return; }
     navigate('publicCombo');
     const el = document.getElementById('publicComboContent');
+    const publicImage = combo.photoDelivery === 'public-explicit' ? comboPhotoUrl(combo, 1) : '';
     let html = '<div class="card" style="max-width:600px;margin:0 auto">';
-    if (combo.photo_filename) html += '<img src="/uploads/' + combo.photo_filename + '" style="width:100%;max-height:400px;object-fit:cover;border-radius:var(--radius-sm);margin-bottom:16px">';
+    if (publicImage) html += '<img src="' + publicImage + '" style="width:100%;max-height:400px;object-fit:cover;border-radius:var(--radius-sm);margin-bottom:16px">';
     html += '<h2 style="color:var(--primary);margin-bottom:8px">' + esc(combo.name) + '</h2>';
     html += '<div class="text-sm" style="color:var(--text-muted);margin-bottom:16px">By ' + esc(combo.author || 'A Potter') + '</div>';
     if (combo.clay_body_name) html += '<div style="margin-bottom:8px"><strong>Clay:</strong> ' + esc(combo.clay_body_name) + '</div>';
@@ -7698,7 +7756,7 @@ async function loadPublicCombo(shareId) {
       '<p style="color:var(--text-light);margin-bottom:10px;font-weight:600;font-size:0.9rem">📤 Share This Combo</p>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">' +
       '<button class="btn btn-sm" onclick="window.open(\'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(comboUrl) + '\',\'_blank\',\'width=600,height=400\')" style="background:#1877F2;color:#fff;border:none">📘 Facebook</button>' +
-      '<button class="btn btn-sm" onclick="window.open(\'https://pinterest.com/pin/create/button/?url=' + encodeURIComponent(comboUrl) + '&description=' + encodeURIComponent(comboTitle) + (combo.photo_filename ? '&media=' + encodeURIComponent('https://thepottersmudroom.com/uploads/' + combo.photo_filename) : '') + '\',\'_blank\',\'width=600,height=400\')" style="background:#E60023;color:#fff;border:none">📌 Pinterest</button>' +
+      '<button class="btn btn-sm" onclick="window.open(\'https://pinterest.com/pin/create/button/?url=' + encodeURIComponent(comboUrl) + '&description=' + encodeURIComponent(comboTitle) + (publicImage ? '&media=' + encodeURIComponent('https://thepottersmudroom.com' + publicImage) : '') + '\',\'_blank\',\'width=600,height=400\')" style="background:#E60023;color:#fff;border:none">📌 Pinterest</button>' +
       '<button class="btn btn-sm" onclick="window.open(\'https://twitter.com/intent/tweet?url=' + encodeURIComponent(comboUrl) + '&text=' + encodeURIComponent(comboTitle) + '\',\'_blank\',\'width=600,height=400\')" style="background:#000;color:#fff;border:none">𝕏 Post</button>' +
       '<button class="btn btn-sm" onclick="shareBlog(\'' + esc(comboUrl) + '\',\'' + esc(combo.name) + '\')" style="background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);color:#fff;border:none">📲 Share</button>' +
       '</div></div>';

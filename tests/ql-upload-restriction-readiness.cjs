@@ -22,7 +22,7 @@ test('public and legacy-ambiguous Piece media remain anonymous compatibility pat
   assert.match(server,/if \(piece && \(piece\.is_public === 1/);
   assert.match(server,/return 'legacy-ambiguous'/);
   assert.match(web,/privatePiecePhotos = p\.photoVisibility === 'private'/);
-  assert.match(web,/src="\/uploads\/['"]? \+ ph\.filename|src="\/uploads\/.*ph\.filename/s);
+  assert.match(web,/pieceEdgePhotoAttrs/);
 });
 test('Piece visibility semantics are metadata-based and do not infer from filenames',()=>{
   const start=server.indexOf('function classifyPiecePhotoVisibility');
@@ -35,7 +35,7 @@ test('at least one intentionally public community media surface remains public',
   assert.match(server,/SHAREABLE GLAZE COMBOS \(Public\)/);
   assert.match(server,/app\.get\('\/api\/combos\/public\/:shareId'/);
   assert.match(server,/gc\.is_public=1/);
-  assert.match(web,/\/uploads\/['"]? \+ combo\.photo_filename|\/uploads\/.*combo\.photo_filename/s);
+  assert.match(web,/publicImage/);
 });
 test('Clay remains account-owned with protected delivery and no invented publication metadata',()=>{
   assert.ok(columns('clay_bodies').has('user_id'));

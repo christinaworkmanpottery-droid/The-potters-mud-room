@@ -569,6 +569,37 @@ app.get('/api/ql/pieces/:pieceId/photos/:photoId', auth, (req, res) => {
   sendOwnedPiecePhoto(req, res, { privateOnly: true });
 });
 
+// Phase 2U: record-aware public delivery, using the Gallery's stored eligibility rules.
+function pieceGalleryEligible(piece) {
+  const status = String(piece?.status || '').trim().toLowerCase().replaceAll(' ', '-').replaceAll('_', '-').replaceAll('final-fired', 'glaze-fired');
+  return classifyPiecePhotoVisibility(piece) === 'public' && ['glaze-fired','done','complete','sold'].includes(status);
+}
+app.get('/api/ql/pieces/:pieceId/photos/:photoId/public', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const piece = db.prepare('SELECT * FROM pieces WHERE id=?').get(req.params.pieceId);
+    if (!pieceGalleryEligible(piece)) return unavailable();
+    const photo = db.prepare('SELECT * FROM piece_photos WHERE id=? AND piece_id=?').get(req.params.photoId, piece.id);
+    if (!photo) return unavailable();
+    const target = safeStoredUpload(photo.filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif)$/i.test(photo.filename)) return unavailable();
+    // Filename possession never authorizes delivery. Any other stored reference fails closed.
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(photo.filename);
+        if (rows.some(row => table !== 'piece_photos' || column !== 'filename' || row.id !== photo.id)) return unavailable();
+      }
+    }
+    res.set('X-Content-Type-Options', 'nosniff');
+    // Revalidate every reuse so unpublishing takes effect without a shared-cache grace period.
+    res.set('Cache-Control', 'public, max-age=0, must-revalidate');
+    res.sendFile(target, error => { if (error && !res.headersSent) { res.set('Cache-Control','no-store'); unavailable(); } });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
+
 // Connected History keeps its existing authenticated owner-scoped behavior.
 app.get('/api/ql/pieces/:pieceId/history/photos/:photoId', auth, (req, res) => {
   sendOwnedPiecePhoto(req, res);
@@ -4151,7 +4182,7 @@ app.get('/api/dashboard', auth, (req, res) => {
 
   const getPh = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order LIMIT 1');
   const getGl = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id=g.id AND g.user_id=? WHERE pg.piece_id=? ORDER BY pg.layer_order');
-  recentPieces.forEach(p => { p.primaryPhoto = getPh.get(p.id) || null; p.glazes = getGl.all(req.userId, p.id); });
+  recentPieces.forEach(p => { p.photoVisibility = classifyPiecePhotoVisibility(p); p.primaryPhoto = getPh.get(p.id) || null; p.glazes = getGl.all(req.userId, p.id); });
 
   const stats = { totalPieces, byStatus, recentPieces, totalClays, totalGlazes, tier };
 
@@ -4179,6 +4210,7 @@ app.get('/api/casualties', auth, (req, res) => {
   pieces.forEach(p => {
     p.glazes = getGl.all(req.userId, p.id);
     const allPhotos = getPh.all(p.id);
+    p.photoVisibility = classifyPiecePhotoVisibility(p);
     p.photos = allPhotos;
     p.primaryPhoto = allPhotos[0] || null;
   });
@@ -7006,6 +7038,9 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         _id: best.piece_id,
         id: best.piece_id,
         title: current.title,
+        user_id: current.user_id,
+        is_public: current.is_public,
+        photoVisibility: classifyPiecePhotoVisibility(current),
         status: current.status,
         notes: current.notes,
         description: current.description,
@@ -7350,6 +7385,10 @@ app.get('/api/gallery', (req, res) => {
       technique: p.technique,
       clayBody: p.clay_body_name,
       photo: p.primary_photo || p.first_photo,
+      photoId: db.prepare('SELECT id FROM piece_photos WHERE piece_id=? AND filename=? ORDER BY sort_order LIMIT 1').get(p.id, p.primary_photo || p.first_photo)?.id || null,
+      photoVisibility: 'public',
+      is_public: 1,
+      status: p.status,
       displayName: p.public_display_name || p.creator_name || 'Anonymous Potter',
       creatorUsername: p.creator_username,
       creatorAvatar: p.creator_avatar,
