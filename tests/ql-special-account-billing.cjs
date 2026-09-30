@@ -38,7 +38,6 @@ test('special-account canonical storage matrix and entitlement compatibility', a
       db.prepare('INSERT INTO users(id,email,tier,billing_period) VALUES(?,?,?,?)')
         .run('special', special[0].toUpperCase(), 'free', stored);
       db.prepare("INSERT INTO users(id,email,tier,billing_period) VALUES('ordinary','ordinary@example.invalid','starter','monthly')").run();
-      db.prepare("INSERT INTO users(id,email,tier,billing_period) VALUES('legacy','legacy@example.invalid','starter','stripe-monthly')").run();
       db.pragma('ignore_check_constraints=OFF');
 
       iap.normalizeSpecialAccountBilling(db);
@@ -47,8 +46,6 @@ test('special-account canonical storage matrix and entitlement compatibility', a
       assert.equal(row.billing_period, expected);
       assert.equal(iap.hasPremiumAccess(db, 'special'), true);
       assert.equal(iap.hasPremiumAccess(db, 'ordinary'), false);
-      assert.equal(iap.hasPremiumAccess(db, 'legacy'), true);
-      assert.equal(db.prepare("SELECT billing_period FROM users WHERE id='legacy'").get().billing_period, 'stripe-monthly');
       assert.deepEqual(db.pragma('integrity_check'), [{ integrity_check: 'ok' }]);
       const once = db.prepare("SELECT tier,billing_period FROM users WHERE id='special'").get();
       iap.normalizeSpecialAccountBilling(db);
@@ -56,6 +53,19 @@ test('special-account canonical storage matrix and entitlement compatibility', a
       db.close();
     });
   }
+
+  await t.test('unrelated historical marker remains readable and is not bulk-normalized', () => {
+    const db = new Database(':memory:');
+    db.exec(`CREATE TABLE users (
+      id TEXT PRIMARY KEY, email TEXT, tier TEXT, billing_period TEXT,
+      plan_expires_at TEXT, iap_expires_at INTEGER
+    )`);
+    db.prepare("INSERT INTO users(id,email,tier,billing_period) VALUES('legacy','legacy@example.invalid','starter','stripe-monthly')").run();
+    iap.normalizeSpecialAccountBilling(db);
+    assert.equal(db.prepare("SELECT billing_period FROM users WHERE id='legacy'").get().billing_period,'stripe-monthly');
+    assert.equal(iap.hasPremiumAccess(db,'legacy'),true);
+    db.close();
+  });
 
   await t.test('compatibility serialization preserves interval and promo meaning', () => {
     assert.equal(iap.compatibleBillingPeriod({ email:special[0], tier:'starter', billing_period:'monthly' }), 'stripe-monthly');
@@ -144,7 +154,6 @@ test('fresh constrained server stores canonical values while preserving observab
   insert.run('aw',special[1],hash,'AW','free','yearly','2020-01-02','SPECIAL-AW');
   insert.run('admin',special[2],hash,'Admin','free','promo','2020-01-03','SPECIAL-ADMIN');
   insert.run('ordinary','ordinary@example.invalid',hash,'Ordinary','starter','monthly','2020-01-04','ORDINARY');
-  insert.run('legacy','legacy@example.invalid',hash,'Legacy','starter','stripe-monthly','2020-01-05','LEGACY');
   db.pragma('ignore_check_constraints=OFF');
   for (const id of ['jg','ordinary']) {
     for (let n=0;n<10;n++) db.prepare('INSERT INTO pieces(id,user_id,title,status) VALUES(?,?,?,?)').run(id+'-piece-'+n,id,'Piece '+n,'in-progress');
@@ -156,12 +165,11 @@ test('fresh constrained server stores canonical values while preserving observab
   db.pragma('foreign_keys=ON');
 
   await t.test('startup canonicalizes only selected invalid/missing storage and preserves allowed values', () => {
-    const rows = Object.fromEntries(db.prepare("SELECT id,tier,billing_period FROM users WHERE id IN ('jg','aw','admin','ordinary','legacy')").all().map(x=>[x.id,x]));
+    const rows = Object.fromEntries(db.prepare("SELECT id,tier,billing_period FROM users WHERE id IN ('jg','aw','admin','ordinary')").all().map(x=>[x.id,x]));
     assert.deepEqual(rows.jg,{id:'jg',tier:'starter',billing_period:'monthly'});
     assert.deepEqual(rows.aw,{id:'aw',tier:'starter',billing_period:'yearly'});
     assert.deepEqual(rows.admin,{id:'admin',tier:'starter',billing_period:'promo'});
     assert.deepEqual(rows.ordinary,{id:'ordinary',tier:'starter',billing_period:'monthly'});
-    assert.deepEqual(rows.legacy,{id:'legacy',tier:'starter',billing_period:'stripe-monthly'});
     assert.deepEqual(db.pragma('integrity_check'),[{integrity_check:'ok'}]);
   });
 
@@ -193,7 +201,7 @@ test('fresh constrained server stores canonical values while preserving observab
   await t.test('Admin paid/gifted classification recognizes special and historical grandfathering without broadening monthly Starter', async () => {
     const r = await req('/api/admin/members',admin);
     assert.equal(r.status,200);
-    assert.equal(r.data.stats.byTier.paid,3); // JG + AW + unrelated historical marker.
+    assert.equal(r.data.stats.byTier.paid,2); // JG + AW special compatibility accounts.
     assert.equal(r.data.stats.byTier.gifted,2); // promo Admin + ordinary Starter.
     const members=Object.fromEntries(r.data.members.map(x=>[x.id,x]));
     assert.equal(members.jg.billing_period,'stripe-monthly');
