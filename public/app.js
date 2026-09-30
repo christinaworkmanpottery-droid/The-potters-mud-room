@@ -1103,6 +1103,12 @@ function df(label, val) {
 }
 
 // ---- Piece CRUD ----
+let pieceClayIntent = null, pieceStudioChanged = false, pieceLayersChanged = false, pieceHydrating = false;
+function editPieceClayManually() {
+  pieceClayIntent = 'manual';
+  document.getElementById('pieceClayId').value = '';
+  document.getElementById('pieceClayPicker').value = '';
+}
 function populateClaySelect(selId, selVal) {
   const s = document.getElementById(selId);
   s.innerHTML = '<option value="">Select clay...</option>' + clayBodies.map(c => '<option value="' + c.id + '"' + (c.id===selVal?' selected':'') + '>' + esc(c.name) + (c.brand?' ('+esc(c.brand)+')':'') + '</option>').join('');
@@ -1117,6 +1123,7 @@ function pickClayFromLibrary(id, name) {
   if (!id) return;
   document.getElementById('pieceClayText').value = name;
   document.getElementById('pieceClayId').value = id;
+  pieceClayIntent = 'saved';
 }
 function glazeOpts() {
   return '<option value="">Select glaze...</option>' + glazes.map(g => '<option value="' + g.id + '">' + esc(g.name) + (g.brand?' ('+esc(g.brand)+')':'') + '</option>').join('');
@@ -1128,7 +1135,8 @@ function populateGlazePicker(row, selectedId) {
   sel.innerHTML = '<option value="">— Pick from Glaze library —</option>' + glazes.map(g => '<option value="' + g.id + '"' + (g.id===selectedId?' selected':'') + '>' + esc(g.name) + (g.brand?' ('+esc(g.brand)+')':'') + '</option>').join('');
   wrap.style.display = glazes.length > 0 ? 'block' : 'none';
 }
-function addGlazeSelector(gId, coats, method, glazeName) {
+function addGlazeSelector(gId, coats, method, glazeName, original) {
+  if (!pieceHydrating) pieceLayersChanged = true;
   const c = document.getElementById('pieceGlazeSelectors');
   const r = document.createElement('div'); r.className = 'glaze-selector-row'; r.style.cssText = 'display:block;margin-bottom:16px';
   r.innerHTML =
@@ -1138,10 +1146,24 @@ function addGlazeSelector(gId, coats, method, glazeName) {
       '<select class="form-select gpick" onchange="pickGlazeFromLibrary(this)" style="font-size:0.85rem"><option value="">— Pick from Glaze library —</option></select>' +
     '</div>' +
     '<div style="display:flex;gap:8px;margin-top:8px;align-items:center">' +
-      '<input type="number" class="form-input gc" placeholder="Coats" min="1" value="' + (coats||1) + '" style="width:80px">' +
-      '<select class="form-select gm" style="flex:1"><option value="">Method (optional)</option><option value="dip"' + (method==='dip'?' selected':'') + '>Dip</option><option value="brush"' + (method==='brush'?' selected':'') + '>Brush</option><option value="spray"' + (method==='spray'?' selected':'') + '>Spray</option><option value="pour"' + (method==='pour'?' selected':'') + '>Pour</option><option value="wax-resist"' + (method==='wax-resist'?' selected':'') + '>Wax Resist</option></select>' +
-      '<button type="button" class="btn btn-sm btn-danger" onclick="this.closest(\'.glaze-selector-row\').remove()" style="flex:none">×</button>' +
+      '<input type="number" class="form-input gc" placeholder="Coats" min="0" value="' + (coats ?? 1) + '" style="width:80px">' +
+      '<select class="form-select gm" style="flex:1"><option value="">Method (optional)</option><option value="dip"' + (method==='dip'?' selected':'') + '>Dip</option><option value="brush"' + (method==='brush'?' selected':'') + '>Brush</option><option value="spray"' + (method==='spray'?' selected':'') + '>Spray</option><option value="pour"' + (method==='pour'?' selected':'') + '>Pour</option><option value="wax-resist"' + (method==='wax-resist'?' selected':'') + '>Wax Resist</option><option value="other"' + (method==='other'?' selected':'') + '>Other</option></select>' +
+      '<button type="button" class="btn btn-sm btn-danger" onclick="pieceLayersChanged=true;this.closest(\'.glaze-selector-row\').remove()" style="flex:none">×</button>' +
     '</div>';
+  const maxOrder = Math.max(-1, ...Array.from(c.children, row => row._layer?.layerOrder ?? -1));
+  r._layer = original ? {
+    id: original.id, glazeId: original.glaze_id, customName: original.custom_name,
+    coats: original.coats, method: original.application_method, notes: original.notes, layerOrder: original.layer_order
+  } : {glazeId:gId || null, customName:gId ? null : glazeName || null, coats:coats ?? 1, method:method ?? null, notes:null, layerOrder:maxOrder+1};
+  r._manualChanged = !original && !gId;
+  const notesInput = document.createElement('textarea'); notesInput.className='form-input gn';
+  notesInput.placeholder='Layer notes'; notesInput.value=r._layer.notes ?? ''; r.appendChild(notesInput);
+  const change = () => { pieceLayersChanged=true; };
+  r.querySelector('.btn-danger').onclick = () => { change(); r.remove(); };
+  r.querySelector('.gtext').oninput = e => { change(); r._layer.glazeId=null; r._layer.customName=e.target.value; r.querySelector('.gid').value=''; r.querySelector('.gpick').value=''; r._manualChanged=true; };
+  r.querySelector('.gc').oninput = e => { change(); r._layer.coats=e.target.value === '' ? null : Number(e.target.value); };
+  r.querySelector('.gm').onchange = e => { change(); r._layer.method=e.target.value || null; };
+  notesInput.oninput = e => { change(); r._layer.notes=e.target.value; };
   populateGlazePicker(r, gId || null);
   if (gId) r.querySelector('.gid').value = gId;
   c.appendChild(r);
@@ -1153,6 +1175,7 @@ function pickGlazeFromLibrary(sel) {
   if (!id) return;
   row.querySelector('.gtext').value = name;
   row.querySelector('.gid').value = id;
+  row._layer.glazeId=id; row._layer.customName=null; row._manualChanged=false; pieceLayersChanged=true;
 }
 function toggleCasualtyFields() {
   const status = document.getElementById('pieceStatus').value;
@@ -1162,6 +1185,9 @@ function toggleCasualtyFields() {
   if (title) title.textContent = status === 'recycled' ? 'Recycle Report' : 'Casualty Report';
 }
 function openPieceModal(p) {
+  pieceClayIntent=null; pieceStudioChanged=false; pieceLayersChanged=false; pieceHydrating=true;
+  document.getElementById('pieceClayText').oninput=editPieceClayManually;
+  document.getElementById('pieceStudio').oninput=()=>{pieceStudioChanged=true;};
   document.getElementById('pieceId').value = p?.id||'';
   document.getElementById('pieceModalTitle').textContent = p ? 'Edit Piece' : 'Add New Piece';
   document.getElementById('pieceTitle').value = p?.title||'';
@@ -1174,12 +1200,12 @@ function openPieceModal(p) {
   document.getElementById('pieceDimensions').value = p?.dimensions||'';
   document.getElementById('pieceWeight').value = p?.weight||'';
   document.getElementById('pieceNotes').value = p?.notes||'';
-  document.getElementById('pieceClayText').value = p?.clay_body_name || p?.clay || '';
+  document.getElementById('pieceClayText').value = p?.clay_body_name || p?.clay || p?.studio || '';
   document.getElementById('pieceClayId').value = p?.clay_body_id || '';
   populateClayPicker(p?.clay_body_id);
   document.getElementById('pieceGlazeSelectors').innerHTML = '';
   if (p?.glazes?.length) {
-    p.glazes.forEach(g => addGlazeSelector(g.glaze_id, g.coats, g.application_method, g.glaze_name || g.name || ''));
+    p.glazes.forEach(g => addGlazeSelector(g.glaze_id, g.coats, g.application_method, g.glaze_name || g.custom_name || g.name || '', g));
   } else if (p?.glaze) {
     addGlazeSelector(null, 1, null, p.glaze);
   }
@@ -1198,6 +1224,7 @@ function openPieceModal(p) {
   document.getElementById('pricingCalcPanel').style.display = 'none';
   updatePricingCalc();
   const ppf = document.getElementById('pieceInlinePhotoFile'); if (ppf) ppf.value = '';
+  pieceHydrating=false;
   openModal('pieceModal');
 }
 async function editPiece(id) { try { openPieceModal(await api('/api/pieces/'+id)); } catch(e) { toast(e.message,'error'); } }
@@ -1208,29 +1235,21 @@ async function savePiece(e) {
   const gIds = [];
   const glazeNames = [];
   gRows.forEach(r => {
-    const gtext = r.querySelector('.gtext').value.trim();
-    const gid = r.querySelector('.gid').value;
-    if (gtext) {
-      glazeNames.push(gtext);
-      gIds.push({
-        glazeId: gid || null,
-        customName: gid ? null : gtext,
-        coats: parseInt(r.querySelector('.gc').value)||1,
-        method: r.querySelector('.gm').value||null
-      });
-    }
+    const gtext=r.querySelector('.gtext').value;
+    if (r._manualChanged && !gtext.trim()) return; // deliberate blank removes only this layer
+    glazeNames.push(gtext);
+    gIds.push({...r._layer});
   });
   const clayText = document.getElementById('pieceClayText').value.trim();
   const clayId = document.getElementById('pieceClayId').value;
   const body = {
     title: document.getElementById('pieceTitle').value,
-    clay: clayText || null,
-    clayBodyId: clayId || null,
+    ...(pieceClayIntent ? {clayIntent:pieceClayIntent, clayBodyId:clayId || null, ...(pieceClayIntent==='manual' ? {clay:clayText} : {})} : !id && clayId ? {clayIntent:'saved',clayBodyId:clayId} : !id && clayText ? {clayIntent:'manual',clay:clayText} : {}),
     glaze: glazeNames.length > 0 ? glazeNames.join(', ') : null,
     status: document.getElementById('pieceStatus').value,
     technique: document.getElementById('pieceTechnique').value||null,
     form: document.getElementById('pieceForm_').value||null,
-    studio: document.getElementById('pieceStudio').value||null,
+    ...((pieceStudioChanged || !id) && {studio:document.getElementById('pieceStudio').value || null}),
     dateStarted: document.getElementById('pieceDateStarted').value||null,
     firingTemp: document.getElementById('pieceFiringTemp').value||null,
     dimensions: document.getElementById('pieceDimensions').value||null,
@@ -1241,7 +1260,7 @@ async function savePiece(e) {
     laborHours: document.getElementById('pieceLaborHours').value||null,
     laborRate: document.getElementById('pieceLaborRate').value||null,
     salePrice: document.getElementById('pieceSalePrice').value||null,
-    glazeIds: gIds,
+    ...((pieceLayersChanged || !id) && {glazeIds:gIds}),
     casualtyType: document.getElementById('pieceCasualtyType').value||null,
     casualtyNotes: document.getElementById('pieceCasualtyNotes').value||null,
     casualtyLesson: document.getElementById('pieceCasualtyLesson').value||null

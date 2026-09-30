@@ -7,7 +7,7 @@ let tmp,server,db,base,secret,tokenA,tokenB,log='';
 async function start(){
  tmp=fs.mkdtempSync(path.join(os.tmpdir(),'ql-profile-media-'));
  for(const n of ['server.js','database.js','iap.js','directory-search.js','calendar-export.js','deletion-lifecycle.cjs'])fs.copyFileSync(path.join(root,n),path.join(tmp,n));
- fs.mkdirSync(path.join(tmp,'ql'));for(const n of ['relationships.cjs','piece-history.cjs'])fs.copyFileSync(path.join(root,'ql',n),path.join(tmp,'ql',n));
+ fs.mkdirSync(path.join(tmp,'ql'));for(const n of ['relationships.cjs','piece-history.cjs','piece-editor.cjs'])fs.copyFileSync(path.join(root,'ql',n),path.join(tmp,'ql',n));
  fs.cpSync(path.join(root,'geodata'),path.join(tmp,'geodata'),{recursive:true});fs.symlinkSync(path.join(root,'node_modules'),path.join(tmp,'node_modules'),'dir');fs.mkdirSync(path.join(tmp,'public/shop'),{recursive:true});fs.copyFileSync(path.join(root,'public/website-utils.js'),path.join(tmp,'public/website-utils.js'));fs.writeFileSync(path.join(tmp,'public/shop/mud-log-preview.pdf'),'preview');fs.writeFileSync(path.join(tmp,'public/shop/the-potters-mud-log.pdf'),'paid-original');
  const port=44000+crypto.randomInt(1000);base='http://127.0.0.1:'+port;secret=crypto.randomBytes(32).toString('hex');
  server=spawn(process.execPath,['server.js'],{cwd:tmp,env:{PATH:process.env.PATH,PORT:String(port),JWT_SECRET:secret,NODE_ENV:'test'},stdio:['ignore','pipe','pipe']});

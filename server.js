@@ -1,3 +1,4 @@
+const pieceEditor = require('./ql/piece-editor.cjs');
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -2605,8 +2606,7 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
   // Handle both JSON and FormData (iOS may send either)
   const body = req.body || {};
   const title = String(body.title || body.name || '').trim() || null;
-  const clayText = String(body.clay || body.studio || '').trim() || null;
-  const clayBodyId = body.clayBodyId || body.clay_body_id || null;
+  let clayText, clayBodyId;
   const statusMap = {'In Progress':'in-progress','Bisque Fired':'bisque-fired','Glazed':'glazed','Final Fired':'glaze-fired','Glaze Fired':'glaze-fired','Complete':'done','Done':'done','Sold':'sold','Broken':'broken','Recycled':'recycled'};
   const rawStatus = String(body.status || 'in-progress').trim();
   const status = statusMap[rawStatus] || rawStatus.toLowerCase().replace(/\s+/g,'-');
@@ -2643,10 +2643,12 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
   const casualtyType = body.casualtyType || body.casualty_type || null;
   const casualtyNotes = body.casualtyNotes || body.casualty_notes || null;
   const casualtyLesson = body.casualtyLesson || body.casualty_lesson || null;
-  let glazeIds = body.glazeIds || body.glaze_ids || null;
-  if (typeof glazeIds === 'string') { try { glazeIds = JSON.parse(glazeIds); } catch(e) { glazeIds = null; } }
+  let glazeIds;
   try {
-    validatePieceRelationships(req.userId, clayBodyId, glazeIds);
+    const validate = (table, id) => ownedRelationship(table, req.userId, id);
+    const clay = pieceEditor.clay(body, {}, validate);
+    clayBodyId = clay.id; clayText = clay.text;
+    glazeIds = pieceEditor.layers(body, [], validate);
   } catch (error) {
     cleanupRequestUploads([req.file]);
     return res.status(error.status || 400).json({ error: error.message });
@@ -2665,8 +2667,8 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
     db.prepare('INSERT INTO pieces (id,user_id,title,description,clay_body_id,studio,status,form,technique,dimensions,weight,material_cost,firing_cost,labor_hours,labor_rate,sale_price,date_started,notes,casualty_type,casualty_notes,casualty_lesson) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
       .run(id, req.userId, title, description, clayBodyId, clayText, status || 'in-progress', form, technique, dimensions, weight, materialCost, firingCost, laborHours, laborRate, salePrice, dateStarted, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null);
     if (glazeIds?.length) {
-      const ins = db.prepare('INSERT INTO piece_glazes (id,piece_id,glaze_id,custom_name,coats,application_method,layer_order) VALUES (?,?,?,?,?,?,?)');
-      glazeIds.forEach((g, i) => ins.run(uuidv4(), id, g.glazeId || null, g.customName || null, g.coats || 1, g.method || null, i));
+      const ins = db.prepare('INSERT INTO piece_glazes (id,piece_id,glaze_id,custom_name,coats,application_method,layer_order,notes) VALUES (?,?,?,?,?,?,?,?)');
+      glazeIds.forEach((g, i) => ins.run(uuidv4(), id, g.glazeId, g.customName, g.coats, g.method, g.layerOrder, g.notes));
     }
   });
   try {
@@ -2758,8 +2760,9 @@ app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
   const body = req.body || {};
   const title = body.title || body.name || null;
   const description = body.description || null;
-  const clayBodyId = body.clayBodyId || body.clay_body_id || null;
-  const studio = body.studio || body.clay || null;
+  let clayBodyId, studio;
+  const storedPiece = db.prepare('SELECT * FROM pieces WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!storedPiece) { cleanupRequestUploads([req.file]); return res.status(404).json({error:'Not found'}); }
   const statusMap2 = {'In Progress':'in-progress','Bisque Fired':'bisque-fired','Glazed':'glazed','Final Fired':'glaze-fired','Glaze Fired':'glaze-fired','Complete':'done','Done':'done','Sold':'sold','Broken':'broken','Recycled':'recycled'};
   const rawSt = body.status ? String(body.status).trim() : null;
   const status = rawSt ? (statusMap2[rawSt] || rawSt.toLowerCase().replace(/\s+/g,'-')) : null;
@@ -2793,10 +2796,13 @@ app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
   const casualtyType = body.casualtyType || body.casualty_type || null;
   const casualtyNotes = body.casualtyNotes || body.casualty_notes || null;
   const casualtyLesson = body.casualtyLesson || body.casualty_lesson || null;
-  let glazeIds = body.glazeIds || body.glaze_ids;
-  if (typeof glazeIds === 'string') { try { glazeIds = JSON.parse(glazeIds); } catch(e) { glazeIds = undefined; } }
+  let glazeIds;
   try {
-    validatePieceRelationships(req.userId, clayBodyId, glazeIds);
+    const validate = (table, id) => ownedRelationship(table, req.userId, id);
+    const clay = pieceEditor.clay(body, storedPiece, validate);
+    clayBodyId = clay.id; studio = clay.text;
+    const storedLayers = db.prepare('SELECT * FROM piece_glazes WHERE piece_id=? ORDER BY layer_order').all(storedPiece.id);
+    glazeIds = pieceEditor.layers(body, storedLayers, validate);
   } catch (error) {
     cleanupRequestUploads([req.file]);
     return res.status(error.status || 400).json({ error: error.message });
@@ -2807,20 +2813,21 @@ app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
   // instead of leaving the piece partially updated with no glazes.
   let updateResult;
   const updatePieceAndGlazes = db.transaction(() => {
-    updateResult = db.prepare(`UPDATE pieces SET title=?,description=?,clay_body_id=?,studio=?,status=?,form=?,technique=?,dimensions=?,weight=?,material_cost=?,firing_cost=?,labor_hours=?,labor_rate=?,sale_price=?,date_started=?,date_completed=?,date_sold=?,notes=?,casualty_type=?,casualty_notes=?,casualty_lesson=?,updated_at=datetime('now') WHERE id=? AND user_id=?`)
-      .run(title, description, clayBodyId, studio, status, form, technique, dimensions, weight, materialCost, firingCost, laborHours, laborRate, salePrice, dateStarted, dateCompleted, dateSold, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null, req.params.id, req.userId);
+    updateResult = db.prepare(`UPDATE pieces SET title=?,description=?,${clayBodyId === storedPiece.clay_body_id ? '' : 'clay_body_id=?,'}studio=?,status=?,form=?,technique=?,dimensions=?,weight=?,material_cost=?,firing_cost=?,labor_hours=?,labor_rate=?,sale_price=?,date_started=?,date_completed=?,date_sold=?,notes=?,casualty_type=?,casualty_notes=?,casualty_lesson=?,updated_at=datetime('now') WHERE id=? AND user_id=?`)
+      .run(title, description, ...(clayBodyId === storedPiece.clay_body_id ? [] : [clayBodyId]), studio, status, form, technique, dimensions, weight, materialCost, firingCost, laborHours, laborRate, salePrice, dateStarted, dateCompleted, dateSold, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null, req.params.id, req.userId);
     if (updateResult.changes === 0) return;
     if (glazeIds !== undefined) {
       db.prepare('DELETE FROM piece_glazes WHERE piece_id=?').run(req.params.id);
       if (glazeIds?.length) {
-        const ins = db.prepare('INSERT INTO piece_glazes (id,piece_id,glaze_id,custom_name,coats,application_method,layer_order) VALUES (?,?,?,?,?,?,?)');
-        glazeIds.forEach((g, i) => ins.run(uuidv4(), req.params.id, g.glazeId || null, g.customName || null, g.coats || 1, g.method || null, i));
+        const ins = db.prepare('INSERT INTO piece_glazes (id,piece_id,glaze_id,custom_name,coats,application_method,layer_order,notes) VALUES (?,?,?,?,?,?,?,?)');
+        glazeIds.forEach((g, i) => ins.run(uuidv4(), req.params.id, g.glazeId, g.customName, g.coats, g.method, g.layerOrder, g.notes));
       }
     }
   });
   try {
     updatePieceAndGlazes();
   } catch (dbErr) {
+    cleanupRequestUploads([req.file]);
     console.error('[DB ERROR] Update piece failed:', dbErr.message, { pieceId: req.params.id });
     return res.status(400).json({ error: 'Could not save piece: ' + dbErr.message });
   }
