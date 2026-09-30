@@ -3309,7 +3309,8 @@ function saveComboRecord(req, res) {
     }
     const id = existing?.id || uuidv4();
     const shared = value('isShared', 'is_shared');
-    const fields = [name, value('clayBodyName','clay_body_name') || null, value('cone','cone') || null, value('atmosphere','atmosphere') || null, value('description','description') || null, value('notes','notes') || null, shared === true || shared === 'true' || shared === 1 ? 1 : 0, ...photos];
+    const sharedValue = shared === null || shared === undefined ? null : (shared === true || shared === 'true' || shared === 1 ? 1 : 0);
+    const fields = [name, value('clayBodyName','clay_body_name') || null, value('cone','cone') || null, value('atmosphere','atmosphere') || null, value('description','description') || null, value('notes','notes') || null, sharedValue, ...photos];
     db.transaction(() => {
       if (existing) db.prepare("UPDATE glaze_combos SET name=?,clay_body_name=?,cone=?,atmosphere=?,description=?,notes=?,is_shared=?,photo_filename=?,photo_filename2=?,updated_at=datetime('now') WHERE id=? AND user_id=?").run(...fields, id, req.userId);
       else db.prepare('INSERT INTO glaze_combos (name,clay_body_name,cone,atmosphere,description,notes,is_shared,photo_filename,photo_filename2,id,user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(...fields, id, req.userId);
