@@ -201,7 +201,7 @@ const STATUS_LABELS = { 'in-progress':'In Progress','leather-hard':'Leather Hard
 const CASUALTY_LABELS = { 'cracked':'Cracked','exploded':'Exploded / Blowout','warped':'Warped','s-crack':'S-Crack','glaze-crawl':'Glaze Crawl','glaze-pinhole':'Glaze Pinholing','glaze-shiver':'Glaze Shivering','glaze-crazing':'Glaze Crazing','glaze-runoff':'Glaze Ran Off','thermal-shock':'Thermal Shock','broke-trimming':'Broke While Trimming','broke-handling':'Broke While Handling','collapsed':'Collapsed','dunting':'Dunting','wrong-color':'Unexpected Color Result','other':'Other' };
 function fmtStatus(s) { return s ? '<span class="status-badge status-' + s + '">' + (STATUS_LABELS[s]||s) + '</span>' : ''; }
 function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { if (id === 'glazeViewModal') clearGlazeMedia('glazeViewBody'); if (id === 'clayViewModal') clearClayMedia('clayViewBody'); document.getElementById(id).classList.remove('open'); }
+function closeModal(id) { const firingScope = { firingModal:'firingPhotosContainer', firingViewModal:'firingViewBody', firingPhotoReorderModal:'firingPhotoReorderContent' }[id]; if (firingScope) closeFiringMediaScope(firingScope); if (id === 'glazeViewModal') clearGlazeMedia('glazeViewBody'); if (id === 'clayViewModal') clearClayMedia('clayViewBody'); document.getElementById(id).classList.remove('open'); }
 
 // iOS decimal keyboards have no native Done key. Give every numeric field a
 // consistent way to dismiss the keyboard so form buttons remain reachable.
@@ -425,7 +425,7 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     clearClayMedia();
     clearGlazeMedia();
     clearTestTileMedia();
-    clearComboMedia();
+    clearFiringMedia(); clearComboMedia();
     clearPieceHistory();
     token = data.token;
     localStorage.setItem('mudlog_token', token);
@@ -445,7 +445,7 @@ function logout() {
   clearClayMedia();
   clearGlazeMedia();
   clearTestTileMedia();
-  clearComboMedia();
+  clearFiringMedia(); clearComboMedia();
   clearPieceHistory();
   token = null; currentUser = null;
   localStorage.removeItem('mudlog_token');
@@ -468,7 +468,7 @@ async function checkAuth() {
     const msg = (e.message || '').toLowerCase();
     if (msg.includes('invalid token') || msg.includes('unauthorized') || msg.includes('no token') || msg.includes('invalid') || msg.includes('expired')) {
       // Token is bad — clear it and show auth screen (not landing page)
-      clearComboMedia();
+      clearFiringMedia(); clearComboMedia();
       token = null;
       localStorage.removeItem('mudlog_token');
       document.getElementById('landingPage').style.display = 'none';
@@ -526,6 +526,7 @@ function navigate(page, options = {}) {
   if (page !== 'clayBodies') { clearClayMedia('clayList'); clearClayMedia('clayViewBody'); }
   if (page !== 'testTiles') clearTestTileMedia();
   if (page !== 'community') clearComboMedia();
+  if (page !== 'firings') clearFiringMedia();
   if (page !== 'pieceDetail') clearPieceHistory();
   try {
     if (!token && !guestMode) {
@@ -1956,15 +1957,98 @@ async function deleteTestTile(id) {
 }
 
 // ---- Firings ----
-function printFiringLog() {
+let firingMediaGeneration = 0;
+const firingMediaViews = new Map();
+function clearFiringMedia(scope) {
+  if (!scope) firingMediaGeneration++;
+  const lightbox = document.getElementById('lightboxImg');
+  for (const [key, view] of firingMediaViews) {
+    if (scope && key !== scope) continue;
+    view.active = false;
+    view.controller.abort();
+    if (view.urls.includes(lightbox?.src)) { lightbox.removeAttribute('src'); closeLightbox(); }
+    view.urls.forEach(url => URL.revokeObjectURL(url));
+    view.images.forEach(img => { img.removeAttribute('src'); img.dataset.protectedReady = '0'; });
+    firingMediaViews.delete(key);
+  }
+  if (!scope) {
+    firingRequests.clear();
+    pendingFiringPhotos = [];
+    if (pendingFiringUrls.has(lightbox?.src)) { lightbox.removeAttribute('src'); closeLightbox(); }
+    if (typeof firingPhotoReorderState !== 'undefined') firingPhotoReorderState = { firingId: null, photos: [] };
+    pendingFiringUrls.forEach(url => URL.revokeObjectURL(url)); pendingFiringUrls.clear();
+    firingPrintWindows.forEach(w => { try { w.close(); } catch (_) {} }); firingPrintWindows.clear();
+    ['firingList', 'firingViewBody', 'firingPhotosContainer', 'firingPhotoReorderContent'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+    ['firingViewModal','firingModal','firingPhotoReorderModal'].forEach(id => document.getElementById(id)?.classList.remove('open'));
+  }
+}
+function firingPhotoMarkup(firing, photo, style = '') {
+  const protectedPhoto = photo.photoDelivery === 'owner-protected' || firing.photoDelivery === 'owner-protected';
+  const attrs = protectedPhoto
+    ? 'data-private-firing-photo="' + esc(photo.id) + '" data-firing-id="' + esc(firing.id) + '" data-protected-ready="0"'
+    : 'src="/uploads/' + encodeURIComponent(photo.filename) + '"';
+  return '<img ' + attrs + ' class="firing-thumb" alt="Firing photo" style="' + style + '" onclick="event.stopPropagation();if(this.src)openLightbox(this.src)">';
+}
+async function loadFiringMedia(scope) {
+  clearFiringMedia(scope);
+  const root = document.getElementById(scope);
+  if (!root) return;
+  const generation = firingMediaGeneration, sessionToken = token;
+  const view = { active: true, controller: new AbortController(), urls: [], images: [...root.querySelectorAll('[data-private-firing-photo]')] };
+  firingMediaViews.set(scope, view);
+  const active = img => view.active && generation === firingMediaGeneration && token === sessionToken && img.isConnected;
+  await Promise.all(view.images.map(async img => {
+    try {
+      const response = await fetch(API + '/api/ql/firing-logs/' + encodeURIComponent(img.dataset.firingId) + '/photos/' + encodeURIComponent(img.dataset.privateFiringPhoto), {
+        headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store', signal: view.controller.signal
+      });
+      if (!response.ok) throw new Error('Photo unavailable');
+      const blob = await response.blob();
+      if (!active(img)) return;
+      const url = URL.createObjectURL(blob);
+      view.urls.push(url);
+      img.src = url;
+      img.dataset.protectedReady = '1';
+      img.onerror = () => { img.removeAttribute('src'); img.alt = 'Photo unavailable'; };
+    } catch (_) { if (active(img)) { img.removeAttribute('src'); img.alt = 'Photo unavailable'; } }
+  }));
+}
+
+
+const firingRequests = new Map();
+const pendingFiringUrls = new Set();
+const firingPrintWindows = new Set();
+function beginFiringRequest(scope) {
+  const marker = {}, generation = firingMediaGeneration, sessionToken = token;
+  firingRequests.set(scope, marker);
+  return () => firingRequests.get(scope) === marker && generation === firingMediaGeneration && sessionToken === token;
+}
+function closeFiringMediaScope(scope) {
+  firingRequests.delete(scope); clearFiringMedia(scope);
+  if (scope === 'firingPhotosContainer') {
+    const lightbox = document.getElementById('lightboxImg');
+    if (pendingFiringUrls.has(lightbox?.src)) { lightbox.removeAttribute('src'); closeLightbox(); }
+    pendingFiringUrls.forEach(url => URL.revokeObjectURL(url)); pendingFiringUrls.clear();
+    pendingFiringPhotos = [];
+  }
+}
+
+
+async function printFiringLog() {
+  const generation = firingMediaGeneration, sessionToken = token;
   const el = document.getElementById('firingList');
   const w = window.open('', '_blank');
-  w.document.write('<html><head><title>Kiln Journal</title><style>body{font-family:Georgia,serif;padding:20px;max-width:800px;margin:0 auto}h1{font-size:1.4rem}.card{border:1px solid #ddd;padding:12px;margin-bottom:8px;border-radius:6px;page-break-inside:avoid}strong{color:#333}.text-sm{font-size:0.85rem;color:#666}@media print{body{padding:0}}</style></head><body>');
-  w.document.write('<h1>🔥 Kiln Journal — The Potter\'s Mud Room</h1>');
-  w.document.write(el ? el.innerHTML : '<p>No firing records</p>');
-  w.document.write('</body></html>');
+  if (!w) return;
+  firingPrintWindows.add(w);
+  await loadFiringMedia('firingList');
+  if (generation !== firingMediaGeneration || token !== sessionToken || w.closed) return;
+  w.document.open();
+  w.document.write('<html><head><title>Kiln Journal</title><style>body{font-family:Georgia,serif;padding:20px;max-width:800px;margin:0 auto}h1{font-size:1.4rem}.card{border:1px solid #ddd;padding:12px;margin-bottom:8px;border-radius:6px;page-break-inside:avoid}strong{color:#333}.text-sm{font-size:0.85rem;color:#666}@media print{body{padding:0}}</style></head><body>' +
+    '<h1>🔥 Kiln Journal — The Potter\'s Mud Room</h1>' +
+    (el ? el.innerHTML : '<p>No firing records</p>') + '</body></html>');
   w.document.close();
-  w.print();
+  await Promise.all([...w.document.images].map(img => img.decode ? img.decode().catch(() => {}) : Promise.resolve()));
+  if (generation === firingMediaGeneration && token === sessionToken && !w.closed) w.print();
 }
 function firingListView(f) {
   const checkbox = isBulkSelectionActive('firings') ? '<input type="checkbox" id="bulkCheck_'+f.id+'" style="width:20px;height:20px;cursor:pointer;margin-right:8px;accent-color:var(--primary)" '+(bulkSelectionMode.firings.selected.has(f.id)?'checked ':'')+' onchange="toggleBulkSelect(\'firings\',\''+f.id+'\', event)">' : '';
@@ -1984,7 +2068,7 @@ function firingListView(f) {
 }
 
 function firingCardView(f) {
-  const photosHtml = (f.photos && f.photos.length > 0) ? '<div style="display:flex;gap:6px;margin:8px 0">' + f.photos.map(p => '<img src="/uploads/' + p.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')">').join('') + '</div>' : '';
+  const photosHtml = (f.photos && f.photos.length > 0) ? '<div style="display:flex;gap:6px;margin:8px 0">' + f.photos.map(p => firingPhotoMarkup(f, p, 'width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in')).join('') + '</div>' : '';
   const checkbox = renderBulkCheckbox('firings', f.id);
   const actions = isBulkSelectionActive('firings') ? '' :
     '<div style="display:flex;gap:4px;flex-shrink:0"><button onclick="event.stopPropagation();editFiring(\'' + f.id + '\')" class="btn-small" title="Edit">✎</button><button onclick="event.stopPropagation();deleteFiring(\'' + f.id + '\')" class="btn-small" title="Delete">✕</button></div>';
@@ -2009,9 +2093,12 @@ function firingCardView(f) {
 }
 
 async function loadFirings() {
+  const active = beginFiringRequest('firingList');
   try {
     const sort = document.getElementById('firingSort')?.value || 'firing_date';
     const firings = await api('/api/firing-logs?sort=' + encodeURIComponent(sort));
+    if (!active()) return;
+    clearFiringMedia('firingList');
     const c = document.getElementById('firingList'), em = document.getElementById('firingEmpty');
     
     // Render bulk controls
@@ -2027,12 +2114,15 @@ async function loadFirings() {
     } else {
       c.innerHTML = firings.map(f => firingCardView(f)).join('');
     }
+    loadFiringMedia('firingList');
     updateBulkSelectionUI('firings');
   } catch(e) { toast(e.message,'error'); }
 }
 let pendingFiringPhotos = [];
 
 function openFiringModal(f = null) {
+  closeFiringMediaScope('firingPhotosContainer');
+  pendingFiringUrls.forEach(url => URL.revokeObjectURL(url)); pendingFiringUrls.clear();
   document.getElementById('firingId').value = f?.id || '';
   document.getElementById('firingType').value = f?.firing_type || 'bisque';
   document.getElementById('firingDate').value = f?.date || new Date().toISOString().split('T')[0];
@@ -2055,7 +2145,9 @@ function openFiringModal(f = null) {
   document.getElementById('firingNotes').value = f?.notes || '';
   const csd = document.getElementById('firingCustomSpeedDetail');
   if (csd) { csd.value = f?.custom_speed_detail || ''; csd.parentElement.classList.toggle('hidden', f?.firing_speed !== 'custom'); }
+  const pickerGeneration = firingMediaGeneration, pickerToken = token;
   api('/api/pieces').then(pieces => {
+    if (pickerGeneration !== firingMediaGeneration || pickerToken !== token) return;
     const s = document.getElementById('firingPiece');
     s.innerHTML = '<option value="">Select piece (optional)...</option>' + pieces.map(p => '<option value="' + p.id + '"' + (f?.piece_id === p.id ? ' selected' : '') + '>' + esc(p.title||'Untitled') + '</option>').join('');
   });
@@ -2070,8 +2162,11 @@ function openFiringModal(f = null) {
 }
 
 async function loadFiringPhotos(firingId) {
+  const active = beginFiringRequest('firingPhotosContainer');
   try {
     const photos = await api('/api/firing-logs/' + firingId + '/photos');
+    if (!active()) return;
+    clearFiringMedia('firingPhotosContainer');
     const cont = document.getElementById('firingPhotosContainer');
     if (!photos || photos.length === 0) {
       cont.innerHTML = '';
@@ -2079,10 +2174,11 @@ async function loadFiringPhotos(firingId) {
     }
     cont.innerHTML = photos.map(p => 
       '<div style="position:relative;display:inline-block;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">' +
-      '<img src="/uploads/' + p.filename + '" style="width:100px;height:100px;object-fit:cover;cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')">' +
-      '<button class="btn-ghost btn-sm" style="position:absolute;top:0;right:0;font-size:0.8rem;background:rgba(0,0,0,0.5);color:white" onclick="deleteFiringPhoto(\'' + p.id + '\');loadFiringPhotos(\'' + firingId + '\')">×</button>' +
+      firingPhotoMarkup({id:firingId}, p, 'width:100px;height:100px;object-fit:cover;cursor:zoom-in') +
+      '<button class="btn-ghost btn-sm" style="position:absolute;top:0;right:0;font-size:0.8rem;background:rgba(0,0,0,0.5);color:white" onclick="deleteFiringPhoto(\'' + p.id + '\').then(()=>loadFiringPhotos(\'' + firingId + '\'))">×</button>' +
       '</div>'
     ).join('');
+    loadFiringMedia('firingPhotosContainer');
   } catch(e) { console.error('Error loading firing photos:', e); }
 }
 
@@ -2108,7 +2204,7 @@ async function uploadFiringPhotos(event) {
       pendingFiringPhotos.push(file);
       const idx = pendingFiringPhotos.length - 1;
       console.log('[uploadFiringPhotos] Added file to pending:', file.name, 'idx:', idx);
-      const url = URL.createObjectURL(file);
+      const url = URL.createObjectURL(file); pendingFiringUrls.add(url);
       const wrap = document.createElement('div');
       wrap.style.cssText = 'position:relative;display:inline-block;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden';
       wrap.dataset.pendingIdx = idx;
@@ -2121,7 +2217,7 @@ async function uploadFiringPhotos(event) {
       btn.className = 'btn-ghost btn-sm';
       btn.style.cssText = 'position:absolute;top:0;right:0;font-size:0.8rem;background:rgba(0,0,0,0.5);color:white';
       btn.textContent = '×';
-      btn.onclick = () => { pendingFiringPhotos[idx] = null; wrap.remove(); };
+      btn.onclick = () => { pendingFiringPhotos[idx] = null; URL.revokeObjectURL(url); pendingFiringUrls.delete(url); wrap.remove(); };
       wrap.appendChild(img);
       wrap.appendChild(btn);
       cont.appendChild(wrap);
@@ -2143,16 +2239,18 @@ async function deleteFiringPhoto(photoId) {
 }
 
 function editFiring(id) {
+  const active = beginFiringRequest('firingPhotosContainer');
   api('/api/firing-logs').then(firings => {
     const f = firings.find(f => f.id === id);
-    if (f) { closeModal('firingViewModal'); openFiringModal(f); }
+    if (active() && f) { closeModal('firingViewModal'); openFiringModal(f); }
   });
 }
 
 function viewFiring(id) {
+  const active = beginFiringRequest('firingViewBody');
   api('/api/firing-logs').then(async firings => {
     const f = firings.find(f => f.id === id);
-    if (!f) return;
+    if (!active() || !f) return;
     const df = (label, val) => val ? '<div class="detail-row"><span class="detail-label">' + esc(label) + '</span><span class="detail-value">' + esc(String(val)) + '</span></div>' : '';
     let photosHtml = '';
     let photos = [];
@@ -2164,10 +2262,12 @@ function viewFiring(id) {
           photosHtml += '<button class="btn btn-sm btn-secondary" onclick="openFiringPhotoReorder(\'' + f.id + '\')" style="margin-bottom:8px"><span style="font-size:1rem">⇅</span> Rearrange Photos</button>';
         }
         photosHtml += '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-          photos.map(p => '<img src="/uploads/' + p.filename + '" style="width:90px;height:90px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')">').join('') +
+          photos.map(p => firingPhotoMarkup(f, p, 'width:90px;height:90px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in')).join('') +
           '</div></div>';
       }
     } catch(e) {}
+    if (!active()) return;
+    clearFiringMedia('firingViewBody');
     document.getElementById('firingViewBody').innerHTML =
       df('Type', f.firing_type) +
       df('Date', fmtDate(f.date)) +
@@ -2187,6 +2287,7 @@ function viewFiring(id) {
     document.getElementById('firingViewEditBtn').onclick = () => editFiring(f.id);
     document.getElementById('firingViewDeleteBtn').onclick = () => { closeModal('firingViewModal'); deleteFiring(f.id); };
     openModal('firingViewModal');
+    loadFiringMedia('firingViewBody');
   });
 }
 
@@ -2206,8 +2307,10 @@ let firingPhotoReorderState = {
 };
 
 async function openFiringPhotoReorder(firingId) {
+  const active = beginFiringRequest('firingPhotoReorderContent');
   try {
     const photos = await api('/api/firing-logs/' + firingId + '/photos');
+    if (!active()) return;
     if (!photos || photos.length < 2) {
       toast('Need at least 2 photos to rearrange', 'error');
       return;
@@ -2229,7 +2332,7 @@ function renderFiringPhotoReorder() {
     photos.map((p, index) => 
       '<div class="photo-reorder-item" style="display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--bg-card)">' +
         '<div style="font-weight:600;color:var(--text-light);min-width:30px">' + (index + 1) + '</div>' +
-        '<img src="/uploads/' + p.filename + '" style="width:60px;height:60px;object-fit:cover;border-radius:4px">' +
+        firingPhotoMarkup({id:firingPhotoReorderState.firingId}, p, 'width:60px;height:60px;object-fit:cover;border-radius:4px') +
         '<div style="flex:1">' +
           '<div style="font-size:0.9rem;color:var(--text-light)">' + (index === 0 ? 'Main Photo' : 'Photo ' + (index + 1)) + '</div>' +
           (index === 0 ? '<div style="font-size:0.75rem;color:var(--text-muted)">Shows on firing detail</div>' : '') +
@@ -2242,7 +2345,9 @@ function renderFiringPhotoReorder() {
     ).join('') +
     '</div>';
   
+  clearFiringMedia('firingPhotoReorderContent');
   document.getElementById('firingPhotoReorderContent').innerHTML = html;
+  loadFiringMedia('firingPhotoReorderContent');
 }
 
 function moveFiringPhoto(index, direction) {
@@ -3950,6 +4055,7 @@ async function redeemPromo() {
   try {
     const d = await api('/api/promo/redeem', { method:'POST', body: { code } });
     toast(d.message, 'success');
+    if (d.token) clearFiringMedia();
     if (d.token) { clearComboMedia(); token = d.token; localStorage.setItem('mudlog_token', d.token); }
     const me = await api('/api/auth/me'); currentUser = me.user; showApp(); navigate('upgrade');
   } catch(e) { toast(e.message,'error'); }

@@ -1975,6 +1975,30 @@ function protectPieceHistoryTestTileMedia(history) {
   for (const entry of history.history || []) if (entry?.recordType === 'test-tile' && entry.values) testTileMediaContract(entry.values);
   return history;
 }
+app.get('/api/ql/firing-logs/:firingId/photos/:photoId', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  res.set('X-Content-Type-Options', 'nosniff');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const photo = db.prepare(`SELECT ph.* FROM firing_photos ph JOIN firing_logs c ON c.id=ph.firing_id
+      WHERE ph.id=? AND c.id=? AND c.user_id=?`).get(req.params.photoId, req.params.firingId, req.userId);
+    if (!photo) return unavailable();
+    const target = safeStoredUpload(photo.filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(photo.filename)) return unavailable();
+    const owned = ownedPhotoSlots(photo.filename, req.userId);
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(photo.filename);
+        if (rows.some(row => !owned.some(slot => slot.table === table && slot.column === column && slot.id === row.id))) return unavailable();
+      }
+    }
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
+
 app.get('/api/ql/glazes/:glazeId/photos/:photoId', auth, (req, res) => {
   res.set('Cache-Control', 'private, no-store');
   const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
@@ -2854,15 +2878,21 @@ app.put('/api/pieces/:id/photos/reorder', auth, (req, res) => {
   res.json({ success: true });
 });
 
+function firingPhotoContract(photo) {
+  return { ...photo, photoDelivery: 'owner-protected', photoVisibility: 'legacy-ambiguous' };
+}
 app.put('/api/firing-logs/:id/photos/reorder', auth, (req, res) => {
   const { photoIds } = req.body;
-  if (!Array.isArray(photoIds)) return res.status(400).json({ error: 'photoIds must be an array' });
-  const log = db.prepare('SELECT * FROM firing_logs WHERE id=? AND user_id=?').get(req.params.id, req.userId);
-  if (!log) return res.status(404).json({ error: 'Firing log not found' });
-  photoIds.forEach((photoId, index) => {
-    db.prepare('UPDATE firing_photos SET sort_order=? WHERE id=? AND firing_id=?').run(index, photoId, req.params.id);
-  });
-  res.json({ success: true });
+  try {
+    const status = db.transaction(() => {
+      if (!db.prepare('SELECT id FROM firing_logs WHERE id=? AND user_id=?').get(req.params.id, req.userId)) return 404;
+      const ids = db.prepare('SELECT id FROM firing_photos WHERE firing_id=?').all(req.params.id).map(p => p.id);
+      if (!Array.isArray(photoIds) || photoIds.length !== ids.length || new Set(photoIds).size !== ids.length || photoIds.some(id => !ids.includes(id))) return 400;
+      photoIds.forEach((id, i) => db.prepare('UPDATE firing_photos SET sort_order=? WHERE id=? AND firing_id=?').run(i, id, req.params.id));
+      return 200;
+    }).immediate();
+    res.status(status).json(status === 200 ? { success: true } : { error: status === 404 ? 'Not found' : 'Invalid photo order' });
+  } catch (_) { res.status(500).json({ error: 'Could not reorder photos' }); }
 });
 
 // ============ FIRING LOGS ============
@@ -2878,7 +2908,7 @@ app.get('/api/firing-logs', auth, (req, res) => {
   const firings = db.prepare(sql).all(req.userId);
   const result = firings.map(f => {
     const photos = db.prepare('SELECT id,filename FROM firing_photos WHERE firing_id=? ORDER BY sort_order ASC').all(f.id);
-    return { ...f, photos };
+    return { ...f, photoDelivery: 'owner-protected', photoVisibility: 'legacy-ambiguous', photos: photos.map(firingPhotoContract) };
   });
   res.json(result);
 });
@@ -2887,7 +2917,7 @@ app.get('/api/firing-logs/:id', auth, (req, res) => {
   const log = db.prepare('SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id AND p.user_id=fl.user_id WHERE fl.id=? AND fl.user_id=?').get(req.params.id, req.userId);
   if (!log) return res.status(404).json({ error: 'Not found' });
   const photos = db.prepare('SELECT id,filename FROM firing_photos WHERE firing_id=? ORDER BY sort_order ASC').all(req.params.id);
-  res.json({ ...log, photos });
+  res.json({ ...log, photoDelivery: 'owner-protected', photoVisibility: 'legacy-ambiguous', photos: photos.map(firingPhotoContract) });
 });
 
 app.post('/api/firing-logs', auth, (req, res) => {
@@ -2938,21 +2968,29 @@ app.delete('/api/firing-logs/:id', auth, (req, res) => {
 
 // Firing photos upload
 app.post('/api/firing-logs/:id/photos', auth, upload.array('photos', 3), (req, res) => {
-  if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
-  const log = db.prepare('SELECT id FROM firing_logs WHERE id=? AND user_id=?').get(req.params.id, req.userId);
-  if (!log) {
+  if (!req.files?.length) return res.status(400).json({ error: 'No files uploaded' });
+  try {
+    const result = db.transaction(() => {
+      if (!db.prepare('SELECT id FROM firing_logs WHERE id=? AND user_id=?').get(req.params.id, req.userId)) return null;
+      const target = req.body.replacePhotoId && db.prepare('SELECT * FROM firing_photos WHERE id=? AND firing_id=?').get(req.body.replacePhotoId, req.params.id);
+      if (req.body.replacePhotoId && (!target || req.files.length !== 1)) return null;
+      const next = db.prepare('SELECT COALESCE(MAX(sort_order), -1)+1 AS n FROM firing_photos WHERE firing_id=?').get(req.params.id).n;
+      const photos = req.files.map((file, i) => {
+        const id = target ? target.id : uuidv4();
+        if (target) db.prepare('UPDATE firing_photos SET filename=?,original_name=? WHERE id=? AND firing_id=?').run(file.filename, file.originalname, id, req.params.id);
+        else db.prepare('INSERT INTO firing_photos (id,firing_id,filename,original_name,sort_order) VALUES (?,?,?,?,?)').run(id, req.params.id, file.filename, file.originalname, next+i);
+        return firingPhotoContract({ id, filename: file.filename });
+      });
+      return { photos, old: target ? [target.filename] : [] };
+    }).immediate();
+    if (!result) { cleanupRequestUploads(req.files); return res.status(404).json({ error: 'Not found' }); }
+    deletionLifecycle.cleanupFiles(result.old);
+    res.json(result.photos);
+  } catch (_) {
+    // Reference-aware cleanup also preserves uploads if a later response fails after commit.
     cleanupRequestUploads(req.files);
-    return res.status(404).json({ error: 'Firing log not found' });
+    res.status(500).json({ error: 'Could not save firing photos' });
   }
-  const nextSortOrder = db.prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM firing_photos WHERE firing_id=?').get(req.params.id).next;
-  const photos = [];
-  req.files.forEach((file, idx) => {
-    const photoId = uuidv4();
-    db.prepare('INSERT INTO firing_photos (id,firing_id,filename,original_name,sort_order) VALUES (?,?,?,?,?)')
-      .run(photoId, req.params.id, file.filename, file.originalname, nextSortOrder + idx);
-    photos.push({ id: photoId, filename: file.filename });
-  });
-  res.json(photos);
 });
 
 // Get firing photos
@@ -2960,7 +2998,7 @@ app.get('/api/firing-logs/:id/photos', auth, (req, res) => {
   const log = db.prepare('SELECT id FROM firing_logs WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!log) return res.status(404).json({ error: 'Firing log not found' });
   const photos = db.prepare('SELECT * FROM firing_photos WHERE firing_id=? ORDER BY sort_order').all(req.params.id);
-  res.json(photos);
+  res.json(photos.map(firingPhotoContract));
 });
 
 // Delete firing photo
