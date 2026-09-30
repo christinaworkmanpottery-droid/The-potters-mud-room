@@ -46,6 +46,10 @@ function isSpecialGrandfatheredUser(user) {
   return !!user && user.tier === 'starter' && isSpecialGrandfatheredEmail(user.email);
 }
 
+function isAdminGrantedUser(user) {
+  return !!user && user.tier === 'starter' && user.admin_granted_access === 1;
+}
+
 function isGrandfatheredPaidUser(user) {
   return !!user
     && user.tier === 'starter'
@@ -57,6 +61,8 @@ function isGrandfatheredPaidUser(user) {
 
 function compatibleBillingPeriod(user) {
   if (!user) return null;
+  // Legacy clients use this display marker for paid-equivalent access, never provider evidence.
+  if (isAdminGrantedUser(user)) return 'stripe-monthly';
   if (user.billing_period === 'promo' || user.billing_period === 'yearly') return user.billing_period;
   if (isSpecialGrandfatheredUser(user)
       && (user.billing_period === 'monthly' || user.billing_period == null || user.billing_period === 'stripe-monthly')) {
@@ -139,9 +145,11 @@ function isIAPActive(db, userId) {
  */
 function hasPremiumAccess(db, userId) {
   const u = db.prepare(
-    'SELECT email, tier, billing_period, plan_expires_at, iap_expires_at FROM users WHERE id=?'
+    'SELECT * FROM users WHERE id=?'
   ).get(userId);
   if (!u) return false;
+
+  if (isAdminGrantedUser(u)) return true;
 
   // Promo / beta
   if (u.billing_period === 'promo') return true;
@@ -585,6 +593,7 @@ module.exports = {
   isSpecialGrandfatheredEmail,
   isSpecialGrandfatheredUser,
   isGrandfatheredPaidUser,
+  isAdminGrantedUser,
   compatibleBillingPeriod,
   normalizeSpecialAccountBilling,
 };

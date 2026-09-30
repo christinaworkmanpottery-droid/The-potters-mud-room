@@ -5451,7 +5451,7 @@
     },
     {
       "name": "users",
-      "sql": "CREATE TABLE users (\n      id TEXT PRIMARY KEY,\n      email TEXT UNIQUE NOT NULL,\n      password_hash TEXT NOT NULL,\n      display_name TEXT,\n      bio TEXT,\n      location TEXT,\n      website TEXT,\n      avatar_filename TEXT,\n      is_private INTEGER DEFAULT 0,\n      tier TEXT DEFAULT 'free' CHECK(tier IN ('free', 'basic', 'mid', 'top', 'starter')),\n      forum_tokens INTEGER DEFAULT 0,\n      unlimited_tokens_until TEXT,\n      stripe_customer_id TEXT,\n      stripe_subscription_id TEXT,\n      billing_period TEXT DEFAULT 'monthly' CHECK(billing_period IN ('monthly', 'yearly', 'promo')),\n      plan_expires_at TEXT,\n      referral_code TEXT UNIQUE,\n      referred_by TEXT,\n      unit_system TEXT DEFAULT 'imperial' CHECK(unit_system IN ('imperial', 'metric')),\n      temp_unit TEXT DEFAULT 'fahrenheit' CHECK(temp_unit IN ('fahrenheit', 'celsius')),\n      newsletter_subscribed INTEGER DEFAULT 1,\n      created_at TEXT DEFAULT (datetime('now')),\n      updated_at TEXT DEFAULT (datetime('now'))\n    , profile_photo TEXT, username TEXT, free_months_remaining INTEGER DEFAULT 0, is_beta_tester INTEGER DEFAULT 0, last_login TEXT DEFAULT NULL, iap_platform TEXT, iap_transaction_id TEXT, iap_expires_at INTEGER, shop_url TEXT, shop_url_2 TEXT, shop_url_3 TEXT, city TEXT, state_region TEXT, country TEXT, findable INTEGER DEFAULT 0, stores_migrated INTEGER DEFAULT 0, ai_tokens INTEGER DEFAULT 0, potter_type TEXT DEFAULT NULL, years_experience TEXT DEFAULT NULL, studio_type TEXT DEFAULT NULL, signup_source TEXT DEFAULT NULL, default_labor_rate REAL DEFAULT NULL)",
+      "sql": "CREATE TABLE users (\n      id TEXT PRIMARY KEY,\n      email TEXT UNIQUE NOT NULL,\n      password_hash TEXT NOT NULL,\n      display_name TEXT,\n      bio TEXT,\n      location TEXT,\n      website TEXT,\n      avatar_filename TEXT,\n      is_private INTEGER DEFAULT 0,\n      tier TEXT DEFAULT 'free' CHECK(tier IN ('free', 'basic', 'mid', 'top', 'starter')),\n      forum_tokens INTEGER DEFAULT 0,\n      unlimited_tokens_until TEXT,\n      stripe_customer_id TEXT,\n      stripe_subscription_id TEXT,\n      billing_period TEXT DEFAULT 'monthly' CHECK(billing_period IN ('monthly', 'yearly', 'promo')),\n      admin_granted_access INTEGER NOT NULL DEFAULT 0 CHECK(admin_granted_access IN (0,1)),\n      plan_expires_at TEXT,\n      referral_code TEXT UNIQUE,\n      referred_by TEXT,\n      unit_system TEXT DEFAULT 'imperial' CHECK(unit_system IN ('imperial', 'metric')),\n      temp_unit TEXT DEFAULT 'fahrenheit' CHECK(temp_unit IN ('fahrenheit', 'celsius')),\n      newsletter_subscribed INTEGER DEFAULT 1,\n      created_at TEXT DEFAULT (datetime('now')),\n      updated_at TEXT DEFAULT (datetime('now'))\n    , profile_photo TEXT, username TEXT, free_months_remaining INTEGER DEFAULT 0, is_beta_tester INTEGER DEFAULT 0, last_login TEXT DEFAULT NULL, iap_platform TEXT, iap_transaction_id TEXT, iap_expires_at INTEGER, shop_url TEXT, shop_url_2 TEXT, shop_url_3 TEXT, city TEXT, state_region TEXT, country TEXT, findable INTEGER DEFAULT 0, stores_migrated INTEGER DEFAULT 0, ai_tokens INTEGER DEFAULT 0, potter_type TEXT DEFAULT NULL, years_experience TEXT DEFAULT NULL, studio_type TEXT DEFAULT NULL, signup_source TEXT DEFAULT NULL, default_labor_rate REAL DEFAULT NULL)",
       "columns": [
         {
           "cid": 0,
@@ -5575,6 +5575,14 @@
         },
         {
           "cid": 15,
+          "name": "admin_granted_access",
+          "type": "INTEGER",
+          "notnull": 1,
+          "dflt_value": "0",
+          "pk": 0
+        },
+        {
+          "cid": 16,
           "name": "plan_expires_at",
           "type": "TEXT",
           "notnull": 0,
@@ -5582,7 +5590,7 @@
           "pk": 0
         },
         {
-          "cid": 16,
+          "cid": 17,
           "name": "referral_code",
           "type": "TEXT",
           "notnull": 0,
@@ -5590,7 +5598,7 @@
           "pk": 0
         },
         {
-          "cid": 17,
+          "cid": 18,
           "name": "referred_by",
           "type": "TEXT",
           "notnull": 0,
@@ -5598,7 +5606,7 @@
           "pk": 0
         },
         {
-          "cid": 18,
+          "cid": 19,
           "name": "unit_system",
           "type": "TEXT",
           "notnull": 0,
@@ -5606,7 +5614,7 @@
           "pk": 0
         },
         {
-          "cid": 19,
+          "cid": 20,
           "name": "temp_unit",
           "type": "TEXT",
           "notnull": 0,
@@ -5614,7 +5622,7 @@
           "pk": 0
         },
         {
-          "cid": 20,
+          "cid": 21,
           "name": "newsletter_subscribed",
           "type": "INTEGER",
           "notnull": 0,
@@ -5622,7 +5630,7 @@
           "pk": 0
         },
         {
-          "cid": 21,
+          "cid": 22,
           "name": "created_at",
           "type": "TEXT",
           "notnull": 0,
@@ -5630,7 +5638,7 @@
           "pk": 0
         },
         {
-          "cid": 22,
+          "cid": 23,
           "name": "updated_at",
           "type": "TEXT",
           "notnull": 0,
@@ -5638,7 +5646,7 @@
           "pk": 0
         },
         {
-          "cid": 23,
+          "cid": 24,
           "name": "profile_photo",
           "type": "TEXT",
           "notnull": 0,
@@ -5646,7 +5654,7 @@
           "pk": 0
         },
         {
-          "cid": 24,
+          "cid": 25,
           "name": "username",
           "type": "TEXT",
           "notnull": 0,
@@ -5654,7 +5662,7 @@
           "pk": 0
         },
         {
-          "cid": 25,
+          "cid": 26,
           "name": "free_months_remaining",
           "type": "INTEGER",
           "notnull": 0,
@@ -5662,7 +5670,7 @@
           "pk": 0
         },
         {
-          "cid": 26,
+          "cid": 27,
           "name": "is_beta_tester",
           "type": "INTEGER",
           "notnull": 0,
@@ -5670,7 +5678,7 @@
           "pk": 0
         },
         {
-          "cid": 27,
+          "cid": 28,
           "name": "last_login",
           "type": "TEXT",
           "notnull": 0,
@@ -5678,7 +5686,7 @@
           "pk": 0
         },
         {
-          "cid": 28,
+          "cid": 29,
           "name": "iap_platform",
           "type": "TEXT",
           "notnull": 0,
@@ -5686,7 +5694,7 @@
           "pk": 0
         },
         {
-          "cid": 29,
+          "cid": 30,
           "name": "iap_transaction_id",
           "type": "TEXT",
           "notnull": 0,
@@ -5694,7 +5702,7 @@
           "pk": 0
         },
         {
-          "cid": 30,
+          "cid": 31,
           "name": "iap_expires_at",
           "type": "INTEGER",
           "notnull": 0,
@@ -5702,7 +5710,7 @@
           "pk": 0
         },
         {
-          "cid": 31,
+          "cid": 32,
           "name": "shop_url",
           "type": "TEXT",
           "notnull": 0,
@@ -5710,7 +5718,7 @@
           "pk": 0
         },
         {
-          "cid": 32,
+          "cid": 33,
           "name": "shop_url_2",
           "type": "TEXT",
           "notnull": 0,
@@ -5718,7 +5726,7 @@
           "pk": 0
         },
         {
-          "cid": 33,
+          "cid": 34,
           "name": "shop_url_3",
           "type": "TEXT",
           "notnull": 0,
@@ -5726,7 +5734,7 @@
           "pk": 0
         },
         {
-          "cid": 34,
+          "cid": 35,
           "name": "city",
           "type": "TEXT",
           "notnull": 0,
@@ -5734,7 +5742,7 @@
           "pk": 0
         },
         {
-          "cid": 35,
+          "cid": 36,
           "name": "state_region",
           "type": "TEXT",
           "notnull": 0,
@@ -5742,7 +5750,7 @@
           "pk": 0
         },
         {
-          "cid": 36,
+          "cid": 37,
           "name": "country",
           "type": "TEXT",
           "notnull": 0,
@@ -5750,7 +5758,7 @@
           "pk": 0
         },
         {
-          "cid": 37,
+          "cid": 38,
           "name": "findable",
           "type": "INTEGER",
           "notnull": 0,
@@ -5758,7 +5766,7 @@
           "pk": 0
         },
         {
-          "cid": 38,
+          "cid": 39,
           "name": "stores_migrated",
           "type": "INTEGER",
           "notnull": 0,
@@ -5766,7 +5774,7 @@
           "pk": 0
         },
         {
-          "cid": 39,
+          "cid": 40,
           "name": "ai_tokens",
           "type": "INTEGER",
           "notnull": 0,
@@ -5774,7 +5782,7 @@
           "pk": 0
         },
         {
-          "cid": 40,
+          "cid": 41,
           "name": "potter_type",
           "type": "TEXT",
           "notnull": 0,
@@ -5782,7 +5790,7 @@
           "pk": 0
         },
         {
-          "cid": 41,
+          "cid": 42,
           "name": "years_experience",
           "type": "TEXT",
           "notnull": 0,
@@ -5790,7 +5798,7 @@
           "pk": 0
         },
         {
-          "cid": 42,
+          "cid": 43,
           "name": "studio_type",
           "type": "TEXT",
           "notnull": 0,
@@ -5798,7 +5806,7 @@
           "pk": 0
         },
         {
-          "cid": 43,
+          "cid": 44,
           "name": "signup_source",
           "type": "TEXT",
           "notnull": 0,
@@ -5806,7 +5814,7 @@
           "pk": 0
         },
         {
-          "cid": 44,
+          "cid": 45,
           "name": "default_labor_rate",
           "type": "REAL",
           "notnull": 0,

@@ -67,6 +67,7 @@ function initDB() {
       stripe_customer_id TEXT,
       stripe_subscription_id TEXT,
       billing_period TEXT DEFAULT 'monthly' CHECK(billing_period IN ('monthly', 'yearly', 'promo')),
+      admin_granted_access INTEGER NOT NULL DEFAULT 0 CHECK(admin_granted_access IN (0,1)),
       plan_expires_at TEXT,
       referral_code TEXT UNIQUE,
       referred_by TEXT,
@@ -495,6 +496,7 @@ function initDB() {
   safeAdd('users', 'profile_photo', 'TEXT');
   safeAdd('users', 'username', 'TEXT');
   safeAdd('users', 'billing_period', "TEXT DEFAULT 'monthly'");
+  safeAdd('users', 'admin_granted_access', 'INTEGER NOT NULL DEFAULT 0 CHECK(admin_granted_access IN (0,1))');
   safeAdd('users', 'plan_expires_at', 'TEXT');
   safeAdd('firing_logs', 'custom_speed_detail', 'TEXT');
   safeAdd('glaze_combos', 'photo_filename2', 'TEXT');

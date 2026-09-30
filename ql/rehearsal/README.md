@@ -75,8 +75,7 @@ mobile source/tests are unchanged.
 Local root-only execution cannot spawn a non-root child (EINVAL). That assertion is explicitly
 BLOCKED locally, not skipped or passed. The exact-head Actions job runs as the hosted non-root
 runner and must execute media fetch + write-permission probes, restore permissions and recover.
-CI requires every named rehearsal check to PASS with zero incomplete checks; source-level
-release blockers below keep the **release/recovery acceptance decision BLOCKED** independently.
+CI requires every named rehearsal check to PASS with zero incomplete checks; any remaining source blockers independently keep the release decision blocked.
 
 ## Confirmed source blockers — no runtime fixes in this slice
 
@@ -89,12 +88,24 @@ release blockers below keep the **release/recovery acceptance decision BLOCKED**
    path, size and SHA-256. Clean-checkout validation runs before install/startup; fixture
    setup verifies the hash and never generates the original. Release/capture manifests
    include it naturally among tracked files. Restore semantics are unchanged.
-3. Source-specific startup assigns `stripe-monthly` despite the fresh `billing_period`
-   CHECK permitting monthly/yearly/promo. Reproduced in a separate synthetic account copy.
-   The SQLite build's read-only integrity_check returns ok while a writable-handle read-only
-   PRAGMA reports `CHECK constraint failed in users`. Exact offline state and explicit field
-   assertions remain necessary; read-only integrity alone is insufficient. A separate approved
-   maintenance audit must resolve the existing assignment/schema incompatibility, not redesign tiers.
+3. **Resolved in the special-account billing slice:** the exact three-account startup
+   policy stores canonical billing values while preserving historical compatibility.
+4. **Resolved in the Admin-granted billing slice:** both explicit Admin upgrade routes use
+   constrained writes and persistent `admin_granted_access` provenance. The rehearsal
+   executes both routes and injects invalid writes on the server connection to prove CHECK
+   enforcement remains enabled. No current-source Admin upgrade writer stores a legacy marker.
+
+Current schema inventory intentionally includes one additional Users column:
+`admin_granted_access INTEGER NOT NULL DEFAULT 0 CHECK(admin_granted_access IN (0,1))`.
+Historical fixtures omit it; exact offline restoration is checked before startup. Startup
+adds only this expected column with zero values, without inferring grants from billing or
+identity. Current QL fixture account `a` has value 1, preserved by exact restore and restarts.
+No table rebuild is introduced for this field. Fresh schema column ordinals shift by one;
+existing databases append the field through safeAdd. Both layouts are valid.
+
+The current expected backend count is 1,453, including 64 Admin-grant checks and 17 special-
+account checks. Rehearsal has 115 checks and requires PASS without source blockers in CI.
+This source result does not authorize production deployment or physical-device testing.
 
 ## Known limits
 

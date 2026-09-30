@@ -766,7 +766,7 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.get('/api/auth/me', auth, (req, res) => {
-  const u = db.prepare('SELECT id,email,display_name,username,bio,location,website,avatar_filename,is_private,tier,unit_system,temp_unit,referral_code,newsletter_subscribed,created_at,city,state_region,country,findable,billing_period,plan_expires_at FROM users WHERE id=?').get(req.userId);
+  const u = db.prepare('SELECT id,email,display_name,username,bio,location,website,avatar_filename,is_private,tier,unit_system,temp_unit,referral_code,newsletter_subscribed,created_at,city,state_region,country,findable,billing_period,admin_granted_access,plan_expires_at FROM users WHERE id=?').get(req.userId);
   if (!u) return res.status(404).json({ error: 'Not found' });
   // Ensure referral code exists
   if (!u.referral_code) {
@@ -781,7 +781,7 @@ app.get('/api/auth/me', auth, (req, res) => {
 
 // User subscription status (used by mobile app BillingScreen)
 app.get('/api/user/subscription', auth, async (req, res) => {
-  const u = db.prepare('SELECT tier, billing_period, plan_expires_at, stripe_subscription_id, stripe_customer_id, email, iap_platform, iap_expires_at FROM users WHERE id=?').get(req.userId);
+  const u = db.prepare('SELECT tier, billing_period, admin_granted_access, plan_expires_at, stripe_subscription_id, stripe_customer_id, email, iap_platform, iap_expires_at FROM users WHERE id=?').get(req.userId);
   if (!u) return res.status(404).json({ error: 'User not found' });
 
   let hasStripe = !!u.stripe_subscription_id;
@@ -1713,7 +1713,7 @@ app.delete('/api/admin/members/:id', auth, (req, res) => {
 app.get('/api/admin/members', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
-    const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, 
+    const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, admin_granted_access, plan_expires_at,
       avatar_filename, created_at, updated_at, stripe_customer_id, stripe_subscription_id 
       FROM users ORDER BY created_at DESC`).all().map(m => ({ ...m, billing_period: iap.compatibleBillingPeriod(m) }));
     const stats = {
@@ -1727,7 +1727,7 @@ app.get('/api/admin/members', auth, (req, res) => {
       const isUnlimited = m.tier === 'starter' || ['basic','mid','top'].includes(m.tier);
       if (isUnlimited) {
         const hasStripe = m.stripe_subscription_id && m.stripe_subscription_id !== '';
-        if (hasStripe || iap.isGrandfatheredPaidUser(m)) {
+        if (hasStripe || iap.isGrandfatheredPaidUser(m) || iap.isAdminGrantedUser(m)) {
           stats.byTier.paid++;
         } else {
           stats.byTier.gifted++;
@@ -4644,19 +4644,45 @@ app.post('/api/admin/announce', auth, (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Manually upgrade/fix a member (e.g. when Stripe webhook missed). Admin only.
-// Body: { tier, billingPeriod, stripeCustomerId, stripeSubscriptionId }
+// Explicit Admin access is independent of interval and payment-provider evidence.
+function adminUpgrade(user, body, targetTier, allowProviderUpdates) {
+  if (!['free', 'basic', 'mid', 'top', 'starter'].includes(targetTier)) {
+    return { status: 400, error: 'Invalid tier' };
+  }
+  const supplied = key => Object.prototype.hasOwnProperty.call(body, key);
+  if (supplied('billingPeriod') && !['monthly', 'yearly', 'promo'].includes(body.billingPeriod)) {
+    return { status: 400, error: 'Invalid billingPeriod' };
+  }
+  if (!user) return { status: 404, error: 'User not found' };
+  for (const key of ['stripeCustomerId', 'stripeSubscriptionId']) {
+    if (allowProviderUpdates && supplied(key) && body[key] !== null && (typeof body[key] !== 'string' || !body[key].trim())) {
+      return { status: 400, error: 'Invalid ' + key };
+    }
+  }
+  const billing = supplied('billingPeriod') ? body.billingPeriod
+    : user.billing_period === 'stripe-monthly' ? 'monthly' : user.billing_period;
+  const grant = targetTier === 'starter' ? 1 : targetTier === 'free' ? 0 : user.admin_granted_access;
+  // A single constrained statement is atomic even when a trigger or constraint fails.
+  const assignments = ['tier=?', 'billing_period=?', 'admin_granted_access=?'];
+  const values = [targetTier, billing, grant];
+  for (const [key, column] of [['stripeCustomerId', 'stripe_customer_id'], ['stripeSubscriptionId', 'stripe_subscription_id']]) {
+    if (allowProviderUpdates && supplied(key)) { assignments.push(column + '=?'); values.push(body[key]); }
+  }
+  db.prepare('UPDATE users SET ' + assignments.join(', ') + ' WHERE id=?').run(...values, user.id);
+  return { status: 200 };
+}
+
+// Explicit null is the supported provider-ID clear instruction; omission preserves.
 app.post('/api/admin/members/:id/upgrade', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
-    const { tier, billingPeriod, stripeCustomerId, stripeSubscriptionId } = req.body || {};
-    if (!tier) return res.status(400).json({ error: 'tier required' });
-    db.pragma('ignore_check_constraints = ON');
-    db.prepare(`UPDATE users SET tier=?, billing_period=?, stripe_customer_id=?, stripe_subscription_id=? WHERE id=?`)
-      .run(tier, billingPeriod || 'stripe-monthly', stripeCustomerId || null, stripeSubscriptionId || null, req.params.id);
-    db.pragma('ignore_check_constraints = OFF');
-    const u = db.prepare('SELECT id,email,tier,billing_period,stripe_customer_id,stripe_subscription_id FROM users WHERE id=?').get(req.params.id);
-    res.json({ success: true, user: u });
+    const body = req.body || {};
+    const target = db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id);
+    if (!target) return res.status(404).json({ error: 'User not found' });
+    const result = adminUpgrade(target, body, body.tier, true);
+    if (result.error) return res.status(result.status).json({ error: result.error });
+    const u = db.prepare('SELECT id,email,tier,billing_period,admin_granted_access,stripe_customer_id,stripe_subscription_id FROM users WHERE id=?').get(req.params.id);
+    res.json({ success: true, user: { ...u, billing_period: iap.compatibleBillingPeriod(u) } });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -4664,7 +4690,7 @@ app.get('/api/admin/members/search', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   const { q } = req.query;
   if (!q) return res.json([]);
-  const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, created_at 
+  const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, admin_granted_access, plan_expires_at, created_at
     FROM users WHERE email LIKE ? OR display_name LIKE ? ORDER BY created_at DESC LIMIT 20`).all('%'+q+'%', '%'+q+'%')
     .map(m => ({ ...m, billing_period: iap.compatibleBillingPeriod(m) }));
   res.json(members);
@@ -5193,20 +5219,20 @@ app.put('/api/admin/blog/:id/publish', auth, (req, res) => {
 
 // Remote admin: upgrade a user's tier by email (password-protected)
 app.post('/api/admin/upgrade-tier/remote', (req, res) => {
-  const { password, email, tier } = req.body;
+  const body = req.body || {};
+  const { password, email } = body;
   if (!process.env.ADMIN_BLOG_PASSWORD || password !== process.env.ADMIN_BLOG_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
-  if (!email) return res.status(400).json({ error: 'Email required' });
-  const targetTier = tier || 'starter';
+  if (typeof email !== 'string' || !email.trim()) return res.status(400).json({ error: 'Email required' });
+  const targetTier = Object.prototype.hasOwnProperty.call(body, 'tier') ? body.tier : 'starter';
   try {
-    db.pragma('ignore_check_constraints = ON');
-    const result = db.prepare('UPDATE users SET tier=?, billing_period=? WHERE LOWER(email)=?').run(targetTier, 'stripe-monthly', email.toLowerCase());
-    db.pragma('ignore_check_constraints = OFF');
-    if (result.changes === 0) return res.status(404).json({ error: 'User not found' });
+    const target = db.prepare('SELECT * FROM users WHERE LOWER(email)=?').get(email.toLowerCase());
+    if (!target) return res.status(404).json({ error: 'User not found' });
+    // Remote route has no interval-edit contract: validate input, then preserve storage.
+    if (Object.prototype.hasOwnProperty.call(body, 'billingPeriod') && !['monthly','yearly','promo'].includes(body.billingPeriod)) return res.status(400).json({error:'Invalid billingPeriod'});
+    const result = adminUpgrade(target, {}, targetTier, false);
+    if (result.error) return res.status(result.status).json({ error: result.error });
     res.json({ success: true, email, tier: targetTier });
-  } catch(e) {
-    db.pragma('ignore_check_constraints = OFF');
-    res.status(500).json({ error: e.message });
-  }
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // Admin blog via password (for remote management without JWT)

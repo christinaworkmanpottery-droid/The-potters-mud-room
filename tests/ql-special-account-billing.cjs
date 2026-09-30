@@ -234,8 +234,11 @@ test('fresh constrained server stores canonical values while preserving observab
   });
 });
 
-test('source keeps the separate Admin upgrade billing-integrity blocker untouched', () => {
+test('both Admin upgrade routes no longer bypass CHECK or default to legacy storage', () => {
   const source = fs.readFileSync(path.join(root,'server.js'),'utf8');
-  assert.match(source,/billingPeriod \|\| 'stripe-monthly'/);
-  assert.match(source,/run\(targetTier, 'stripe-monthly', email\.toLowerCase\(\)\)/);
+  for (const route of ['/api/admin/members/:id/upgrade','/api/admin/upgrade-tier/remote']) {
+    const body = source.slice(source.indexOf("app.post('"+route),source.indexOf("\n});",source.indexOf("app.post('"+route)));
+    assert.doesNotMatch(body,/ignore_check_constraints|billingPeriod \|\| 'stripe-monthly'/);
+    assert.match(body,/adminUpgrade/);
+  }
 });
