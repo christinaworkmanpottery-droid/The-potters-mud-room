@@ -4,8 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const app = fs.readFileSync(path.resolve(__dirname,'../public/app.js'),'utf8');
 
-test('website Event cards use contract-aware image markup',()=>assert.match(app,/eventImageMarkup\(e, 'photo-thumb'/));
-test('website Event detail uses contract-aware image markup',()=>assert.match(app,/eventImageMarkup\(e, 'detail-photo'/));
+test('website Event cards use contract-aware image markup',()=>assert.match(app,/eventImageMarkup\\(e, 'photo-thumb'/));
+test('website Event detail uses contract-aware image markup',()=>assert.match(app,/eventImageMarkup\\(e, 'detail-photo'/));
 test('private Event images use authenticated blob loading',()=>{
   assert.match(app,/\/api\/ql\/events\/.*\/photos\//);
   assert.match(app,/Authorization: 'Bearer ' \+ token/);
