@@ -16,11 +16,6 @@ const crypto = require('crypto');
 const { Expo } = require('expo-server-sdk');
 const { initDB } = require('./database');
 const iap = require('./iap');
-const {
-  isGrandfatheredPaidUser,
-  compatibleBillingPeriod,
-  normalizeSpecialAccountBilling,
-} = require('./billing-compat.cjs');
 
 const expo = new Expo();
 
@@ -46,7 +41,7 @@ try {
   db.pragma('ignore_check_constraints = ON');
   db.prepare("UPDATE users SET tier='starter' WHERE tier IN ('basic','mid','top')").run();
   db.pragma('ignore_check_constraints = OFF');
-  normalizeSpecialAccountBilling(db);
+  iap.normalizeSpecialAccountBilling(db);
 } catch(e) {
   db.pragma('ignore_check_constraints = OFF');
   console.error('⚠️  Could not normalize startup membership compatibility:', e.message);
@@ -781,7 +776,7 @@ app.get('/api/auth/me', auth, (req, res) => {
   }
   // Get referral stats
   const referralStats = db.prepare('SELECT COUNT(*) as count FROM referral_rewards WHERE referrer_id=?').get(req.userId);
-  res.json({ user: { ...u, billing_period: compatibleBillingPeriod(u), isAdmin: isAdmin(req), displayName: u.display_name, pieceCount: getPieceCount(req.userId), referralCount: referralStats?.count || 0, freeMonthsRemaining: u.free_months_remaining || 0, newsletterSubscribed: u.newsletter_subscribed } });
+  res.json({ user: { ...u, billing_period: iap.compatibleBillingPeriod(u), isAdmin: isAdmin(req), displayName: u.display_name, pieceCount: getPieceCount(req.userId), referralCount: referralStats?.count || 0, freeMonthsRemaining: u.free_months_remaining || 0, newsletterSubscribed: u.newsletter_subscribed } });
 });
 
 // User subscription status (used by mobile app BillingScreen)
@@ -819,7 +814,7 @@ app.get('/api/user/subscription', auth, async (req, res) => {
   res.json({
     plan: u.tier || 'free',
     status: hasPremium ? 'active' : 'inactive',
-    billingPeriod: compatibleBillingPeriod(u),
+    billingPeriod: iap.compatibleBillingPeriod(u),
     expiresAt: u.plan_expires_at || null,
     hasStripeSubscription: hasStripe,
     hasIAPSubscription: hasIAP,
@@ -1720,7 +1715,7 @@ app.get('/api/admin/members', auth, (req, res) => {
   try {
     const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, 
       avatar_filename, created_at, updated_at, stripe_customer_id, stripe_subscription_id 
-      FROM users ORDER BY created_at DESC`).all().map(m => ({ ...m, billing_period: compatibleBillingPeriod(m) }));
+      FROM users ORDER BY created_at DESC`).all().map(m => ({ ...m, billing_period: iap.compatibleBillingPeriod(m) }));
     const stats = {
       total: members.length,
       byTier: { free: 0, paid: 0, gifted: 0 },
@@ -1732,7 +1727,7 @@ app.get('/api/admin/members', auth, (req, res) => {
       const isUnlimited = m.tier === 'starter' || ['basic','mid','top'].includes(m.tier);
       if (isUnlimited) {
         const hasStripe = m.stripe_subscription_id && m.stripe_subscription_id !== '';
-        if (hasStripe || isGrandfatheredPaidUser(m)) {
+        if (hasStripe || iap.isGrandfatheredPaidUser(m)) {
           stats.byTier.paid++;
         } else {
           stats.byTier.gifted++;
@@ -4671,7 +4666,7 @@ app.get('/api/admin/members/search', auth, (req, res) => {
   if (!q) return res.json([]);
   const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, created_at 
     FROM users WHERE email LIKE ? OR display_name LIKE ? ORDER BY created_at DESC LIMIT 20`).all('%'+q+'%', '%'+q+'%')
-    .map(m => ({ ...m, billing_period: compatibleBillingPeriod(m) }));
+    .map(m => ({ ...m, billing_period: iap.compatibleBillingPeriod(m) }));
   res.json(members);
 });
 
