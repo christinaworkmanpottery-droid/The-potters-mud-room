@@ -2766,7 +2766,7 @@ function closeSaleMediaScope(scope) {
   if (scope === 'saleDetailsContent') {
     document.getElementById(scope)?.replaceChildren();
     const edit = document.getElementById('saleDetailsEdit');
-    if (edit) { edit.hidden = true; edit.onclick = null; }
+    if (edit) { edit.hidden = true; edit.disabled = true; edit.style.display = 'none'; edit.onclick = null; }
   }
   saleRequestSerials.set(scope, (saleRequestSerials.get(scope) || 0) + 1);
   clearSaleMedia(scope);
@@ -2835,7 +2835,7 @@ async function viewSale(id, options = {}) {
       String(window._currentPieceId) === String(pieceId) && (!options.active || options.active())));
   clearSaleMedia('saleDetailsContent');
   const body = document.getElementById('saleDetailsContent'), edit = document.getElementById('saleDetailsEdit');
-  edit.hidden = true; edit.onclick = null;
+  edit.hidden = true; edit.disabled = true; edit.style.display = 'none'; edit.onclick = null;
   body.textContent = 'Loading Sale…'; body.setAttribute('aria-busy', 'true');
   document.getElementById('saleDetailsModal').dataset.pieceOrigin = String(pieceOrigin);
   openModal('saleDetailsModal');
@@ -2852,7 +2852,7 @@ async function viewSale(id, options = {}) {
       df('Total', '$' + (WebsiteUtils.moneyCents(sale.price || 0) * (sale.quantity || 1) / 100).toFixed(2)) +
       df('Event', sale.event_name) + df('Venue', sale.venue) + df('Buyer', sale.buyer_name) + df('Notes', sale.notes);
     body.setAttribute('aria-busy', 'false');
-    edit.hidden = pieceOrigin;
+    edit.hidden = pieceOrigin; edit.disabled = pieceOrigin; edit.style.display = pieceOrigin ? 'none' : '';
     edit.onclick = pieceOrigin ? null : () => { if (!active()) return; closeModal('saleDetailsModal'); editSale(id); };
     await loadSaleMedia('saleDetailsContent');
   } catch(e) {
