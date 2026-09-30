@@ -133,6 +133,10 @@ async function api(path, opts = {}) {
   if (res.status === 401 && /^\/api\/sales(?:[/?]|$)/.test(path) && requestToken === token) clearSaleMedia();
   if (res.status === 401 && /^\/api\/(?:ql\/)?events(?:[/?]|$)/.test(path) && requestToken === token) clearEventMedia();
   const d = await res.json();
+  if (/^\/api\/(?:auth\/me|profile|user\/profile|users|forum|community|messages|potters)(?:[/?]|$)/.test(path)) {
+    if (requestToken !== token) throw new Error('Session changed');
+    if (res.status === 401) clearProfileMedia();
+  }
   if (!res.ok) throw new Error(d.error || 'Something went wrong');
   return d;
 }
@@ -429,7 +433,7 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     clearClayMedia();
     clearGlazeMedia();
     clearTestTileMedia();
-    clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
+    clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
     clearPieceHistory();
     token = data.token;
     localStorage.setItem('mudlog_token', token);
@@ -449,7 +453,7 @@ function logout() {
   clearClayMedia();
   clearGlazeMedia();
   clearTestTileMedia();
-  clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
+  clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
   clearPieceHistory();
   token = null; currentUser = null;
   localStorage.removeItem('mudlog_token');
@@ -459,6 +463,7 @@ function logout() {
 }
 
 async function checkAuth() {
+  const requestToken = token;
   // Don't override reset-password view
   if (window.location.hash.startsWith('#reset-password')) return;
   if (!token && window.location.hash === '#preview') { showGuestPreview('community', true); return; }
@@ -466,13 +471,14 @@ async function checkAuth() {
   try {
     document.getElementById('landingPage').style.display = 'none';
     const d = await api('/api/auth/me');
+    if (requestToken !== token) return;
     currentUser = d.user;
     showApp();
   } catch(e) {
     const msg = (e.message || '').toLowerCase();
     if (msg.includes('invalid token') || msg.includes('unauthorized') || msg.includes('no token') || msg.includes('invalid') || msg.includes('expired')) {
       // Token is bad — clear it and show auth screen (not landing page)
-      clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
+      clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
       token = null;
       localStorage.removeItem('mudlog_token');
       document.getElementById('landingPage').style.display = 'none';
@@ -3730,7 +3736,7 @@ async function loadForumPosts() {
     }
     em.classList.add('hidden');
     c.innerHTML = posts.map(p => {
-      const avatar = p.author_avatar ? '<img src="/uploads/' + p.author_avatar + '" class="forum-avatar">' : '<div class="forum-avatar-placeholder">' + (p.author_name||'?')[0].toUpperCase() + '</div>';
+      const avatar = p.author_avatar ? '<img ' + profileAvatarAttributes(p.author_avatar, 'community') + ' class="forum-avatar">' : '<div class="forum-avatar-placeholder">' + (p.author_name||'?')[0].toUpperCase() + '</div>';
       const photos = (p.photos||[]).length ? '<span class="piece-meta-tag">📷 ' + p.photos.length + '</span>' : '';
       return '<div class="card forum-post-card" onclick="viewForumPost(\'' + p.id + '\')">' +
         '<div style="display:flex;gap:12px;align-items:flex-start">' + avatar +
@@ -3752,14 +3758,14 @@ async function viewForumPost(id) {
   try {
     const post = await api('/api/forum/posts/' + id);
     navigate('forumPost');
-    const avatar = post.author_avatar ? '<img src="/uploads/' + post.author_avatar + '" class="forum-avatar-lg">' : '<div class="forum-avatar-placeholder forum-avatar-lg">' + (post.author_name||'?')[0].toUpperCase() + '</div>';
+    const avatar = post.author_avatar ? '<img ' + profileAvatarAttributes(post.author_avatar, 'community') + ' class="forum-avatar-lg">' : '<div class="forum-avatar-placeholder forum-avatar-lg">' + (post.author_name||'?')[0].toUpperCase() + '</div>';
     const photos = (post.photos||[]).map(p => {
       const ext = (p.filename||'').split('.').pop().toLowerCase();
       if (['mp4','mov','webm'].includes(ext)) return '<video src="/uploads/' + p.filename + '" class="forum-photo" controls style="max-width:100%;max-height:400px;border-radius:var(--radius-sm)"></video>';
       return '<img src="/uploads/' + p.filename + '" class="forum-photo" style="max-width:100%;max-height:400px" onclick="window.open(\'/uploads/' + p.filename + '\',\'_blank\')">';
     }).join('');
     const replies = (post.replies||[]).map(r => {
-      const ra = r.author_avatar ? '<img src="/uploads/' + r.author_avatar + '" class="forum-avatar">' : '<div class="forum-avatar-placeholder">' + (r.author_name||'?')[0].toUpperCase() + '</div>';
+      const ra = r.author_avatar ? '<img ' + profileAvatarAttributes(r.author_avatar, 'community') + ' class="forum-avatar">' : '<div class="forum-avatar-placeholder">' + (r.author_name||'?')[0].toUpperCase() + '</div>';
       const rPhotos = (r.photos||[]).map(p => {
         const ext = (p.filename||'').split('.').pop().toLowerCase();
         if (['mp4','mov','webm'].includes(ext)) return '<video src="/uploads/' + p.filename + '" class="forum-photo" controls style="max-width:300px;max-height:200px"></video>';
@@ -3966,10 +3972,69 @@ async function buyProduct(id) {
   } catch(e) { toast(e.message,'error'); }
 }
 
+
+// Phase 2Q Profile/avatar loading. Public contexts never carry an owner token.
+const profileMedia = new Map();
+let profileMediaGeneration = 0;
+let profileMediaObserver;
+function clearProfileMedia() {
+  profileMediaGeneration++;
+  for (const e of profileMedia.values()) { e.controller.abort(); if (e.url) URL.revokeObjectURL(e.url); }
+  profileMedia.clear();
+  document.querySelectorAll('img[data-profile-media]').forEach(img => { img.removeAttribute('src'); img.style.display = 'none'; });
+}
+function profileAvatarAttributes(filename, context = 'community', ownerId = '') {
+  if (!filename) return '';
+  const encoded = encodeURIComponent(filename);
+  if (['directory','featured','review','piece','combo'].includes(context))
+    return `src="/api/ql/avatars/public/${context}/${encoded}" onerror="this.style.visibility='hidden'"`;
+  if (context === 'legacy') return `src="/uploads/${encoded}" onerror="this.style.visibility='hidden'"`;
+  const route = context === 'owner' ? '/api/ql/profiles/' + encodeURIComponent(ownerId) + '/photos/' + encoded : '/api/ql/avatars/community/' + encoded;
+  if (!profileMediaObserver) {
+    profileMediaObserver = new MutationObserver(() => hydrateProfileMedia(document));
+    profileMediaObserver.observe(document.documentElement, { childList: true, subtree: true });
+  }
+  return `data-profile-media="${esc(route)}" data-profile-generation="${profileMediaGeneration}" onerror="this.style.visibility='hidden'"`;
+}
+async function hydrateProfileMedia(root) {
+  const generation = profileMediaGeneration, requestToken = token;
+  if (!requestToken) return;
+  // Removed/replaced images release their blobs and outstanding work.
+  for (const [route, entry] of profileMedia) {
+    if (![...document.querySelectorAll('img[data-profile-media]')].some(img => img.dataset.profileMedia === route)) {
+      entry.controller.abort(); if (entry.url) URL.revokeObjectURL(entry.url); profileMedia.delete(route);
+    }
+  }
+  for (const img of root.querySelectorAll('img[data-profile-media]')) {
+    if (generation !== profileMediaGeneration || requestToken !== token) return;
+    if (Number(img.dataset.profileGeneration) !== generation) continue;
+    const route = img.dataset.profileMedia;
+    let entry = profileMedia.get(route);
+    if (!entry) {
+      entry = { controller: new AbortController(), url: null };
+      profileMedia.set(route, entry);
+      try {
+        const response = await fetch(API + route, { headers: { Authorization: 'Bearer ' + requestToken }, cache: 'no-store', signal: entry.controller.signal });
+        if (response.status === 401 && generation === profileMediaGeneration && requestToken === token) { clearProfileMedia(); return; }
+        if (!response.ok) throw Error('Avatar unavailable');
+        const url = URL.createObjectURL(await response.blob());
+        if (generation !== profileMediaGeneration || requestToken !== token || profileMedia.get(route) !== entry) { URL.revokeObjectURL(url); return; }
+        entry.url = url;
+        document.querySelectorAll('img[data-profile-media]').forEach(node => {
+          if (node.dataset.profileMedia === route && Number(node.dataset.profileGeneration) === generation) node.src = url;
+        });
+      } catch (_) { /* Local failure: no legacy/static retry for authenticated media. */ }
+    }
+    if (entry.url && img.isConnected && generation === profileMediaGeneration && requestToken === token) img.src = entry.url;
+  }
+}
+
 // ---- Profile ----
 async function loadProfile() {
+  const requestToken = token;
   try {
     const d = await api('/api/auth/me');
+    if (requestToken !== token) return;
     currentUser = d.user;
     refreshAccountStatus();
     document.getElementById('profileName').value = d.user.display_name || '';
@@ -3994,7 +4059,7 @@ async function loadProfile() {
     const preview = document.getElementById('profilePhotoPreview');
     if (preview) {
       if (d.user.avatar_filename) {
-        preview.innerHTML = '<img src="/uploads/' + d.user.avatar_filename + '" style="width:100%;height:100%;object-fit:cover">';
+        preview.innerHTML = '<img ' + profileAvatarAttributes(d.user.avatar_filename, 'owner', d.user.id) + ' style="width:100%;height:100%;object-fit:cover">';
       } else {
         preview.innerHTML = '🏺';
       }
@@ -4143,7 +4208,7 @@ async function loadFindPotter() {
     em.classList.add('hidden');
     c.innerHTML = potters.map(p => {
       const avatar = p.avatarFilename
-        ? '<img src="/uploads/' + esc(p.avatarFilename) + '" style="width:48px;height:48px;object-fit:cover;border-radius:50%;flex-shrink:0">'
+        ? '<img ' + profileAvatarAttributes(p.avatarFilename, 'directory') + ' style="width:48px;height:48px;object-fit:cover;border-radius:50%;flex-shrink:0">'
         : '<div style="width:48px;height:48px;border-radius:50%;background:var(--bg-light);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">🏺</div>';
       const loc = [p.city, p.stateRegion, p.country].filter(Boolean).join(', ') + (p.distanceMiles !== undefined ? ' · about ' + p.distanceMiles + ' miles between city centres' : '');
       const shops = [p.shopUrl, p.shopUrl2, p.shopUrl3].filter(Boolean);
@@ -4357,16 +4422,18 @@ function trackActivity(action, page) {
 function loadProfilePhoto() {
   const preview = document.getElementById('profilePhotoPreview');
   if (preview && currentUser?.avatar_filename) {
-    preview.innerHTML = '<img src="/uploads/' + currentUser.avatar_filename + '" style="width:100%;height:100%;object-fit:cover">';
+    preview.innerHTML = '<img ' + profileAvatarAttributes(currentUser.avatar_filename, 'owner', currentUser.id) + ' style="width:100%;height:100%;object-fit:cover">';
   }
 }
 async function uploadProfilePhoto(input) {
+  const requestToken = token, generation = profileMediaGeneration;
   if (!input.files?.[0]) return;
   const fd = new FormData();
   fd.append('photo', input.files[0]);
   try {
     const r = await fetch('/api/profile/photo', { method:'POST', headers:{Authorization:'Bearer '+token}, body:fd });
-    const d = await r.json(); if (!r.ok) throw new Error(d.error);
+    const d = await r.json(); if (requestToken !== token || generation !== profileMediaGeneration) return;
+    if (!r.ok) { if (r.status === 401) clearProfileMedia(); throw new Error(d.error); }
     toast('Profile photo updated!','success');
     currentUser.avatar_filename = d.filename;
     loadProfilePhoto();
@@ -6128,7 +6195,7 @@ async function toggleComboComments(comboId) {
   try {
     const comments = await api('/api/community/combos/' + comboId + '/comments');
     let html = comments.map(c => {
-      const avatar = c.author_avatar ? '<img src="/uploads/' + c.author_avatar + '" style="width:28px;height:28px;border-radius:50%;object-fit:cover">' : '<div style="width:28px;height:28px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:0.8rem">' + (c.author_name||'?')[0].toUpperCase() + '</div>';
+      const avatar = c.author_avatar ? '<img ' + profileAvatarAttributes(c.author_avatar, 'community') + ' style="width:28px;height:28px;border-radius:50%;object-fit:cover">' : '<div style="width:28px;height:28px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:0.8rem">' + (c.author_name||'?')[0].toUpperCase() + '</div>';
       const deleteBtn = (c.user_id === currentUser?.id || currentUser?.email === 'christinaworkmanpottery@gmail.com') ? '<button class="btn-ghost btn-sm" onclick="deleteComboComment(\'' + c.id + '\',\'' + comboId + '\')" style="font-size:0.7rem">🗑️</button>' : '';
       return '<div style="display:flex;gap:8px;margin-bottom:10px">' + avatar +
         '<div style="flex:1"><div style="display:flex;justify-content:space-between"><strong class="text-sm">' + esc(c.author_name||'Anonymous') + '</strong><div>' + deleteBtn + '<span class="text-sm" style="color:var(--text-muted)">' + timeAgo(c.created_at) + '</span></div></div>' +
@@ -6219,7 +6286,7 @@ async function loadMessages() {
     if (!d.conversations.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
     c.innerHTML = d.conversations.map(m => {
-      const avatar = m.partner_avatar ? '<img src="/uploads/' + m.partner_avatar + '" style="width:40px;height:40px;border-radius:50%;object-fit:cover">' : '<div style="width:40px;height:40px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700">' + (m.partner_name||'?')[0].toUpperCase() + '</div>';
+      const avatar = m.partner_avatar ? '<img ' + profileAvatarAttributes(m.partner_avatar, 'community') + ' style="width:40px;height:40px;border-radius:50%;object-fit:cover">' : '<div style="width:40px;height:40px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700">' + (m.partner_name||'?')[0].toUpperCase() + '</div>';
       const isUnread = !m.is_read && m.to_user_id === currentUser?.id;
       return '<div class="notif-item' + (isUnread ? ' unread' : '') + '" onclick="navigate(\'messageThread\');loadMessageThread(\'' + m.partner_id + '\')">' +
         '<div style="display:flex;gap:12px;align-items:center">' + avatar +
@@ -6235,7 +6302,7 @@ async function loadMessageThread(userId) {
     const d = await api('/api/messages/' + userId);
     const el = document.getElementById('messageThreadContent');
     const partner = d.partner || {};
-    const avatar = partner.avatar_filename ? '<img src="/uploads/' + partner.avatar_filename + '" style="width:36px;height:36px;border-radius:50%;object-fit:cover">' : '<div style="width:36px;height:36px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700">' + (partner.display_name||'?')[0].toUpperCase() + '</div>';
+    const avatar = partner.avatar_filename ? '<img ' + profileAvatarAttributes(partner.avatar_filename, 'community') + ' style="width:36px;height:36px;border-radius:50%;object-fit:cover">' : '<div style="width:36px;height:36px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700">' + (partner.display_name||'?')[0].toUpperCase() + '</div>';
     let html = '<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px">' + avatar + '<h2>' + esc(partner.display_name||'Unknown') + '</h2></div>';
     html += '<div style="max-height:400px;overflow-y:auto;padding:12px;background:var(--bg);border-radius:var(--radius-sm);margin-bottom:16px" id="msgThreadScroll">';
     if (!d.messages.length) html += '<div class="text-sm" style="color:var(--text-muted);text-align:center;padding:20px">No messages yet. Start the conversation!</div>';
@@ -7133,7 +7200,7 @@ function renderMembers(members) {
   c.innerHTML = ribbon + members.map(u =>
     '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg-card)">' +
     '<div style="cursor:pointer;flex-shrink:0" onclick="viewMemberProfile(\'' + u.id + '\')">' +
-    (u.avatar_filename ? '<img src="/uploads/' + u.avatar_filename + '" style="width:44px;height:44px;border-radius:50%;object-fit:cover">' : '<div style="width:44px;height:44px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;color:var(--primary)">' + (u.display_name||'?')[0].toUpperCase() + '</div>') +
+    (u.avatar_filename ? '<img ' + profileAvatarAttributes(u.avatar_filename, 'community') + ' style="width:44px;height:44px;border-radius:50%;object-fit:cover">' : '<div style="width:44px;height:44px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;color:var(--primary)">' + (u.display_name||'?')[0].toUpperCase() + '</div>') +
     '</div>' +
     '<div style="flex:1;min-width:0;cursor:pointer" onclick="viewMemberProfile(\'' + u.id + '\')">' +
     '<div style="font-weight:600;font-size:0.95rem;color:var(--primary)">' + esc(u.display_name||'Member') +
@@ -7161,7 +7228,7 @@ async function viewMemberProfile(userId) {
     } else {
       c.innerHTML = '<div class="card" style="max-width:500px">' +
         '<div style="display:flex;gap:16px;align-items:center;margin-bottom:16px">' +
-        (u.avatar_filename ? '<img src="/uploads/' + u.avatar_filename + '" style="width:80px;height:80px;border-radius:50%;object-fit:cover">' : '<div style="width:80px;height:80px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:2rem;color:var(--primary)">' + (u.displayName||u.display_name||'?')[0].toUpperCase() + '</div>') +
+        (u.avatar_filename ? '<img ' + profileAvatarAttributes(u.avatar_filename, 'community') + ' style="width:80px;height:80px;border-radius:50%;object-fit:cover">' : '<div style="width:80px;height:80px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:2rem;color:var(--primary)">' + (u.displayName||u.display_name||'?')[0].toUpperCase() + '</div>') +
         '<div><h2 style="margin:0">' + esc(u.displayName || u.display_name || 'Member') + '</h2>' +
         (u.location ? '<div class="text-sm" style="color:var(--text-light);margin-top:4px">📍 ' + esc(u.location) + '</div>' : '') +
         '</div></div>' +
@@ -7436,7 +7503,7 @@ async function loadFeaturedPotter() {
     if (!data || !section || !card) return;
     section.style.display = '';
     const avatar = data.avatar_filename
-      ? '<img src="/uploads/' + data.avatar_filename + '" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--primary)">'
+      ? '<img ' + profileAvatarAttributes(data.avatar_filename, 'featured') + ' style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--primary)">'
       : '<div style="width:80px;height:80px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:2rem;color:#fff">' + ((data.display_name||'?')[0]).toUpperCase() + '</div>';
     card.innerHTML = '<div class="card" style="max-width:500px;margin:0 auto;text-align:center;padding:24px">' +
       '<div style="margin-bottom:16px">' + avatar + '</div>' +

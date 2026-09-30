@@ -1294,13 +1294,69 @@ app.put('/api/profile/newsletter', auth, (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/profile/avatar', auth, upload.single('avatar'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No file' });
-  const old = db.prepare('SELECT avatar_filename FROM users WHERE id=?').get(req.userId);
-  db.prepare('UPDATE users SET avatar_filename=? WHERE id=?').run(req.file.filename, req.userId);
-  deletionLifecycle.cleanupFiles([old?.avatar_filename]);
-  res.json({ filename: req.file.filename });
-});
+// Phase 2Q: avatars are presentation, never permission to read full profiles.
+// Community member presentation is authenticated and uses avatar_filename only.
+// profile_photo is owner-only unless the current featured-potter record publishes it.
+function profileAvatarPublic(user, filename, context) {
+  if (context === 'directory') return user.avatar_filename === filename && user.findable === 1 && user.is_private === 0;
+  if (context === 'featured') return !!db.prepare('SELECT 1 FROM (SELECT user_id FROM featured_potter ORDER BY featured_date DESC LIMIT 1) WHERE user_id=?').get(user.id);
+  if (user.avatar_filename !== filename) return false;
+  if (context === 'review') return !!db.prepare('SELECT 1 FROM reviews WHERE user_id=? AND is_approved=1').get(user.id);
+  if (context === 'piece') return !!db.prepare('SELECT 1 FROM pieces WHERE user_id=? AND is_public=1').get(user.id);
+  if (context === 'combo') return !!db.prepare('SELECT 1 FROM glaze_combos WHERE user_id=? AND is_public=1').get(user.id);
+  return false;
+}
+function deliverProfileAvatar(req, res, mode) {
+  res.set('Cache-Control', 'private, no-store');
+  res.set('X-Content-Type-Options', 'nosniff');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const filename = req.params.filename;
+    const refs = db.prepare('SELECT id,avatar_filename,profile_photo,is_private,findable FROM users WHERE avatar_filename=? OR profile_photo=?').all(filename, filename);
+    if (!refs.length) return unavailable();
+    const allowed = u => mode === 'owner' ? u.id === req.userId && u.id === req.params.userId
+      : mode === 'community' ? u.avatar_filename === filename
+      : profileAvatarPublic(u, filename, req.params.context);
+    // Any private/foreign alias blocks the whole filename; no first-match authorization.
+    if (refs.some(u => !allowed(u))) return unavailable();
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      if (table === 'users') continue;
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        if (db.prepare(`SELECT 1 FROM ${table} WHERE ${column}=? LIMIT 1`).get(filename)) return unavailable();
+      }
+    }
+    const target = safeStoredUpload(filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(filename)) return unavailable();
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+}
+app.get('/api/ql/profiles/:userId/photos/:filename', auth, (req,res) => deliverProfileAvatar(req,res,'owner'));
+app.get('/api/ql/avatars/community/:filename', auth, (req,res) => deliverProfileAvatar(req,res,'community'));
+app.get('/api/ql/avatars/public/:context/:filename', (req,res) => deliverProfileAvatar(req,res,'public'));
+function mutateProfileAvatar(req, res, both, remove = false) {
+  if (!remove && !req.file) return res.status(400).json({ error: 'No file' });
+  const discard = () => deletionLifecycle.cleanupFiles([req.file?.filename]);
+  try {
+    let old;
+    db.transaction(() => {
+      old = db.prepare('SELECT avatar_filename,profile_photo FROM users WHERE id=?').get(req.userId);
+      if (!old) return;
+      if (both || remove) db.prepare('UPDATE users SET avatar_filename=?,profile_photo=? WHERE id=?').run(remove ? null : req.file.filename, remove ? null : req.file.filename, req.userId);
+      else db.prepare('UPDATE users SET avatar_filename=? WHERE id=?').run(req.file.filename, req.userId);
+    }).immediate();
+    if (!old) { discard(); return res.status(404).json({ error: 'Photo unavailable' }); }
+    deletionLifecycle.cleanupFiles([old.avatar_filename, ...(both || remove ? [old.profile_photo] : [])]);
+    res.json(remove ? { success: true } : { filename: req.file.filename });
+  } catch (_) {
+    // Reference-aware cleanup retains a replacement even after a response failure.
+    discard();
+    if (!res.headersSent) res.status(500).json({ error: 'Could not update profile photo' });
+  }
+}
+app.post('/api/profile/avatar', auth, upload.single('avatar'), (req,res) => mutateProfileAvatar(req,res,false));
+app.delete(['/api/profile/avatar','/api/profile/photo'], auth, (req,res) => mutateProfileAvatar(req,res,true,true));
 
 app.get('/api/profile/:id', auth, (req, res) => {
   const u = db.prepare('SELECT id,display_name,bio,location,website,avatar_filename,is_private,tier,created_at,shop_url,shop_url_2,shop_url_3,city,state_region,country FROM users WHERE id=?').get(req.params.id);
@@ -1729,13 +1785,7 @@ app.post('/api/shop/apply-discount', auth, (req, res) => {
 });
 
 // ============ PROFILE PHOTO ============
-app.post('/api/profile/photo', auth, upload.single('photo'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No file' });
-  const old = db.prepare('SELECT profile_photo,avatar_filename FROM users WHERE id=?').get(req.userId);
-  db.prepare('UPDATE users SET profile_photo=?, avatar_filename=? WHERE id=?').run(req.file.filename, req.file.filename, req.userId);
-  deletionLifecycle.cleanupFiles([old?.profile_photo, old?.avatar_filename]);
-  res.json({ filename: req.file.filename });
-});
+app.post('/api/profile/photo', auth, upload.single('photo'), (req,res) => mutateProfileAvatar(req,res,true));
 
 // ============ EXPORT (all tiers — glazes and pieces) ============
 app.get('/api/export/glazes', auth, (req, res) => {
