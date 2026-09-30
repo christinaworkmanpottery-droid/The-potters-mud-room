@@ -47,13 +47,13 @@ completion is observed explicitly before comparisons; merely listening never mar
   Test Tile routes/linking/History redaction; normalization retains qualifying access.
 - Forum image/video/HEAD/range/parent binding, block variants and restart-lost playback grants;
   Shop active/inactive images, merchant access, two purchasers, pending/completed orders,
-  uploaded original, generated built-in original and real public preview.
+  uploaded original, tracked authoritative built-in original and real public preview.
 - Separate malformed/corrupt/partial/missing/orphan/conflicting/schema-drift/permission copies,
   manifest rejection, retained quarantine, corrected clean restore. Four individual invalid
   post-QL historical table definitions are intentionally injected into disposable copies;
   application startup must refuse without any row/schema mutation. No repair is added.
 
-Images are decoded with Sharp; the synthetic MP4 is decoded by FFmpeg; actual PDFKit-generated
+Images are decoded with Sharp; the synthetic MP4 is decoded by FFmpeg; tracked original
 PDF and tracked preview are inspected and rendered by Poppler, then decoded with Sharp.
 
 ## Evidence and results
@@ -83,11 +83,12 @@ release blockers below keep the **release/recovery acceptance decision BLOCKED**
 1. **Resolved in the Admin demographics slice:** the route uses established `isAdmin(req)`
    authorization with no schema changes. Fresh-state rehearsal now requires admin success,
    ordinary-user 403, and unauthenticated 401 instead of the former missing-column 500.
-2. The tested tracked release contains the preview and generator but **not**
-   `public/shop/the-potters-mud-log.pdf`. The fixture deliberately generates a disposable
-   original to prove route/binding/paired capture. This is not proof that a release artifact
-   or production backup contains the original. Approve a separate release-asset packaging
-   slice before declaring release recovery ready; do not silently regenerate during restore.
+2. **Resolved in the Shop release-asset slice:** the original is restored byte-for-byte
+   from `643cd0f5b5f26949d0d550f009ebe5eb1c2311f0` and tracked at
+   `public/shop/the-potters-mud-log.pdf`. See `../shop-release-asset.json` for provenance,
+   path, size and SHA-256. Clean-checkout validation runs before install/startup; fixture
+   setup verifies the hash and never generates the original. Release/capture manifests
+   include it naturally among tracked files. Restore semantics are unchanged.
 3. Source-specific startup assigns `stripe-monthly` despite the fresh `billing_period`
    CHECK permitting monthly/yearly/promo. Reproduced in a separate synthetic account copy.
    The SQLite build's read-only integrity_check returns ok while a writable-handle read-only
