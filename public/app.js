@@ -522,6 +522,7 @@ function navigate(page, options = {}) {
   if (page !== 'glazes') { clearGlazeMedia('glazeList'); clearGlazeMedia('glazeViewBody'); }
   if (page !== 'clayBodies') { clearClayMedia('clayList'); clearClayMedia('clayViewBody'); }
   if (page !== 'testTiles') clearTestTileMedia();
+  if (page !== 'community') clearComboMedia();
   if (page !== 'pieceDetail') clearPieceHistory();
   try {
     if (!token && !guestMode) {
