@@ -4475,9 +4475,42 @@ app.delete('/api/project-photos/:id', auth, (req, res) => {
 });
 
 // ============ EVENTS ============
+// Calendar subscription and Event sharing expose metadata only. Event images have no
+// publication flag, so current owner responses use authenticated protected delivery.
+// Historical static URLs remain legacy-compatible until publication state can be proven.
+function eventMediaContract(event) {
+  if (!event) return event;
+  event.photoDelivery = event.image_filename ? 'owner-protected' : null;
+  event.photoVisibility = event.image_filename ? 'legacy-ambiguous' : null;
+  return event;
+}
+
+app.get('/api/ql/events/:eventId/photos/:filename', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  res.set('X-Content-Type-Options', 'nosniff');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const photo = db.prepare('SELECT image_filename AS filename FROM events WHERE id=? AND user_id=? AND image_filename=?')
+      .get(req.params.eventId, req.userId, req.params.filename);
+    if (!photo) return unavailable();
+    const target = safeStoredUpload(photo.filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(photo.filename)) return unavailable();
+    const owned = ownedPhotoSlots(photo.filename, req.userId);
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(photo.filename);
+        if (rows.some(row => !owned.some(slot => slot.table === table && slot.column === column && slot.id === row.id))) return unavailable();
+      }
+    }
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
+
 app.get('/api/events', auth, (req, res) => {
   const events = db.prepare('SELECT * FROM events WHERE user_id=? ORDER BY event_date ASC').all(req.userId);
-  res.json(events);
+  res.json(events.map(eventMediaContract));
 });
 
 app.post('/api/events', auth, (req, res) => {
@@ -4501,22 +4534,38 @@ app.post('/api/events', auth, (req, res) => {
 
 app.post('/api/events/:id/photo', auth, upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
-  const ev = db.prepare('SELECT * FROM events WHERE id=? AND user_id=?').get(req.params.id, req.userId);
-  if (!ev) return res.status(404).json({ error: 'Event not found' });
-  db.prepare('UPDATE events SET image_filename=? WHERE id=? AND user_id=?').run(req.file.filename, req.params.id, req.userId);
-  deletionLifecycle.cleanupFiles([ev.image_filename]);
-  res.json({ filename: req.file.filename });
+  const discardNew = () => deletionLifecycle.cleanupFiles([req.file?.filename]);
+  try {
+    const ev = db.prepare('SELECT * FROM events WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+    if (!ev) { discardNew(); return res.status(404).json({ error: 'Event not found' }); }
+    const result = db.prepare("UPDATE events SET image_filename=?,updated_at=datetime('now') WHERE id=? AND user_id=?")
+      .run(req.file.filename, req.params.id, req.userId);
+    if (!result.changes) { discardNew(); return res.status(404).json({ error: 'Event not found' }); }
+    deletionLifecycle.cleanupFiles([ev.image_filename]);
+    res.json(eventMediaContract({ filename: req.file.filename, image_filename: req.file.filename }));
+  } catch (_) {
+    discardNew();
+    if (!res.headersSent) res.status(500).json({ error: 'Could not save event photo' });
+  }
 });
 
 app.put('/api/events/:id', auth, (req, res) => {
   const { title, description, eventDate, startTime, endTime, location, venue, address, website } = req.body;
-  db.prepare('UPDATE events SET title=?,description=?,event_date=?,start_time=?,end_time=?,location=?,venue=?,address=?,website=?,updated_at=datetime(\'now\') WHERE id=? AND user_id=?')
+  const result = db.prepare("UPDATE events SET title=?,description=?,event_date=?,start_time=?,end_time=?,location=?,venue=?,address=?,website=?,updated_at=datetime('now') WHERE id=? AND user_id=?")
     .run(title, description, eventDate, startTime, endTime, location, venue || null, address || null, website || null, req.params.id, req.userId);
+  if (!result.changes) return res.status(404).json({ error: 'Event not found' });
   res.json({ success: true });
 });
 
 app.delete('/api/events/:id', auth, (req, res) => {
-  db.prepare('DELETE FROM events WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  const result = db.transaction(() => {
+    const ev = db.prepare('SELECT image_filename FROM events WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+    if (!ev) return null;
+    const deleted = db.prepare('DELETE FROM events WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+    return deleted.changes ? ev : null;
+  }).immediate();
+  if (!result) return res.status(404).json({ error: 'Event not found' });
+  deletionLifecycle.cleanupFiles([result.image_filename]);
   res.json({ success: true });
 });
 
@@ -4532,7 +4581,8 @@ app.get('/api/events/export/ics', auth, (req, res) => {
   res.send(icsContent);
 });
 
-// iCal subscription feed — live URL for Google/Apple Calendar to poll
+// iCal subscription feed — live URL for Google/Apple Calendar to poll.
+// buildICS intentionally excludes image_filename and protected/static image URLs.
 app.get('/api/events/subscribe/:userId', (req, res) => {
   const user = db.prepare('SELECT id FROM users WHERE id=?').get(req.params.userId);
   if (!user) return res.status(404).send('Not found');
