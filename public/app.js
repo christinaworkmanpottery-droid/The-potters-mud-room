@@ -671,10 +671,21 @@ async function loadNotificationIndicator() {
 let pieceEdgeGeneration = 0;
 const pieceEdgeUrls = new Set();
 const pieceEdgeControllers = new Set();
+const pieceEdgeNodes = new Map();
+function clearPieceEdgeMediaScope(root) {
+  if (!root) return;
+  for (const [img, view] of pieceEdgeNodes) {
+    if (!root.contains(img)) continue;
+    view.controller.abort(); pieceEdgeControllers.delete(view.controller);
+    if (view.url) { URL.revokeObjectURL(view.url); pieceEdgeUrls.delete(view.url); }
+    img.removeAttribute('src'); pieceEdgeNodes.delete(img);
+  }
+}
 let pieceSearchPreviewUrl = null;
 function clearPieceEdgeMedia() {
   pieceEdgeGeneration++;
   pieceEdgeControllers.forEach(c => c.abort()); pieceEdgeControllers.clear();
+  pieceEdgeNodes.clear();
   pieceEdgeUrls.forEach(url => URL.revokeObjectURL(url)); pieceEdgeUrls.clear();
   document.querySelectorAll('[data-piece-edge]').forEach(img => img.removeAttribute('src'));
   for (const id of ['recentPieces','piecesList','casualtyList','visualSearchResults']) document.getElementById(id)?.replaceChildren();
@@ -697,13 +708,14 @@ async function loadPieceEdgeMedia(root=document) {
   const generation = pieceEdgeGeneration, sessionToken = token;
   await Promise.all([...root.querySelectorAll('[data-piece-edge-route]')].map(async img => {
     const controller = new AbortController(); pieceEdgeControllers.add(controller);
-    const active = () => token === sessionToken && generation === pieceEdgeGeneration && img.isConnected;
+    const view = { controller, url: null }; pieceEdgeNodes.set(img, view);
+    const active = () => !controller.signal.aborted && token === sessionToken && generation === pieceEdgeGeneration && img.isConnected;
     try {
       const response = await fetch(API + img.dataset.pieceEdgeRoute, {headers:{Authorization:'Bearer ' + sessionToken}, cache:'no-store', signal:controller.signal});
       if (!response.ok) throw new Error('unavailable');
       const blob = await response.blob();
       if (!active()) return;
-      const url = URL.createObjectURL(blob); pieceEdgeUrls.add(url); img.src = url;
+      const url = URL.createObjectURL(blob); view.url = url; pieceEdgeUrls.add(url); img.src = url;
     } catch (_) { if (active()) { img.removeAttribute('src'); img.alt = 'Photo unavailable'; } }
     finally { pieceEdgeControllers.delete(controller); }
   }));
@@ -2610,6 +2622,7 @@ document.addEventListener('keydown',event=>{
 let saleMediaGeneration = 0;
 const saleMediaViews = new Map();
 function clearSaleMedia(scope) {
+  if (!scope || scope === 'salePhotoPreview') clearPieceEdgeMediaScope(document.getElementById('salePhotoPreview'));
   if (!scope) saleMediaGeneration++;
   const lightbox = document.getElementById('lightboxImg');
   for (const [key, view] of saleMediaViews) {
@@ -2624,6 +2637,7 @@ function clearSaleMedia(scope) {
   if (!scope) {
     saleRequestSerials.clear();
     _salePieces = []; saleSavePending = false;
+    document.getElementById('salePiece')?.replaceChildren();
     for (const id of ['salesList', 'salesSummary', 'saleDetailsContent', 'salePhotoPreview']) {
       const el = document.getElementById(id); if (el) el.innerHTML = '';
     }
@@ -2777,6 +2791,9 @@ function openSaleModal() {
 }
 function onSalePieceSelect(id) {
   clearSaleMedia('salePhotoPreview');
+  const preview = document.getElementById('salePhotoPreview');
+  const hasLocalPhoto = document.getElementById('salePhotoInput').files.length > 0;
+  if (!hasLocalPhoto) preview.innerHTML = '';
   if (!id) return;
   const p = _salePieces.find(x => x.id === id);
   if (!p) return;
@@ -2787,11 +2804,10 @@ function onSalePieceSelect(id) {
   const priceEl = document.getElementById('salePrice');
   if (!priceEl.value && p.price) priceEl.value = p.price;
   // Show piece photo if available
-  const preview = document.getElementById('salePhotoPreview');
   const photo = p.primaryPhoto || (p.photos && p.photos[0]);
   if (document.getElementById('salePhotoInput').files.length) return;
   if (photo) {
-    preview.innerHTML = '<div style="margin-bottom:8px"><img src="/uploads/' + photo.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);border:2px solid var(--border)" />' +
+    preview.innerHTML = '<div style="margin-bottom:8px"><img ' + pieceEdgePhotoAttrs(p, photo) + ' style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);border:2px solid var(--border)" />' +
       (p.clay_body_name ? '<div class="text-sm" style="color:var(--text-light);margin-top:4px">🪨 ' + esc(p.clay_body_name) + '</div>' : '') +
       (p.glaze ? '<div class="text-sm" style="color:var(--text-light)">🎨 ' + esc(p.glaze) + '</div>' : '') +
       '</div>';
@@ -2802,6 +2818,7 @@ function onSalePieceSelect(id) {
       (p.glaze ? '<div class="text-sm" style="color:var(--text-light)">🎨 ' + esc(p.glaze) + '</div>' : '') +
       '</div>' : '';
   }
+  void loadPieceEdgeMedia(preview);
 }
 
 function openBulkSaleModal() {
