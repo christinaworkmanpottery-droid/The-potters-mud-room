@@ -1932,6 +1932,43 @@ function testTileMediaContract(tile) {
   });
   return tile;
 }
+
+function glazeComboMediaContract(combo) {
+  if (!combo) return combo;
+  const explicitlyPublic = combo.is_shared === 1 || combo.is_public === 1;
+  const explicitlyPrivate = combo.is_shared === 0 && combo.is_public === 0;
+  const delivery = explicitlyPublic ? 'public-explicit' : explicitlyPrivate ? 'owner-protected' : 'legacy-static';
+  const visibility = explicitlyPublic ? 'public' : explicitlyPrivate ? 'private' : 'legacy-ambiguous';
+  for (const [field, suffix] of [['photo_filename', ''], ['photo_filename2', '2']]) {
+    combo['photoDelivery' + suffix] = combo[field] ? delivery : 'legacy-static';
+    combo['photoVisibility' + suffix] = visibility;
+  }
+  return combo;
+}
+
+function glazeComboPhotoField(slot) {
+  return Number(slot) === 1 ? 'photo_filename' : Number(slot) === 2 ? 'photo_filename2' : null;
+}
+
+function glazeComboExplicitlyPublic(combo) {
+  return !!combo && (combo.is_shared === 1 || combo.is_public === 1);
+}
+
+function publicGlazeComboFilenameSafe(filename) {
+  const { fileSlots } = require('./deletion-lifecycle.cjs');
+  let sawReference = false;
+  for (const [table, columns] of Object.entries(fileSlots)) {
+    const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+    for (const column of columns.filter(c => available.has(c))) {
+      const rows = db.prepare(`SELECT * FROM ${table} WHERE ${column}=?`).all(filename);
+      for (const row of rows) {
+        sawReference = true;
+        if (table !== 'glaze_combos' || !glazeComboExplicitlyPublic(row)) return false;
+      }
+    }
+  }
+  return sawReference;
+}
 function protectPieceHistoryTestTileMedia(history) {
   if (!history) return history;
   for (const entry of history.testTiles || []) if (entry?.values) testTileMediaContract(entry.values);
@@ -3217,7 +3254,7 @@ app.get('/api/community/combos', auth, requireTier('starter'), (req, res) => {
   if (sort === 'newest') { sql += ' ORDER BY gc.created_at DESC'; }
   else if (sort === 'comments') { sql += ' ORDER BY comment_count DESC'; }
   else { sql += ' ORDER BY gc.likes DESC, gc.created_at DESC'; }
-  const combos = db.prepare(sql).all(...params);
+  const combos = db.prepare(sql).all(...params).map(glazeComboMediaContract);
   const getL = db.prepare('SELECT * FROM glaze_combo_layers WHERE combo_id=? ORDER BY layer_order');
   const getLike = db.prepare('SELECT id FROM combo_likes WHERE combo_id=? AND user_id=?');
   const getCommentCount = db.prepare('SELECT COUNT(*) as c FROM combo_comments WHERE combo_id=?');
@@ -3235,7 +3272,7 @@ app.get('/api/community/combos/:id', auth, (req, res) => {
   combo.layers = db.prepare('SELECT * FROM glaze_combo_layers WHERE combo_id=? ORDER BY layer_order').all(combo.id);
   combo.user_liked = !!db.prepare('SELECT id FROM combo_likes WHERE combo_id=? AND user_id=?').get(combo.id, req.userId);
   combo.comment_count = db.prepare('SELECT COUNT(*) as c FROM combo_comments WHERE combo_id=?').get(combo.id).c;
-  res.json({ combo });
+  res.json({ combo: glazeComboMediaContract(combo) });
 });
 
 function saveComboRecord(req, res) {
@@ -3292,11 +3329,61 @@ function saveComboRecord(req, res) {
 app.post('/api/community/combos', auth, requireTier('starter'), upload.array('photos', 2), saveComboRecord);
 app.put('/api/community/combos/:id', auth, upload.array('photos', 2), saveComboRecord);
 
+// Phase 2K: public Glaze Combo photo delivery. Anonymous only for explicit public states.
+app.get('/api/ql/community/combos/:comboId/photos/:slot/public', (req, res) => {
+  res.set('Cache-Control', 'public, max-age=300');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const field = glazeComboPhotoField(req.params.slot);
+    if (!field) return unavailable();
+    const combo = db.prepare('SELECT * FROM glaze_combos WHERE id=?').get(req.params.comboId);
+    if (!glazeComboExplicitlyPublic(combo)) return unavailable();
+    const filename = combo[field];
+    if (!filename || !publicGlazeComboFilenameSafe(filename)) return unavailable();
+    const target = safeStoredUpload(filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(filename)) return unavailable();
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
+
+// Phase 2K: private/draft Glaze Combo photo delivery. Owner only.
+app.get('/api/ql/community/combos/:comboId/photos/:slot', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const field = glazeComboPhotoField(req.params.slot);
+    if (!field) return unavailable();
+    const combo = db.prepare('SELECT * FROM glaze_combos WHERE id=? AND user_id=?').get(req.params.comboId, req.userId);
+    if (!combo || glazeComboExplicitlyPublic(combo)) return unavailable();
+    if (!(combo.is_shared === 0 && combo.is_public === 0)) return unavailable();
+    const filename = combo[field];
+    if (!filename) return unavailable();
+    const target = safeStoredUpload(filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(filename)) return unavailable();
+    const owned = ownedPhotoSlots(filename, req.userId);
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(filename);
+        if (rows.some(row => !owned.some(ref => ref.table === table && ref.column === column && ref.id === row.id))) return unavailable();
+      }
+    }
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
+
 // Delete combo (owner only)
 app.delete('/api/community/combos/:id', auth, (req, res) => {
-  const combo = db.prepare('SELECT user_id FROM glaze_combos WHERE id=?').get(req.params.id);
+  const combo = db.prepare('SELECT * FROM glaze_combos WHERE id=?').get(req.params.id);
   if (!combo || combo.user_id !== req.userId) return res.status(403).json({ error: 'Not authorized' });
-  db.prepare('DELETE FROM glaze_combos WHERE id=?').run(req.params.id);
+  const oldPhotos = [combo.photo_filename, combo.photo_filename2].filter(Boolean);
+  db.transaction(() => {
+    db.prepare('DELETE FROM glaze_combos WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  }).immediate();
+  deletionLifecycle.cleanupFiles(oldPhotos);
   res.json({ success: true });
 });
 
@@ -4395,7 +4482,7 @@ app.get('/api/combos/public/:shareId', (req, res) => {
     if (!combo) return res.status(404).json({ error: 'Combo not found or is private' });
     const layers = db.prepare('SELECT * FROM glaze_combo_layers WHERE combo_id=? ORDER BY layer_order').all(combo.id);
     combo.layers = layers;
-    res.json(combo);
+    res.json(glazeComboMediaContract(combo));
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
