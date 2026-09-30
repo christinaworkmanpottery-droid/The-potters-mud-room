@@ -129,6 +129,7 @@ async function api(path, opts = {}) {
     opts.body = JSON.stringify(opts.body);
   }
   const res = await fetch(API + path, { ...opts, headers: opts.body instanceof FormData ? { Authorization: 'Bearer ' + token } : h });
+  if (res.status === 401 && /^\/api\/projects(?:[/?]|$)/.test(path) && requestToken === token) clearProjectMedia();
   if (res.status === 401 && /^\/api\/sales(?:[/?]|$)/.test(path) && requestToken === token) clearSaleMedia();
   const d = await res.json();
   if (!res.ok) throw new Error(d.error || 'Something went wrong');
@@ -203,7 +204,7 @@ const STATUS_LABELS = { 'in-progress':'In Progress','leather-hard':'Leather Hard
 const CASUALTY_LABELS = { 'cracked':'Cracked','exploded':'Exploded / Blowout','warped':'Warped','s-crack':'S-Crack','glaze-crawl':'Glaze Crawl','glaze-pinhole':'Glaze Pinholing','glaze-shiver':'Glaze Shivering','glaze-crazing':'Glaze Crazing','glaze-runoff':'Glaze Ran Off','thermal-shock':'Thermal Shock','broke-trimming':'Broke While Trimming','broke-handling':'Broke While Handling','collapsed':'Collapsed','dunting':'Dunting','wrong-color':'Unexpected Color Result','other':'Other' };
 function fmtStatus(s) { return s ? '<span class="status-badge status-' + s + '">' + (STATUS_LABELS[s]||s) + '</span>' : ''; }
 function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { const saleScope = {saleModal:'salePhotoPreview',saleDetailsModal:'saleDetailsContent',bulkSaleModal:'bulkSale'}[id]; if (saleScope) closeSaleMediaScope(saleScope); const firingScope = { firingModal:'firingPhotosContainer', firingViewModal:'firingViewBody', firingPhotoReorderModal:'firingPhotoReorderContent' }[id]; if (firingScope) closeFiringMediaScope(firingScope); if (id === 'glazeViewModal') clearGlazeMedia('glazeViewBody'); if (id === 'clayViewModal') clearClayMedia('clayViewBody'); document.getElementById(id).classList.remove('open'); }
+function closeModal(id) { if (id === 'projectModal' || id === 'projectPhotoModal') closeProjectMediaScope(id); const saleScope = {saleModal:'salePhotoPreview',saleDetailsModal:'saleDetailsContent',bulkSaleModal:'bulkSale'}[id]; if (saleScope) closeSaleMediaScope(saleScope); const firingScope = { firingModal:'firingPhotosContainer', firingViewModal:'firingViewBody', firingPhotoReorderModal:'firingPhotoReorderContent' }[id]; if (firingScope) closeFiringMediaScope(firingScope); if (id === 'glazeViewModal') clearGlazeMedia('glazeViewBody'); if (id === 'clayViewModal') clearClayMedia('clayViewBody'); document.getElementById(id).classList.remove('open'); }
 
 // iOS decimal keyboards have no native Done key. Give every numeric field a
 // consistent way to dismiss the keyboard so form buttons remain reachable.
@@ -427,7 +428,7 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     clearClayMedia();
     clearGlazeMedia();
     clearTestTileMedia();
-    clearSaleMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
+    clearProjectMedia(); clearSaleMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
     clearPieceHistory();
     token = data.token;
     localStorage.setItem('mudlog_token', token);
@@ -447,7 +448,7 @@ function logout() {
   clearClayMedia();
   clearGlazeMedia();
   clearTestTileMedia();
-  clearSaleMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
+  clearProjectMedia(); clearSaleMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
   clearPieceHistory();
   token = null; currentUser = null;
   localStorage.removeItem('mudlog_token');
@@ -470,7 +471,7 @@ async function checkAuth() {
     const msg = (e.message || '').toLowerCase();
     if (msg.includes('invalid token') || msg.includes('unauthorized') || msg.includes('no token') || msg.includes('invalid') || msg.includes('expired')) {
       // Token is bad — clear it and show auth screen (not landing page)
-      clearSaleMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
+      clearProjectMedia(); clearSaleMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
       token = null;
       localStorage.removeItem('mudlog_token');
       document.getElementById('landingPage').style.display = 'none';
@@ -529,6 +530,7 @@ function navigate(page, options = {}) {
   if (page !== 'testTiles') clearTestTileMedia();
   if (page !== 'community') clearComboMedia();
   if (page !== 'firings') clearFiringMedia();
+  if (page !== 'projects') clearProjectMedia();
   if (page !== 'sales') clearSaleMedia();
   if (page !== 'pricingCalculator') clearPricingMedia();
   if (page !== 'pieceDetail') clearPieceHistory();
@@ -6490,9 +6492,87 @@ async function deleteStore(storeId) {
 }
 
 // ============ PROJECTS ============
+let projectMediaGeneration = 0;
+const projectMediaViews = new Map();
+function clearProjectMedia(scope) {
+  if (!scope) projectMediaGeneration++;
+  const lightbox = document.getElementById('lightboxImg');
+  for (const [key, view] of projectMediaViews) {
+    if (scope && key !== scope) continue;
+    view.active = false;
+    view.controller.abort();
+    if (view.urls.includes(lightbox?.src)) { lightbox.removeAttribute('src'); closeLightbox(); }
+    view.urls.forEach(url => URL.revokeObjectURL(url));
+    view.images.forEach(img => { img.removeAttribute('src'); img.dataset.protectedReady = '0'; });
+    projectMediaViews.delete(key);
+  }
+  if (!scope) {
+    projectRequestSerials.clear();
+    for (const id of ['projectsList', 'projectPhotoPreviewContainer']) {
+      const el = document.getElementById(id); if (el) el.innerHTML = '';
+    }
+    for (const id of ['projectModal','projectPhotoModal']) {
+      const modal = document.getElementById(id); modal?.classList.remove('open');
+      modal?.querySelectorAll('input,textarea').forEach(el => { el.value = ''; });
+    }
+  }
+}
+function projectPhotoMarkup(project, photo) {
+  const attrs = (photo.photoDelivery || project.photoDelivery) === 'owner-protected'
+    ? 'data-private-project-photo="' + esc(photo.id) + '" data-project-id="' + esc(project.id) + '" data-protected-ready="0"'
+    : 'src="/uploads/' + encodeURIComponent(photo.filename) + '"';
+  return '<img ' + attrs + ' alt="Project photo" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="event.stopPropagation();if(this.getAttribute(\'src\'))openLightbox(this.src)">';
+}
+async function loadProjectMedia(scope) {
+  clearProjectMedia(scope);
+  const root = document.getElementById(scope);
+  if (!root) return;
+  const generation = projectMediaGeneration, sessionToken = token;
+  const view = { active: true, controller: new AbortController(), urls: [], images: [...root.querySelectorAll('[data-private-project-photo]')] };
+  projectMediaViews.set(scope, view);
+  const active = img => view.active && generation === projectMediaGeneration && token === sessionToken && img.isConnected;
+  await Promise.all(view.images.map(async img => {
+    try {
+      const response = await fetch(API + '/api/ql/projects/' + encodeURIComponent(img.dataset.projectId) + '/photos/' + encodeURIComponent(img.dataset.privateProjectPhoto), {
+        headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store', signal: view.controller.signal
+      });
+      if (response.status === 401 && active(img)) { clearProjectMedia(); return; }
+      if (!response.ok) throw new Error('Photo unavailable');
+      const blob = await response.blob();
+      if (!active(img)) return;
+      const url = URL.createObjectURL(blob);
+      view.urls.push(url);
+      img.src = url;
+      img.dataset.protectedReady = '1';
+      img.onerror = () => { img.removeAttribute('src'); img.alt = 'Photo unavailable'; };
+    } catch (_) { if (active(img)) { img.removeAttribute('src'); img.alt = 'Photo unavailable'; } }
+  }));
+}
+
+const projectRequestSerials = new Map();
+function beginProjectRequest(scope) {
+  const serial = (projectRequestSerials.get(scope) || 0) + 1;
+  projectRequestSerials.set(scope, serial);
+  const generation = projectMediaGeneration, sessionToken = token;
+  return () => serial === projectRequestSerials.get(scope) && generation === projectMediaGeneration && sessionToken === token;
+}
+function closeProjectMediaScope(scope) {
+  projectRequestSerials.set(scope, (projectRequestSerials.get(scope) || 0) + 1);
+  clearProjectMedia(scope);
+  if (scope === 'projectModal') {
+    projectRequestSerials.set('projectPreview', (projectRequestSerials.get('projectPreview') || 0) + 1);
+    const preview = document.getElementById('projectPhotoPreviewContainer'); if (preview) preview.innerHTML = '';
+    const input = document.getElementById('projectPhotoInput'); if (input) input.value = '';
+  }
+}
+
+
 async function loadProjects() {
+  const active = beginProjectRequest('projectsList');
+  clearProjectMedia('projectsList');
   try {
     let projects = await api('/api/projects');
+    if (!active()) return;
     const c = document.getElementById('projectsList'), em = document.getElementById('projectsEmpty');
     if (!projects.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
@@ -6514,19 +6594,20 @@ async function loadProjects() {
       projects = [...projects].sort((a, b) => new Date(b.created_at||0) - new Date(a.created_at||0));
     }
     const priorityColors = { high: 'var(--danger)', medium: '#F4A623', low: 'var(--success)' };
-    const photosHtml = (photos) => photos && photos.length > 0 ? '<div style="display:flex;gap:6px;margin:8px 0;flex-wrap:wrap">' + photos.map(p => '<img src="/uploads/' + p.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')">').join('') + '</div>' : '';
+    const photosHtml = (project) => project.photos?.length ? '<div style="display:flex;gap:6px;margin:8px 0;flex-wrap:wrap">' + project.photos.map(photo => projectPhotoMarkup(project, photo)).join('') + '</div>' : '';
     c.innerHTML = projects.map(p =>
       '<div class="card" style="cursor:pointer" onclick="editProject(\'' + p.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(p.title) + '</div>' +
       '<div class="text-sm" style="color:var(--text-light)">' + (p.due_date ? 'Due: ' + fmtDate(p.due_date) : '') + '</div></div>' +
       '<div style="display:flex;gap:6px;align-items:center">' +
       (p.priority && p.priority !== 'medium' ? '<span class="piece-meta-tag" style="color:' + priorityColors[p.priority] + ';background:' + priorityColors[p.priority] + '22">' + p.priority + '</span>' : '<span class="piece-meta-tag" style="color:' + priorityColors['medium'] + ';background:' + priorityColors['medium'] + '22">medium</span>') +
       '<span class="piece-meta-tag">' + (p.status||'active') + '</span></div></div>' +
-      photosHtml(p.photos) +
+      photosHtml(p) +
       (p.description ? '<div class="text-sm mt-8">' + esc(p.description) + '</div>' : '') +
       '<div style="display:flex;gap:4px;margin-top:10px"><button onclick="event.stopPropagation();openProjectPhotoUpload(\'' + p.id + '\')" class="btn-small" title="Add photos">📸</button><button onclick="event.stopPropagation();editProject(\'' + p.id + '\')" class="btn-small">✎</button><button onclick="event.stopPropagation();deleteProject(\'' + p.id + '\')" class="btn-small">✕</button></div>' +
       '</div>'
     ).join('');
-  } catch(e) { toast(e.message,'error'); }
+    await loadProjectMedia('projectsList');
+  } catch(e) { if (active()) toast(e.message,'error'); }
 }
 
 function openProjectModal(p = null) {
@@ -6548,7 +6629,9 @@ function openProjectModal(p = null) {
 }
 
 function editProject(id) {
-  api('/api/projects').then(projects => {
+  const active = beginProjectRequest('projectModal');
+  return api('/api/projects').then(projects => {
+    if (!active()) return;
     const p = projects.find(x => x.id === id);
     if (p) openProjectModal(p);
   });
@@ -6556,6 +6639,7 @@ function editProject(id) {
 
 async function saveProject(e) {
   e.preventDefault();
+  const active = beginProjectRequest('projectSave');
   const id = document.getElementById('projectId').value;
   const body = {
     title: document.getElementById('projectTitle').value,
@@ -6571,6 +6655,7 @@ async function saveProject(e) {
       trackActivity('edit_project', 'projects');
     } else {
       const created = await api('/api/projects', {method:'POST',body});
+      if (!active()) return;
       trackActivity('create_project', 'projects');
       // Upload photo if one was selected
       const photoInput = document.getElementById('projectPhotoInput');
@@ -6587,6 +6672,7 @@ async function saveProject(e) {
         toast('Project added!','success');
       }
     }
+    if (!active()) return;
     closeModal('projectModal');
     document.getElementById('projectId').value = '';
     loadProjects();
@@ -6599,12 +6685,14 @@ async function deleteProject(id) {
 }
 
 function previewProjectPhoto(event) {
+  const active = beginProjectRequest('projectPreview');
   const file = event.target.files[0];
   const container = document.getElementById('projectPhotoPreviewContainer');
   if (!container) return;
   if (file) {
     const reader = new FileReader();
     reader.onload = function(e) {
+      if (!active()) return;
       container.innerHTML = '<img src="' + e.target.result + '" style="max-width:200px; max-height:200px; border-radius:8px; margin:8px 0;" alt="Project photo preview">';
     };
     reader.readAsDataURL(file);
@@ -6621,6 +6709,7 @@ function openProjectPhotoUpload(projectId) {
 
 async function uploadProjectPhotos(event) {
   event.preventDefault();
+  const active = beginProjectRequest('projectUpload');
   const projectId = document.getElementById('projectPhotoProjectId').value;
   const files = document.getElementById('projectPhotoFile').files;
   if (!files.length) return;
@@ -6628,6 +6717,7 @@ async function uploadProjectPhotos(event) {
   for (let f of files) formData.append('photos', f);
   try {
     await api('/api/projects/' + projectId + '/photos', { method: 'POST', body: formData });
+    if (!active()) return;
     toast('Photos uploaded', 'success');
     closeModal('projectPhotoModal');
     loadProjects();

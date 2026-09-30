@@ -119,3 +119,7 @@ The smallest next blocker-removal slice is **Phase 2G: protected delivery for Cl
 ## Phase 2G addendum
 
 The inventory above is the Phase 2F historical baseline. Clay now has owner-protected web/shared-mobile delivery on the isolated Phase 2G branch, with historical visibility still unknown. See `PHASE2G-CLAY-MEDIA.md` for complete mapping, scoped edit isolation and remaining static-URL exposure. Global restriction remains NOT READY. Next implementation slice is Glaze library photos only.
+
+## Phase 2O Project-only update
+
+Project owner responses now use protected parent/photo-ID delivery across website gallery/lightbox and shared mobile detail/editor. Historical classification remains ambiguous; old compiled clients/static URLs remain compatible. See `PHASE2O-PROJECT-MEDIA.md` for the complete inventory, mutations, verification, and residual risks. This supersedes the Project-specific unprotected status in the original Phase 2F snapshot; other snapshot categories are historical, not a claim of current completion.

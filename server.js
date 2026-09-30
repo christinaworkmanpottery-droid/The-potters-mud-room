@@ -1975,6 +1975,30 @@ function protectPieceHistoryTestTileMedia(history) {
   for (const entry of history.history || []) if (entry?.recordType === 'test-tile' && entry.values) testTileMediaContract(entry.values);
   return history;
 }
+app.get('/api/ql/projects/:projectId/photos/:photoId', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  res.set('X-Content-Type-Options', 'nosniff');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const photo = db.prepare('SELECT ph.filename FROM project_photos ph JOIN projects p ON p.id=ph.project_id WHERE p.id=? AND p.user_id=? AND ph.id=?')
+      .get(req.params.projectId, req.userId, req.params.photoId);
+    if (!photo) return unavailable();
+    const target = safeStoredUpload(photo.filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(photo.filename)) return unavailable();
+    const owned = ownedPhotoSlots(photo.filename, req.userId);
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(photo.filename);
+        if (rows.some(row => !owned.some(slot => slot.table === table && slot.column === column && slot.id === row.id))) return unavailable();
+      }
+    }
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
+
 app.get('/api/ql/sales/:saleId/photos/:filename', auth, (req, res) => {
   res.set('Cache-Control', 'private, no-store');
   res.set('X-Content-Type-Options', 'nosniff');
@@ -4323,11 +4347,18 @@ app.delete('/api/goals/:id', auth, (req, res) => {
 });
 
 // ============ PROJECTS ============
+// Delivery is owner scoped; historical publication remains unclassified.
+function projectMediaContract(record) {
+  return { ...record, photoDelivery: 'owner-protected', photoVisibility: 'legacy-ambiguous' };
+}
+function projectPhotos(projectId) {
+  return db.prepare('SELECT id,filename,sort_order FROM project_photos WHERE project_id=? ORDER BY sort_order ASC, rowid ASC').all(projectId).map(projectMediaContract);
+}
 app.get('/api/projects', auth, (req, res) => {
   const projects = db.prepare('SELECT * FROM projects WHERE user_id=? ORDER BY due_date ASC, updated_at DESC').all(req.userId);
   const result = projects.map(p => {
-    const photos = db.prepare('SELECT id,filename FROM project_photos WHERE project_id=? ORDER BY sort_order ASC').all(p.id);
-    return { ...p, photos };
+    const photos = projectPhotos(p.id);
+    return projectMediaContract({ ...p, photos });
   });
   res.json(result);
 });
@@ -4355,11 +4386,12 @@ app.post('/api/projects', auth, (req, res) => {
 app.get('/api/projects/:id', auth, (req, res) => {
   const project = db.prepare('SELECT * FROM projects WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!project) return res.status(404).json({ error: 'Project not found' });
-  const photos = db.prepare('SELECT id,filename FROM project_photos WHERE project_id=? ORDER BY sort_order ASC').all(project.id);
-  res.json({ ...project, photos });
+  const photos = projectPhotos(project.id);
+  res.json(projectMediaContract({ ...project, photos }));
 });
 
 app.put('/api/projects/:id', auth, (req, res) => {
+  if (!db.prepare('SELECT 1 FROM projects WHERE id=? AND user_id=?').get(req.params.id, req.userId)) return res.status(404).json({ error: 'Not found' });
   const { title, name, description, status, dueDate, deadline, notes, priority, contactName, contactEmail, contactPhone, contactNotes, shoppingList, budget } = req.body;
   const projectTitle = title || name;
   if (!projectTitle) return res.status(400).json({ error: 'Project name is required' });
@@ -4376,37 +4408,70 @@ app.put('/api/projects/:id', auth, (req, res) => {
 });
 
 app.delete('/api/projects/:id', auth, (req, res) => {
-  db.prepare('DELETE FROM projects WHERE id=? AND user_id=?').run(req.params.id, req.userId);
-  res.json({ success: true });
+  try {
+    const files = db.transaction(() => {
+      if (!db.prepare('SELECT 1 FROM projects WHERE id=? AND user_id=?').get(req.params.id, req.userId)) return null;
+      const files = db.prepare('SELECT filename FROM project_photos WHERE project_id=?').all(req.params.id).map(p => p.filename);
+      db.prepare('DELETE FROM project_photos WHERE project_id=?').run(req.params.id);
+      db.prepare('DELETE FROM projects WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+      return files;
+    }).immediate();
+    if (!files) return res.status(404).json({ error: 'Not found' });
+    deletionLifecycle.cleanupFiles(files);
+    res.json({ success: true });
+  } catch (_) { if (!res.headersSent) res.status(500).json({ error: 'Could not delete project' }); }
 });
 
 app.post('/api/projects/:id/photos', auth, upload.array('photos', 5), (req, res) => {
-  const projectId = req.params.id;
-  const project = db.prepare('SELECT user_id FROM projects WHERE id=?').get(projectId);
-  if (!project || project.user_id !== req.userId) return res.status(403).json({ error: 'Unauthorized' });
-  for (const f of req.files) {
-    const photoId = uuidv4();
-    db.prepare('INSERT INTO project_photos (id,project_id,filename,original_name) VALUES (?,?,?,?)')
-      .run(photoId, projectId, f.filename, f.originalname);
+  const files = req.files || [];
+  try {
+    const result = db.transaction(() => {
+      if (!db.prepare('SELECT 1 FROM projects WHERE id=? AND user_id=?').get(req.params.id, req.userId)) return null;
+      const target = req.body.replacePhotoId ? db.prepare('SELECT * FROM project_photos WHERE project_id=? AND id=?').get(req.params.id, req.body.replacePhotoId) : null;
+      if (req.body.replacePhotoId && !target) return null;
+      if (!files.length || (target && files.length !== 1)) { const e = new Error('Invalid photos'); e.status = 400; throw e; }
+      if (target) {
+        db.prepare('UPDATE project_photos SET filename=?,original_name=? WHERE id=? AND project_id=?').run(files[0].filename, files[0].originalname, target.id, req.params.id);
+        return { files: [target.filename], photos: [{ id: target.id, filename: files[0].filename }] };
+      }
+      const last = db.prepare('SELECT MAX(sort_order) AS n FROM project_photos WHERE project_id=?').get(req.params.id).n;
+      const photos = files.map((f, index) => {
+        const id = uuidv4();
+        db.prepare('INSERT INTO project_photos (id,project_id,filename,original_name,sort_order) VALUES (?,?,?,?,?)').run(id, req.params.id, f.filename, f.originalname, (last ?? -1) + 1 + index);
+        return { id, filename: f.filename };
+      });
+      return { files: [], photos };
+    }).immediate();
+    if (!result) {
+      deletionLifecycle.cleanupFiles(files.map(f => f.filename));
+      return res.status(404).json({ error: 'Not found' });
+    }
+    deletionLifecycle.cleanupFiles(result.files);
+    res.json({ success: true, ...result.photos[0], photos: result.photos.map(projectMediaContract) });
+  } catch (error) {
+    // Reference-aware cleanup also protects a committed replacement if sending fails.
+    deletionLifecycle.cleanupFiles(files.map(f => f.filename));
+    if (!res.headersSent) res.status(error.status || 500).json({ error: 'Could not save project photos' });
   }
-  res.json({ success: true });
 });
 
 app.get('/api/projects/:id/photos', auth, (req, res) => {
-  const projectId = req.params.id;
-  const project = db.prepare('SELECT user_id FROM projects WHERE id=?').get(projectId);
-  if (!project || project.user_id !== req.userId) return res.status(403).json({ error: 'Unauthorized' });
-  const photos = db.prepare('SELECT id,filename FROM project_photos WHERE project_id=? ORDER BY sort_order ASC').all(projectId);
-  res.json(photos);
+  if (!db.prepare('SELECT 1 FROM projects WHERE id=? AND user_id=?').get(req.params.id, req.userId)) return res.status(404).json({ error: 'Not found' });
+  res.json(projectPhotos(req.params.id));
 });
 
 app.delete('/api/project-photos/:id', auth, (req, res) => {
-  const photo = db.prepare('SELECT p.project_id, pr.user_id FROM project_photos p JOIN projects pr ON p.project_id=pr.id WHERE p.id=?').get(req.params.id);
-  if (!photo || photo.user_id !== req.userId) return res.status(403).json({ error: 'Unauthorized' });
-  const filename = db.prepare('SELECT filename FROM project_photos WHERE id=?').get(req.params.id)?.filename;
-  db.prepare('DELETE FROM project_photos WHERE id=?').run(req.params.id);
-  deletionLifecycle.cleanupFiles([filename]);
-  res.json({ success: true });
+  try {
+    const photo = db.transaction(() => {
+      const photo = db.prepare('SELECT ph.filename FROM project_photos ph JOIN projects p ON ph.project_id=p.id WHERE ph.id=? AND p.user_id=?').get(req.params.id, req.userId);
+      if (!photo) return null;
+      db.prepare('DELETE FROM project_photos WHERE id=?').run(req.params.id);
+      return photo;
+    }).immediate();
+    if (!photo) return res.status(404).json({ error: 'Not found' });
+    deletionLifecycle.cleanupFiles([photo.filename]);
+    res.json({ success: true });
+  } catch (_) { if (!res.headersSent) res.status(500).json({ error: 'Could not delete project photo' }); }
 });
 
 // ============ EVENTS ============
