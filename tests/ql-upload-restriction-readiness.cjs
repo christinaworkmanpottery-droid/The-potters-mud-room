@@ -69,3 +69,26 @@ test('readiness conclusion and next slice are explicit',()=>{
   assert.match(inventory,/GLOBAL \`\/uploads\` IS NOT READY FOR RESTRICTION/);
   assert.match(inventory,/Phase 2G: protected delivery for Clay media only/);
 });
+
+const closure=fs.readFileSync('ql/PHASE2T-UPLOAD-RESTRICTION-CLOSURE.md','utf8');
+test('Phase 2T keeps anonymous uploads unchanged while recording current-source blockers',()=>{
+  assert.match(server,/app\.use\('\/uploads', express\.static\(UPLOADS_DIR\)\)/);
+  assert.match(closure,/GLOBAL \/uploads IS NOT READY FOR RESTRICTION/);
+  assert.match(closure,/PHASE 2 IS NOT READY TO CLOSE/);
+  assert.match(closure,/Website Piece cards\/dashboard\/list/);
+  assert.match(closure,/Website Photo Lookup thumbnails/);
+});
+test('Phase 2T records protected and explicit-public contracts without auto-classifying history',()=>{
+  for(const phrase of ['Clay','Glaze library','Glaze\/Clay Tests','Test Tiles','Firings','Pricing','Sales','Projects','Events','Profile\/avatar','Forum images\/videos','Shop'])
+    assert.match(closure,new RegExp(phrase));
+  assert.match(closure,/Never infer visibility from filename, UUID shape, extension, age or directory location/);
+  assert.match(closure,/Shop paid originals remain exact-purchase protected/);
+  assert.match(closure,/Forum media remains authenticated/);
+  assert.match(closure,/Find a Potter\/public avatar rules and Calendar\/iCal regressions pass/);
+});
+test('Phase 2T public-media closure gaps and exact 2U slice are explicit',()=>{
+  assert.match(closure,/Public Piece Gallery: NOT YET COMPLETE/);
+  assert.match(closure,/public Glaze Combo page and Pinterest media URL/);
+  assert.match(closure,/Phase 2U — Piece\/public-edge media closure/);
+  assert.match(closure,/Do not restrict global \/uploads/);
+});
