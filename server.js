@@ -3321,10 +3321,12 @@ function saveComboRecord(req, res) {
       }
     })();
     deletionLifecycle.cleanupFiles(oldPhotos.filter(old => !photos.includes(old)));
+    const savedUploads = new Set(photos.filter(Boolean));
+    deletionLifecycle.cleanupFiles((req.files || []).map(file => file.filename).filter(filename => !savedUploads.has(filename)));
     res.json({ id, success: true, photo_filename: photos[0], photo_filename2: photos[1] });
-  } catch(err) { res.status(400).json({ error: err.message }); }
-  finally {
+  } catch(err) {
     deletionLifecycle.cleanupFiles((req.files || []).map(file => file.filename));
+    res.status(400).json({ error: err.message });
   }
 }
 app.post('/api/community/combos', auth, requireTier('starter'), upload.array('photos', 2), saveComboRecord);
