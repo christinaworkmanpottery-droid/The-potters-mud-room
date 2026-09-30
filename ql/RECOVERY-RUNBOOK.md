@@ -137,3 +137,38 @@ mixed operations/audit/corruption detection → whole-tree restore → exact byt
 legacy reads/audit/FK/integrity → readonly reopen. The images are synthetic byte fixtures,
 not image-quality certification. No live writer orchestration, production schema, large-scale
 runtime, permissions, live disk recovery, store purchase or device behavior is certified.
+
+## Pre-release expanded disposable procedure (2026-09-30)
+
+The expanded implementation is `rehearsal/README.md` and `rehearsal/run.cjs`. Its Actions artifact
+is the evidence for the exact tested commit. It does not authorize any production operation.
+
+1. Create an isolated checkout, install committed dependencies with Node 22/npm ci, generate test
+   secrets and synthetic fixtures, enforce loopback/outbound isolation. Empty-start proof launches
+   server.js directly without preparatory initDB. For historical QL preparation, run current legacy
+   compatibility first, then only the existing migrate(db) helper.
+2. Wait for startup photo processing and every verification request; stop the child and all writers.
+   WAL TRUNCATE checkpoint must not be busy; close all handles and verify no outstanding sidecars.
+3. Capture the complete DB and uploads tree as one cold generation together with matching tracked
+   code, lockfile, static files, geodata, seed-blog-drafts.js and explicit Shop original/preview assets.
+   Record path/hash/size/permission manifests and schema/index/trigger/row/relationship/ledger baseline.
+4. Preserve a failed whole generation in quarantine. Verify the backup manifests, then copy into a
+   new clean staging generation. Never initialize a blank DB before restore, overlay uploads, or mix
+   WAL/SHM generations. Missing bytes, unexpected paths or permissions fail the manifest gate.
+5. Verify exact offline hashes and state, open readonly with fileMustExist, run integrity/FK checks
+   and explicit ownership/legacy TEXT Contact/Shop-path audits. Integrity alone is not enough:
+   the special-account billing CHECK incompatibility is documented separately in the rehearsal report.
+6. Only after acceptance of the offline generation, start the isolated application. Wait for photo
+   processing. Compare every schema/row change to the enumerated startup transition; do not label
+   documented seeding, tier/referral/store/photo changes as corruption or ignore unexplained drift.
+7. Exercise authenticated HTTP and UI reads/media/History/Contact/iCal contracts. Password login
+   deliberately updates last_login. Stop, capture, restart and validate; repeat for a second restart.
+   Media must remain byte-exact; later startup must reach stable resulting state.
+8. Damaged-copy diagnostic launches are explicitly separate from accepted restore generations. Keep
+   the clean backup unchanged; restore a new whole generation to recover. Do not self-heal records,
+   adopt orphan files, rewrite owners, or repair ledgers automatically.
+9. Do not reconnect devices or queues until a separately authorized recovery is accepted. Server
+   backup does not include device state; stale same-account operations remain a documented risk.
+
+The Admin demographics defect and newly observed release-asset/billing-constraint blockers are
+separate maintenance work. **Do not treat successful test execution as production release approval.**

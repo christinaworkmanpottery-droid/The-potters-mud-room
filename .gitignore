@@ -8,3 +8,7 @@ data/
 .env
 database.sqlite
 .buildwork/
+
+# Disposable rehearsal local authorization marker and generated evidence
+.rehearsal-checkout
+ql/rehearsal/evidence/
