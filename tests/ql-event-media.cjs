@@ -49,7 +49,7 @@ test('shared-file reference protection still includes Event images', () => {
   assert.match(deletion,/hasStoredFileReference/);
 });
 test('global uploads remains unrestricted by Phase 2P', () => {
-  assert.match(server,/app\.use\('\/uploads', express\.static\(uploadsDir\)\)/);
+  assert.match(server,/app\.use\('\/uploads', express\.static\(UPLOADS_DIR\)\)/);
 });
 test('Event metadata update is owner scoped and missing-equivalent', () => {
   const p=server.indexOf("app.put('/api/events/:id'");

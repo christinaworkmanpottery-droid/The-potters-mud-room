@@ -38,7 +38,7 @@ for (const [args, extraEnv] of [
   [['--test', 'tests/ql-pricing-media.cjs', 'tests/ql-pricing-media-dom.cjs'], {}],
   [['--test', 'tests/ql-sales-media.cjs', 'tests/ql-sales-media-dom.cjs'], {}],
   [['--test', 'tests/ql-project-media.cjs', 'tests/ql-project-media-dom.cjs'], {}],
-  [['--test', 'tests/ql-event-media.cjs', 'tests/ql-event-media-dom.cjs'], {}]
+  [['--test', 'tests/ql-event-media.cjs', 'tests/ql-event-media-dom.cjs', 'tests/ql-event-media-api.cjs'], {}]
 ]) {
   const result = spawnSync(process.execPath, args, { cwd: root, env: { ...cleanEnv, ...extraEnv }, stdio: 'inherit' });
   if (result.status !== 0) process.exit(result.status || 1);

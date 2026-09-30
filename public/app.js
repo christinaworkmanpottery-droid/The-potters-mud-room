@@ -6743,6 +6743,9 @@ function clearEventMedia() {
     if (entry?.url) URL.revokeObjectURL(entry.url);
   }
   eventMedia.clear();
+  document.querySelectorAll('img[data-event-media]').forEach(img => { img.removeAttribute('src'); img.style.display = 'none'; });
+  const list = document.getElementById('eventsList');
+  if (list) list.innerHTML = '';
 }
 function eventMediaVisibility(event) {
   return event?.photoDelivery === 'owner-protected' ? 'private' : 'legacy-ambiguous';
@@ -6755,8 +6758,10 @@ function eventImageMarkup(event, className = 'photo-thumb', alt = '') {
 }
 async function hydrateEventMedia(root, events) {
   const generation = eventMediaGeneration;
+  const requestToken = token;
   const byKey = new Map(events.filter(e => e?.image_filename).map(e => [String(e.id)+':'+String(e.image_filename), e]));
   for (const img of root.querySelectorAll('img[data-event-media]')) {
+    if (generation !== eventMediaGeneration || requestToken !== token) return;
     const key = img.dataset.eventMedia;
     const event = byKey.get(key);
     if (!event || eventMediaVisibility(event) !== 'private') continue;
@@ -6767,11 +6772,12 @@ async function hydrateEventMedia(root, events) {
       eventMedia.set(key, entry);
       try {
         const response = await fetch(API + '/api/ql/events/' + encodeURIComponent(event.id) + '/photos/' + encodeURIComponent(event.image_filename), {
-          headers: { Authorization: 'Bearer ' + token }, cache: 'no-store', signal: controller.signal
+          headers: { Authorization: 'Bearer ' + requestToken }, cache: 'no-store', signal: controller.signal
         });
+        if (response.status === 401 && generation === eventMediaGeneration && requestToken === token) { clearEventMedia(); return; }
         if (!response.ok) throw new Error('Event photo unavailable');
         const url = URL.createObjectURL(await response.blob());
-        if (generation !== eventMediaGeneration || eventMedia.get(key) !== entry) { URL.revokeObjectURL(url); continue; }
+        if (generation !== eventMediaGeneration || requestToken !== token || eventMedia.get(key) !== entry) { URL.revokeObjectURL(url); return; }
         entry.url = url;
       } catch (_) { if (eventMedia.get(key) === entry) eventMedia.delete(key); continue; }
     }
@@ -6781,8 +6787,11 @@ async function hydrateEventMedia(root, events) {
 
 // ============ EVENTS ============
 async function loadEvents() {
+  clearEventMedia();
+  const generation = eventMediaGeneration, requestToken = token;
   try {
     const events = await api('/api/events');
+    if (generation !== eventMediaGeneration || requestToken !== token) return;
     const c = document.getElementById('eventsList'), em = document.getElementById('eventsEmpty');
     if (!events.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
@@ -6832,7 +6841,9 @@ async function loadEvents() {
 }
 
 function shareEvent(id) {
+  const generation = eventMediaGeneration, requestToken = token;
   api('/api/events').then(events => {
+    if (generation !== eventMediaGeneration || requestToken !== token) return;
     const e = events.find(x => x.id === id);
     if (!e) return;
     const text = e.title + ' — ' + fmtDate(e.event_date) + (e.start_time ? ' at ' + e.start_time : '') + (e.location ? ' · ' + e.location : '') + (e.address ? ' · ' + e.address : '') + (e.website ? '\n' + e.website : '');
@@ -6858,7 +6869,9 @@ function openEventModal(e = null) {
 }
 
 function editEvent(id) {
+  const generation = eventMediaGeneration, requestToken = token;
   api('/api/events').then(events => {
+    if (generation !== eventMediaGeneration || requestToken !== token) return;
     const e = events.find(x => x.id === id);
     if (e) openEventModal(e);
   });
