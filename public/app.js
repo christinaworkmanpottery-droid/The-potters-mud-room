@@ -3147,6 +3147,57 @@ function savePricingRates() {
 }
 
 // ---- Community Combos ----
+let comboMediaGeneration = 0;
+const comboMediaControllers = new Set();
+const comboMediaBlobUrls = new Set();
+function clearComboMedia() {
+  comboMediaGeneration++;
+  comboMediaControllers.forEach(controller => controller.abort());
+  comboMediaControllers.clear();
+  comboMediaBlobUrls.forEach(url => URL.revokeObjectURL(url));
+  comboMediaBlobUrls.clear();
+}
+function comboPhotoMeta(combo, slot) {
+  const suffix = slot === 1 ? '' : '2';
+  return {
+    filename: combo?.[slot === 1 ? 'photo_filename' : 'photo_filename2'],
+    delivery: combo?.['photoDelivery' + suffix],
+  };
+}
+function comboPhotoUrl(combo, slot) {
+  const meta = comboPhotoMeta(combo, slot);
+  if (!meta.filename) return '';
+  if (meta.delivery === 'public-explicit') return '/api/ql/community/combos/' + encodeURIComponent(combo.id) + '/photos/' + slot + '/public';
+  if (meta.delivery === 'legacy-static') return '/uploads/' + encodeURIComponent(meta.filename);
+  return '';
+}
+async function loadComboPrivateMedia(root=document) {
+  const generation = comboMediaGeneration, sessionToken = token;
+  const nodes = [...root.querySelectorAll('[data-private-combo-photo]')];
+  await Promise.all(nodes.map(async img => {
+    const comboId = img.dataset.comboId, slot = img.dataset.comboSlot;
+    if (!comboId || !slot || !sessionToken) return;
+    const controller = new AbortController(); comboMediaControllers.add(controller);
+    try {
+      const response = await fetch('/api/ql/community/combos/' + encodeURIComponent(comboId) + '/photos/' + slot, {
+        headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store', signal: controller.signal
+      });
+      if (!response.ok) throw new Error('Photo unavailable');
+      const url = URL.createObjectURL(await response.blob());
+      if (generation !== comboMediaGeneration || sessionToken !== token || !img.isConnected) { URL.revokeObjectURL(url); return; }
+      comboMediaBlobUrls.add(url); img.src = url;
+    } catch (_) {
+      if (generation === comboMediaGeneration && img.isConnected) { img.removeAttribute('src'); img.alt='Photo unavailable'; }
+    } finally { comboMediaControllers.delete(controller); }
+  }));
+}
+function comboPhotoMarkup(combo, slot, style) {
+  const meta = comboPhotoMeta(combo, slot);
+  if (!meta.filename) return '';
+  if (meta.delivery === 'owner-protected') return '<img data-private-combo-photo data-combo-id="' + esc(combo.id) + '" data-combo-slot="' + slot + '" alt="Combo photo ' + slot + '" style="' + style + '">';
+  const src = comboPhotoUrl(combo, slot);
+  return src ? '<img src="' + src + '" alt="Combo photo ' + slot + '" style="' + style + '" loading="lazy" onclick="openLightbox(this.src)">' : '';
+}
 function debounceLoadCombos() { clearTimeout(debounceTimer); debounceTimer = setTimeout(loadCombos, 300); }
 async function loadCombos() {
   try {
@@ -3170,7 +3221,7 @@ async function loadCombos() {
       (cb.atmosphere ? '<span class="piece-meta-tag">' + esc(cb.atmosphere) + '</span>' : '') +
       '</div></div>' +
       (cb.clay_body_name ? '<div class="text-sm mb-16"><strong>Clay:</strong> ' + esc(cb.clay_body_name) + '</div>' : '') +
-      (cb.photo_filename || cb.photo_filename2 ? '<div style="display:flex;gap:8px;margin-bottom:12px">' + (cb.photo_filename ? '<img src="/uploads/' + cb.photo_filename + '" style="max-width:300px;max-height:300px;border-radius:var(--radius-sm);object-fit:cover;cursor:zoom-in" loading="lazy" onclick="openLightbox(\'/uploads/' + cb.photo_filename + '\')">' : '') + (cb.photo_filename2 ? '<img src="/uploads/' + cb.photo_filename2 + '" style="max-width:300px;max-height:300px;border-radius:var(--radius-sm);object-fit:cover;cursor:zoom-in" loading="lazy" onclick="openLightbox(\'/uploads/' + cb.photo_filename2 + '\')">' : '') + '</div>' : '') +
+      (cb.photo_filename || cb.photo_filename2 ? '<div style="display:flex;gap:8px;margin-bottom:12px">' + comboPhotoMarkup(cb, 1, 'max-width:300px;max-height:300px;border-radius:var(--radius-sm);object-fit:cover;cursor:zoom-in') + comboPhotoMarkup(cb, 2, 'max-width:300px;max-height:300px;border-radius:var(--radius-sm);object-fit:cover;cursor:zoom-in') + '</div>' : '') +
       '<div>' + (cb.layers||[]).map((l,i) => '<div style="margin-bottom:4px"><span style="color:var(--text-muted);font-size:0.8rem">Layer ' + (i+1) + ':</span> <span class="glaze-tag">' + esc(l.glaze_name) + '</span>' + (l.brand ? ' <span class="text-sm">(' + esc(l.brand) + ')</span>' : '') + (l.coats > 1 ? ' · ' + l.coats + ' coats' : '') + '</div>').join('') + '</div>' +
       (cb.description ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(cb.description) + '</div>' : '') +
       '<div style="display:flex;gap:12px;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">' +
@@ -3185,6 +3236,7 @@ async function loadCombos() {
       '<div id="comboComments_' + cb.id + '" class="hidden" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"></div>' +
       '</div>'
     ).join('');
+    await loadComboPrivateMedia(c);
   } catch(e) { toast(e.message,'error'); }
 }
 
@@ -3196,7 +3248,7 @@ function editCombo(id) {
     if (combo) {
       populateComboDataLists();
       document.getElementById('comboModalTitle').textContent = 'Edit Community Library Entry';
-      comboPhotoSlots = [combo.photo_filename || null, combo.photo_filename2 || null];
+      comboPhotoSlots = [combo.photo_filename ? { filename: combo.photo_filename, combo, slot: 1 } : null, combo.photo_filename2 ? { filename: combo.photo_filename2, combo, slot: 2 } : null];
       document.getElementById('comboPhotos').value = '';
       renderComboPhotos();
       document.getElementById('comboId').value = combo.id;
@@ -3284,7 +3336,7 @@ async function saveCombo(e) {
   let photoIndex = 0;
   const slots = comboPhotoSlots.map(photo => {
     if (photo instanceof File) { fd.append('photos', photo); return photoIndex++; }
-    return photo;
+    return photo?.filename || photo;
   });
   fd.append('photoSlots', JSON.stringify(slots));
   try {
@@ -7492,12 +7544,16 @@ function renderComboPhotos() {
   document.getElementById('comboPhotoSlots').innerHTML = comboPhotoSlots.map((photo, i) => {
     let src = '';
     if (photo instanceof File) { src = URL.createObjectURL(photo); comboPhotoObjectUrls.push(src); }
+    else if (photo?.filename) src = comboPhotoUrl(photo.combo, photo.slot);
     else if (photo) src = '/uploads/' + encodeURIComponent(photo);
+    const protectedAttrs = photo?.combo && comboPhotoMeta(photo.combo, photo.slot).delivery === 'owner-protected'
+      ? ' data-private-combo-photo data-combo-id="' + esc(photo.combo.id) + '" data-combo-slot="' + photo.slot + '"' : '';
     return '<div style="flex:1;min-width:120px">' +
-      (src ? '<img alt="Photo ' + (i+1) + '" src="' + src + '" style="width:100%;height:110px;object-fit:contain">' : '<p class="text-sm">Photo ' + (i+1) + '</p>') +
+      (photo ? '<img alt="Photo ' + (i+1) + '"' + protectedAttrs + (src ? ' src="' + src + '"' : '') + ' style="width:100%;height:110px;object-fit:contain">' : '<p class="text-sm">Photo ' + (i+1) + '</p>') +
       '<label class="btn btn-secondary btn-sm">' + (photo ? 'Replace' : 'Add photo') + '<input type="file" accept="image/*" hidden onchange="setComboPhoto(' + i + ', this)"></label>' +
       (photo ? '<button type="button" class="btn btn-secondary btn-sm" onclick="comboPhotoSlots[' + i + ']=null;renderComboPhotos()">Remove</button>' : '') + '</div>';
   }).join('');
+  loadComboPrivateMedia(document.getElementById('comboPhotoSlots'));
 }
 function setComboPhoto(index, input) {
   if (input.files[0]) comboPhotoSlots[index] = input.files[0];
