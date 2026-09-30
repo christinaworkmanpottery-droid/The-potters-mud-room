@@ -18,7 +18,6 @@
 
 const https = require('https');
 const { v4: uuidv4 } = require('uuid');
-const { isSpecialGrandfatheredUser } = require('./billing-compat.cjs');
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -27,6 +26,57 @@ const APPLE_SHARED_SECRET = process.env.APPLE_SHARED_SECRET || '';
 const GOOGLE_PACKAGE_NAME = process.env.GOOGLE_PACKAGE_NAME || 'com.pottersmudroom.app';
 
 const VALID_PRODUCT_IDS = ['starter_monthly', 'starter_yearly'];
+
+const SPECIAL_GRANDFATHERED_EMAILS = Object.freeze([
+  'jgk1020@gmail.com',
+  'awhiteman96@gmail.com',
+  'christinaworkmanpottery@gmail.com',
+]);
+const SPECIAL_GRANDFATHERED_EMAIL_SET = new Set(SPECIAL_GRANDFATHERED_EMAILS);
+
+function normalizedEmail(email) {
+  return typeof email === 'string' ? email.trim().toLowerCase() : '';
+}
+
+function isSpecialGrandfatheredEmail(email) {
+  return SPECIAL_GRANDFATHERED_EMAIL_SET.has(normalizedEmail(email));
+}
+
+function isSpecialGrandfatheredUser(user) {
+  return !!user && user.tier === 'starter' && isSpecialGrandfatheredEmail(user.email);
+}
+
+function isGrandfatheredPaidUser(user) {
+  return !!user
+    && user.tier === 'starter'
+    && (
+      user.billing_period === 'stripe-monthly'
+      || (isSpecialGrandfatheredEmail(user.email) && user.billing_period !== 'promo')
+    );
+}
+
+function compatibleBillingPeriod(user) {
+  if (!user) return null;
+  if (user.billing_period === 'promo' || user.billing_period === 'yearly') return user.billing_period;
+  if (isSpecialGrandfatheredUser(user)
+      && (user.billing_period === 'monthly' || user.billing_period == null || user.billing_period === 'stripe-monthly')) {
+    return 'stripe-monthly';
+  }
+  return user.billing_period ?? null;
+}
+
+function normalizeSpecialAccountBilling(db) {
+  const placeholders = SPECIAL_GRANDFATHERED_EMAILS.map(() => '?').join(',');
+  return db.prepare(`
+    UPDATE users
+    SET tier='starter',
+        billing_period=CASE
+          WHEN billing_period IN ('monthly','yearly','promo') THEN billing_period
+          ELSE 'monthly'
+        END
+    WHERE LOWER(email) IN (${placeholders})
+  `).run(...SPECIAL_GRANDFATHERED_EMAILS);
+}
 
 // Apple verification endpoints
 const APPLE_PROD_URL = 'https://buy.itunes.apple.com/verifyReceipt';
@@ -531,4 +581,10 @@ module.exports = {
   verifyAndroidPurchase,
   parseGoogleNotification,
   VALID_PRODUCT_IDS,
+  SPECIAL_GRANDFATHERED_EMAILS,
+  isSpecialGrandfatheredEmail,
+  isSpecialGrandfatheredUser,
+  isGrandfatheredPaidUser,
+  compatibleBillingPeriod,
+  normalizeSpecialAccountBilling,
 };
