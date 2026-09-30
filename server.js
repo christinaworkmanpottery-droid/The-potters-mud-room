@@ -509,7 +509,8 @@ for (const [pathName, kind, bodyKey] of [
       res.set('X-QL-Relationships-Available', service.available() ? 'true' : 'false');
       // Retain all old fields while adding the canonical saved-Pricing detail
       // fields through the existing serializer. No alternate JSON contract.
-      res.json(kind === 'pricing' ? records.map(row => ({ ...row, ...parsePricingCalculation(row) })) : records);
+      res.json(kind === 'pricing' ? records.map(row => ({ ...row, ...parsePricingCalculation(row) }))
+        : kind === 'firing' ? records.map(serializeFiring) : records);
     } catch (error) { qlRelationshipError(res, error); }
   });
   app.post(`/api/ql/pieces/:pieceId/${pathName}`, auth, (req, res) => {
@@ -3070,6 +3071,13 @@ app.put('/api/firing-logs/:id/photos/reorder', auth, (req, res) => {
 });
 
 // ============ FIRING LOGS ============
+// Shared canonical representation for list, detail, and Piece relationships.
+function serializeFiring(log) {
+  const piece = log.piece_id && db.prepare('SELECT title FROM pieces WHERE id=? AND user_id=?').get(log.piece_id, log.user_id);
+  const photos = db.prepare('SELECT id,filename FROM firing_photos WHERE firing_id=? ORDER BY sort_order ASC').all(log.id);
+  return { ...log, piece_title: piece?.title || null, photoDelivery: 'owner-protected', photoVisibility: 'legacy-ambiguous', photos: photos.map(firingPhotoContract) };
+}
+
 app.get('/api/firing-logs', auth, (req, res) => {
   const { sort } = req.query;
   let sql = 'SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id AND p.user_id=fl.user_id WHERE fl.user_id=?';
@@ -3080,18 +3088,15 @@ app.get('/api/firing-logs', auth, (req, res) => {
   else orderBy = 'ORDER BY fl.date DESC'; // 'firing_date' is default
   sql += ' ' + orderBy;
   const firings = db.prepare(sql).all(req.userId);
-  const result = firings.map(f => {
-    const photos = db.prepare('SELECT id,filename FROM firing_photos WHERE firing_id=? ORDER BY sort_order ASC').all(f.id);
-    return { ...f, photoDelivery: 'owner-protected', photoVisibility: 'legacy-ambiguous', photos: photos.map(firingPhotoContract) };
-  });
+  const result = firings.map(serializeFiring);
   res.json(result);
 });
 
 app.get('/api/firing-logs/:id', auth, (req, res) => {
   const log = db.prepare('SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id AND p.user_id=fl.user_id WHERE fl.id=? AND fl.user_id=?').get(req.params.id, req.userId);
   if (!log) return res.status(404).json({ error: 'Not found' });
-  const photos = db.prepare('SELECT id,filename FROM firing_photos WHERE firing_id=? ORDER BY sort_order ASC').all(req.params.id);
-  res.json({ ...log, photoDelivery: 'owner-protected', photoVisibility: 'legacy-ambiguous', photos: photos.map(firingPhotoContract) });
+  res.set('Cache-Control', 'private, no-store');
+  res.json(serializeFiring(log));
 });
 
 app.post('/api/firing-logs', auth, (req, res) => {

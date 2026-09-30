@@ -793,6 +793,8 @@ function clearPieceHistory() {
   clearPieceEdgeMedia();
   clearPricingMedia('linkedPricingViewer');
   document.getElementById('linkedPricing')?.remove();
+  if (document.getElementById('linkedFirings')) { closeModal('firingViewModal'); document.getElementById('firingViewBody').replaceChildren(); }
+  document.getElementById('linkedFirings')?.remove();
   pieceViewGeneration++;
   pieceHistoryUrls.forEach(url => URL.revokeObjectURL(url));
   pieceHistoryUrls = [];
@@ -987,14 +989,7 @@ async function viewPiece(id) {
       (g.application_method ? ' <span class="text-sm" style="color:var(--text-light)">— ' + esc(g.application_method) + '</span>' : '') +
       '</div>'
     ).join('') || '<span style="color:var(--text-muted)">No glazes recorded</span>';
-    const firings = (p.firings||[]).map(f =>
-      '<div class="card" style="padding:14px;margin-bottom:8px"><strong>' + esc(f.firing_type||'Firing') + '</strong> — Cone ' + esc(f.cone||'?') +
-      (f.atmosphere ? ' (' + esc(f.atmosphere) + ')' : '') + (f.kiln_name ? ' — ' + esc(f.kiln_name) : '') +
-      (f.firing_speed ? '<br><span class="text-sm"><strong>Speed:</strong> ' + esc(f.firing_speed) + (f.custom_speed_detail ? ' — ' + esc(f.custom_speed_detail) : '') + '</span>' : '') +
-      (f.hold_used ? '<br><span class="text-sm"><strong>Hold:</strong> Yes' + (f.hold_duration ? ' — ' + esc(f.hold_duration) : '') + '</span>' : '') +
-      (f.date ? '<br><span class="text-sm" style="color:var(--text-light)">' + fmtDate(f.date) + '</span>' : '') +
-      (f.results ? '<br><span class="text-sm">' + esc(f.results) + '</span>' : '') + '</div>'
-    ).join('');
+    const firings = savedPieceFiringsMarkup(p.firings);
 
     const maxPhotos = (currentUser?.tier || 'free') === 'free' ? 1 : 3;
     const canAddPhoto = (p.photos||[]).length < maxPhotos;
@@ -1031,7 +1026,7 @@ async function viewPiece(id) {
       (p.sale_price ? df('Sale Price', '$' + parseFloat(p.sale_price).toFixed(2)) : '') +
       (p.cleanNotes ? df('Notes', p.cleanNotes) : (p.description ? df('Notes', p.description) : '')) + '</div>' +
       '<div>' +
-      (firings ? '<div class="card mb-16"><h3 style="margin-bottom:12px">Firings</h3>' + firings + '</div>' : '') +
+      '<div id="pieceSavedFirings">' + (firings ? '<div class="card mb-16"><h3 style="margin-bottom:12px">Firings</h3>' + firings + '</div>' : '') + '</div>' +
       ((p.status === 'broken' || p.status === 'recycled') ? '<div class="card" style="border:2px solid var(--danger);background:rgba(220,53,69,0.05)"><h3 style="margin-bottom:12px;color:var(--danger)">' + (p.status === 'recycled' ? 'Recycle Report' : 'Casualty Report') + '</h3>' +
         df('What Happened', p.casualty_type ? CASUALTY_LABELS[p.casualty_type] || p.casualty_type : 'Not specified') +
         (p.casualty_notes ? df('What Went Wrong', p.casualty_notes) : '') +
@@ -1047,6 +1042,7 @@ async function viewPiece(id) {
     history.append(historyElement('h2', 'Connected History'), loading);
     document.getElementById('pieceDetailContent').append(history);
     mountLinkedPricing(p.id, generation, sessionToken);
+    mountLinkedFirings(p.id, generation, sessionToken);
     if (privatePiecePhotos) void loadPrivatePieceDetailPhotos(p.id, generation, sessionToken);
     else void loadPieceEdgeMedia(document.getElementById('photoReorderContainer'));
     void loadPieceHistory(p.id, history, generation, sessionToken);
@@ -2328,10 +2324,21 @@ function editFiring(id) {
   });
 }
 
-function viewFiring(id) {
-  const active = beginFiringRequest('firingViewBody');
-  api('/api/firing-logs').then(async firings => {
+function viewFiring(id, options = {}) {
+  const requestActive = beginFiringRequest('firingViewBody');
+  const account = currentUser?.id;
+  const active = () => requestActive() && account === currentUser?.id && (!options.active || options.active());
+  const readOnly = options.readOnly === true;
+  const body = document.getElementById('firingViewBody');
+  clearFiringMedia('firingViewBody');
+  body.textContent = 'Loading Firing…';
+  document.getElementById('firingViewEditBtn').hidden = true;
+  document.getElementById('firingViewDeleteBtn').hidden = true;
+  openModal('firingViewModal');
+  const details = readOnly ? api('/api/firing-logs/' + encodeURIComponent(id)).then(f => [f]) : api('/api/firing-logs');
+  return details.then(async firings => {
     const f = firings.find(f => f.id === id);
+    if (active() && !f) throw Error('unavailable');
     if (!active() || !f) return;
     const df = (label, val) => val ? '<div class="detail-row"><span class="detail-label">' + esc(label) + '</span><span class="detail-value">' + esc(String(val)) + '</span></div>' : '';
     let photosHtml = '';
@@ -2340,7 +2347,7 @@ function viewFiring(id) {
       photos = await api('/api/firing-logs/' + f.id + '/photos');
       if (photos && photos.length) {
         photosHtml = '<div style="margin-top:12px">';
-        if (photos.length > 1) {
+        if (!readOnly && photos.length > 1) {
           photosHtml += '<button class="btn btn-sm btn-secondary" onclick="openFiringPhotoReorder(\'' + f.id + '\')" style="margin-bottom:8px"><span style="font-size:1rem">⇅</span> Rearrange Photos</button>';
         }
         photosHtml += '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
@@ -2366,10 +2373,18 @@ function viewFiring(id) {
       df('Notes', f.notes) +
       (f.piece_title ? df('Piece', f.piece_title) : '') +
       photosHtml;
-    document.getElementById('firingViewEditBtn').onclick = () => editFiring(f.id);
+    document.getElementById('firingViewEditBtn').hidden = false;
+    document.getElementById('firingViewDeleteBtn').hidden = readOnly;
+    document.getElementById('firingViewEditBtn').onclick = () => { if (active()) editFiring(f.id); };
     document.getElementById('firingViewDeleteBtn').onclick = () => { closeModal('firingViewModal'); deleteFiring(f.id); };
     openModal('firingViewModal');
     loadFiringMedia('firingViewBody');
+  }).catch(() => {
+    if (!active()) return;
+    body.replaceChildren(historyElement('p', 'Firing unavailable. Try again when connected.'));
+    const retry = historyElement('button', 'Retry', 'btn btn-secondary');
+    retry.onclick = () => { if (active()) void viewFiring(id, options); };
+    body.append(retry);
   });
 }
 
@@ -8407,6 +8422,118 @@ function mountLinkedPricing(pieceId, generation, sessionToken) {
       root.append(viewer, button('Back to linked calculations', () => load()));
       void loadPricingMedia('linkedPricingViewer');
     } catch (_) { if (active()) { busy = false; failure(); } }
+  }
+  void load();
+}
+
+function savedPieceFiringsMarkup(firings) {
+  return (firings || []).map(f =>
+      '<div class="card" style="padding:14px;margin-bottom:8px"><strong>' + esc(f.firing_type||'Firing') + '</strong> — Cone ' + esc(f.cone||'?') +
+      (f.atmosphere ? ' (' + esc(f.atmosphere) + ')' : '') + (f.kiln_name ? ' — ' + esc(f.kiln_name) : '') +
+      (f.firing_speed ? '<br><span class="text-sm"><strong>Speed:</strong> ' + esc(f.firing_speed) + (f.custom_speed_detail ? ' — ' + esc(f.custom_speed_detail) : '') + '</span>' : '') +
+      (f.hold_used ? '<br><span class="text-sm"><strong>Hold:</strong> Yes' + (f.hold_duration ? ' — ' + esc(f.hold_duration) : '') + '</span>' : '') +
+      (f.date ? '<br><span class="text-sm" style="color:var(--text-light)">' + fmtDate(f.date) + '</span>' : '') +
+      (f.results ? '<br><span class="text-sm">' + esc(f.results) + '</span>' : '') + '</div>'
+    ).join('');
+}
+function firingLinkLabel(f) {
+  return [f.kiln_name, f.date, f.firing_type, f.cone && 'Cone ' + f.cone].filter(Boolean).join(' · ') || 'Firing ' + f.id;
+}
+// Manual associations only. Each mount belongs to one Piece and login generation.
+function mountLinkedFirings(pieceId, generation, sessionToken) {
+  const root = historyElement('section', null, 'card mb-16');
+  root.id = 'linkedFirings';
+  root.setAttribute('aria-label', 'Linked Firings');
+  document.getElementById('pieceDetailContent').append(root);
+  const account = currentUser?.id;
+  let busy = false, serial = 0;
+  const active = () => root.isConnected && generation === pieceViewGeneration &&
+    sessionToken === token && account === currentUser?.id && currentPage === 'pieceDetail' && window._currentPieceId === pieceId;
+  const button = (label, action) => {
+    const el = historyElement('button', label, 'btn btn-secondary btn-sm');
+    el.type = 'button'; el.onclick = action; return el;
+  };
+  const request = async (path, options = {}) => {
+    if (!active()) throw Error('stale');
+    const response = await fetch(API + path, { ...options, cache: 'no-store',
+      headers: { Authorization: 'Bearer ' + sessionToken, 'Content-Type': 'application/json' } });
+    const data = await response.json();
+    if (!active() || !response.ok) throw Error('unavailable');
+    return { data, available: response.headers.get('X-QL-Relationships-Available') === 'true' };
+  };
+  const base = '/api/ql/pieces/' + encodeURIComponent(pieceId) + '/firings';
+  const reset = text => {
+    root.replaceChildren(historyElement('h2', 'Linked Firings'));
+    root.setAttribute('aria-busy', String(busy));
+    if (text) { const status = historyElement('p', text); status.setAttribute('role', 'status'); root.append(status); }
+  };
+  const failure = () => {
+    reset('Linked Firings is unavailable. Try again when connected.');
+    root.append(button('Retry', () => load()));
+  };
+  async function load(afterMutation = false) {
+    if (!active() || busy) return;
+    busy = true; const run = ++serial; reset('Loading linked Firings…');
+    // Invalidate earlier History work by replacing its container after mutation.
+    if (afterMutation) {
+      const old = document.getElementById('pieceHistory');
+      if (old) {
+        const next = old.cloneNode(false); old.replaceWith(next);
+        next.append(historyElement('h2', 'Connected History'), historyElement('p', 'Loading connected history…'));
+        void loadPieceHistory(pieceId, next, generation, sessionToken);
+      }
+    }
+    try {
+      const result = await request(base);
+      if (!active() || serial !== run) return;
+      if (!result.available) {
+        busy = false; reset('Linked Firings is not available for this database.');
+        root.append(button('Retry', () => load())); return;
+      }
+      if (afterMutation) {
+        const piece = (await request('/api/pieces/' + encodeURIComponent(pieceId))).data;
+        if (!active()) return;
+        const legacy = document.getElementById('pieceSavedFirings');
+        if (legacy) legacy.innerHTML = savedPieceFiringsMarkup(piece.firings);
+      }
+      const saved = (await request('/api/firing-logs')).data;
+      const linked = await Promise.all(result.data.map(row => request('/api/firing-logs/' + encodeURIComponent(row.id)).then(r => r.data)));
+      if (!active() || serial !== run) return;
+      busy = false; reset(linked.length ? '' : 'No saved Firings linked.');
+      for (const calc of linked) {
+        const row = historyElement('div', null, 'mb-16');
+        row.append(historyElement('strong', firingLinkLabel(calc)),
+          historyElement('p', [calc.date, calc.firing_type, calc.cone && 'Cone ' + calc.cone, 'ID: ' + calc.id].filter(Boolean).join(' · ')),
+          button('View', () => view(calc.id)), button('Unlink', () => mutate(calc.id, 'DELETE')));
+        root.append(row);
+      }
+      const ids = new Set(linked.map(row => row.id));
+      const eligible = saved.filter(row => !ids.has(row.id));
+      if (eligible.length) {
+        const picker = historyElement('select', null, 'form-select'); picker.setAttribute('aria-label', 'Saved Firing to link');
+        const placeholder = historyElement('option', 'Select a saved Firing'); placeholder.value = ''; picker.append(placeholder);
+        for (const calc of eligible) { const option = historyElement('option', (firingLinkLabel(calc)) + ' · ' + calc.id); option.value = calc.id; picker.append(option); }
+        const link = button('Link', () => { if (picker.value) void mutate(picker.value, 'POST'); });
+        link.disabled = true; picker.onchange = () => { link.disabled = !picker.value; };
+        root.append(picker, link);
+      } else root.append(historyElement('p', 'No additional saved Firings available to link.'));
+    } catch (_) { if (active() && serial === run) { busy = false; failure(); } }
+  }
+  async function mutate(id, method) {
+    if (!active() || busy) return;
+    busy = true; reset('Updating link…');
+    try {
+      await request(base + (method === 'DELETE' ? '/' + encodeURIComponent(id) : ''),
+        { method, ...(method === 'POST' ? { body: JSON.stringify({ firingId: id }) } : {}) });
+      if (!active()) return;
+      busy = false; await load(true);
+    } catch (_) { if (active()) { busy = false; failure(); } }
+  }
+  async function view(id) {
+    if (!active() || busy) return;
+    busy = true;
+    try { await viewFiring(id, { readOnly: true, active }); }
+    finally { if (active()) busy = false; }
   }
   void load();
 }
