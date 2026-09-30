@@ -1936,7 +1936,7 @@ function testTileMediaContract(tile) {
 function glazeComboMediaContract(combo) {
   if (!combo) return combo;
   const explicitlyPublic = combo.is_shared === 1 || combo.is_public === 1;
-  const explicitlyPrivate = combo.is_shared === 0 && combo.is_public === 0;
+  const explicitlyPrivate = combo.is_shared === 0 && combo.is_public !== 1;
   const delivery = explicitlyPublic ? 'public-explicit' : explicitlyPrivate ? 'owner-protected' : 'legacy-static';
   const visibility = explicitlyPublic ? 'public' : explicitlyPrivate ? 'private' : 'legacy-ambiguous';
   for (const [field, suffix] of [['photo_filename', ''], ['photo_filename2', '2']]) {
@@ -3357,7 +3357,7 @@ app.get('/api/ql/community/combos/:comboId/photos/:slot', auth, (req, res) => {
     if (!field) return unavailable();
     const combo = db.prepare('SELECT * FROM glaze_combos WHERE id=? AND user_id=?').get(req.params.comboId, req.userId);
     if (!combo || glazeComboExplicitlyPublic(combo)) return unavailable();
-    if (!(combo.is_shared === 0 && combo.is_public === 0)) return unavailable();
+    if (!(combo.is_shared === 0 && combo.is_public !== 1)) return unavailable();
     const filename = combo[field];
     if (!filename) return unavailable();
     const target = safeStoredUpload(filename);
