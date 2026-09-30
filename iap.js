@@ -18,6 +18,7 @@
 
 const https = require('https');
 const { v4: uuidv4 } = require('uuid');
+const { isSpecialGrandfatheredUser } = require('./billing-compat.cjs');
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -88,15 +89,17 @@ function isIAPActive(db, userId) {
  */
 function hasPremiumAccess(db, userId) {
   const u = db.prepare(
-    'SELECT tier, billing_period, plan_expires_at, iap_expires_at FROM users WHERE id=?'
+    'SELECT email, tier, billing_period, plan_expires_at, iap_expires_at FROM users WHERE id=?'
   ).get(userId);
   if (!u) return false;
 
   // Promo / beta
   if (u.billing_period === 'promo') return true;
 
-  // Grandfathered Stripe-monthly (the two original subscribers)
+  // Historical marker remains supported, while the exact startup compatibility
+  // accounts can use CHECK-compatible billing storage without losing access.
   if (u.billing_period === 'stripe-monthly' && u.tier === 'starter') return true;
+  if (isSpecialGrandfatheredUser(u)) return true;
 
   // Active Stripe subscription with expiry
   if (u.tier === 'starter' && u.plan_expires_at) {
