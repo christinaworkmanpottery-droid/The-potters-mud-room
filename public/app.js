@@ -3210,6 +3210,7 @@ async function loadCombos() {
     if (cone) u += 'cone=' + encodeURIComponent(cone) + '&';
     if (filter) u += 'filter=' + encodeURIComponent(filter) + '&';
     const combos = await api(u);
+    clearComboMedia();
     const c = document.getElementById('comboList'), em = document.getElementById('communityEmpty');
     const guestBanner = guestMode ? previewHero('See real glaze combos before you join.', 'This preview is here to show you the kind of pottery knowledge and inspiration waiting inside The Potter’s Mud Room — layered glazes, cone notes, clay pairings, and shared results from other potters.', ['Save your own glaze tests and combo results', 'Track clay bodies, firings, and finished pieces together', 'Comment, like, and message other potters'], 'Start Free', "requireSignup('save combos, track firings, and join the community')") : '';
     if (!combos.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
