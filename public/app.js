@@ -216,7 +216,27 @@ const STATUS_LABELS = { 'in-progress':'In Progress','leather-hard':'Leather Hard
 const CASUALTY_LABELS = { 'cracked':'Cracked','exploded':'Exploded / Blowout','warped':'Warped','s-crack':'S-Crack','glaze-crawl':'Glaze Crawl','glaze-pinhole':'Glaze Pinholing','glaze-shiver':'Glaze Shivering','glaze-crazing':'Glaze Crazing','glaze-runoff':'Glaze Ran Off','thermal-shock':'Thermal Shock','broke-trimming':'Broke While Trimming','broke-handling':'Broke While Handling','collapsed':'Collapsed','dunting':'Dunting','wrong-color':'Unexpected Color Result','other':'Other' };
 function fmtStatus(s) { return s ? '<span class="status-badge status-' + s + '">' + (STATUS_LABELS[s]||s) + '</span>' : ''; }
 function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { if (id === 'testTileViewModal' || id === 'testTileModal') clearTestTileMedia(); if (id === 'projectModal' || id === 'projectPhotoModal') closeProjectMediaScope(id); const saleScope = {saleModal:'salePhotoPreview',saleDetailsModal:'saleDetailsContent',bulkSaleModal:'bulkSale'}[id]; if (saleScope) closeSaleMediaScope(saleScope); const firingScope = { firingModal:'firingPhotosContainer', firingViewModal:'firingViewBody', firingPhotoReorderModal:'firingPhotoReorderContent' }[id]; if (firingScope) closeFiringMediaScope(firingScope); if (id === 'glazeViewModal') clearGlazeMedia('glazeViewBody'); if (id === 'clayViewModal') clearClayMedia('clayViewBody'); document.getElementById(id).classList.remove('open'); }
+// Controls must remain inert even when author CSS overrides the hidden attribute.
+function viewerControl(id, enabled, handler = null) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.hidden = !enabled; el.disabled = !enabled; el.tabIndex = enabled ? 0 : -1;
+  el.style.display = enabled ? '' : 'none';
+  el.onclick = enabled ? handler : null;
+}
+const pieceViewerOrigins = new Map();
+function rememberPieceViewer(id, enabled) {
+  if (!enabled) { pieceViewerOrigins.delete(id); return; }
+  if (!document.getElementById(id)?.classList.contains('open')) {
+    pieceViewerOrigins.set(id, { control: document.activeElement, token, account: currentUser?.id });
+  }
+}
+function returnPieceViewerFocus(id) {
+  const origin = pieceViewerOrigins.get(id); pieceViewerOrigins.delete(id);
+  if (origin?.control?.isConnected && origin.token === token && origin.account === currentUser?.id) origin.control.focus();
+}
+let firingPieceReturn = null;
+function closeModal(id) { if (id === 'firingModal') firingPieceReturn = null; if (id === 'firingViewModal') { viewerControl('firingViewEditBtn', false); viewerControl('firingViewDeleteBtn', false); document.getElementById('firingViewBody')?.replaceChildren(); } returnPieceViewerFocus(id); if (id === 'testTileViewModal' || id === 'testTileModal') clearTestTileMedia(); if (id === 'projectModal' || id === 'projectPhotoModal') closeProjectMediaScope(id); const saleScope = {saleModal:'salePhotoPreview',saleDetailsModal:'saleDetailsContent',bulkSaleModal:'bulkSale'}[id]; if (saleScope) closeSaleMediaScope(saleScope); const firingScope = { firingModal:'firingPhotosContainer', firingViewModal:'firingViewBody', firingPhotoReorderModal:'firingPhotoReorderContent' }[id]; if (firingScope) closeFiringMediaScope(firingScope); if (id === 'glazeViewModal') clearGlazeMedia('glazeViewBody'); if (id === 'clayViewModal') clearClayMedia('clayViewBody'); document.getElementById(id).classList.remove('open'); }
 
 // iOS decimal keyboards have no native Done key. Give every numeric field a
 // consistent way to dismiss the keyboard so form buttons remain reachable.
@@ -792,7 +812,13 @@ function debounceLoadPieces() { clearTimeout(debounceTimer); debounceTimer = set
 let pieceViewGeneration = 0;
 let pieceHistoryUrls = [];
 let pieceDetailPrivatePhotoUrls = [];
+function disposeHistoryPhotos() {
+  pieceHistoryUrls.forEach(url => URL.revokeObjectURL(url));
+  pieceHistoryUrls = [];
+}
+
 function clearPieceHistory() {
+  pieceViewerOrigins.clear(); firingPieceReturn = null;
   if (document.getElementById('saleDetailsModal')?.dataset.pieceOrigin === 'true') closeModal('saleDetailsModal');
   clearPieceEdgeMedia();
   clearPricingMedia('linkedPricingViewer');
@@ -914,7 +940,7 @@ function renderPieceHistory(container, data) {
       if (e.recordType === 'sale') {
         const view = historyElement('button', 'View', 'btn btn-secondary btn-sm');
         view.type = 'button'; view.setAttribute('aria-label', 'View Sale ' + name);
-        view.onclick = () => { if (active()) void viewSale(e.sourceRecordId, { pieceId, active }); };
+        view.onclick = () => { view.focus(); if (active()) void viewSale(e.sourceRecordId, { pieceId, active }); };
         item.append(view);
       }
       list.append(item);
@@ -1843,7 +1869,7 @@ function clearTestTileMedia() {
   testTileDetailController?.abort(); testTileDetailController = null;
   document.getElementById('testTileViewBody')?.replaceChildren();
   const edit = document.getElementById('testTileViewEditBtn');
-  if (edit) { edit.hidden = true; edit.onclick = null; }
+  if (edit) viewerControl('testTileViewEditBtn', false);
   const title = document.getElementById('testTileViewTitle'); if (title) title.textContent = 'Test Tile';
   for (const view of testTileMediaViews.values()) {
     view.active = false;
@@ -1861,6 +1887,7 @@ function invalidateTestTileAccess(refreshHistory = true) {
   document.getElementById('linkedTestTiles')?._locked?.();
   const history = document.getElementById('pieceHistory');
   if (history && refreshHistory) {
+    disposeHistoryPhotos();
     const next = history.cloneNode(false); history.replaceWith(next);
     next.append(historyElement('h2', 'Connected History'));
     void loadPieceHistory(window._currentPieceId, next, pieceViewGeneration, token);
@@ -1955,6 +1982,7 @@ function testTileCard(t) {
 }
 
 async function viewTestTileById(id, options = {}) {
+  rememberPieceViewer('testTileViewModal', options.readOnly === true);
   clearTestTileMedia();
   const generation = testTileMediaGeneration, sessionToken = token, account = currentUser?.id;
   const controller = new AbortController(); testTileDetailController = controller;
@@ -2004,8 +2032,7 @@ function renderTestTile(t, options = {}, active = () => true) {
   if (t.notes) html += '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);color:var(--text-light);font-size:0.9rem">' + esc(t.notes) + '</div>';
   document.getElementById('testTileViewTitle').textContent = t.name || 'Test Tile';
   document.getElementById('testTileViewBody').innerHTML = html;
-  document.getElementById('testTileViewEditBtn').hidden = options.readOnly === true;
-  document.getElementById('testTileViewEditBtn').onclick = options.readOnly ? null : () => { if (!active()) return; closeModal('testTileViewModal'); openTestTileModal(t); };
+  viewerControl('testTileViewEditBtn', !options.readOnly, () => { if (!active()) return; closeModal('testTileViewModal'); openTestTileModal(t); });
   openModal('testTileViewModal');
   loadTestTileMedia(document.getElementById('testTileViewBody'));
 }
@@ -2257,6 +2284,7 @@ async function loadFirings() {
 let pendingFiringPhotos = [];
 
 function openFiringModal(f = null) {
+  firingPieceReturn = null;
   closeFiringMediaScope('firingPhotosContainer');
   pendingFiringUrls.forEach(url => URL.revokeObjectURL(url)); pendingFiringUrls.clear();
   document.getElementById('firingId').value = f?.id || '';
@@ -2374,15 +2402,16 @@ async function deleteFiringPhoto(photoId) {
   } catch(e) { toast(e.message, 'error'); }
 }
 
-function editFiring(id) {
+function editFiring(id, origin = null, viewerActive = () => true) {
   const active = beginFiringRequest('firingPhotosContainer');
   api('/api/firing-logs').then(firings => {
     const f = firings.find(f => f.id === id);
-    if (active() && f) { closeModal('firingViewModal'); openFiringModal(f); }
+    if (active() && viewerActive() && f && (!origin || origin.active())) { closeModal('firingViewModal'); openFiringModal(f); firingPieceReturn = origin; }
   });
 }
 
 function viewFiring(id, options = {}) {
+  rememberPieceViewer('firingViewModal', options.readOnly === true);
   const requestActive = beginFiringRequest('firingViewBody');
   const account = currentUser?.id;
   const active = () => requestActive() && account === currentUser?.id && (!options.active || options.active());
@@ -2390,8 +2419,8 @@ function viewFiring(id, options = {}) {
   const body = document.getElementById('firingViewBody');
   clearFiringMedia('firingViewBody');
   body.textContent = 'Loading Firing…';
-  document.getElementById('firingViewEditBtn').hidden = true;
-  document.getElementById('firingViewDeleteBtn').hidden = true;
+  viewerControl('firingViewEditBtn', false);
+  viewerControl('firingViewDeleteBtn', false);
   openModal('firingViewModal');
   const details = readOnly ? api('/api/firing-logs/' + encodeURIComponent(id)).then(f => [f]) : api('/api/firing-logs');
   return details.then(async firings => {
@@ -2431,10 +2460,8 @@ function viewFiring(id, options = {}) {
       df('Notes', f.notes) +
       (f.piece_title ? df('Piece', f.piece_title) : '') +
       photosHtml;
-    document.getElementById('firingViewEditBtn').hidden = false;
-    document.getElementById('firingViewDeleteBtn').hidden = readOnly;
-    document.getElementById('firingViewEditBtn').onclick = () => { if (active()) editFiring(f.id); };
-    document.getElementById('firingViewDeleteBtn').onclick = () => { closeModal('firingViewModal'); deleteFiring(f.id); };
+    viewerControl('firingViewEditBtn', true, () => { if (active()) editFiring(f.id, options.onSaved ? { active: options.active, refresh: options.onSaved } : null, active); });
+    viewerControl('firingViewDeleteBtn', !readOnly, () => { if (!active() || readOnly) return; closeModal('firingViewModal'); deleteFiring(f.id); });
     openModal('firingViewModal');
     loadFiringMedia('firingViewBody');
   }).catch(() => {
@@ -2542,6 +2569,9 @@ async function saveFiringPhotoOrder() {
 }
 
 async function saveFiring(e) {
+  const origin = firingPieceReturn;
+  const saveToken = token, saveAccount = currentUser?.id;
+  const saveActive = () => saveToken === token && saveAccount === currentUser?.id && (!origin || origin.active());
   e.preventDefault();
   const saveBtn = document.getElementById('saveFiringBtn');
   if (saveBtn.disabled) return; // prevent double-tap
@@ -2575,6 +2605,7 @@ async function saveFiring(e) {
     const method = firingId ? 'PUT' : 'POST';
     const url = firingId ? '/api/firing-logs/' + firingId : '/api/firing-logs';
     const result = await api(url, { method, body });
+    if (!saveActive()) return;
     const savedId = firingId || result.id;
     // Lock the hidden id immediately so any late tap cannot re-POST
     document.getElementById('firingId').value = savedId;
@@ -2593,13 +2624,16 @@ async function saveFiring(e) {
         toast('Firing saved, but photo upload failed: ' + photoErr.message, 'warning');
       }
     }
+    if (!saveActive()) return;
     toast(firingId ? 'Firing updated!' : 'Firing logged!', 'success');
     trackActivity(firingId ? 'edit_firing' : 'log_firing', 'firings');
     pendingFiringPhotos = [];
     closeModal('firingModal');
     document.getElementById('firingId').value = '';
     loadFirings();
+    if (origin && origin.active()) await origin.refresh();
   } catch(e) {
+    if (!saveActive()) return;
     toast(e.message, 'error');
     saveBtn.disabled = false;
     saveBtn.textContent = 'Save Firing';
@@ -2827,6 +2861,7 @@ async function loadSales() {
 let _salePieces = [];
 let saleSavePending = false;
 async function viewSale(id, options = {}) {
+  rememberPieceViewer('saleDetailsModal', Boolean(options.pieceId));
   const requestActive = beginSaleRequest('saleDetailsContent');
   const pieceOrigin = options.pieceId != null;
   const pieceId = options.pieceId, generation = pieceViewGeneration, account = currentUser?.id;
@@ -8416,7 +8451,7 @@ function mountLinkedPricing(pieceId, generation, sessionToken) {
     sessionToken === token && account === currentUser?.id && currentPage === 'pieceDetail' && window._currentPieceId === pieceId;
   const button = (label, action) => {
     const el = historyElement('button', label, 'btn btn-secondary btn-sm');
-    el.type = 'button'; el.onclick = action; return el;
+    el.type = 'button'; el.onclick = event => { el.focus(); action(event); }; return el;
   };
   const request = async (path, options = {}) => {
     if (!active()) throw Error('stale');
@@ -8444,6 +8479,7 @@ function mountLinkedPricing(pieceId, generation, sessionToken) {
     if (afterMutation) {
       const old = document.getElementById('pieceHistory');
       if (old) {
+        disposeHistoryPhotos();
         const next = old.cloneNode(false); old.replaceWith(next);
         next.append(historyElement('h2', 'Connected History'), historyElement('p', 'Loading connected history…'));
         void loadPieceHistory(pieceId, next, generation, sessionToken);
@@ -8500,7 +8536,7 @@ function mountLinkedPricing(pieceId, generation, sessionToken) {
       viewer.append(historyElement('h3', calc.name || 'Saved calculation'), historyElement('p', calc.description || ''), historyElement('p', 'Saved: ' + (calc.created_at || 'date unavailable')));
       const breakdown = historyElement('div'); breakdown.innerHTML = pricingBreakdownMarkup(calc.result, calc.inputs); viewer.append(breakdown);
       if (calc.photo_filename) { const photo = historyElement('div'); photo.innerHTML = pricingPhotoMarkup(calc, 'max-width:100%;max-height:200px;border-radius:8px'); viewer.append(photo); }
-      root.append(viewer, button('Back to linked calculations', () => load()));
+      root.append(viewer, button('Back to linked calculations', async () => { await load(); if (active()) { root.tabIndex = -1; (root.querySelector('button,select') || root).focus(); } }));
       void loadPricingMedia('linkedPricingViewer');
     } catch (_) { if (active()) { busy = false; failure(); } }
   }
@@ -8532,7 +8568,7 @@ function mountLinkedFirings(pieceId, generation, sessionToken) {
     sessionToken === token && account === currentUser?.id && currentPage === 'pieceDetail' && window._currentPieceId === pieceId;
   const button = (label, action) => {
     const el = historyElement('button', label, 'btn btn-secondary btn-sm');
-    el.type = 'button'; el.onclick = action; return el;
+    el.type = 'button'; el.onclick = event => { el.focus(); action(event); }; return el;
   };
   const request = async (path, options = {}) => {
     if (!active()) throw Error('stale');
@@ -8559,23 +8595,24 @@ function mountLinkedFirings(pieceId, generation, sessionToken) {
     if (afterMutation) {
       const old = document.getElementById('pieceHistory');
       if (old) {
+        disposeHistoryPhotos();
         const next = old.cloneNode(false); old.replaceWith(next);
         next.append(historyElement('h2', 'Connected History'), historyElement('p', 'Loading connected history…'));
         void loadPieceHistory(pieceId, next, generation, sessionToken);
       }
     }
     try {
-      const result = await request(base);
-      if (!active() || serial !== run) return;
-      if (!result.available) {
-        busy = false; reset('Linked Firings is not available for this database.');
-        root.append(button('Retry', () => load())); return;
-      }
       if (afterMutation) {
         const piece = (await request('/api/pieces/' + encodeURIComponent(pieceId))).data;
         if (!active()) return;
         const legacy = document.getElementById('pieceSavedFirings');
         if (legacy) legacy.innerHTML = savedPieceFiringsMarkup(piece.firings);
+      }
+      const result = await request(base);
+      if (!active() || serial !== run) return;
+      if (!result.available) {
+        busy = false; reset('Linked Firings is not available for this database.');
+        root.append(button('Retry', () => load())); return;
       }
       const saved = (await request('/api/firing-logs')).data;
       const linked = await Promise.all(result.data.map(row => request('/api/firing-logs/' + encodeURIComponent(row.id)).then(r => r.data)));
@@ -8613,7 +8650,7 @@ function mountLinkedFirings(pieceId, generation, sessionToken) {
   async function view(id) {
     if (!active() || busy) return;
     busy = true;
-    try { await viewFiring(id, { readOnly: true, active }); }
+    try { await viewFiring(id, { readOnly: true, active, onSaved: async () => { await load(true); if (active()) { root.tabIndex = -1; (root.querySelector('button,select') || root).focus(); } } }); }
     finally { if (active()) busy = false; }
   }
   void load();
@@ -8633,7 +8670,7 @@ function mountLinkedTestTiles(pieceId, generation, sessionToken) {
     sessionToken === token && account === currentUser?.id && currentPage === 'pieceDetail' && window._currentPieceId === pieceId;
   const button = (label, action) => {
     const el = historyElement('button', label, 'btn btn-secondary btn-sm');
-    el.type = 'button'; el.onclick = action; return el;
+    el.type = 'button'; el.onclick = event => { el.focus(); action(event); }; return el;
   };
   const request = async (path, options = {}) => {
     if (!active()) throw Error('stale');
@@ -8663,6 +8700,7 @@ function mountLinkedTestTiles(pieceId, generation, sessionToken) {
     if (afterMutation) {
       const old = document.getElementById('pieceHistory');
       if (old) {
+        disposeHistoryPhotos();
         const next = old.cloneNode(false); old.replaceWith(next);
         next.append(historyElement('h2', 'Connected History'), historyElement('p', 'Loading connected history…'));
         void loadPieceHistory(pieceId, next, generation, sessionToken);
@@ -8689,7 +8727,7 @@ function mountLinkedTestTiles(pieceId, generation, sessionToken) {
       const ids = new Set(linked.map(row => row.id));
       const eligible = saved.filter(row => !ids.has(row.id));
       if (eligible.length) {
-        const picker = historyElement('select', null, 'form-select'); picker.setAttribute('aria-label', 'Saved Firing to link');
+        const picker = historyElement('select', null, 'form-select'); picker.setAttribute('aria-label', 'Saved Test Tile to link');
         const placeholder = historyElement('option', 'Select a saved Test Tile'); placeholder.value = ''; picker.append(placeholder);
         for (const calc of eligible) { const option = historyElement('option', (testTileLinkLabel(calc)) + ' · ' + calc.id); option.value = calc.id; picker.append(option); }
         const link = button('Link', () => { if (picker.value) void mutate(picker.value, 'POST'); });
