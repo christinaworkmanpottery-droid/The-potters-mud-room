@@ -16,6 +16,11 @@ const crypto = require('crypto');
 const { Expo } = require('expo-server-sdk');
 const { initDB } = require('./database');
 const iap = require('./iap');
+const {
+  isGrandfatheredPaidUser,
+  compatibleBillingPeriod,
+  normalizeSpecialAccountBilling,
+} = require('./billing-compat.cjs');
 
 const expo = new Expo();
 
@@ -34,13 +39,18 @@ db.exec(`CREATE TABLE IF NOT EXISTS ai_usage (
 )`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_ai_usage_user_month ON ai_usage(user_id, created_at)`);
 
-// Migrate all tiers to free/unlimited (starter = unlimited internally)
+// Migrate all tiers to free/unlimited (starter = unlimited internally).
+// Keep the historical CHECK bypass only around legacy tier normalization; special
+// grandfathered accounts are normalized separately to CHECK-compatible storage.
 try {
   db.pragma('ignore_check_constraints = ON');
   db.prepare("UPDATE users SET tier='starter' WHERE tier IN ('basic','mid','top')").run();
-  db.prepare("UPDATE users SET tier='starter', billing_period='stripe-monthly' WHERE LOWER(email) IN ('jgk1020@gmail.com','awhiteman96@gmail.com','christinaworkmanpottery@gmail.com')").run();
   db.pragma('ignore_check_constraints = OFF');
-} catch(e) { db.pragma('ignore_check_constraints = OFF'); }
+  normalizeSpecialAccountBilling(db);
+} catch(e) {
+  db.pragma('ignore_check_constraints = OFF');
+  console.error('⚠️  Could not normalize startup membership compatibility:', e.message);
+}
 
 // AI tokens column
 try { db.exec("ALTER TABLE users ADD COLUMN ai_tokens INTEGER DEFAULT 0"); } catch(e) { /* already exists */ }
@@ -771,7 +781,7 @@ app.get('/api/auth/me', auth, (req, res) => {
   }
   // Get referral stats
   const referralStats = db.prepare('SELECT COUNT(*) as count FROM referral_rewards WHERE referrer_id=?').get(req.userId);
-  res.json({ user: { ...u, isAdmin: isAdmin(req), displayName: u.display_name, pieceCount: getPieceCount(req.userId), referralCount: referralStats?.count || 0, freeMonthsRemaining: u.free_months_remaining || 0, newsletterSubscribed: u.newsletter_subscribed } });
+  res.json({ user: { ...u, billing_period: compatibleBillingPeriod(u), isAdmin: isAdmin(req), displayName: u.display_name, pieceCount: getPieceCount(req.userId), referralCount: referralStats?.count || 0, freeMonthsRemaining: u.free_months_remaining || 0, newsletterSubscribed: u.newsletter_subscribed } });
 });
 
 // User subscription status (used by mobile app BillingScreen)
@@ -809,7 +819,7 @@ app.get('/api/user/subscription', auth, async (req, res) => {
   res.json({
     plan: u.tier || 'free',
     status: hasPremium ? 'active' : 'inactive',
-    billingPeriod: u.billing_period || null,
+    billingPeriod: compatibleBillingPeriod(u),
     expiresAt: u.plan_expires_at || null,
     hasStripeSubscription: hasStripe,
     hasIAPSubscription: hasIAP,
@@ -1710,7 +1720,7 @@ app.get('/api/admin/members', auth, (req, res) => {
   try {
     const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, 
       avatar_filename, created_at, updated_at, stripe_customer_id, stripe_subscription_id 
-      FROM users ORDER BY created_at DESC`).all();
+      FROM users ORDER BY created_at DESC`).all().map(m => ({ ...m, billing_period: compatibleBillingPeriod(m) }));
     const stats = {
       total: members.length,
       byTier: { free: 0, paid: 0, gifted: 0 },
@@ -1722,8 +1732,7 @@ app.get('/api/admin/members', auth, (req, res) => {
       const isUnlimited = m.tier === 'starter' || ['basic','mid','top'].includes(m.tier);
       if (isUnlimited) {
         const hasStripe = m.stripe_subscription_id && m.stripe_subscription_id !== '';
-        const isStripeMonthly = m.billing_period === 'stripe-monthly';
-        if (hasStripe || isStripeMonthly) {
+        if (hasStripe || isGrandfatheredPaidUser(m)) {
           stats.byTier.paid++;
         } else {
           stats.byTier.gifted++;
@@ -4661,7 +4670,8 @@ app.get('/api/admin/members/search', auth, (req, res) => {
   const { q } = req.query;
   if (!q) return res.json([]);
   const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, created_at 
-    FROM users WHERE email LIKE ? OR display_name LIKE ? ORDER BY created_at DESC LIMIT 20`).all('%'+q+'%', '%'+q+'%');
+    FROM users WHERE email LIKE ? OR display_name LIKE ? ORDER BY created_at DESC LIMIT 20`).all('%'+q+'%', '%'+q+'%')
+    .map(m => ({ ...m, billing_period: compatibleBillingPeriod(m) }));
   res.json(members);
 });
 
