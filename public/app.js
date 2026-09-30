@@ -236,7 +236,7 @@ function returnPieceViewerFocus(id) {
   if (origin?.control?.isConnected && origin.token === token && origin.account === currentUser?.id) origin.control.focus();
 }
 let firingPieceReturn = null;
-function closeModal(id) { if (id === 'firingModal') firingPieceReturn = null; if (id === 'firingViewModal') { viewerControl('firingViewEditBtn', false); viewerControl('firingViewDeleteBtn', false); document.getElementById('firingViewBody')?.replaceChildren(); } returnPieceViewerFocus(id); if (id === 'testTileViewModal' || id === 'testTileModal') clearTestTileMedia(); if (id === 'projectModal' || id === 'projectPhotoModal') closeProjectMediaScope(id); const saleScope = {saleModal:'salePhotoPreview',saleDetailsModal:'saleDetailsContent',bulkSaleModal:'bulkSale'}[id]; if (saleScope) closeSaleMediaScope(saleScope); const firingScope = { firingModal:'firingPhotosContainer', firingViewModal:'firingViewBody', firingPhotoReorderModal:'firingPhotoReorderContent' }[id]; if (firingScope) closeFiringMediaScope(firingScope); if (id === 'glazeViewModal') clearGlazeMedia('glazeViewBody'); if (id === 'clayViewModal') clearClayMedia('clayViewBody'); document.getElementById(id).classList.remove('open'); }
+function closeModal(id) { if (id === 'clayViewModal') { clayViewSerial++; clayViewReadOnly = false; clayViewControls(false); document.getElementById('clayViewBody')?.replaceChildren(); } if (id === 'firingModal') firingPieceReturn = null; if (id === 'firingViewModal') { viewerControl('firingViewEditBtn', false); viewerControl('firingViewDeleteBtn', false); document.getElementById('firingViewBody')?.replaceChildren(); } returnPieceViewerFocus(id); if (id === 'testTileViewModal' || id === 'testTileModal') clearTestTileMedia(); if (id === 'projectModal' || id === 'projectPhotoModal') closeProjectMediaScope(id); const saleScope = {saleModal:'salePhotoPreview',saleDetailsModal:'saleDetailsContent',bulkSaleModal:'bulkSale'}[id]; if (saleScope) closeSaleMediaScope(saleScope); const firingScope = { firingModal:'firingPhotosContainer', firingViewModal:'firingViewBody', firingPhotoReorderModal:'firingPhotoReorderContent' }[id]; if (firingScope) closeFiringMediaScope(firingScope); if (id === 'glazeViewModal') clearGlazeMedia('glazeViewBody'); if (id === 'clayViewModal') clearClayMedia('clayViewBody'); document.getElementById(id).classList.remove('open'); }
 
 // iOS decimal keyboards have no native Done key. Give every numeric field a
 // consistent way to dismiss the keyboard so form buttons remain reachable.
@@ -818,6 +818,8 @@ function disposeHistoryPhotos() {
 }
 
 function clearPieceHistory() {
+  currentPieceClay = null;
+  if (clayViewReadOnly) closeModal('clayViewModal');
   pieceViewerOrigins.clear(); firingPieceReturn = null;
   if (document.getElementById('saleDetailsModal')?.dataset.pieceOrigin === 'true') closeModal('saleDetailsModal');
   clearPieceEdgeMedia();
@@ -1049,7 +1051,7 @@ async function viewPiece(id) {
         (hasMultiplePhotos ? '<button id="reorderPhotosBtn" class="btn btn-secondary btn-sm" onclick="togglePhotoReorderMode()">↕️ Reorder Photos</button>' : '') +
         '</div><div class="detail-photos mb-16" id="photoReorderContainer">' + photos + '</div>' : '') +
       '<div class="detail-grid"><div class="card"><h3 style="margin-bottom:16px">Details</h3>' +
-      df('Clay Body', p.clay_body_name||p.clay||p.studio) + '<div class="detail-field"><div class="detail-label">Glaze</div><div class="detail-value">' + ((p.glazes&&p.glazes.length) ? p.glazes.map(g => {
+      '<div id="pieceClayDisplay" style="display:flex;align-items:center;gap:8px">' + df('Clay Body', p.clay_body_name||p.clay||p.studio) + '</div>' + '<div class="detail-field"><div class="detail-label">Glaze</div><div class="detail-value">' + ((p.glazes&&p.glazes.length) ? p.glazes.map(g => {
         let parts = [esc(g.glaze_name)];
         if (g.coats && g.coats > 0) parts.push((g.coats === 1 ? '1 coat' : g.coats + ' coats'));
         if (g.application_method) parts.push(esc(g.application_method));
@@ -1081,6 +1083,7 @@ async function viewPiece(id) {
     loading.setAttribute('role', 'status');
     history.append(historyElement('h2', 'Connected History'), loading);
     document.getElementById('pieceDetailContent').append(history);
+    mountPieceClay(p, generation, sessionToken);
     mountLinkedPricing(p.id, generation, sessionToken);
     mountLinkedFirings(p.id, generation, sessionToken);
     mountLinkedTestTiles(p.id, generation, sessionToken);
@@ -1362,9 +1365,15 @@ async function uploadPhoto(e) {
 
 // ---- Clay Bodies ----
 let clayMediaGeneration = 0;
+let clayViewSerial = 0, clayViewReadOnly = false, currentPieceClay = null;
+function clayViewControls(enabled, cl) {
+  viewerControl('clayViewDuplicateBtn', enabled, () => { closeModal('clayViewModal'); duplicateClay(cl.id); });
+  viewerControl('clayViewEditBtn', enabled, () => { closeModal('clayViewModal'); editClayById(cl.id); });
+  viewerControl('clayViewPhotoBtn', enabled, () => { closeModal('clayViewModal'); openClayPhotoUpload(cl.id); });
+}
 const clayMediaViews = new Map();
 function clearClayMedia(scope) {
-  if (!scope) clayMediaGeneration++;
+  if (!scope) { clayMediaGeneration++; clayViewSerial++; clayViewReadOnly = false; clayViewControls(false); currentPieceClay = null; }
   for (const [key, view] of clayMediaViews) {
     if (scope && key !== scope) continue;
     view.active = false;
@@ -1484,8 +1493,62 @@ async function loadClayBodies() {
   } catch(e) { toast(e.message,'error'); }
 }
 function editClayById(id) { const c = clayBodies.find(x=>x.id===id); if(c) openClayModal(c); }
+// A descriptive name is never evidence of a saved Clay relationship.
+function mountPieceClay(piece, generation, sessionToken) {
+  const root = document.getElementById('pieceClayDisplay');
+  const account = currentUser?.id, clayId = piece.clay_body_id;
+  const context = { pieceId: piece.id, clayId };
+  currentPieceClay = context;
+  const active = () => currentPieceClay === context && root?.isConnected && generation === pieceViewGeneration &&
+    token === sessionToken && currentUser?.id === account && currentPage === 'pieceDetail' && window._currentPieceId === piece.id;
+  if (!root || !clayId || !account || String(piece.user_id) !== String(account)) return;
+  // Preflight independently authorizes Clay; only then expose View.
+  void api('/api/clay-bodies/' + encodeURIComponent(clayId), { cache: 'no-store' }).then(data => {
+    const clay = data.clay || data;
+    if (!active() || String(clay?.id) !== String(clayId) || String(clay?.user_id) !== String(account)) return;
+    const button = historyElement('button', 'View', 'btn btn-secondary btn-sm');
+    button.id = 'pieceClayView'; button.type = 'button'; button.setAttribute('aria-label', 'View saved Clay');
+    button.onclick = () => { button.focus(); if (active()) void viewPieceClay(context, active); };
+    root.append(button);
+  }).catch(() => {});
+}
+async function viewPieceClay(context, originActive) {
+  if (!originActive()) return;
+  rememberPieceViewer('clayViewModal', true);
+  const serial = ++clayViewSerial, sessionToken = token, account = currentUser?.id;
+  clayViewReadOnly = true; clayViewControls(false); clearClayMedia('clayViewBody');
+  const body = document.getElementById('clayViewBody');
+  document.getElementById('clayViewTitle').textContent = 'Clay';
+  body.replaceChildren(historyElement('p', 'Loading Clay…')); openModal('clayViewModal');
+  const active = () => serial === clayViewSerial && clayViewReadOnly && originActive() &&
+    token === sessionToken && currentUser?.id === account;
+  const unavailable = () => { const error = Error('Clay unavailable'); error.status = 404; throw error; };
+  const request = async path => {
+    const response = await fetch(API + path, { headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store' });
+    if (!response.ok) { const error = Error('Clay unavailable'); error.status = response.status; throw error; }
+    return response.json();
+  };
+  try {
+    const data = await request('/api/clay-bodies/' + encodeURIComponent(context.clayId));
+    const clay = data.clay || data;
+    if (!active()) return;
+    if (String(clay?.id) !== String(context.clayId) || String(clay?.user_id) !== String(account)) unavailable();
+    const piece = await request('/api/pieces/' + encodeURIComponent(context.pieceId));
+    if (!active()) return;
+    if (String(piece?.id) !== String(context.pieceId) || String(piece?.user_id) !== String(account) ||
+        String(piece?.clay_body_id) !== String(context.clayId)) unavailable();
+    openClayViewModal(clay, { readOnly: true });
+  } catch (error) {
+    if (!active()) return;
+    body.replaceChildren(historyElement('p', [401,403,404].includes(error.status) ? 'Clay unavailable.' : 'Unable to load Clay.'));
+    const retry = historyElement('button', 'Retry', 'btn btn-secondary btn-sm'); retry.type = 'button';
+    retry.onclick = () => { if (active()) void viewPieceClay(context, originActive); }; body.append(retry);
+  }
+}
 function viewClayById(id) { const c = clayBodies.find(x=>x.id===id); if(c) openClayViewModal(c); }
-function openClayViewModal(cl) {
+function openClayViewModal(cl, options = {}) {
+  if (!options.readOnly) { clayViewSerial++; clayViewReadOnly = false; rememberPieceViewer('clayViewModal', false); }
+  clearClayMedia('clayViewBody');
   const photos = (cl.photos||[]).map(p =>
     '<div style="display:inline-block;margin-right:8px;text-align:center">' +
     clayPhotoMarkup(cl, p, 'width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in') + '<br>' +
@@ -1508,9 +1571,7 @@ function openClayViewModal(cl) {
   html += '<div style="margin-top:4px"><span class="piece-meta-tag" style="background:' + (cl.in_stock ? 'rgba(40,167,69,0.1);color:var(--success)' : 'rgba(220,53,69,0.1);color:var(--danger)') + '">' + (cl.in_stock ? 'In Stock' : 'Out of Stock') + '</span></div>';
   document.getElementById('clayViewTitle').textContent = cl.name;
   document.getElementById('clayViewBody').innerHTML = html;
-  document.getElementById('clayViewDuplicateBtn').onclick = () => { closeModal('clayViewModal'); duplicateClay(cl.id); };
-  document.getElementById('clayViewEditBtn').onclick = () => { closeModal('clayViewModal'); editClayById(cl.id); };
-  document.getElementById('clayViewPhotoBtn').onclick = () => { closeModal('clayViewModal'); openClayPhotoUpload(cl.id); };
+  clayViewControls(!options.readOnly, cl);
   openModal('clayViewModal');
   void loadClayMedia('clayViewBody');
 }
