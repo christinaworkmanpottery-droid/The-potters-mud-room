@@ -22,13 +22,18 @@ function isSpecialGrandfatheredUser(user) {
 function isGrandfatheredPaidUser(user) {
   return !!user
     && user.tier === 'starter'
-    && (user.billing_period === 'stripe-monthly' || isSpecialGrandfatheredEmail(user.email));
+    && (
+      user.billing_period === 'stripe-monthly'
+      || (isSpecialGrandfatheredEmail(user.email) && user.billing_period !== 'promo')
+    );
 }
 
 function compatibleBillingPeriod(user) {
   if (!user) return null;
-  if (user.billing_period === 'promo') return 'promo';
-  if (isSpecialGrandfatheredUser(user)) return 'stripe-monthly';
+  if (user.billing_period === 'promo' || user.billing_period === 'yearly') return user.billing_period;
+  if (isSpecialGrandfatheredUser(user) && (user.billing_period === 'monthly' || user.billing_period == null || user.billing_period === 'stripe-monthly')) {
+    return 'stripe-monthly';
+  }
   return user.billing_period ?? null;
 }
 
