@@ -7,6 +7,7 @@ test('private route is owner scoped no-store nosniff and generic',()=>{assert.ok
 test('community responses carry media contract',()=>{assert.ok(server.includes('.all(...params).map(glazeComboMediaContract)'));assert.ok(server.includes('combo: glazeComboMediaContract(combo)'));assert.ok(server.includes('res.json(glazeComboMediaContract(combo))'));});
 test('website selects public protected and legacy loading',()=>{for(const value of ['comboPhotoUrl','public-explicit','legacy-static','data-private-combo-photo','loadComboPrivateMedia(c)'])assert.ok(app.includes(value));});
 test('website protected loader is stale guarded and cleans blobs',()=>{for(const value of ['comboMediaGeneration','sessionToken = token','generation !== comboMediaGeneration','URL.revokeObjectURL','controller.abort','clearComboMedia'])assert.ok(app.includes(value));});
+test('session replacement and navigation clear private Combo state',()=>{assert.ok(app.includes('clearComboMedia();'));});
 test('website image failure is local',()=>{assert.ok(app.includes("img.removeAttribute('src'); img.alt='Photo unavailable'"));});
 test('two-slot mutation preserves mapping and reference-safe cleanup',()=>{assert.ok(server.includes('slots.length !== 2'));assert.ok(server.includes('oldPhotos.filter(old => !photos.includes(old))'));assert.ok(deletion.includes("glaze_combos: ['photo_filename', 'photo_filename2']"));});
 test('Combo delete cleans after DB delete',()=>{assert.ok(server.includes('deletionLifecycle.cleanupFiles(oldPhotos)'));assert.ok(deletion.includes('hasStoredFileReference'));});
