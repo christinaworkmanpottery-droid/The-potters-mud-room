@@ -1,7 +1,8 @@
 # Disposable pre-release recovery rehearsal
 
 This is test tooling, **not a production backup/deployment command**. Phase 3 remains closed.
-Application source is unchanged from backend `4f570ec1c3d63f2fc35be94ca7f2f5f4bc532d0a`.
+Original baseline: backend `4f570ec1c3d63f2fc35be94ca7f2f5f4bc532d0a`.
+The Admin demographics maintenance slice changes only that route authorization check.
 Mobile queue/editor source checkpoint is `7ab57c662daa2c8d97cfbd9a3cc454bbe2cd1a8e`.
 
 ## Execute in isolation
@@ -79,10 +80,9 @@ release blockers below keep the **release/recovery acceptance decision BLOCKED**
 
 ## Confirmed source blockers — no runtime fixes in this slice
 
-1. `/api/admin/demographics` selects absent `users.is_admin`. Reproduced as HTTP 500 on fresh
-   state. Smallest separate maintenance slice: replace that unsupported column query with the
-   established `isAdmin(req)` authorization contract, retain response shape/query behavior,
-   and add fresh-state authorized/ordinary/unauthenticated regressions. Add no schema column.
+1. **Resolved in the Admin demographics slice:** the route uses established `isAdmin(req)`
+   authorization with no schema changes. Fresh-state rehearsal now requires admin success,
+   ordinary-user 403, and unauthenticated 401 instead of the former missing-column 500.
 2. The tested tracked release contains the preview and generator but **not**
    `public/shop/the-potters-mud-log.pdf`. The fixture deliberately generates a disposable
    original to prove route/binding/paired capture. This is not proof that a release artifact

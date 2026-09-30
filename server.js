@@ -1347,8 +1347,7 @@ app.put('/api/user/demographics', auth, (req, res) => {
 
 // Admin: view all user demographics
 app.get('/api/admin/demographics', auth, (req, res) => {
-  const user = db.prepare('SELECT is_admin FROM users WHERE id=?').get(req.userId);
-  if (!user?.is_admin) return res.status(403).json({ error: 'Admin only' });
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   const users = db.prepare('SELECT id, display_name, email, potter_type, years_experience, studio_type, location, created_at FROM users ORDER BY created_at DESC').all();
   const summary = {
     total: users.length,
