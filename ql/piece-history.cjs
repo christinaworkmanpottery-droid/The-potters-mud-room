@@ -12,7 +12,7 @@ function order(items){const rank={sale:0,firing:1,'test-tile':2,pricing:3,'piece
   if(ad&&bd&&ad!==bd)return bd.localeCompare(ad);if(ad&&!bd)return -1;if(!ad&&bd)return 1;
   return (rank[a.recordType]??99)-(rank[b.recordType]??99)||String(a.sourceRecordId).localeCompare(String(b.sourceRecordId));});}
 function createPieceHistoryService(db){
- function get({userId,pieceId}){
+ function get({userId,pieceId,testTilesAccess = 'available'}){
   if(!userId||!pieceId)throw unavailable();
   const piece=db.prepare('SELECT * FROM pieces WHERE id=? AND user_id=?').get(pieceId,userId);if(!piece)throw unavailable();
   const clayRow=piece.clay_body_id?db.prepare('SELECT * FROM clay_bodies WHERE id=? AND user_id=?').get(piece.clay_body_id,userId):null;
@@ -33,7 +33,7 @@ function createPieceHistoryService(db){
   for(const q of qlf){if(firingById.has(q.firing_id))continue;const r=db.prepare('SELECT * FROM firing_logs WHERE id=? AND user_id=?').get(q.firing_id,userId);if(r)firingById.set(r.id,{r,legacy:false,q})}
   const firings=[...firingById.values()].map(({r,legacy,q})=>entry('firing',r.id,r,{recordedAt:firstDate(r,['date','created_at']),relationshipDate:q?.created_at||null,source:legacy&&q?'legacy+ql':legacy?'legacy':'ql',relationshipId:q?.id||r.id}));
 
-  const testTiles=[];if(tableExists(db,'ql_piece_test_tiles'))for(const q of db.prepare('SELECT id,test_tile_id,created_at FROM ql_piece_test_tiles WHERE user_id=? AND piece_id=? ORDER BY created_at,id').all(userId,pieceId)){
+  const testTiles=[];if(testTilesAccess === 'available' && tableExists(db,'ql_piece_test_tiles'))for(const q of db.prepare('SELECT id,test_tile_id,created_at FROM ql_piece_test_tiles WHERE user_id=? AND piece_id=? ORDER BY created_at,id').all(userId,pieceId)){
    const r=db.prepare('SELECT * FROM test_tiles WHERE id=? AND user_id=?').get(q.test_tile_id,userId);if(r)testTiles.push(entry('test-tile',r.id,r,{recordedAt:firstDate(r,['created_at']),relationshipDate:q.created_at||null,manualLabel:r.name||r.glaze_name||r.clay_name||null,source:'ql',relationshipId:q.id}));}
   const pricing=[];if(tableExists(db,'ql_piece_pricing'))for(const q of db.prepare('SELECT id,pricing_id,created_at FROM ql_piece_pricing WHERE user_id=? AND piece_id=? ORDER BY created_at,id').all(userId,pieceId)){
    const r=db.prepare('SELECT * FROM pricing_calculations WHERE id=? AND user_id=?').get(q.pricing_id,userId);if(r)pricing.push(entry('pricing',r.id,r,{recordedAt:firstDate(r,['created_at']),relationshipDate:q.created_at||null,manualLabel:r.name||null,source:'ql',relationshipId:q.id}));}
@@ -45,7 +45,7 @@ function createPieceHistoryService(db){
    .map(r=>entry('piece-photo',r.id,r,{recordedAt:firstDate(r,['created_at']),manualLabel:r.stage||r.original_name||null}));
 
   const history=order([...(clay?[clay]:[]),...glazeLayers,...firings,...testTiles,...pricing,...sales,...photos]);
-  return {piece:entry('piece',piece.id,piece,{recordedAt:firstDate(piece,['date_started','created_at']),source:'piece'}),clay,glazeLayers,firings,testTiles,pricing,sales,photos,history};
+  return {piece:entry('piece',piece.id,piece,{recordedAt:firstDate(piece,['date_started','created_at']),source:'piece'}),clay,glazeLayers,firings,testTiles,testTilesAccess,pricing,sales,photos,history};
  }
  return Object.freeze({get});
 }

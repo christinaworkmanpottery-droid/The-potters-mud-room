@@ -483,6 +483,35 @@ function requireTier(min) {
     res.status(403).json({ error: min === 'starter' ? 'Upgrade to Unlimited to use this feature.' : 'Upgrade required.' });
   };
 }
+// Test Tile access is always established from the current database account.
+function hasTestTileEntitlement(userId) {
+  try { return ['starter', 'basic', 'mid', 'top'].includes(db.prepare('SELECT tier FROM users WHERE id=?').get(userId)?.tier); }
+  catch (_) { return false; }
+}
+function testTileLocked(res) {
+  return res.status(403).json({ error: 'Upgrade to Unlimited to use this feature.', code: 'TEST_TILE_ENTITLEMENT_REQUIRED' });
+}
+function requireTestTileEntitlement(req, res, next) {
+  res.set('Cache-Control', 'private, no-store');
+  if (!hasTestTileEntitlement(req.userId)) return testTileLocked(res);
+  next();
+}
+// Auth and owned Piece precede infrastructure, which precedes entitlement.
+function testTileRelationshipAccess(req, res) {
+  res.set('Cache-Control', 'private, no-store');
+  if (!db.prepare('SELECT 1 FROM pieces WHERE id=? AND user_id=?').get(req.params.pieceId, req.userId)) {
+    res.status(404).json({ error: 'Relationship unavailable' }); return false;
+  }
+  const available = getQlRelationshipService().available();
+  if (req.method === 'GET') res.set('X-QL-Relationships-Available', String(available));
+  if (!available) {
+    if (req.method === 'GET') res.json([]);
+    else res.status(409).json({ error: 'QL relationships unavailable' });
+    return false;
+  }
+  if (!hasTestTileEntitlement(req.userId)) { testTileLocked(res); return false; }
+  return true;
+}
 function getPieceCount(uid) { return db.prepare('SELECT COUNT(*) as c FROM pieces WHERE user_id=?').get(uid).c; }
 
 let qlRelationshipService;
@@ -496,12 +525,14 @@ function qlRelationshipError(res, error) {
   console.error('[QL relationship]', error?.message || error);
   return res.status(500).json({ error: 'Relationship update failed' });
 }
+app.use(['/api/test-tiles', '/api/ql/test-tiles', '/api/ql/pieces/:pieceId/test-tiles'], (req, res, next) => { res.set('Cache-Control', 'private, no-store'); next(); });
 for (const [pathName, kind, bodyKey] of [
   ['firings', 'firing', 'firingId'],
   ['test-tiles', 'testTile', 'testTileId'],
   ['pricing', 'pricing', 'pricingId']
 ]) {
   app.get(`/api/ql/pieces/:pieceId/${pathName}`, auth, (req, res) => {
+    if (kind === 'testTile' && !testTileRelationshipAccess(req, res)) return;
     try {
       const service = getQlRelationshipService();
       const records = service.list({ userId: req.userId, pieceId: req.params.pieceId, kind });
@@ -510,10 +541,11 @@ for (const [pathName, kind, bodyKey] of [
       // Retain all old fields while adding the canonical saved-Pricing detail
       // fields through the existing serializer. No alternate JSON contract.
       res.json(kind === 'pricing' ? records.map(row => ({ ...row, ...parsePricingCalculation(row) }))
-        : kind === 'firing' ? records.map(serializeFiring) : records);
+        : kind === 'firing' ? records.map(serializeFiring) : records.map(serializeTestTile));
     } catch (error) { qlRelationshipError(res, error); }
   });
   app.post(`/api/ql/pieces/:pieceId/${pathName}`, auth, (req, res) => {
+    if (kind === 'testTile' && !testTileRelationshipAccess(req, res)) return;
     try {
       const targetId = req.body?.[bodyKey];
       const relationship = getQlRelationshipService().create({ userId: req.userId, pieceId: req.params.pieceId, kind, targetId });
@@ -521,6 +553,7 @@ for (const [pathName, kind, bodyKey] of [
     } catch (error) { qlRelationshipError(res, error); }
   });
   app.delete(`/api/ql/pieces/:pieceId/${pathName}/:targetId`, auth, (req, res) => {
+    if (kind === 'testTile' && !testTileRelationshipAccess(req, res)) return;
     try {
       const removed = getQlRelationshipService().remove({ userId: req.userId, pieceId: req.params.pieceId, kind, targetId: req.params.targetId });
       res.json({ removed: removed > 0 });
@@ -536,7 +569,7 @@ function getQlPieceHistoryService() {
 app.get('/api/ql/pieces/:pieceId/history', auth, (req, res) => {
   res.set('Cache-Control', 'private, no-store');
   try {
-    res.json(protectPieceHistoryTestTileMedia(getQlPieceHistoryService().get({ userId: req.userId, pieceId: req.params.pieceId })));
+    res.json(protectPieceHistoryTestTileMedia(getQlPieceHistoryService().get({ userId: req.userId, pieceId: req.params.pieceId, testTilesAccess: !getQlRelationshipService().available() ? 'unavailable' : hasTestTileEntitlement(req.userId) ? 'available' : 'locked' })));
   } catch (error) {
     if (error?.status === 404) return res.status(404).json({ error: 'Piece unavailable' });
     console.error('[QL Piece history]', error?.message || error);
@@ -2036,6 +2069,14 @@ function testTileMediaContract(tile) {
   return tile;
 }
 
+function serializeTestTile(tile) {
+  if (!tile) return tile;
+  return testTileMediaContract({ ...tile,
+    glaze_library_name: tile.glaze_id ? db.prepare('SELECT name FROM glazes WHERE id=? AND user_id=?').get(tile.glaze_id, tile.user_id)?.name || null : null,
+    clay_library_name: tile.clay_body_id ? db.prepare('SELECT name FROM clay_bodies WHERE id=? AND user_id=?').get(tile.clay_body_id, tile.user_id)?.name || null : null
+  });
+}
+
 function glazeComboMediaContract(combo) {
   if (!combo) return combo;
   const explicitlyPublic = combo.is_shared === 1 || combo.is_public === 1;
@@ -2074,8 +2115,8 @@ function publicGlazeComboFilenameSafe(filename) {
 }
 function protectPieceHistoryTestTileMedia(history) {
   if (!history) return history;
-  for (const entry of history.testTiles || []) if (entry?.values) testTileMediaContract(entry.values);
-  for (const entry of history.history || []) if (entry?.recordType === 'test-tile' && entry.values) testTileMediaContract(entry.values);
+  for (const entry of history.testTiles || []) if (entry?.values) entry.values = serializeTestTile(entry.values);
+  for (const entry of history.history || []) if (entry?.recordType === 'test-tile' && entry.values) entry.values = serializeTestTile(entry.values);
   return history;
 }
 app.get('/api/ql/projects/:projectId/photos/:photoId', auth, (req, res) => {
@@ -2798,6 +2839,7 @@ app.delete('/api/pieces/:id', auth, (req, res) => {
 // Bulk delete endpoint - reuses existing deletion logic for each type
 app.post('/api/bulk-delete', auth, (req, res) => {
   const { type, ids } = req.body;
+  if (type === 'test-tiles' && !hasTestTileEntitlement(req.userId)) { res.set('Cache-Control', 'private, no-store'); return testTileLocked(res); }
   if (!type || !Array.isArray(ids) || ids.length === 0) {
     return res.status(400).json({ error: 'Invalid request' });
   }
@@ -2940,7 +2982,12 @@ const replacementPhotoUpload = (req, res, next) => {
 
 // Replace existing photo pixels. Legacy HEIC/HEIF records migrate to a new JPEG
 // filename because Build 34 always sends JPEG bytes.
-app.put('/api/photos/by-filename/:filename', auth, replacementPhotoUpload, async (req, res) => {
+app.put('/api/photos/by-filename/:filename', auth, (req, res, next) => {
+  if (ownedPhotoSlots(req.params.filename, req.userId).some(slot => slot.table === 'test_tiles') && !hasTestTileEntitlement(req.userId)) {
+    res.set('Cache-Control', 'private, no-store'); return testTileLocked(res);
+  }
+  next();
+}, replacementPhotoUpload, async (req, res) => {
   const rawFilename = String(req.params.filename || '');
   const filename = path.basename(rawFilename);
   const invalidFilename = !rawFilename || rawFilename !== filename || filename === '.' || filename === '..' || (/[/\\\0]/.test(filename)) || filename.length > 255;
@@ -7087,7 +7134,7 @@ const originalPhotoHandler = null; // handled inline above via backfill
 // ==================== TEST TILE LIBRARY (Unlimited only) ====================
 
 // GET all test tiles for the user
-app.get('/api/test-tiles', auth, requireTier('starter'), (req, res) => {
+app.get('/api/test-tiles', auth, requireTestTileEntitlement, (req, res) => {
   const tiles = db.prepare(`
     SELECT tt.*, g.name as glaze_library_name, cb.name as clay_library_name
     FROM test_tiles tt
@@ -7096,11 +7143,22 @@ app.get('/api/test-tiles', auth, requireTier('starter'), (req, res) => {
     WHERE tt.user_id = ?
     ORDER BY tt.created_at DESC
   `).all(req.userId);
-  res.json(tiles.map(testTileMediaContract));
+  res.json(tiles.map(serializeTestTile));
+});
+
+// Free tier: can see that the feature exists but gets upgrade prompt
+app.get('/api/test-tiles/preview', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  res.json({
+    feature: 'Test Tile Library',
+    description: 'Track every test tile with glaze, clay body, firing details, thickness, layering, photos, and results. Build a searchable library of all your glaze experiments.',
+    available: hasTestTileEntitlement(req.userId),
+    upgradeMessage: 'Upgrade to Unlimited to access the Test Tile Library and organize all your glaze experiments in one place.'
+  });
 });
 
 // GET single test tile
-app.get('/api/test-tiles/:id', auth, requireTier('starter'), (req, res) => {
+app.get('/api/test-tiles/:id', auth, requireTestTileEntitlement, (req, res) => {
   const tile = db.prepare(`
     SELECT tt.*, g.name as glaze_library_name, cb.name as clay_library_name
     FROM test_tiles tt
@@ -7109,11 +7167,11 @@ app.get('/api/test-tiles/:id', auth, requireTier('starter'), (req, res) => {
     WHERE tt.id = ? AND tt.user_id = ?
   `).get(req.params.id, req.userId);
   if (!tile) return res.status(404).json({ error: 'Test tile not found' });
-  res.json(testTileMediaContract(tile));
+  res.json(serializeTestTile(tile));
 });
 
 // Protected Test Tile photo delivery. Slot is 1..3 and maps exactly to the stored field.
-app.get('/api/ql/test-tiles/:tileId/photos/:slot', auth, requireTier('starter'), (req, res) => {
+app.get('/api/ql/test-tiles/:tileId/photos/:slot', auth, requireTestTileEntitlement, (req, res) => {
   res.set('Cache-Control', 'private, no-store');
   const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
   try {
@@ -7140,7 +7198,7 @@ app.get('/api/ql/test-tiles/:tileId/photos/:slot', auth, requireTier('starter'),
 });
 
 // CREATE test tile
-app.post('/api/test-tiles', auth, requireTier('starter'), upload.array('photos', 3), (req, res) => {
+app.post('/api/test-tiles', auth, requireTestTileEntitlement, upload.array('photos', 3), (req, res) => {
   const { name, glaze_id, glaze_name, clay_body_id, clay_name, cone, atmosphere, application_method, coats, thickness, surface_result, color_result, layered_over, layered_under, kiln_position, firing_schedule, notes, rating, tags } = req.body;
   const id = uuidv4();
   const photos = req.files || [];
@@ -7181,7 +7239,7 @@ app.post('/api/test-tiles', auth, requireTier('starter'), upload.array('photos',
 });
 
 // UPDATE test tile
-app.put('/api/test-tiles/:id', auth, requireTier('starter'), upload.array('photos', 3), (req, res) => {
+app.put('/api/test-tiles/:id', auth, requireTestTileEntitlement, upload.array('photos', 3), (req, res) => {
   const tile = db.prepare('SELECT * FROM test_tiles WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!tile) return res.status(404).json({ error: 'Test tile not found' });
   
@@ -7263,7 +7321,7 @@ app.put('/api/test-tiles/:id', auth, requireTier('starter'), upload.array('photo
 });
 
 // DELETE test tile
-app.delete('/api/test-tiles/:id', auth, requireTier('starter'), (req, res) => {
+app.delete('/api/test-tiles/:id', auth, requireTestTileEntitlement, (req, res) => {
   try {
     if (!deletionLifecycle.deleteStudioRecord(req.userId, req.params.id, 'testTile')) return res.status(404).json({ error: 'Test tile not found' });
     res.json({ success: true });
@@ -7271,25 +7329,15 @@ app.delete('/api/test-tiles/:id', auth, requireTier('starter'), (req, res) => {
 });
 
 // GET test tiles filtered by glaze
-app.get('/api/glazes/:id/test-tiles', auth, requireTier('starter'), (req, res) => {
+app.get('/api/glazes/:id/test-tiles', auth, requireTestTileEntitlement, (req, res) => {
   const tiles = db.prepare('SELECT * FROM test_tiles WHERE glaze_id=? AND user_id=? ORDER BY created_at DESC').all(req.params.id, req.userId);
-  res.json(tiles.map(testTileMediaContract));
+  res.json(tiles.map(serializeTestTile));
 });
 
 // GET test tiles filtered by clay body
-app.get('/api/clay-bodies/:id/test-tiles', auth, requireTier('starter'), (req, res) => {
+app.get('/api/clay-bodies/:id/test-tiles', auth, requireTestTileEntitlement, (req, res) => {
   const tiles = db.prepare('SELECT * FROM test_tiles WHERE clay_body_id=? AND user_id=? ORDER BY created_at DESC').all(req.params.id, req.userId);
-  res.json(tiles.map(testTileMediaContract));
-});
-
-// Free tier: can see that the feature exists but gets upgrade prompt
-app.get('/api/test-tiles/preview', auth, (req, res) => {
-  res.json({
-    feature: 'Test Tile Library',
-    description: 'Track every test tile with glaze, clay body, firing details, thickness, layering, photos, and results. Build a searchable library of all your glaze experiments.',
-    available: req.userTier === 'starter',
-    upgradeMessage: 'Upgrade to Unlimited to access the Test Tile Library and organize all your glaze experiments in one place.'
-  });
+  res.json(tiles.map(serializeTestTile));
 });
 
 // =========================================================================== 

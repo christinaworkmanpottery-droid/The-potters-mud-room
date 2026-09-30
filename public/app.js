@@ -141,7 +141,10 @@ async function api(path, opts = {}) {
     if (requestToken !== token) throw new Error('Session changed');
     if (res.status === 401) { clearProfileMedia(); clearForumMedia(); }
   }
-  if (!res.ok) throw new Error(d.error || 'Something went wrong');
+  if (!res.ok) {
+    if (res.status === 403 && d.code === 'TEST_TILE_ENTITLEMENT_REQUIRED' && requestToken === token) invalidateTestTileAccess();
+    throw Object.assign(new Error(d.error || 'Something went wrong'), { status: res.status, code: d.code });
+  }
   return d;
 }
 function requireSignup(feature) {
@@ -213,7 +216,7 @@ const STATUS_LABELS = { 'in-progress':'In Progress','leather-hard':'Leather Hard
 const CASUALTY_LABELS = { 'cracked':'Cracked','exploded':'Exploded / Blowout','warped':'Warped','s-crack':'S-Crack','glaze-crawl':'Glaze Crawl','glaze-pinhole':'Glaze Pinholing','glaze-shiver':'Glaze Shivering','glaze-crazing':'Glaze Crazing','glaze-runoff':'Glaze Ran Off','thermal-shock':'Thermal Shock','broke-trimming':'Broke While Trimming','broke-handling':'Broke While Handling','collapsed':'Collapsed','dunting':'Dunting','wrong-color':'Unexpected Color Result','other':'Other' };
 function fmtStatus(s) { return s ? '<span class="status-badge status-' + s + '">' + (STATUS_LABELS[s]||s) + '</span>' : ''; }
 function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { if (id === 'projectModal' || id === 'projectPhotoModal') closeProjectMediaScope(id); const saleScope = {saleModal:'salePhotoPreview',saleDetailsModal:'saleDetailsContent',bulkSaleModal:'bulkSale'}[id]; if (saleScope) closeSaleMediaScope(saleScope); const firingScope = { firingModal:'firingPhotosContainer', firingViewModal:'firingViewBody', firingPhotoReorderModal:'firingPhotoReorderContent' }[id]; if (firingScope) closeFiringMediaScope(firingScope); if (id === 'glazeViewModal') clearGlazeMedia('glazeViewBody'); if (id === 'clayViewModal') clearClayMedia('clayViewBody'); document.getElementById(id).classList.remove('open'); }
+function closeModal(id) { if (id === 'testTileViewModal' || id === 'testTileModal') clearTestTileMedia(); if (id === 'projectModal' || id === 'projectPhotoModal') closeProjectMediaScope(id); const saleScope = {saleModal:'salePhotoPreview',saleDetailsModal:'saleDetailsContent',bulkSaleModal:'bulkSale'}[id]; if (saleScope) closeSaleMediaScope(saleScope); const firingScope = { firingModal:'firingPhotosContainer', firingViewModal:'firingViewBody', firingPhotoReorderModal:'firingPhotoReorderContent' }[id]; if (firingScope) closeFiringMediaScope(firingScope); if (id === 'glazeViewModal') clearGlazeMedia('glazeViewBody'); if (id === 'clayViewModal') clearClayMedia('clayViewBody'); document.getElementById(id).classList.remove('open'); }
 
 // iOS decimal keyboards have no native Done key. Give every numeric field a
 // consistent way to dismiss the keyboard so form buttons remain reachable.
@@ -793,6 +796,7 @@ function clearPieceHistory() {
   clearPieceEdgeMedia();
   clearPricingMedia('linkedPricingViewer');
   document.getElementById('linkedPricing')?.remove();
+  if (document.getElementById('linkedTestTiles')) { closeModal('testTileViewModal'); document.getElementById('linkedTestTiles').remove(); }
   if (document.getElementById('linkedFirings')) { closeModal('firingViewModal'); document.getElementById('firingViewBody').replaceChildren(); }
   document.getElementById('linkedFirings')?.remove();
   pieceViewGeneration++;
@@ -917,6 +921,7 @@ async function loadPieceHistory(id, container, generation, sessionToken) {
   try {
     const data = await api('/api/ql/pieces/' + encodeURIComponent(id) + '/history');
     if (!active()) return;
+    if (data.testTilesAccess === 'locked') invalidateTestTileAccess(false);
     renderPieceHistory(container, data);
     // Photo bytes are authenticated too; never load the public filename from metadata.
     await Promise.all(Array.from(container.querySelectorAll('[data-history-photo]')).map(async placeholder => {
@@ -1043,6 +1048,7 @@ async function viewPiece(id) {
     document.getElementById('pieceDetailContent').append(history);
     mountLinkedPricing(p.id, generation, sessionToken);
     mountLinkedFirings(p.id, generation, sessionToken);
+    mountLinkedTestTiles(p.id, generation, sessionToken);
     if (privatePiecePhotos) void loadPrivatePieceDetailPhotos(p.id, generation, sessionToken);
     else void loadPieceEdgeMedia(document.getElementById('photoReorderContainer'));
     void loadPieceHistory(p.id, history, generation, sessionToken);
@@ -1821,9 +1827,15 @@ async function deleteGlaze(id) {
 // ---- Test Tiles ----
 let testTiles = [];
 let testTileMediaGeneration = 0;
+let testTileDetailController = null;
 const testTileMediaViews = new Map();
 function clearTestTileMedia() {
   testTileMediaGeneration++;
+  testTileDetailController?.abort(); testTileDetailController = null;
+  document.getElementById('testTileViewBody')?.replaceChildren();
+  const edit = document.getElementById('testTileViewEditBtn');
+  if (edit) { edit.hidden = true; edit.onclick = null; }
+  const title = document.getElementById('testTileViewTitle'); if (title) title.textContent = 'Test Tile';
   for (const view of testTileMediaViews.values()) {
     view.active = false;
     view.controller.abort();
@@ -1833,6 +1845,19 @@ function clearTestTileMedia() {
   testTileMediaViews.clear();
   const lightbox = document.getElementById('lightboxImg');
   if (lightbox?.src?.startsWith('blob:')) { lightbox.removeAttribute('src'); closeLightbox(); }
+}
+function invalidateTestTileAccess(refreshHistory = true) {
+  clearTestTileMedia(); testTiles = [];
+  document.getElementById('testTileList')?.replaceChildren();
+  document.getElementById('linkedTestTiles')?._locked?.();
+  const history = document.getElementById('pieceHistory');
+  if (history && refreshHistory) {
+    const next = history.cloneNode(false); history.replaceWith(next);
+    next.append(historyElement('h2', 'Connected History'));
+    void loadPieceHistory(window._currentPieceId, next, pieceViewGeneration, token);
+  }
+  const body = document.getElementById('testTileViewBody');
+  if (body) body.textContent = 'Test Tiles locked. Upgrade to Unlimited to use this feature.';
 }
 function testTileSlotFilename(tile, slot) { return tile?.[slot === 1 ? 'photo_filename' : 'photo_filename' + slot] || null; }
 function testTileSlotDelivery(tile, slot) { return tile?.[slot === 1 ? 'photoDelivery' : 'photoDelivery' + slot] || 'legacy-ambiguous'; }
@@ -1851,6 +1876,7 @@ async function loadTestTileMedia(root) {
   await Promise.all(view.images.map(async img => {
     try {
       const response = await fetch('/api/ql/test-tiles/' + encodeURIComponent(img.dataset.testTileId) + '/photos/' + encodeURIComponent(img.dataset.privateTestTilePhoto), { headers:{Authorization:'Bearer '+sessionToken}, cache:'no-store', signal:view.controller.signal });
+      if (response.status === 403 && active(img)) invalidateTestTileAccess();
       if (!response.ok) throw new Error('Photo unavailable');
       const blob = await response.blob(); if (!active(img)) return;
       const url = URL.createObjectURL(blob); view.urls.push(url); img.src=url;
@@ -1886,7 +1912,7 @@ async function loadTestTiles() {
     loadTestTileMedia(c);
     updateBulkSelectionUI('testTiles');
   } catch(e) {
-    if (e.message && e.message.includes('403')) {
+    if (e.status === 403) {
       c.innerHTML = '';
       em.classList.remove('hidden');
       document.getElementById('testTileEmpty').innerHTML = '<div class="empty-state-icon">🧪</div><div class="empty-state-title">Test Tile Library</div><p>Track every glaze test — clay body, cone, surface result, photos, and ratings. Available on the Unlimited plan.</p><button class="btn btn-primary" onclick="navigate(\'upgrade\')">Upgrade to Unlimited</button>';
@@ -1919,9 +1945,31 @@ function testTileCard(t) {
     '</div></div>';
 }
 
-function viewTestTileById(id) {
-  const t = testTiles.find(x => x.id === id);
-  if (!t) return;
+async function viewTestTileById(id, options = {}) {
+  clearTestTileMedia();
+  const generation = testTileMediaGeneration, sessionToken = token, account = currentUser?.id;
+  const controller = new AbortController(); testTileDetailController = controller;
+  const active = () => generation === testTileMediaGeneration && sessionToken === token && account === currentUser?.id && (!options.active || options.active());
+  const body = document.getElementById('testTileViewBody');
+  body.textContent = 'Loading Test Tile…'; openModal('testTileViewModal');
+  try {
+    const response = await fetch(API + '/api/test-tiles/' + encodeURIComponent(id), { cache: 'no-store', signal: controller.signal, headers: { Authorization: 'Bearer ' + sessionToken } });
+    const t = await response.json();
+    if (!active()) return;
+    if (!response.ok) {
+      if (response.status === 403) { invalidateTestTileAccess(); return; }
+      throw Object.assign(Error('Test Tile unavailable'), { status: response.status });
+    }
+    if (String(t.id) !== String(id)) throw Error('Test Tile unavailable');
+    renderTestTile(t, options, active);
+  } catch (error) {
+    if (!active()) return;
+    body.replaceChildren(historyElement('p', error.status === 404 ? 'Test Tile unavailable.' : 'Unable to load Test Tile.'));
+    const retry = historyElement('button', 'Retry', 'btn btn-secondary');
+    retry.onclick = () => { if (active()) void viewTestTileById(id, options); }; body.append(retry);
+  }
+}
+function renderTestTile(t, options = {}, active = () => true) {
   const stars = t.rating ? '★'.repeat(t.rating) + '☆'.repeat(5 - t.rating) : null;
   let html = '';
   const photos = [1,2,3].filter(slot => testTileSlotFilename(t, slot));
@@ -1930,8 +1978,8 @@ function viewTestTileById(id) {
     photos.forEach(slot => { html += testTilePhotoMarkup(t, slot, 'width:90px;height:90px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in'); });
     html += '</div>';
   }
-  if (t.glaze_name) html += '<div class="view-row"><span class="detail-label">Glaze</span><span>' + esc(t.glaze_name) + '</span></div>';
-  if (t.clay_name) html += '<div class="view-row"><span class="detail-label">Clay Body</span><span>' + esc(t.clay_name) + '</span></div>';
+  if (t.glaze_name || t.glaze_library_name) html += '<div class="view-row"><span class="detail-label">Glaze</span><span>' + esc(t.glaze_name || t.glaze_library_name) + '</span></div>';
+  if (t.clay_name || t.clay_library_name) html += '<div class="view-row"><span class="detail-label">Clay Body</span><span>' + esc(t.clay_name || t.clay_library_name) + '</span></div>';
   if (t.cone) html += '<div class="view-row"><span class="detail-label">Cone</span><span>' + esc(t.cone) + '</span></div>';
   if (t.atmosphere) html += '<div class="view-row"><span class="detail-label">Atmosphere</span><span>' + esc(t.atmosphere) + '</span></div>';
   if (t.application_method) html += '<div class="view-row"><span class="detail-label">Application</span><span>' + esc(t.application_method) + (t.coats > 1 ? ' · ' + t.coats + ' coats' : '') + '</span></div>';
@@ -1947,7 +1995,8 @@ function viewTestTileById(id) {
   if (t.notes) html += '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);color:var(--text-light);font-size:0.9rem">' + esc(t.notes) + '</div>';
   document.getElementById('testTileViewTitle').textContent = t.name || 'Test Tile';
   document.getElementById('testTileViewBody').innerHTML = html;
-  document.getElementById('testTileViewEditBtn').onclick = () => { closeModal('testTileViewModal'); openTestTileModal(t); };
+  document.getElementById('testTileViewEditBtn').hidden = options.readOnly === true;
+  document.getElementById('testTileViewEditBtn').onclick = options.readOnly ? null : () => { if (!active()) return; closeModal('testTileViewModal'); openTestTileModal(t); };
   openModal('testTileViewModal');
   loadTestTileMedia(document.getElementById('testTileViewBody'));
 }
@@ -8533,6 +8582,104 @@ function mountLinkedFirings(pieceId, generation, sessionToken) {
     if (!active() || busy) return;
     busy = true;
     try { await viewFiring(id, { readOnly: true, active }); }
+    finally { if (active()) busy = false; }
+  }
+  void load();
+}
+
+function testTileLinkLabel(t) {
+  return [t.name, t.clay_name || t.clay_library_name, t.glaze_name || t.glaze_library_name, t.cone && 'Cone ' + t.cone, t.created_at, t.id].filter(Boolean).join(' · ');
+}
+function mountLinkedTestTiles(pieceId, generation, sessionToken) {
+  const root = historyElement('section', null, 'card mb-16');
+  root.id = 'linkedTestTiles';
+  root.setAttribute('aria-label', 'Linked Test Tiles');
+  document.getElementById('pieceDetailContent').append(root);
+  const account = currentUser?.id;
+  let busy = false, serial = 0;
+  const active = () => root.isConnected && generation === pieceViewGeneration &&
+    sessionToken === token && account === currentUser?.id && currentPage === 'pieceDetail' && window._currentPieceId === pieceId;
+  const button = (label, action) => {
+    const el = historyElement('button', label, 'btn btn-secondary btn-sm');
+    el.type = 'button'; el.onclick = action; return el;
+  };
+  const request = async (path, options = {}) => {
+    if (!active()) throw Error('stale');
+    const response = await fetch(API + path, { ...options, cache: 'no-store',
+      headers: { Authorization: 'Bearer ' + sessionToken, 'Content-Type': 'application/json' } });
+    const data = await response.json();
+    if (!active()) throw Error('stale');
+    if (!response.ok) throw Object.assign(Error('unavailable'), { status: response.status });
+    return { data, available: response.headers.get('X-QL-Relationships-Available') === 'true' };
+  };
+  const base = '/api/ql/pieces/' + encodeURIComponent(pieceId) + '/test-tiles';
+  const reset = text => {
+    root.replaceChildren(historyElement('h2', 'Linked Test Tiles'));
+    root.setAttribute('aria-busy', String(busy));
+    if (text) { const status = historyElement('p', text); status.setAttribute('role', 'status'); root.append(status); }
+  };
+  root._locked = () => { if (active()) { ++serial; busy = false; reset('Test Tiles locked. Upgrade to Unlimited to use this feature.'); root.append(button('Retry', () => load())); } };
+  const failure = error => {
+    if (error?.status === 403) { invalidateTestTileAccess(); return; }
+    reset('Linked Test Tiles is unavailable. Try again when connected.');
+    root.append(button('Retry', () => load()));
+  };
+  async function load(afterMutation = false) {
+    if (!active() || busy) return;
+    busy = true; const run = ++serial; reset('Loading linked Test Tiles…');
+    // Invalidate earlier History work by replacing its container after mutation.
+    if (afterMutation) {
+      const old = document.getElementById('pieceHistory');
+      if (old) {
+        const next = old.cloneNode(false); old.replaceWith(next);
+        next.append(historyElement('h2', 'Connected History'), historyElement('p', 'Loading connected history…'));
+        void loadPieceHistory(pieceId, next, generation, sessionToken);
+      }
+    }
+    try {
+      const result = await request(base);
+      if (!active() || serial !== run) return;
+      if (!result.available) {
+        busy = false; reset('Linked Test Tiles is not available for this database.');
+        root.append(button('Retry', () => load())); return;
+      }
+      const saved = (await request('/api/test-tiles')).data;
+      const linked = await Promise.all(result.data.map(row => request('/api/test-tiles/' + encodeURIComponent(row.id)).then(r => r.data)));
+      if (!active() || serial !== run) return;
+      busy = false; reset(linked.length ? '' : 'No saved Test Tiles linked.');
+      for (const calc of linked) {
+        const row = historyElement('div', null, 'mb-16');
+        row.append(historyElement('strong', testTileLinkLabel(calc)),
+          historyElement('p', [calc.cone && 'Cone ' + calc.cone, calc.created_at, 'ID: ' + calc.id].filter(Boolean).join(' · ')),
+          button('View', () => view(calc.id)), button('Unlink', () => mutate(calc.id, 'DELETE')));
+        root.append(row);
+      }
+      const ids = new Set(linked.map(row => row.id));
+      const eligible = saved.filter(row => !ids.has(row.id));
+      if (eligible.length) {
+        const picker = historyElement('select', null, 'form-select'); picker.setAttribute('aria-label', 'Saved Firing to link');
+        const placeholder = historyElement('option', 'Select a saved Test Tile'); placeholder.value = ''; picker.append(placeholder);
+        for (const calc of eligible) { const option = historyElement('option', (testTileLinkLabel(calc)) + ' · ' + calc.id); option.value = calc.id; picker.append(option); }
+        const link = button('Link', () => { if (picker.value) void mutate(picker.value, 'POST'); });
+        link.disabled = true; picker.onchange = () => { link.disabled = !picker.value; };
+        root.append(picker, link);
+      } else root.append(historyElement('p', 'No additional saved Test Tiles available to link.'));
+    } catch (_) { if (active() && serial === run) { busy = false; failure(_); } }
+  }
+  async function mutate(id, method) {
+    if (!active() || busy) return;
+    busy = true; reset('Updating link…');
+    try {
+      await request(base + (method === 'DELETE' ? '/' + encodeURIComponent(id) : ''),
+        { method, ...(method === 'POST' ? { body: JSON.stringify({ testTileId: id }) } : {}) });
+      if (!active()) return;
+      busy = false; await load(true);
+    } catch (_) { if (active()) { busy = false; failure(_); } }
+  }
+  async function view(id) {
+    if (!active() || busy) return;
+    busy = true;
+    try { await viewTestTileById(id, { readOnly: true, active }); }
     finally { if (active()) busy = false; }
   }
   void load();
