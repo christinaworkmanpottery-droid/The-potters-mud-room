@@ -5,6 +5,7 @@ const root = path.resolve(__dirname, '..');
 const cleanEnv = { PATH: process.env.PATH, NODE_ENV: 'test' };
 for (const [args, extraEnv] of [
   [['ql/verify.cjs'], {}],
+  [['--test', 'tests/ql-lifecycle-recovery.cjs'], {}],
   [['--test', 'tests/ql-piece-glaze-api.cjs', 'tests/ql-piece-glaze-dom.cjs'], {}],
   [['--test', 'tests/ql-piece-clay-api.cjs', 'tests/ql-piece-clay-dom.cjs'], {}],
   [['--test', 'tests/ql-workflow-hardening.cjs'], {}],

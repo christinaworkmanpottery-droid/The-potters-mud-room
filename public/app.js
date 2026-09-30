@@ -956,7 +956,8 @@ function renderPieceHistory(container, data) {
   container.setAttribute('aria-busy', 'false');
 }
 async function loadPieceHistory(id, container, generation, sessionToken) {
-  const active = () => container.isConnected && generation === pieceViewGeneration && token === sessionToken;
+  const account = currentUser?.id;
+  const active = () => container.isConnected && generation === pieceViewGeneration && token === sessionToken && currentUser?.id === account;
   try {
     const data = await api('/api/ql/pieces/' + encodeURIComponent(id) + '/history');
     if (!active()) return;
@@ -981,6 +982,7 @@ async function loadPieceHistory(id, container, generation, sessionToken) {
         placeholder.replaceChildren(img);
       } catch (_) { if (active()) placeholder.textContent = 'Photo unavailable'; }
     }));
+    return true;
   } catch (_) {
     if (!active()) return;
     const failure = historyElement('p', 'History could not be loaded. Your piece details are still available.');
@@ -997,6 +999,7 @@ async function loadPieceHistory(id, container, generation, sessionToken) {
       loadPieceHistory(id, container, generation, sessionToken);
     };
     container.append(retry);
+    return false;
   }
 }
 
@@ -8587,7 +8590,7 @@ function mountLinkedPricing(pieceId, generation, sessionToken) {
   root.setAttribute('aria-label', 'Linked Pricing');
   document.getElementById('pieceDetailContent').append(root);
   const account = currentUser?.id;
-  let busy = false, serial = 0;
+  let busy = false, serial = 0, needsReconcile = false;
   const active = () => root.isConnected && generation === pieceViewGeneration &&
     sessionToken === token && account === currentUser?.id && currentPage === 'pieceDetail' && window._currentPieceId === pieceId;
   const button = (label, action) => {
@@ -8615,7 +8618,9 @@ function mountLinkedPricing(pieceId, generation, sessionToken) {
   };
   async function load(afterMutation = false) {
     if (!active() || busy) return;
+    afterMutation = afterMutation || needsReconcile;
     busy = true; const run = ++serial; reset('Loading linked calculations…');
+    let historyRecovery = Promise.resolve();
     // Invalidate earlier History work by replacing its container after mutation.
     if (afterMutation) {
       const old = document.getElementById('pieceHistory');
@@ -8623,10 +8628,12 @@ function mountLinkedPricing(pieceId, generation, sessionToken) {
         disposeHistoryPhotos();
         const next = old.cloneNode(false); old.replaceWith(next);
         next.append(historyElement('h2', 'Connected History'), historyElement('p', 'Loading connected history…'));
-        void loadPieceHistory(pieceId, next, generation, sessionToken);
+        historyRecovery = loadPieceHistory(pieceId, next, generation, sessionToken);
       }
     }
     try {
+      if (await historyRecovery === false) throw Error('History recovery incomplete');
+      if (!active() || serial !== run) return;
       const result = await request(base);
       if (!active() || serial !== run) return;
       if (!result.available) {
@@ -8636,7 +8643,7 @@ function mountLinkedPricing(pieceId, generation, sessionToken) {
       const saved = (await request('/api/pricing-calculations')).data;
       const linked = await Promise.all(result.data.map(row => request('/api/pricing-calculations/' + encodeURIComponent(row.id)).then(r => r.data)));
       if (!active() || serial !== run) return;
-      busy = false; reset(linked.length ? '' : 'No saved calculations linked.');
+      needsReconcile = false; busy = false; reset(linked.length ? '' : 'No saved calculations linked.');
       for (const calc of linked) {
         const row = historyElement('div', null, 'mb-16');
         row.append(historyElement('strong', calc.name || 'Saved calculation'),
@@ -8658,6 +8665,7 @@ function mountLinkedPricing(pieceId, generation, sessionToken) {
   }
   async function mutate(id, method) {
     if (!active() || busy) return;
+    needsReconcile = true;
     busy = true; reset('Updating link…');
     try {
       await request(base + (method === 'DELETE' ? '/' + encodeURIComponent(id) : ''),
@@ -8704,7 +8712,7 @@ function mountLinkedFirings(pieceId, generation, sessionToken) {
   root.setAttribute('aria-label', 'Linked Firings');
   document.getElementById('pieceDetailContent').append(root);
   const account = currentUser?.id;
-  let busy = false, serial = 0;
+  let busy = false, serial = 0, needsReconcile = false;
   const active = () => root.isConnected && generation === pieceViewGeneration &&
     sessionToken === token && account === currentUser?.id && currentPage === 'pieceDetail' && window._currentPieceId === pieceId;
   const button = (label, action) => {
@@ -8731,7 +8739,9 @@ function mountLinkedFirings(pieceId, generation, sessionToken) {
   };
   async function load(afterMutation = false) {
     if (!active() || busy) return;
+    afterMutation = afterMutation || needsReconcile;
     busy = true; const run = ++serial; reset('Loading linked Firings…');
+    let historyRecovery = Promise.resolve();
     // Invalidate earlier History work by replacing its container after mutation.
     if (afterMutation) {
       const old = document.getElementById('pieceHistory');
@@ -8739,11 +8749,15 @@ function mountLinkedFirings(pieceId, generation, sessionToken) {
         disposeHistoryPhotos();
         const next = old.cloneNode(false); old.replaceWith(next);
         next.append(historyElement('h2', 'Connected History'), historyElement('p', 'Loading connected history…'));
-        void loadPieceHistory(pieceId, next, generation, sessionToken);
+        historyRecovery = loadPieceHistory(pieceId, next, generation, sessionToken);
       }
     }
     try {
       if (afterMutation) {
+        const oldLegacy = document.getElementById('pieceSavedFirings');
+        if (oldLegacy) oldLegacy.textContent = 'Loading saved Firings…';
+        if (await historyRecovery === false) throw Error('History recovery incomplete');
+        if (!active() || serial !== run) return;
         const piece = (await request('/api/pieces/' + encodeURIComponent(pieceId))).data;
         if (!active()) return;
         const legacy = document.getElementById('pieceSavedFirings');
@@ -8758,7 +8772,7 @@ function mountLinkedFirings(pieceId, generation, sessionToken) {
       const saved = (await request('/api/firing-logs')).data;
       const linked = await Promise.all(result.data.map(row => request('/api/firing-logs/' + encodeURIComponent(row.id)).then(r => r.data)));
       if (!active() || serial !== run) return;
-      busy = false; reset(linked.length ? '' : 'No saved Firings linked.');
+      needsReconcile = false; busy = false; reset(linked.length ? '' : 'No saved Firings linked.');
       for (const calc of linked) {
         const row = historyElement('div', null, 'mb-16');
         row.append(historyElement('strong', firingLinkLabel(calc)),
@@ -8780,6 +8794,7 @@ function mountLinkedFirings(pieceId, generation, sessionToken) {
   }
   async function mutate(id, method) {
     if (!active() || busy) return;
+    needsReconcile = true;
     busy = true; reset('Updating link…');
     try {
       await request(base + (method === 'DELETE' ? '/' + encodeURIComponent(id) : ''),
@@ -8806,7 +8821,7 @@ function mountLinkedTestTiles(pieceId, generation, sessionToken) {
   root.setAttribute('aria-label', 'Linked Test Tiles');
   document.getElementById('pieceDetailContent').append(root);
   const account = currentUser?.id;
-  let busy = false, serial = 0;
+  let busy = false, serial = 0, needsReconcile = false;
   const active = () => root.isConnected && generation === pieceViewGeneration &&
     sessionToken === token && account === currentUser?.id && currentPage === 'pieceDetail' && window._currentPieceId === pieceId;
   const button = (label, action) => {
@@ -8836,7 +8851,9 @@ function mountLinkedTestTiles(pieceId, generation, sessionToken) {
   };
   async function load(afterMutation = false) {
     if (!active() || busy) return;
+    afterMutation = afterMutation || needsReconcile;
     busy = true; const run = ++serial; reset('Loading linked Test Tiles…');
+    let historyRecovery = Promise.resolve();
     // Invalidate earlier History work by replacing its container after mutation.
     if (afterMutation) {
       const old = document.getElementById('pieceHistory');
@@ -8844,10 +8861,12 @@ function mountLinkedTestTiles(pieceId, generation, sessionToken) {
         disposeHistoryPhotos();
         const next = old.cloneNode(false); old.replaceWith(next);
         next.append(historyElement('h2', 'Connected History'), historyElement('p', 'Loading connected history…'));
-        void loadPieceHistory(pieceId, next, generation, sessionToken);
+        historyRecovery = loadPieceHistory(pieceId, next, generation, sessionToken);
       }
     }
     try {
+      if (await historyRecovery === false) throw Error('History recovery incomplete');
+      if (!active() || serial !== run) return;
       const result = await request(base);
       if (!active() || serial !== run) return;
       if (!result.available) {
@@ -8857,7 +8876,7 @@ function mountLinkedTestTiles(pieceId, generation, sessionToken) {
       const saved = (await request('/api/test-tiles')).data;
       const linked = await Promise.all(result.data.map(row => request('/api/test-tiles/' + encodeURIComponent(row.id)).then(r => r.data)));
       if (!active() || serial !== run) return;
-      busy = false; reset(linked.length ? '' : 'No saved Test Tiles linked.');
+      needsReconcile = false; busy = false; reset(linked.length ? '' : 'No saved Test Tiles linked.');
       for (const calc of linked) {
         const row = historyElement('div', null, 'mb-16');
         row.append(historyElement('strong', testTileLinkLabel(calc)),
@@ -8879,6 +8898,7 @@ function mountLinkedTestTiles(pieceId, generation, sessionToken) {
   }
   async function mutate(id, method) {
     if (!active() || busy) return;
+    needsReconcile = true;
     busy = true; reset('Updating link…');
     try {
       await request(base + (method === 'DELETE' ? '/' + encodeURIComponent(id) : ''),
