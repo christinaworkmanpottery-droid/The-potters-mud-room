@@ -1,7 +1,7 @@
 name: QL Phase 1 + Phase 2 Verify
 on:
   push:
-    branches: [ql/phase-1-relationships, ql/phase-2a-piece-history, ql/phase-2b-piece-history-web, ql/phase-2c-history-validation, ql/phase-2d-piece-media, ql/phase-2e-private-piece-mobile, ql/phase-2f-upload-audit, ql/phase-2g-clay-media, ql/phase-2h-glaze-media, ql/phase-2i-glaze-clay-test-media, ql/phase-2j-test-tile-media]
+    branches: [ql/phase-1-relationships, ql/phase-2a-piece-history, ql/phase-2b-piece-history-web, ql/phase-2c-history-validation, ql/phase-2d-piece-media, ql/phase-2e-private-piece-mobile, ql/phase-2f-upload-audit, ql/phase-2g-clay-media, ql/phase-2h-glaze-media, ql/phase-2i-glaze-clay-test-media, ql/phase-2j-test-tile-media, ql/phase-2k-glaze-combo-media]
   workflow_dispatch:
 jobs:
   verify:
