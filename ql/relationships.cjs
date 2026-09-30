@@ -206,6 +206,7 @@ function createRelationshipService(db) {
     if (!relationshipTablesInstalled(db)) throw serviceUnavailable();
   }
   return Object.freeze({
+    available() { return relationshipTablesInstalled(db); },
     writeLegacyFiring(args, persist) { return writeLegacyFiring(db, args, persist); },
     create({ userId, pieceId, kind, targetId }) {
       ensureInstalled();

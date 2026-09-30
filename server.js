@@ -303,7 +303,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req,
   res.json({ received: true });
 });
 
-app.use(cors());
+app.use(cors({ exposedHeaders: ['X-QL-Relationships-Available'] }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use((req, res, next) => {
@@ -503,7 +503,13 @@ for (const [pathName, kind, bodyKey] of [
 ]) {
   app.get(`/api/ql/pieces/:pieceId/${pathName}`, auth, (req, res) => {
     try {
-      res.json(getQlRelationshipService().list({ userId: req.userId, pieceId: req.params.pieceId, kind }));
+      const service = getQlRelationshipService();
+      const records = service.list({ userId: req.userId, pieceId: req.params.pieceId, kind });
+      res.set('Cache-Control', 'private, no-store');
+      res.set('X-QL-Relationships-Available', service.available() ? 'true' : 'false');
+      // Retain all old fields while adding the canonical saved-Pricing detail
+      // fields through the existing serializer. No alternate JSON contract.
+      res.json(kind === 'pricing' ? records.map(row => ({ ...row, ...parsePricingCalculation(row) })) : records);
     } catch (error) { qlRelationshipError(res, error); }
   });
   app.post(`/api/ql/pieces/:pieceId/${pathName}`, auth, (req, res) => {

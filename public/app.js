@@ -791,6 +791,8 @@ let pieceHistoryUrls = [];
 let pieceDetailPrivatePhotoUrls = [];
 function clearPieceHistory() {
   clearPieceEdgeMedia();
+  clearPricingMedia('linkedPricingViewer');
+  document.getElementById('linkedPricing')?.remove();
   pieceViewGeneration++;
   pieceHistoryUrls.forEach(url => URL.revokeObjectURL(url));
   pieceHistoryUrls = [];
@@ -1044,6 +1046,7 @@ async function viewPiece(id) {
     loading.setAttribute('role', 'status');
     history.append(historyElement('h2', 'Connected History'), loading);
     document.getElementById('pieceDetailContent').append(history);
+    mountLinkedPricing(p.id, generation, sessionToken);
     if (privatePiecePhotos) void loadPrivatePieceDetailPhotos(p.id, generation, sessionToken);
     else void loadPieceEdgeMedia(document.getElementById('photoReorderContainer'));
     void loadPieceHistory(p.id, history, generation, sessionToken);
@@ -3197,43 +3200,15 @@ function updateMarkupButtons() {
   });
 }
 
-function calculatePrice() {
-  clearPricingMedia('calcPhotoPreview');
-  const clay = parseFloat(document.getElementById('calcClayCost').value) || 0;
-  const glaze = parseFloat(document.getElementById('calcGlazeCost').value) || 0;
-  const supplies = parseFloat(document.getElementById('calcSuppliesCost').value) || 0;
-  const firing = parseFloat(document.getElementById('calcFiringCost').value) || 0;
-  const monthlyStudio = parseFloat(document.getElementById('calcStudioCost').value) || 0;
-  const piecesPerMonth = parseFloat(document.getElementById('calcMonthlyPieces').value) || 0;
-  const rate = parseFloat(document.getElementById('calcHourlyRate').value) || 0;
-  const hours = parseFloat(document.getElementById('calcHoursSpent').value) || 0;
-  const monthlyOverhead = parseFloat(document.getElementById('calcOverheadCost').value) || 0;
-  const mult = parseFloat(document.getElementById('calcMarkup').value) || 2.5;
-  
-  if ((monthlyStudio > 0 || monthlyOverhead > 0) && piecesPerMonth <= 0) {
-    toast('Enter how many pieces you make per month so the app can divide your monthly costs', 'error');
-    return;
-  }
-  
-  const materialsCost = clay + glaze + supplies;
-  const laborCost = rate * hours;
-  const studioPerPiece = piecesPerMonth > 0 ? monthlyStudio / piecesPerMonth : 0;
-  const overheadPerPiece = piecesPerMonth > 0 ? monthlyOverhead / piecesPerMonth : 0;
-  const totalCost = materialsCost + firing + studioPerPiece + laborCost + overheadPerPiece;
-  const suggestedPrice = totalCost * mult;
-  
-  pricingCalcState.result = {
-    materialsCost, laborCost, firing, studioPerPiece, overheadPerPiece,
-    monthlyStudio, monthlyOverhead, piecesPerMonth,
-    totalCost, markup: mult, suggestedPrice,
-    profit: suggestedPrice - totalCost
-  };
-  
-  const results = document.getElementById('pricingResults');
-  results.style.display = 'block';
-  results.innerHTML = `
-    <div class="card" style="background:var(--bg-light);border:2px solid var(--primary)">
-      <h3 style="margin-bottom:16px">Price Breakdown</h3>
+function pricingBreakdownMarkup(result = {}, inputs = {}) {
+  result = result || {}; inputs = inputs || {};
+  const number = value => Number.isFinite(Number(value)) ? Number(value) : 0;
+  const [materialsCost, laborCost, firing, studioPerPiece, overheadPerPiece,
+    monthlyStudio, monthlyOverhead, piecesPerMonth, totalCost, suggestedPrice, profit] =
+    ['materialsCost','laborCost','firing','studioPerPiece','overheadPerPiece','monthlyStudio',
+     'monthlyOverhead','piecesPerMonth','totalCost','suggestedPrice','profit'].map(key => number(result[key]));
+  const mult = number(result.markup), hours = number(inputs.hoursSpent), rate = number(inputs.hourlyRate);
+  return `      <h3 style="margin-bottom:16px">Price Breakdown</h3>
       <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
         <span>Materials</span>
         <span style="font-weight:600">$${materialsCost.toFixed(2)}</span>
@@ -3256,29 +3231,69 @@ function calculatePrice() {
         <span style="font-weight:600">$${overheadPerPiece.toFixed(2)}</span>
       </div>
       ${piecesPerMonth > 0 ? `<div style="font-size:0.8rem;color:var(--text-muted);padding:4px 0 8px 0;border-bottom:1px solid var(--border)">$${monthlyOverhead.toFixed(2)} monthly overhead / ${piecesPerMonth.toFixed(0)} pieces</div>` : ''}
-      
+
       <div style="display:flex;justify-content:space-between;padding:12px 0;font-weight:700;font-size:1.1rem;border-bottom:2px solid var(--border)">
         <span>Total Cost</span>
         <span>$${totalCost.toFixed(2)}</span>
       </div>
-      
+
       <div style="display:flex;justify-content:space-between;padding:12px 0;font-weight:700;font-size:1.2rem;color:var(--primary)">
         <span>Suggested Price (${mult}×)</span>
         <span style="font-size:1.4rem">$${suggestedPrice.toFixed(2)}</span>
       </div>
-      
+
       <div style="display:flex;justify-content:space-between;padding:8px 0;color:var(--success)">
         <span>Your Profit</span>
-        <span style="font-weight:600">$${pricingCalcState.result.profit.toFixed(2)}</span>
+        <span style="font-weight:600">$${profit.toFixed(2)}</span>
       </div>
-      
+
       <div style="background:#fffbf0;border-left:3px solid var(--warning);padding:12px;margin-top:16px;border-radius:4px">
         <div style="display:flex;gap:8px;align-items:start">
           <span style="font-size:1.2rem">💡</span>
           <p style="margin:0;font-size:0.9rem;color:var(--text-light)">Monthly costs are now divided across the number of pieces you make, so one plate does not get charged your full monthly rent.</p>
         </div>
       </div>
-      
+
+`;
+}
+
+function calculatePrice() {
+  clearPricingMedia('calcPhotoPreview');
+  const clay = parseFloat(document.getElementById('calcClayCost').value) || 0;
+  const glaze = parseFloat(document.getElementById('calcGlazeCost').value) || 0;
+  const supplies = parseFloat(document.getElementById('calcSuppliesCost').value) || 0;
+  const firing = parseFloat(document.getElementById('calcFiringCost').value) || 0;
+  const monthlyStudio = parseFloat(document.getElementById('calcStudioCost').value) || 0;
+  const piecesPerMonth = parseFloat(document.getElementById('calcMonthlyPieces').value) || 0;
+  const rate = parseFloat(document.getElementById('calcHourlyRate').value) || 0;
+  const hours = parseFloat(document.getElementById('calcHoursSpent').value) || 0;
+  const monthlyOverhead = parseFloat(document.getElementById('calcOverheadCost').value) || 0;
+  const mult = parseFloat(document.getElementById('calcMarkup').value) || 2.5;
+
+  if ((monthlyStudio > 0 || monthlyOverhead > 0) && piecesPerMonth <= 0) {
+    toast('Enter how many pieces you make per month so the app can divide your monthly costs', 'error');
+    return;
+  }
+
+  const materialsCost = clay + glaze + supplies;
+  const laborCost = rate * hours;
+  const studioPerPiece = piecesPerMonth > 0 ? monthlyStudio / piecesPerMonth : 0;
+  const overheadPerPiece = piecesPerMonth > 0 ? monthlyOverhead / piecesPerMonth : 0;
+  const totalCost = materialsCost + firing + studioPerPiece + laborCost + overheadPerPiece;
+  const suggestedPrice = totalCost * mult;
+
+  pricingCalcState.result = {
+    materialsCost, laborCost, firing, studioPerPiece, overheadPerPiece,
+    monthlyStudio, monthlyOverhead, piecesPerMonth,
+    totalCost, markup: mult, suggestedPrice,
+    profit: suggestedPrice - totalCost
+  };
+
+  const results = document.getElementById('pricingResults');
+  results.style.display = 'block';
+  results.innerHTML = `
+    <div class="card" style="background:var(--bg-light);border:2px solid var(--primary)">
+${pricingBreakdownMarkup(pricingCalcState.result, { hoursSpent: hours, hourlyRate: rate })}
       <!-- Save calculation -->
       <div style="margin-top:20px;padding-top:20px;border-top:2px solid var(--border)">
         <h4 style="margin-bottom:12px">Save this calculation</h4>
@@ -3308,7 +3323,7 @@ function handleCalculationPhoto(event) {
   clearPricingMedia('calcPhotoPreview');
   const file = event.target.files[0];
   if (!file) return;
-  
+
   const reader = new FileReader();
   reader.onload = (e) => {
     if (!active()) return;
@@ -3329,7 +3344,7 @@ async function saveCalculation() {
     toast('Calculate a price first', 'error');
     return;
   }
-  
+
   try {
     const formData = new FormData();
     formData.append('name', document.getElementById('calcName').value.trim() || `Pricing calculation ${new Date().toLocaleDateString()}`);
@@ -8292,4 +8307,106 @@ function addComboPhotos(input) {
   files.forEach(file => { comboPhotoSlots[comboPhotoSlots.indexOf(null)] = file; });
   input.value = '';
   renderComboPhotos();
+}
+// Manual associations only. Each mount belongs to one Piece and login generation.
+function mountLinkedPricing(pieceId, generation, sessionToken) {
+  const root = historyElement('section', null, 'card mb-16');
+  root.id = 'linkedPricing';
+  root.setAttribute('aria-label', 'Linked Pricing');
+  document.getElementById('pieceDetailContent').append(root);
+  const account = currentUser?.id;
+  let busy = false, serial = 0;
+  const active = () => root.isConnected && generation === pieceViewGeneration &&
+    sessionToken === token && account === currentUser?.id && currentPage === 'pieceDetail' && window._currentPieceId === pieceId;
+  const button = (label, action) => {
+    const el = historyElement('button', label, 'btn btn-secondary btn-sm');
+    el.type = 'button'; el.onclick = action; return el;
+  };
+  const request = async (path, options = {}) => {
+    if (!active()) throw Error('stale');
+    const response = await fetch(API + path, { ...options, cache: 'no-store',
+      headers: { Authorization: 'Bearer ' + sessionToken, 'Content-Type': 'application/json' } });
+    const data = await response.json();
+    if (!active() || !response.ok) throw Error('unavailable');
+    return { data, available: response.headers.get('X-QL-Relationships-Available') === 'true' };
+  };
+  const base = '/api/ql/pieces/' + encodeURIComponent(pieceId) + '/pricing';
+  const reset = text => {
+    clearPricingMedia('linkedPricingViewer');
+    root.replaceChildren(historyElement('h2', 'Linked Pricing'));
+    root.setAttribute('aria-busy', String(busy));
+    if (text) { const status = historyElement('p', text); status.setAttribute('role', 'status'); root.append(status); }
+  };
+  const failure = () => {
+    reset('Linked Pricing is unavailable. Try again when connected.');
+    root.append(button('Retry', () => load()));
+  };
+  async function load(afterMutation = false) {
+    if (!active() || busy) return;
+    busy = true; const run = ++serial; reset('Loading linked calculations…');
+    // Invalidate earlier History work by replacing its container after mutation.
+    if (afterMutation) {
+      const old = document.getElementById('pieceHistory');
+      if (old) {
+        const next = old.cloneNode(false); old.replaceWith(next);
+        next.append(historyElement('h2', 'Connected History'), historyElement('p', 'Loading connected history…'));
+        void loadPieceHistory(pieceId, next, generation, sessionToken);
+      }
+    }
+    try {
+      const result = await request(base);
+      if (!active() || serial !== run) return;
+      if (!result.available) {
+        busy = false; reset('Linked Pricing is not available for this database.');
+        root.append(button('Retry', () => load())); return;
+      }
+      const saved = (await request('/api/pricing-calculations')).data;
+      const linked = await Promise.all(result.data.map(row => request('/api/pricing-calculations/' + encodeURIComponent(row.id)).then(r => r.data)));
+      if (!active() || serial !== run) return;
+      busy = false; reset(linked.length ? '' : 'No saved calculations linked.');
+      for (const calc of linked) {
+        const row = historyElement('div', null, 'mb-16');
+        row.append(historyElement('strong', calc.name || 'Saved calculation'),
+          historyElement('p', [calc.description, calc.created_at, 'ID: ' + calc.id].filter(Boolean).join(' · ')),
+          button('View', () => view(calc.id)), button('Unlink', () => mutate(calc.id, 'DELETE')));
+        root.append(row);
+      }
+      const ids = new Set(linked.map(row => row.id));
+      const eligible = saved.filter(row => !ids.has(row.id));
+      if (eligible.length) {
+        const picker = historyElement('select', null, 'form-select'); picker.setAttribute('aria-label', 'Saved calculation to link');
+        const placeholder = historyElement('option', 'Select a saved calculation'); placeholder.value = ''; picker.append(placeholder);
+        for (const calc of eligible) { const option = historyElement('option', (calc.name || 'Saved calculation') + ' · ' + (calc.created_at || calc.id)); option.value = calc.id; picker.append(option); }
+        const link = button('Link', () => { if (picker.value) void mutate(picker.value, 'POST'); });
+        link.disabled = true; picker.onchange = () => { link.disabled = !picker.value; };
+        root.append(picker, link);
+      } else root.append(historyElement('p', 'No additional saved calculations available to link.'));
+    } catch (_) { if (active() && serial === run) { busy = false; failure(); } }
+  }
+  async function mutate(id, method) {
+    if (!active() || busy) return;
+    busy = true; reset('Updating link…');
+    try {
+      await request(base + (method === 'DELETE' ? '/' + encodeURIComponent(id) : ''),
+        { method, ...(method === 'POST' ? { body: JSON.stringify({ pricingId: id }) } : {}) });
+      if (!active()) return;
+      busy = false; await load(true);
+    } catch (_) { if (active()) { busy = false; failure(); } }
+  }
+  async function view(id) {
+    if (!active() || busy) return;
+    busy = true; reset('Loading saved calculation…');
+    try {
+      const calc = (await request('/api/pricing-calculations/' + encodeURIComponent(id))).data;
+      if (!active()) return;
+      busy = false; reset();
+      const viewer = historyElement('div'); viewer.id = 'linkedPricingViewer';
+      viewer.append(historyElement('h3', calc.name || 'Saved calculation'), historyElement('p', calc.description || ''), historyElement('p', 'Saved: ' + (calc.created_at || 'date unavailable')));
+      const breakdown = historyElement('div'); breakdown.innerHTML = pricingBreakdownMarkup(calc.result, calc.inputs); viewer.append(breakdown);
+      if (calc.photo_filename) { const photo = historyElement('div'); photo.innerHTML = pricingPhotoMarkup(calc, 'max-width:100%;max-height:200px;border-radius:8px'); viewer.append(photo); }
+      root.append(viewer, button('Back to linked calculations', () => load()));
+      void loadPricingMedia('linkedPricingViewer');
+    } catch (_) { if (active()) { busy = false; failure(); } }
+  }
+  void load();
 }
