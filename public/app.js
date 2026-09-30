@@ -425,6 +425,7 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     clearClayMedia();
     clearGlazeMedia();
     clearTestTileMedia();
+    clearComboMedia();
     clearPieceHistory();
     token = data.token;
     localStorage.setItem('mudlog_token', token);
@@ -444,6 +445,7 @@ function logout() {
   clearClayMedia();
   clearGlazeMedia();
   clearTestTileMedia();
+  clearComboMedia();
   clearPieceHistory();
   token = null; currentUser = null;
   localStorage.removeItem('mudlog_token');
@@ -466,6 +468,7 @@ async function checkAuth() {
     const msg = (e.message || '').toLowerCase();
     if (msg.includes('invalid token') || msg.includes('unauthorized') || msg.includes('no token') || msg.includes('invalid') || msg.includes('expired')) {
       // Token is bad — clear it and show auth screen (not landing page)
+      clearComboMedia();
       token = null;
       localStorage.removeItem('mudlog_token');
       document.getElementById('landingPage').style.display = 'none';
@@ -3157,6 +3160,10 @@ function clearComboMedia() {
   comboMediaControllers.clear();
   comboMediaBlobUrls.forEach(url => URL.revokeObjectURL(url));
   comboMediaBlobUrls.clear();
+  document.querySelectorAll('[data-private-combo-photo]').forEach(img => {
+    img.removeAttribute('src');
+    img.alt = 'Photo unavailable';
+  });
 }
 function comboPhotoMeta(combo, slot) {
   const suffix = slot === 1 ? '' : '2';
@@ -3188,7 +3195,7 @@ async function loadComboPrivateMedia(root=document) {
       if (generation !== comboMediaGeneration || sessionToken !== token || !img.isConnected) { URL.revokeObjectURL(url); return; }
       comboMediaBlobUrls.add(url); img.src = url;
     } catch (_) {
-      if (generation === comboMediaGeneration && img.isConnected) { img.removeAttribute('src'); img.alt='Photo unavailable'; }
+      if (generation === comboMediaGeneration && sessionToken === token && img.isConnected) { img.removeAttribute('src'); img.alt='Photo unavailable'; }
     } finally { comboMediaControllers.delete(controller); }
   }));
 }
@@ -3201,6 +3208,7 @@ function comboPhotoMarkup(combo, slot, style) {
 }
 function debounceLoadCombos() { clearTimeout(debounceTimer); debounceTimer = setTimeout(loadCombos, 300); }
 async function loadCombos() {
+  const requestedToken = token, requestedGeneration = comboMediaGeneration;
   try {
     const search = document.getElementById('comboSearch')?.value||'';
     const cone = document.getElementById('comboConeFilter')?.value||'';
@@ -3210,6 +3218,7 @@ async function loadCombos() {
     if (cone) u += 'cone=' + encodeURIComponent(cone) + '&';
     if (filter) u += 'filter=' + encodeURIComponent(filter) + '&';
     const combos = await api(u);
+    if (requestedToken !== token || requestedGeneration !== comboMediaGeneration) return;
     clearComboMedia();
     const c = document.getElementById('comboList'), em = document.getElementById('communityEmpty');
     const guestBanner = guestMode ? previewHero('See real glaze combos before you join.', 'This preview is here to show you the kind of pottery knowledge and inspiration waiting inside The Potter’s Mud Room — layered glazes, cone notes, clay pairings, and shared results from other potters.', ['Save your own glaze tests and combo results', 'Track clay bodies, firings, and finished pieces together', 'Comment, like, and message other potters'], 'Start Free', "requireSignup('save combos, track firings, and join the community')") : '';
@@ -3941,7 +3950,7 @@ async function redeemPromo() {
   try {
     const d = await api('/api/promo/redeem', { method:'POST', body: { code } });
     toast(d.message, 'success');
-    if (d.token) { token = d.token; localStorage.setItem('mudlog_token', d.token); }
+    if (d.token) { clearComboMedia(); token = d.token; localStorage.setItem('mudlog_token', d.token); }
     const me = await api('/api/auth/me'); currentUser = me.user; showApp(); navigate('upgrade');
   } catch(e) { toast(e.message,'error'); }
 }

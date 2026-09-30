@@ -2,6 +2,25 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const server=fs.readFileSync('server.js','utf8'),app=fs.readFileSync('public/app.js','utf8'),deletion=fs.readFileSync('deletion-lifecycle.cjs','utf8');
 const vm = require('node:vm');
 const Database = require('better-sqlite3');
+test('runtime website clears displayed Combo blobs and rejects late downloads on session teardown', async () => {
+  let release, serial=0;
+  const revoked=[], img={dataset:{comboId:'combo',comboSlot:'1'},isConnected:true,src:'',removeAttribute(key){if(key==='src')this.src='';}};
+  const document={querySelectorAll:()=>[img]};
+  const context=vm.createContext({document,token:'A',AbortController,
+    URL:{createObjectURL:()=> 'blob:'+ ++serial,revokeObjectURL:url=>revoked.push(url)},
+    fetch:async()=>{await new Promise(resolve=>{release=resolve;});return {ok:true,blob:async()=>({})};}
+  });
+  vm.runInContext(app.slice(app.indexOf('let comboMediaGeneration ='),app.indexOf('function comboPhotoMarkup(')),context);
+  const first=context.loadComboPrivateMedia(document);release();await first;assert.equal(img.src,'blob:1');
+  const late=context.loadComboPrivateMedia(document);context.clearComboMedia();context.token='B';
+  assert.equal(img.src,'');assert.ok(revoked.includes('blob:1'));release();await late;
+  assert.equal(img.src,'');assert.ok(revoked.includes('blob:2'));
+  assert.match(app,/clearComboMedia\(\);\s*clearPieceHistory\(\);\s*token = data.token/);
+  assert.match(app,/function logout\(\) \{[^}]*clearComboMedia\(\);[^}]*token = null/);
+  assert.match(app,/clearComboMedia\(\);\s*token = null;\s*localStorage.removeItem/);
+  assert.match(app,/if \(d.token\) \{ clearComboMedia\(\); token = d.token/);
+  assert.match(app,/const combos = await api\(u\);\s*if \(requestedToken !== token \|\| requestedGeneration !== comboMediaGeneration\) return;/);
+});
 function comboHarness() {
   const db = new Database(':memory:');
   db.exec(`CREATE TABLE glaze_combos (id TEXT PRIMARY KEY, user_id TEXT, name TEXT, clay_body_name TEXT, cone TEXT, atmosphere TEXT, description TEXT, notes TEXT, is_shared INTEGER, is_public INTEGER, share_id TEXT, photo_filename TEXT, photo_filename2 TEXT, updated_at TEXT);
