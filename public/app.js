@@ -425,7 +425,7 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     clearClayMedia();
     clearGlazeMedia();
     clearTestTileMedia();
-    clearFiringMedia(); clearComboMedia();
+    clearPricingMedia(); clearFiringMedia(); clearComboMedia();
     clearPieceHistory();
     token = data.token;
     localStorage.setItem('mudlog_token', token);
@@ -445,7 +445,7 @@ function logout() {
   clearClayMedia();
   clearGlazeMedia();
   clearTestTileMedia();
-  clearFiringMedia(); clearComboMedia();
+  clearPricingMedia(); clearFiringMedia(); clearComboMedia();
   clearPieceHistory();
   token = null; currentUser = null;
   localStorage.removeItem('mudlog_token');
@@ -468,7 +468,7 @@ async function checkAuth() {
     const msg = (e.message || '').toLowerCase();
     if (msg.includes('invalid token') || msg.includes('unauthorized') || msg.includes('no token') || msg.includes('invalid') || msg.includes('expired')) {
       // Token is bad — clear it and show auth screen (not landing page)
-      clearFiringMedia(); clearComboMedia();
+      clearPricingMedia(); clearFiringMedia(); clearComboMedia();
       token = null;
       localStorage.removeItem('mudlog_token');
       document.getElementById('landingPage').style.display = 'none';
@@ -527,6 +527,7 @@ function navigate(page, options = {}) {
   if (page !== 'testTiles') clearTestTileMedia();
   if (page !== 'community') clearComboMedia();
   if (page !== 'firings') clearFiringMedia();
+  if (page !== 'pricingCalculator') clearPricingMedia();
   if (page !== 'pieceDetail') clearPieceHistory();
   try {
     if (!token && !guestMode) {
@@ -2757,6 +2758,64 @@ async function deleteSale(id) {
 }
 
 // ---- Pricing Calculator ----
+let pricingMediaGeneration = 0;
+const pricingMediaViews = new Map();
+function clearPricingMedia(scope) {
+  if (!scope) pricingMediaGeneration++;
+  const lightbox = document.getElementById('lightboxImg');
+  for (const [key, view] of pricingMediaViews) {
+    if (scope && key !== scope) continue;
+    view.active = false;
+    view.controller.abort();
+    if (view.urls.includes(lightbox?.src)) { lightbox.removeAttribute('src'); closeLightbox(); }
+    view.urls.forEach(url => URL.revokeObjectURL(url));
+    view.images.forEach(img => { img.removeAttribute('src'); img.dataset.protectedReady = '0'; });
+    pricingMediaViews.delete(key);
+  }
+  if (!scope) {
+    pricingRequestSerial++;
+    pricingCalcState = { savedRates: null, savedCalculations: [], result: null, selectedCalculationId: null, calculationPhoto: null, savedPhotoFilename: null };
+    const page = document.getElementById('pagePricingCalculator'); if (page) page.innerHTML = '';
+  }
+}
+function pricingPhotoMarkup(calc, style = '') {
+  const attrs = calc.photoDelivery === 'owner-protected'
+    ? 'data-private-pricing-photo="' + esc(calc.photo_filename) + '" data-pricing-id="' + esc(calc.id) + '" data-protected-ready="0"'
+    : 'src="/uploads/' + encodeURIComponent(calc.photo_filename) + '"';
+  return '<img ' + attrs + ' alt="Pricing photo" style="' + style + '">';
+}
+async function loadPricingMedia(scope) {
+  clearPricingMedia(scope);
+  const root = document.getElementById(scope);
+  if (!root) return;
+  const generation = pricingMediaGeneration, sessionToken = token;
+  const view = { active: true, controller: new AbortController(), urls: [], images: [...root.querySelectorAll('[data-private-pricing-photo]')] };
+  pricingMediaViews.set(scope, view);
+  const active = img => view.active && generation === pricingMediaGeneration && token === sessionToken && img.isConnected;
+  await Promise.all(view.images.map(async img => {
+    try {
+      const response = await fetch(API + '/api/ql/pricing-calculations/' + encodeURIComponent(img.dataset.pricingId) + '/photos/' + encodeURIComponent(img.dataset.privatePricingPhoto), {
+        headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store', signal: view.controller.signal
+      });
+      if (!response.ok) throw new Error('Photo unavailable');
+      const blob = await response.blob();
+      if (!active(img)) return;
+      const url = URL.createObjectURL(blob);
+      view.urls.push(url);
+      img.src = url;
+      img.dataset.protectedReady = '1';
+      img.onerror = () => { img.removeAttribute('src'); img.alt = 'Photo unavailable'; };
+    } catch (_) { if (active(img)) { img.removeAttribute('src'); img.alt = 'Photo unavailable'; } }
+  }));
+}
+
+
+let pricingRequestSerial = 0;
+function beginPricingRequest() {
+  const serial = ++pricingRequestSerial, generation = pricingMediaGeneration, sessionToken = token;
+  return () => serial === pricingRequestSerial && generation === pricingMediaGeneration && sessionToken === token;
+}
+
 let pricingCalcState = {
   savedRates: null,
   result: null,
@@ -2767,6 +2826,7 @@ let pricingCalcState = {
 };
 
 async function loadPricingCalculator() {
+  const active = beginPricingRequest();
   const page = document.getElementById('pagePricingCalculator');
   const isPaid = currentUser?.tier && currentUser.tier !== 'free';
   
@@ -2780,8 +2840,11 @@ async function loadPricingCalculator() {
   
   // Load saved calculations history
   try {
-    pricingCalcState.savedCalculations = await api('/api/pricing-calculations');
+    const calculations = await api('/api/pricing-calculations');
+    if (!active()) return;
+    pricingCalcState.savedCalculations = calculations;
   } catch(e) {
+    if (!active()) return;
     console.warn('Could not load pricing calculations:', e.message);
   }
   
@@ -2955,6 +3018,7 @@ function updateMarkupButtons() {
 }
 
 function calculatePrice() {
+  clearPricingMedia('calcPhotoPreview');
   const clay = parseFloat(document.getElementById('calcClayCost').value) || 0;
   const glaze = parseFloat(document.getElementById('calcGlazeCost').value) || 0;
   const supplies = parseFloat(document.getElementById('calcSuppliesCost').value) || 0;
@@ -3060,14 +3124,18 @@ function calculatePrice() {
 }
 
 function handleCalculationPhoto(event) {
+  const active = beginPricingRequest();
+  clearPricingMedia('calcPhotoPreview');
   const file = event.target.files[0];
   if (!file) return;
   
   const reader = new FileReader();
   reader.onload = (e) => {
+    if (!active()) return;
     pricingCalcState.calculationPhoto = e.target.result;
     pricingCalcState.savedPhotoFilename = null;
     document.getElementById('calcPhotoPreview').style.display = 'block';
+    document.getElementById('calcPhotoImg').removeAttribute('data-private-pricing-photo');
     document.getElementById('calcPhotoImg').src = e.target.result;
     document.getElementById('calcPhotoLabel').textContent = 'Change Photo';
   };
@@ -3075,6 +3143,8 @@ function handleCalculationPhoto(event) {
 }
 
 async function saveCalculation() {
+  const active = beginPricingRequest();
+  const sessionToken = token;
   if (!pricingCalcState.result) {
     toast('Calculate a price first', 'error');
     return;
@@ -3103,14 +3173,16 @@ async function saveCalculation() {
       formData.append('photo', blob, 'calculation-photo.jpg');
     }
     
+    if (!active()) return;
     let saved;
     if (pricingCalcState.selectedCalculationId) {
       const res = await fetch('/api/pricing-calculations/' + pricingCalcState.selectedCalculationId, {
         method: 'PUT',
-        headers: { Authorization: 'Bearer ' + token },
+        headers: { Authorization: 'Bearer ' + sessionToken },
         body: formData
       });
       const data = await res.json();
+      if (!active()) return;
       if (!res.ok) throw new Error(data.error || 'Could not update');
       saved = data;
       pricingCalcState.savedCalculations = pricingCalcState.savedCalculations.map(c => c.id === saved.id ? saved : c);
@@ -3118,10 +3190,11 @@ async function saveCalculation() {
     } else {
       const res = await fetch('/api/pricing-calculations', {
         method: 'POST',
-        headers: { Authorization: 'Bearer ' + token },
+        headers: { Authorization: 'Bearer ' + sessionToken },
         body: formData
       });
       const data = await res.json();
+      if (!active()) return;
       if (!res.ok) throw new Error(data.error || 'Could not save');
       saved = data;
       pricingCalcState.selectedCalculationId = saved.id;
@@ -3131,11 +3204,12 @@ async function saveCalculation() {
     
     renderSavedCalculations();
   } catch(e) {
-    toast(e.message, 'error');
+    if (active()) toast(e.message, 'error');
   }
 }
 
 function renderSavedCalculations() {
+  clearPricingMedia('savedCalculationsList');
   const list = document.getElementById('savedCalculationsList');
   if (!list) return;
   
@@ -3146,7 +3220,7 @@ function renderSavedCalculations() {
   
   list.innerHTML = pricingCalcState.savedCalculations.map(calc => `
     <div class="card" style="margin-bottom:12px;padding:12px;display:flex;gap:12px;align-items:center;cursor:pointer" onclick="reopenCalculation('${calc.id}')">
-      ${calc.photo_filename ? `<img src="/uploads/${calc.photo_filename}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:2px solid var(--border)">` : `<div style="width:60px;height:60px;background:var(--bg-light);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.5rem">🧮</div>`}
+      ${calc.photo_filename ? pricingPhotoMarkup(calc, 'width:60px;height:60px;object-fit:cover;border-radius:8px;border:2px solid var(--border)') : `<div style="width:60px;height:60px;background:var(--bg-light);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.5rem">🧮</div>`}
       <div style="flex:1">
         <div style="font-weight:600;margin-bottom:4px">${calc.name || 'Saved calculation'}</div>
         <div style="font-size:0.85rem;color:var(--text-light)">${calc.created_at ? new Date(calc.created_at.replace(' ', 'T') + 'Z').toLocaleDateString() : ''}</div>
@@ -3155,9 +3229,12 @@ function renderSavedCalculations() {
       <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteCalculation('${calc.id}')" title="Delete">🗑️</button>
     </div>
   `).join('');
+  loadPricingMedia('savedCalculationsList');
 }
 
 async function reopenCalculation(id) {
+  pricingRequestSerial++;
+  clearPricingMedia('calcPhotoPreview');
   const calc = pricingCalcState.savedCalculations.find(c => c.id === id);
   if (!calc) return;
   
@@ -3186,7 +3263,8 @@ async function reopenCalculation(id) {
     if (calc.description) document.getElementById('calcDescription').value = calc.description;
     if (calc.photo_filename) {
       document.getElementById('calcPhotoPreview').style.display = 'block';
-      document.getElementById('calcPhotoImg').src = '/uploads/' + calc.photo_filename;
+      document.getElementById('calcPhotoImg').outerHTML = pricingPhotoMarkup(calc, 'max-width:100%;max-height:200px;border-radius:8px').replace('<img ', '<img id="calcPhotoImg" ');
+      loadPricingMedia('calcPhotoPreview');
       document.getElementById('calcPhotoLabel').textContent = 'Change Photo';
     }
   }
@@ -3195,10 +3273,13 @@ async function reopenCalculation(id) {
 }
 
 async function deleteCalculation(id) {
+  const active = beginPricingRequest();
   if (!confirm('Delete this saved calculation? This cannot be undone.')) return;
   
   try {
     await api('/api/pricing-calculations/' + id, { method: 'DELETE' });
+    if (!active()) return;
+    if (pricingCalcState.selectedCalculationId === id) clearPricingCalculator();
     pricingCalcState.savedCalculations = pricingCalcState.savedCalculations.filter(c => c.id !== id);
     toast('Calculation deleted', 'success');
     renderSavedCalculations();
@@ -3208,6 +3289,8 @@ async function deleteCalculation(id) {
 }
 
 function clearPricingCalculator() {
+  pricingRequestSerial++;
+  clearPricingMedia('calcPhotoPreview');
   const savedRates = pricingCalcState.savedRates;
   document.getElementById('calcClayCost').value = '';
   document.getElementById('calcGlazeCost').value = '';
@@ -4055,7 +4138,7 @@ async function redeemPromo() {
   try {
     const d = await api('/api/promo/redeem', { method:'POST', body: { code } });
     toast(d.message, 'success');
-    if (d.token) clearFiringMedia();
+    if (d.token) { clearFiringMedia(); clearPricingMedia(); }
     if (d.token) { clearComboMedia(); token = d.token; localStorage.setItem('mudlog_token', d.token); }
     const me = await api('/api/auth/me'); currentUser = me.user; showApp(); navigate('upgrade');
   } catch(e) { toast(e.message,'error'); }

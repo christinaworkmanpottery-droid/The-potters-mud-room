@@ -1975,6 +1975,30 @@ function protectPieceHistoryTestTileMedia(history) {
   for (const entry of history.history || []) if (entry?.recordType === 'test-tile' && entry.values) testTileMediaContract(entry.values);
   return history;
 }
+app.get('/api/ql/pricing-calculations/:pricingId/photos/:filename', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  res.set('X-Content-Type-Options', 'nosniff');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const photo = db.prepare('SELECT photo_filename AS filename FROM pricing_calculations WHERE id=? AND user_id=? AND photo_filename=?')
+      .get(req.params.pricingId, req.userId, req.params.filename);
+    if (!photo) return unavailable();
+    const target = safeStoredUpload(photo.filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(photo.filename)) return unavailable();
+    const owned = ownedPhotoSlots(photo.filename, req.userId);
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(photo.filename);
+        if (rows.some(row => !owned.some(slot => slot.table === table && slot.column === column && slot.id === row.id))) return unavailable();
+      }
+    }
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
+
 app.get('/api/ql/firing-logs/:firingId/photos/:photoId', auth, (req, res) => {
   res.set('Cache-Control', 'private, no-store');
   res.set('X-Content-Type-Options', 'nosniff');
@@ -3027,6 +3051,8 @@ const parsePricingCalculation = (row) => ({
   inputs: JSON.parse(row.inputs_json),
   result: JSON.parse(row.result_json),
   photo_filename: row.photo_filename,
+  photoDelivery: 'owner-protected',
+  photoVisibility: 'legacy-ambiguous',
   created_at: row.created_at,
 });
 
@@ -3037,7 +3063,7 @@ app.get('/api/pricing-calculations', auth, (req, res) => {
 
 app.post('/api/pricing-calculations', auth, upload.single('photo'), (req, res) => {
   const discardUpload = () => {
-    if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    deletionLifecycle.cleanupFiles([req.file?.filename]);
   };
   let inputs;
   let result;
@@ -3056,10 +3082,12 @@ app.post('/api/pricing-calculations', auth, upload.single('photo'), (req, res) =
     discardUpload();
     return res.status(400).json({ error: 'Piece photo must be a supported image under 20MB.' });
   }
+  try {
   const id = uuidv4();
   db.prepare('INSERT INTO pricing_calculations (id,user_id,name,description,inputs_json,result_json,photo_filename) VALUES (?,?,?,?,?,?,?)')
     .run(id, req.userId, String(req.body.name || '').trim() || null, String(req.body.description || '').trim() || null, JSON.stringify(inputs), JSON.stringify(result), req.file?.filename || null);
   res.status(201).json(parsePricingCalculation(db.prepare('SELECT * FROM pricing_calculations WHERE id=? AND user_id=?').get(id, req.userId)));
+  } catch (_) { discardUpload(); if (!res.headersSent) res.status(500).json({ error: 'Could not save pricing calculation.' }); }
 });
 
 app.get('/api/pricing-calculations/:id', auth, (req, res) => {
@@ -3071,7 +3099,7 @@ app.get('/api/pricing-calculations/:id', auth, (req, res) => {
 app.put('/api/pricing-calculations/:id', auth, upload.single('photo'), (req, res) => {
   const existing = db.prepare('SELECT * FROM pricing_calculations WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   const discardUpload = () => {
-    if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    deletionLifecycle.cleanupFiles([req.file?.filename]);
   };
   if (!existing) {
     discardUpload();
@@ -3094,6 +3122,7 @@ app.put('/api/pricing-calculations/:id', auth, upload.single('photo'), (req, res
     discardUpload();
     return res.status(400).json({ error: 'Piece photo must be a supported image under 20MB.' });
   }
+  try {
   const oldPhotoFilename = existing.photo_filename;
   const photoFilename = req.file?.filename || oldPhotoFilename;
   db.prepare('UPDATE pricing_calculations SET name=?,description=?,inputs_json=?,result_json=?,photo_filename=? WHERE id=? AND user_id=?')
@@ -3102,6 +3131,7 @@ app.put('/api/pricing-calculations/:id', auth, upload.single('photo'), (req, res
     deletionLifecycle.cleanupFiles([oldPhotoFilename]);
   }
   res.json(parsePricingCalculation(db.prepare('SELECT * FROM pricing_calculations WHERE id=? AND user_id=?').get(req.params.id, req.userId)));
+  } catch (_) { discardUpload(); if (!res.headersSent) res.status(500).json({ error: 'Could not save pricing calculation.' }); }
 });
 
 app.delete('/api/pricing-calculations/:id', auth, (req, res) => {
