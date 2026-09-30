@@ -225,6 +225,9 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req,
         db.prepare('UPDATE users SET tier=?, stripe_customer_id=?, stripe_subscription_id=? WHERE id=?')
           .run(tier, session.customer, session.subscription, userId);
       } else if (purchaseType === 'merchant') {
+        // A completed checkout is not necessarily a completed payment.
+        if (!['paid','no_payment_required'].includes(session.payment_status)) break;
+        if (db.prepare('SELECT 1 FROM merchant_orders WHERE stripe_session_id=?').get(session.id)) break;
         // Record merchant purchase
         const productId = session.metadata.productId;
         const orderId = uuidv4();
@@ -317,6 +320,18 @@ app.use((req, res, next) => {
   next();
 });
 app.use('/uploads', express.static(UPLOADS_DIR));
+// The generated paid original is not a public preview. Keep its disk path unchanged.
+app.use((req,res,next)=>{
+  try { if(path.posix.normalize(decodeURIComponent(req.path)).toLowerCase()==='/shop/the-potters-mud-log.pdf')return shopUnavailable(res); }
+  catch { return next(); }
+  next();
+});
+app.get('/shop/mud-log-preview.pdf', (req, res) => {
+  const file = safeShopAsset('mud-log-preview.pdf');
+  if (!file) return shopUnavailable(res);
+  res.set({'Cache-Control':'public, max-age=0, must-revalidate','X-Content-Type-Options':'nosniff'});
+  res.sendFile(file, e => { if (e && !res.headersSent) shopUnavailable(res); });
+});
 
 // Version check endpoint — verify which code is actually deployed
 app.get('/api/version', (req, res) => {
@@ -3932,15 +3947,72 @@ app.delete('/api/admin/disk/cleanup-large', auth, (req, res) => {
 });
 
 // ============ MERCHANT SHOP ============
-app.get('/api/shop/products', (req, res) => {
-  const products = db.prepare('SELECT id,name,description,price,product_type,image_filename,is_digital FROM merchant_products WHERE is_active=1 ORDER BY sort_order, created_at').all();
-  res.json(products);
+// Phase 2S: publication is explicit is_active=1; this is a single admin-owned shop.
+function shopUnavailable(res) {
+  return res.set({'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'}).status(404).json({error:'Media unavailable'});
+}
+function shopAdmin(req) {
+  try { if(jwt.verify(req.headers.authorization?.slice(7),JWT_SECRET,{algorithms:['HS256']}).orderId)return false; }catch{return false;}
+  // Match the documented Christina-only merchant contract, never client owner IDs.
+  return db.prepare('SELECT email FROM users WHERE id=?').get(req.userId)?.email === ADMIN_EMAIL;
+}
+function requireShopAdmin(req,res,next) {
+  if (!shopAdmin(req)) return shopUnavailable(res);
+  next();
+}
+function safeShopAsset(filename) {
+  if (!['the-potters-mud-log.pdf','mud-log-preview.pdf'].includes(filename)) return null;
+  const target=path.join(__dirname,'public','shop',filename);
+  try { return fs.lstatSync(target).isFile() ? target : null; } catch { return null; }
+}
+function shopFileIsolated(product, field) {
+  const filename=product[field];
+  if (!filename) return false;
+  for (const [table,columns] of Object.entries(require('./deletion-lifecycle.cjs').fileSlots)) {
+    const existing=new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c=>c.name));
+    for (const column of columns.filter(c=>existing.has(c))) {
+      const rows=db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(filename);
+      if (rows.some(row=>table!=='merchant_products'||column!==field||row.id!==product.id)) return false;
+    }
+  }
+  return true;
+}
+function shopDownloadFile(product) {
+  // No fallback from an unbound/ambiguous order to the universal Mud Log original.
+  if (!product || product.is_digital!==1 || !shopFileIsolated(product,'download_filename')) return null;
+  const filename=product.download_filename;
+  if (filename==='mud-log-preview.pdf') return null;
+  if (filename==='the-potters-mud-log.pdf') {
+    // Two physical candidates with the same stored identity are ambiguous.
+    if (safeStoredUpload(filename)) return null;
+    return safeShopAsset(filename);
+  }
+  return safeStoredUpload(filename);
+}
+function shopProductView(p) {
+  const {download_filename,...publicFields}=p;
+  return {...publicFields,mediaAccess:p.is_active===1?'public-catalog':p.is_active===0?'merchant-private':'legacy-ambiguous',
+    image_url:p.image_filename?`/api/ql/shop/products/${encodeURIComponent(p.id)}/image/public`:null};
+}
+function sendShopImage(req,res,privateView) {
+  try {
+    const p=db.prepare('SELECT * FROM merchant_products WHERE id=?').get(req.params.productId);
+    if (!p || (!privateView && p.is_active!==1) || !shopFileIsolated(p,'image_filename')) return shopUnavailable(res);
+    const file=safeStoredUpload(p.image_filename);
+    if (!file || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(p.image_filename)) return shopUnavailable(res);
+    res.set({'Cache-Control':privateView?'private, no-store':'public, max-age=0, must-revalidate','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'});
+    res.sendFile(file,e=>{if(e&&!res.headersSent)shopUnavailable(res)});
+  } catch { if(!res.headersSent)shopUnavailable(res); }
+}
+app.get('/api/ql/shop/products/:productId/image/public',(req,res)=>sendShopImage(req,res,false));
+app.get('/api/ql/shop/products/:productId/image',auth,requireShopAdmin,(req,res)=>sendShopImage(req,res,true));
+app.get('/api/shop/products',(req,res)=>{
+  res.json(db.prepare('SELECT * FROM merchant_products WHERE is_active=1 ORDER BY sort_order,created_at').all().map(shopProductView));
 });
-
-app.get('/api/shop/products/:id', (req, res) => {
-  const p = db.prepare('SELECT * FROM merchant_products WHERE id=? AND is_active=1').get(req.params.id);
-  if (!p) return res.status(404).json({ error: 'Not found' });
-  res.json(p);
+app.get('/api/shop/products/:id',(req,res)=>{
+  const p=db.prepare('SELECT * FROM merchant_products WHERE id=? AND is_active=1').get(req.params.id);
+  if(!p)return shopUnavailable(res);
+  res.json(shopProductView(p));
 });
 
 app.post('/api/shop/checkout', auth, async (req, res) => {
@@ -3968,31 +4040,61 @@ app.post('/api/shop/checkout', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Admin: manage merchant products (simple — Christina only for now)
-app.post('/api/shop/products', auth, upload.single('image'), (req, res) => {
-  const { name, description, price, productType, isDigital } = req.body;
-  if (!name || !price) return res.status(400).json({ error: 'Name and price required' });
-  const id = uuidv4();
-  db.prepare('INSERT INTO merchant_products (id,name,description,price,product_type,image_filename,is_digital,sort_order) VALUES (?,?,?,?,?,?,?,?)')
-    .run(id, name, description, parseFloat(price), productType || 'other', req.file?.filename || null, isDigital ? 1 : 0, 0);
-  res.json({ id });
+// Admin-only mutation, authorization before multipart writes. No original upload workflow
+// exists in this repository; download_filename is never accepted from request bodies.
+function shopUpload(req,res,next) {
+  const discard=()=>cleanupRequestUploads([req.file]);
+  res.once('close',discard); // Safe after commit: reference-aware cleanup retains live files.
+  upload.single('image')(req,res,async error=>{
+    if(error){discard();return res.status(400).json({error:'Image upload unavailable'});}
+    try {
+      if(req.file){
+        if(req.file.size>MAX_IMAGE_SIZE)throw Error('Image too large');
+        const metadata=await require('sharp')(req.file.path).metadata();
+        if(!metadata.width||!metadata.height)throw Error('Invalid image');
+        await require('sharp')(req.file.path).stats();
+      }
+      if(req.aborted||res.destroyed){discard();return;}
+      next();
+    }catch{discard();res.status(400).json({error:'Image upload unavailable'});}
+  });
+}
+function shopBoolean(value) {
+  if(value===true||value===1||value==='1'||value==='true')return 1;
+  if(value===false||value===0||value==='0'||value==='false')return 0;
+  throw Error('Invalid state');
+}
+app.post('/api/shop/products',auth,requireShopAdmin,shopUpload,(req,res)=>{
+  try {
+    const {name,description,price,productType,isDigital}=req.body;
+    if(!name||!price)throw Error('Name and price required');
+    const id=uuidv4();
+    db.transaction(()=>db.prepare('INSERT INTO merchant_products (id,name,description,price,product_type,image_filename,is_digital,sort_order) VALUES (?,?,?,?,?,?,?,?)')
+      .run(id,name,description||null,parseFloat(price),productType||'other',req.file?.filename||null,isDigital===undefined?0:shopBoolean(isDigital),0)).immediate();
+    res.json({id});
+  }catch{cleanupRequestUploads([req.file]);if(!res.headersSent)res.status(400).json({error:'Product unavailable'});}
 });
-
-app.put('/api/shop/products/:id', auth, upload.single('image'), (req, res) => {
-  const { name, description, price, productType, isDigital, isActive } = req.body;
-  const updates = [];
-  const params = [];
-  if (name !== undefined) { updates.push('name=?'); params.push(name); }
-  if (description !== undefined) { updates.push('description=?'); params.push(description); }
-  if (price !== undefined) { updates.push('price=?'); params.push(parseFloat(price)); }
-  if (productType !== undefined) { updates.push('product_type=?'); params.push(productType); }
-  if (isDigital !== undefined) { updates.push('is_digital=?'); params.push(isDigital ? 1 : 0); }
-  if (isActive !== undefined) { updates.push('is_active=?'); params.push(isActive ? 1 : 0); }
-  if (req.file) { updates.push('image_filename=?'); params.push(req.file.filename); }
-  if (!updates.length) return res.status(400).json({ error: 'Nothing to update' });
-  params.push(req.params.id);
-  db.prepare(`UPDATE merchant_products SET ${updates.join(',')} WHERE id=?`).run(...params);
-  res.json({ success: true });
+app.put('/api/shop/products/:id',auth,requireShopAdmin,(req,res,next)=>{
+  if(!db.prepare('SELECT 1 FROM merchant_products WHERE id=?').get(req.params.id))return shopUnavailable(res);
+  next();
+},shopUpload,(req,res)=>{
+  try {
+    const previous=db.transaction(()=>{
+      const old=db.prepare('SELECT * FROM merchant_products WHERE id=?').get(req.params.id);
+      if(!old)throw Error('Missing product');
+      const fields={name:'name',description:'description',price:'price',productType:'product_type',isDigital:'is_digital',isActive:'is_active'};
+      const updates=[],values=[];
+      for(const [key,column]of Object.entries(fields))if(req.body[key]!==undefined){
+        updates.push(column+'=?');values.push(key==='isDigital'||key==='isActive'?shopBoolean(req.body[key]):key==='price'?parseFloat(req.body[key]):req.body[key]);
+      }
+      if(req.file){updates.push('image_filename=?');values.push(req.file.filename);}
+      if(!updates.length)throw Error('No changes');
+      db.prepare(`UPDATE merchant_products SET ${updates.join(',')} WHERE id=?`).run(...values,old.id);
+      return req.file?old.image_filename:null;
+    }).immediate();
+    deletionLifecycle.cleanupFiles([previous]);
+    res.json({success:true});
+  }catch{cleanupRequestUploads([req.file]);if(!res.headersSent)res.status(400).json({error:'Product unavailable'});}
 });
 
 // My Purchases — list user's completed orders with download info
@@ -4011,39 +4113,30 @@ app.get('/api/shop/my-purchases', auth, (req, res) => {
   res.json(orders);
 });
 
-// Download purchased digital product
-app.get('/api/shop/download/:orderId', (req, res) => {
-  // Accept either auth header or token query param (for email links)
-  let userId = null;
-  const tokenParam = req.query.token;
-  if (tokenParam) {
-    try {
-      const decoded = require('jsonwebtoken').verify(tokenParam, JWT_SECRET);
-      if (decoded.orderId === req.params.orderId) userId = decoded.userId;
-    } catch(e) { /* invalid token */ }
-  }
-  if (!userId) {
-    // Try normal auth
-    const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith('Bearer ')) {
-      try {
-        const decoded = require('jsonwebtoken').verify(authHeader.slice(7), JWT_SECRET);
-        userId = decoded.userId;
-      } catch(e) { /* invalid */ }
+// Existing 30-day signed email grant is order-scoped, not a guest checkout.
+app.get('/api/shop/download/:orderId',(req,res)=>{
+  res.set({'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'});
+  try {
+    let userId=null;
+    const bearer=req.headers.authorization?.startsWith('Bearer ')?req.headers.authorization.slice(7):null;
+    // An explicit signed-in account takes precedence; foreign email grants cannot override it.
+    if(bearer){
+      const decoded=jwt.verify(bearer,JWT_SECRET,{algorithms:['HS256']});
+      if(decoded.orderId) {if(decoded.orderId===req.params.orderId)userId=decoded.userId;}
+      else userId=decoded.userId;
+    }else if(typeof req.query.token==='string'){
+      const decoded=jwt.verify(req.query.token,JWT_SECRET,{algorithms:['HS256']});
+      if(decoded.orderId===req.params.orderId)userId=decoded.userId;
     }
-  }
-  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-
-  const order = db.prepare('SELECT mo.*, mp.product_type, mp.name as product_name FROM merchant_orders mo JOIN merchant_products mp ON mo.product_id=mp.id WHERE mo.id=? AND mo.user_id=? AND mo.status=?')
-    .get(req.params.orderId, userId, 'completed');
-  if (!order) return res.status(404).json({ error: 'Purchase not found' });
-
-  // Serve the PDF file
-  const filePath = require('path').join(__dirname, 'public', 'shop', 'the-potters-mud-log.pdf');
-  if (!require('fs').existsSync(filePath)) return res.status(404).json({ error: 'File not available' });
-  res.setHeader('Content-Disposition', `attachment; filename="${order.product_name.replace(/[^a-zA-Z0-9 .-]/g, '')}.pdf"`);
-  res.setHeader('Content-Type', 'application/pdf');
-  res.sendFile(filePath);
+    if(!userId||!db.prepare('SELECT 1 FROM users WHERE id=?').get(userId))return shopUnavailable(res);
+    const p=db.prepare(`SELECT mp.* FROM merchant_orders mo JOIN merchant_products mp ON mp.id=mo.product_id
+      WHERE mo.id=? AND mo.user_id=? AND mo.status='completed'`).get(req.params.orderId,userId);
+    const file=shopDownloadFile(p);
+    if(!file)return shopUnavailable(res);
+    // Unpublishing does not revoke an existing completed purchase (existing business rule).
+    res.attachment(path.basename(file));
+    res.sendFile(file,e=>{if(e&&!res.headersSent)shopUnavailable(res)});
+  }catch{if(!res.headersSent)shopUnavailable(res);}
 });
 
 // ============ DASHBOARD ============

@@ -38,6 +38,7 @@ for (const [args, extraEnv] of [
   [['--test', 'tests/ql-pricing-media.cjs', 'tests/ql-pricing-media-dom.cjs'], {}],
   [['--test', 'tests/ql-sales-media.cjs', 'tests/ql-sales-media-dom.cjs'], {}],
   [['--test', 'tests/ql-project-media.cjs', 'tests/ql-project-media-dom.cjs'], {}],
+  [['--test', 'tests/ql-shop-media-api.cjs', 'tests/ql-shop-media-dom.cjs'], {}],
   [['--test', 'tests/ql-forum-media-api.cjs', 'tests/ql-forum-media-dom.cjs'], {}],
   [['--test', 'tests/ql-profile-media-api.cjs', 'tests/ql-profile-media-dom.cjs'], {}],
   [['--test', 'tests/ql-event-media.cjs', 'tests/ql-event-media-dom.cjs', 'tests/ql-event-media-api.cjs'], {}]
@@ -45,4 +46,4 @@ for (const [args, extraEnv] of [
   const result = spawnSync(process.execPath, args, { cwd: root, env: { ...cleanEnv, ...extraEnv }, stdio: 'inherit' });
   if (result.status !== 0) process.exit(result.status || 1);
 }
-console.log('PASS Phase 1 regressions/readiness unchanged plus Phase 2A-2R protected/public-aware studio media and upload restriction-readiness validation');
+console.log('PASS Phase 1 regressions/readiness unchanged plus Phase 2A-2S protected/public-aware studio media and upload restriction-readiness validation');

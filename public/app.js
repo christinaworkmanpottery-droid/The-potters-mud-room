@@ -134,6 +134,8 @@ async function api(path, opts = {}) {
   if (res.status === 401 && /^\/api\/sales(?:[/?]|$)/.test(path) && requestToken === token) clearSaleMedia();
   if (res.status === 401 && /^\/api\/(?:ql\/)?events(?:[/?]|$)/.test(path) && requestToken === token) clearEventMedia();
   const d = await res.json();
+  if (/^\/api\/shop(?:[/?]|$)/.test(path) && requestToken !== token) throw Error('Session changed');
+  if (/^\/api\/shop(?:[/?]|$)/.test(path) && res.status === 401 && requestToken === token) clearShopMedia();
   if (/^\/api\/forum(?:[/?]|$)/.test(path) && requestForumGeneration !== forumMediaGeneration) throw new Error('Session changed');
   if (/^\/api\/(?:auth\/me|profile|user\/profile|users|forum|community|messages|potters)(?:[/?]|$)/.test(path)) {
     if (requestToken !== token) throw new Error('Session changed');
@@ -435,7 +437,7 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     clearClayMedia();
     clearGlazeMedia();
     clearTestTileMedia();
-    clearForumMedia(); clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
+    clearShopMedia(); clearForumMedia(); clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
     clearPieceHistory();
     token = data.token;
     localStorage.setItem('mudlog_token', token);
@@ -455,7 +457,7 @@ function logout() {
   clearClayMedia();
   clearGlazeMedia();
   clearTestTileMedia();
-  clearForumMedia(); clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
+  clearShopMedia(); clearForumMedia(); clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
   clearPieceHistory();
   token = null; currentUser = null;
   localStorage.removeItem('mudlog_token');
@@ -480,7 +482,7 @@ async function checkAuth() {
     const msg = (e.message || '').toLowerCase();
     if (msg.includes('invalid token') || msg.includes('unauthorized') || msg.includes('no token') || msg.includes('invalid') || msg.includes('expired')) {
       // Token is bad — clear it and show auth screen (not landing page)
-      clearForumMedia(); clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
+      clearShopMedia(); clearForumMedia(); clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
       token = null;
       localStorage.removeItem('mudlog_token');
       document.getElementById('landingPage').style.display = 'none';
@@ -4014,7 +4016,7 @@ async function loadShop() {
       return;
     }
     c.innerHTML = products.map(p => {
-      const img = p.image_filename ? '<img src="/uploads/' + p.image_filename + '" class="shop-product-img">' : '<div class="shop-product-placeholder">' + (p.product_type === 'sticker' ? '🏷️' : p.product_type === 'journal' ? '📓' : p.product_type === 'pdf' ? '📄' : '🎁') + '</div>';
+      const img = p.image_filename ? '<img '+shopMediaAttributes(p)+' class="shop-product-img">' : '<div class="shop-product-placeholder">' + (p.product_type === 'sticker' ? '🏷️' : p.product_type === 'journal' ? '📓' : p.product_type === 'pdf' ? '📄' : '🎁') + '</div>';
       const typeLabel = p.is_digital ? '<span class="piece-meta-tag">Digital Download</span>' : '<span class="piece-meta-tag">Physical</span>';
       const previewLink = p.product_type === 'pdf' ? '<a href="/shop/mud-log-preview.pdf" target="_blank" rel="noopener" class="btn btn-secondary btn-sm mt-8" style="width:100%">📖 Preview Sample Pages</a>' : '';
       return '<div class="card shop-product-card">' + img +
@@ -4037,6 +4039,70 @@ async function buyProduct(id) {
   } catch(e) { toast(e.message,'error'); }
 }
 
+
+// Phase 2S Shop media loading.
+const shopMedia = new Map();
+let shopMediaGeneration = 0;
+let shopMediaObserver;
+function clearShopMedia() {
+  shopMediaGeneration++;
+  for (const e of shopMedia.values()) { e.controller.abort(); if (e.url) URL.revokeObjectURL(e.url); }
+  shopMedia.clear();
+  document.querySelectorAll('img[data-shop-media]').forEach(img => { img.removeAttribute('src'); img.style.display = 'none'; });
+}
+function shopMediaAttributes(product, privateView=false) {
+  const route='/api/ql/shop/products/'+encodeURIComponent(product.id)+'/image';
+  if(!privateView)return `src="${esc(route)}/public" onerror="this.style.visibility='hidden'"`;
+  if(!shopMediaObserver){shopMediaObserver=new MutationObserver(()=>hydrateShopMedia(document));shopMediaObserver.observe(document.documentElement,{childList:true,subtree:true});}
+  return `data-shop-media="${esc(route)}" data-shop-generation="${shopMediaGeneration}" onerror="this.style.visibility='hidden'"`;
+}
+async function hydrateShopMedia(root) {
+  const generation = shopMediaGeneration, requestToken = token;
+  if (!requestToken) return;
+  // Removed/replaced images release their blobs and outstanding work.
+  for (const [route, entry] of shopMedia) {
+    if (![...document.querySelectorAll('img[data-shop-media]')].some(img => img.dataset.shopMedia === route)) {
+      entry.controller.abort(); if (entry.url) URL.revokeObjectURL(entry.url); shopMedia.delete(route);
+    }
+  }
+  for (const img of root.querySelectorAll('img[data-shop-media]')) {
+    if (generation !== shopMediaGeneration || requestToken !== token) return;
+    if (Number(img.dataset.shopGeneration) !== generation) continue;
+    const route = img.dataset.shopMedia;
+    let entry = shopMedia.get(route);
+    if (!entry) {
+      entry = { controller: new AbortController(), url: null };
+      shopMedia.set(route, entry);
+      try {
+        const response = await fetch(API + route, { headers: { Authorization: 'Bearer ' + requestToken }, cache: 'no-store', signal: entry.controller.signal });
+        if (response.status === 401 && generation === shopMediaGeneration && requestToken === token) { clearShopMedia(); return; }
+        if (!response.ok) throw Error('Image unavailable');
+        const url = URL.createObjectURL(await response.blob());
+        if (generation !== shopMediaGeneration || requestToken !== token || shopMedia.get(route) !== entry) { URL.revokeObjectURL(url); return; }
+        entry.url = url;
+        document.querySelectorAll('img[data-shop-media]').forEach(node => {
+          if (node.dataset.shopMedia === route && Number(node.dataset.shopGeneration) === generation) node.src = url;
+        });
+      } catch (_) { /* Local failure: no legacy/static retry for authenticated media. */ }
+    }
+    if (entry.url && img.isConnected && generation === shopMediaGeneration && requestToken === token) img.src = entry.url;
+  }
+}
+
+async function downloadShopPurchase(orderId) {
+  const generation=shopMediaGeneration,requestToken=token;
+  if(!requestToken)throw Error('Sign in required');
+  const response=await fetch(API+'/api/shop/download/'+encodeURIComponent(orderId),{headers:{Authorization:'Bearer '+requestToken},cache:'no-store'});
+  const current=()=>generation===shopMediaGeneration && requestToken===token;
+  if(!current())return;
+  if(response.status===401){clearShopMedia();throw Error('Sign in required');}
+  if(!response.ok)throw Error('Download unavailable');
+  const blob=await response.blob();if(!current())return;
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  try {a.href=url;a.download='purchased-download';document.body.appendChild(a);a.click();}
+  finally {a.remove();URL.revokeObjectURL(url);}
+}
+// End Phase 2S Shop media loading.
 
 // Phase 2Q Profile/avatar loading. Public contexts never carry an owner token.
 const profileMedia = new Map();
