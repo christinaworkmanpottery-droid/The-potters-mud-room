@@ -1,5 +1,23 @@
 # Quantum Leap — start here
 
+## Current handoff — September 30, 2026 (Los Angeles)
+
+Start with `SEARCH-1-STUDIO-SEARCH.md` and `TESTING-MILESTONES.md`.
+Master-roadmap **Phase 3: Search + Photo Lookup 2.0** is now active.
+Historical engineering branches named Phase 3A–3H completed manual relationship
+work under the master roadmap's Connected Studio foundation; they do not mean
+master-roadmap Search is complete. Those engineering contracts remain closed.
+Search-1 adds a read-only studio search API; website/mobile search UI is next.
+
+The user has paused broad physical-device validation. Preserve TestFlight
+1.0.6 (49) as the isolated pipeline checkpoint. Continue engineering regressions
+without requiring Christina to repeatedly test unchanged legacy UI. Invite her
+at meaningful user-facing milestones. Production remains untouched.
+
+The sections below are historical Phase 0/1/2 setup notes. Their statements
+that no hosted environment exists and that immediate broad manual validation
+is the next task are superseded by the current handoff and testing policy.
+
 Phase 1I safety repairs completed 2026-09-29: **Phase 1 READY TO CLOSE**.
 See `PHASE1-READINESS.md` for repair evidence and deferred production gates and `RECOVERY-RUNBOOK.md` for recovery.
 See `CHECKPOINT.md`. Runtime changes exist only on the isolated QL branch; nothing deployed.

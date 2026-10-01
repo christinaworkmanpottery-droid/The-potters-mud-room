@@ -22,6 +22,35 @@ Evolve The Potter's Mud Room into a coherent Studio + Community + Business produ
 
 ## Execution order and constraints
 
+### September 30 roadmap reconciliation and resumption
+
+The current `Quantum_Leap_Master_Tracker.xlsx` (Quantum Leap folder, September 30)
+uses the following master phase numbers. Do not confuse these with the historical
+engineering branch/slice numbers, especially completed engineering Phase 3A–3H.
+
+| Master phase | Scope | Current development interpretation |
+| --- | --- | --- |
+| 0 | Baseline / architecture / isolation | Complete |
+| 1 | Relationships / safety / synchronization / integrity | Complete; retain gates |
+| 2 | Connected Studio foundation / media / manual workflows | Foundation source work complete; preserve contracts |
+| 3 | Search + Photo Lookup 2.0 | Next unfinished phase; Search-1 API started here |
+| 4 | Wedgie / Esme intelligence + Voice | Future; candidate Wedgie name is not final |
+| 5 | Manual Mode + QL Future + Porcelain redesign | Manual foundation exists; full UX remains |
+| 6 | Adaptive / foldable / Duo / tablet | Future |
+| 7 | Community / Ask a Potter / business tools | Existing features partial; Studio Finds/Potter Picks required for launch |
+| 8 | Mac/computer + narrow CarPlay feasibility | Future |
+| 9 | Migration readiness | Recovery groundwork done; final migration gate remains |
+| 10 | Independent testing | Engineering verification continues throughout development |
+| 11 | Member testing / refinement | After meaningful product milestones and engineering gates |
+| 12 | Production replacement | Separate explicit release authorization required |
+
+Christina's September 30 instruction authorizes resuming development from the
+next unfinished master-roadmap phase. Broad physical validation is paused, not
+marked passed and not a prerequisite for further isolated feature development.
+See `TESTING-MILESTONES.md`; it supersedes earlier immediate-manual-test handoffs.
+Search-1 is one bounded backend slice, not completion of master Phase 3. Preserve
+existing Photo Lookup until a measured improvement passes a labeled evaluation.
+
 1. Phase 0: audit current systems; pin baselines; isolate work; document data relationships, reuse and risks; verify and commit. No new QL product features.
 2. Propose and approve small relationship/model and manual-workflow chunks before intelligence, voice or visual redesign.
 3. Implement and independently verify each approved chunk in isolation; preserve compatibility with existing clients.

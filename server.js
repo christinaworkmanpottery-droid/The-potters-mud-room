@@ -567,6 +567,22 @@ for (const [pathName, kind, bodyKey] of [
   });
 }
 
+// QL Search-1: fresh, owner-scoped saved-record metadata. No media or AI calls.
+let qlStudioSearchService;
+app.get('/api/ql/search', (req, res, next) => {
+  res.set('Cache-Control', 'private, no-store');
+  next();
+}, auth, (req, res) => {
+  try {
+    if (!qlStudioSearchService) qlStudioSearchService = require('./ql/studio-search.cjs').createStudioSearchService(db);
+    res.json(qlStudioSearchService.search({ q:req.query.q, types:req.query.types,
+      limit:req.query.limit, offset:req.query.offset, userId:req.userId }));
+  } catch (error) {
+    const status = [400,401].includes(error?.status) ? error.status : 500;
+    res.status(status).json({error:status===400?'Invalid search options':status===401?'Not authenticated':'Search unavailable'});
+  }
+});
+
 let qlPieceHistoryService;
 function getQlPieceHistoryService() {
   if (!qlPieceHistoryService) qlPieceHistoryService = require('./ql/piece-history.cjs').createPieceHistoryService(db);
