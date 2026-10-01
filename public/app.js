@@ -133,6 +133,7 @@ async function api(path, opts = {}) {
   if (res.status === 401 && /^\/api\/projects(?:[/?]|$)/.test(path) && requestToken === token) clearProjectMedia();
   if (res.status === 401 && /^\/api\/sales(?:[/?]|$)/.test(path) && requestToken === token) clearSaleMedia();
   if (res.status === 401 && /^\/api\/(?:ql\/)?events(?:[/?]|$)/.test(path) && requestToken === token) clearEventMedia();
+  if (res.status === 401 && requestToken === token) window.StudioSearch?.invalidate();
   const d = await res.json();
   if (/^\/api\/shop(?:[/?]|$)/.test(path) && requestToken !== token) throw Error('Session changed');
   if (/^\/api\/shop(?:[/?]|$)/.test(path) && res.status === 401 && requestToken === token) clearShopMedia();
@@ -236,7 +237,7 @@ function returnPieceViewerFocus(id) {
   if (origin?.control?.isConnected && origin.token === token && origin.account === currentUser?.id) origin.control.focus();
 }
 let firingPieceReturn = null;
-function closeModal(id) { if (id === 'glazeViewModal') { glazeViewSerial++; glazeViewReadOnly = false; glazeViewControls(false); clearGlazeClayTestMedia(); document.getElementById('glazeViewBody')?.replaceChildren(); } if (id === 'clayViewModal') { clayViewSerial++; clayViewReadOnly = false; clayViewControls(false); document.getElementById('clayViewBody')?.replaceChildren(); } if (id === 'firingModal') firingPieceReturn = null; if (id === 'firingViewModal') { viewerControl('firingViewEditBtn', false); viewerControl('firingViewDeleteBtn', false); document.getElementById('firingViewBody')?.replaceChildren(); } returnPieceViewerFocus(id); if (id === 'testTileViewModal' || id === 'testTileModal') clearTestTileMedia(); if (id === 'projectModal' || id === 'projectPhotoModal') closeProjectMediaScope(id); const saleScope = {saleModal:'salePhotoPreview',saleDetailsModal:'saleDetailsContent',bulkSaleModal:'bulkSale'}[id]; if (saleScope) closeSaleMediaScope(saleScope); const firingScope = { firingModal:'firingPhotosContainer', firingViewModal:'firingViewBody', firingPhotoReorderModal:'firingPhotoReorderContent' }[id]; if (firingScope) closeFiringMediaScope(firingScope); if (id === 'glazeViewModal') clearGlazeMedia('glazeViewBody'); if (id === 'clayViewModal') clearClayMedia('clayViewBody'); document.getElementById(id).classList.remove('open'); }
+function closeModal(id) { if (window.StudioSearch?.closeViewer(id)) return; if (id === 'glazeViewModal') { glazeViewSerial++; glazeViewReadOnly = false; glazeViewControls(false); clearGlazeClayTestMedia(); document.getElementById('glazeViewBody')?.replaceChildren(); } if (id === 'clayViewModal') { clayViewSerial++; clayViewReadOnly = false; clayViewControls(false); document.getElementById('clayViewBody')?.replaceChildren(); } if (id === 'firingModal') firingPieceReturn = null; if (id === 'firingViewModal') { viewerControl('firingViewEditBtn', false); viewerControl('firingViewDeleteBtn', false); document.getElementById('firingViewBody')?.replaceChildren(); } returnPieceViewerFocus(id); if (id === 'testTileViewModal' || id === 'testTileModal') clearTestTileMedia(); if (id === 'projectModal' || id === 'projectPhotoModal') closeProjectMediaScope(id); const saleScope = {saleModal:'salePhotoPreview',saleDetailsModal:'saleDetailsContent',bulkSaleModal:'bulkSale'}[id]; if (saleScope) closeSaleMediaScope(saleScope); const firingScope = { firingModal:'firingPhotosContainer', firingViewModal:'firingViewBody', firingPhotoReorderModal:'firingPhotoReorderContent' }[id]; if (firingScope) closeFiringMediaScope(firingScope); if (id === 'glazeViewModal') clearGlazeMedia('glazeViewBody'); if (id === 'clayViewModal') clearClayMedia('clayViewBody'); document.getElementById(id).classList.remove('open'); }
 
 // iOS decimal keyboards have no native Done key. Give every numeric field a
 // consistent way to dismiss the keyboard so form buttons remain reachable.
@@ -455,6 +456,7 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     });
     dbg('Got response, saving token...');
     if (isSignUp && referredBy) sessionStorage.removeItem('referral_code');
+    window.StudioSearch?.invalidate();
     // A successful auth response may replace an existing session without an explicit logout.
     // Clear any private History DOM/blob URLs before installing the new account token.
     clearClayMedia();
@@ -477,6 +479,7 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
   }
 });
 function logout() {
+  window.StudioSearch?.invalidate();
   clearClayMedia();
   clearGlazeMedia();
   clearTestTileMedia();
@@ -504,6 +507,7 @@ async function checkAuth() {
   } catch(e) {
     const msg = (e.message || '').toLowerCase();
     if (msg.includes('invalid token') || msg.includes('unauthorized') || msg.includes('no token') || msg.includes('invalid') || msg.includes('expired')) {
+      window.StudioSearch?.invalidate();
       // Token is bad — clear it and show auth screen (not landing page)
       clearShopMedia(); clearForumMedia(); clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
       token = null;
@@ -518,6 +522,7 @@ async function checkAuth() {
   }
 }
 function showApp() {
+  window.StudioSearch?.syncSession();
   try {
     guestMode = false;
     document.getElementById('landingPage').style.display = 'none';
@@ -532,8 +537,8 @@ function showApp() {
     });
     checkUrlParams();
     const hashPage = window.location.hash.replace('#', '').split('?')[0];
-    const validPages = ['dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','myStore','projects','events','contacts','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog','studioNotes','visualSearch','testTiles','findPotter'];
-    if (hashPage === 'preview') { showGuestPreview('community', true); } else if (hashPage === 'profile/find-potter') { navigate('profile', { fromHistory: true }); document.getElementById('findPotterSettings').scrollIntoView(); } else if (hashPage && hashPage.startsWith('blog/')) {
+    const validPages = ['studioSearch','dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','myStore','projects','events','contacts','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog','studioNotes','visualSearch','testTiles','findPotter'];
+    if (hashPage.startsWith('studioSearch/')) { window.StudioSearch?.restore(hashPage); } else if (hashPage === 'preview') { showGuestPreview('community', true); } else if (hashPage === 'profile/find-potter') { navigate('profile', { fromHistory: true }); document.getElementById('findPotterSettings').scrollIntoView(); } else if (hashPage && hashPage.startsWith('blog/')) {
       const slug = hashPage.replace('blog/', '');
       if (slug) viewBlogPost(slug);
       else navigate('blog');
@@ -559,6 +564,7 @@ function showApp() {
 let currentPage = 'dashboard';
 let restoredUrl = '';
 function navigate(page, options = {}) {
+  window.StudioSearch?.onNavigate(page, options);
   if (page !== 'glazes') { clearGlazeMedia('glazeList'); clearGlazeMedia('glazeViewBody'); }
   if (page !== 'clayBodies') { clearClayMedia('clayList'); clearClayMedia('clayViewBody'); }
   if (page !== 'testTiles') clearTestTileMedia();
@@ -592,6 +598,7 @@ function navigate(page, options = {}) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
     const map = {
+      studioSearch:'pageStudioSearch', searchRecord:'pageSearchRecord',
       dashboard:'pageDashboard', pieces:'pagePieces', pieceDetail:'pagePieceDetail',
       clayBodies:'pageClayBodies', glazes:'pageGlazes', firings:'pageFirings',
       casualties:'pageCasualties',
@@ -611,6 +618,7 @@ function navigate(page, options = {}) {
     const el = document.getElementById(map[page]); if (el) el.classList.add('active');
     try { const nb = document.querySelector('.nav-link[data-page="' + page + '"]'); if (nb) nb.classList.add('active'); } catch(e) {}
   const loaders = {
+    studioSearch:() => window.StudioSearch?.enter(),
     dashboard:loadDashboard, pieces:loadPieces, clayBodies:loadClayBodies,
     glazes:loadGlazes, firings:loadFirings, casualties:loadCasualties, sales:loadSales, pricingCalculator:loadPricingCalculator, testTiles:loadTestTiles, findPotter:loadFindPotter,
     goals:loadGoals, myStore:loadMyStores, projects:loadProjects, events:loadEvents, contacts:loadContacts, studioNotes:loadStudioNotes,
@@ -1003,13 +1011,14 @@ async function loadPieceHistory(id, container, generation, sessionToken) {
   }
 }
 
-async function viewPiece(id) {
+async function viewPiece(id, options = {}) {
   clearPieceHistory();
   const generation = pieceViewGeneration, sessionToken = token;
   try {
-    const p = await api('/api/pieces/' + encodeURIComponent(id));
-    if (generation !== pieceViewGeneration || token !== sessionToken) return;
-    navigate('pieceDetail');
+    const p = await api('/api/pieces/' + encodeURIComponent(id), { cache: 'no-store' });
+    if (generation !== pieceViewGeneration || token !== sessionToken || (options.active && !options.active())) return;
+    if (options.active && (String(p.id) !== String(id) || String(p.user_id) !== String(currentUser?.id))) throw Object.assign(Error('Piece unavailable'), {status:404});
+    navigate('pieceDetail', options.active ? {fromHistory:true, searchDetail:true} : {});
     window._currentPieceId = p.id;
     window._currentPiecePhotos = p.photos || [];
     window._reorderMode = false;
@@ -1096,7 +1105,7 @@ async function viewPiece(id) {
     if (privatePiecePhotos) void loadPrivatePieceDetailPhotos(p.id, generation, sessionToken);
     else void loadPieceEdgeMedia(document.getElementById('photoReorderContainer'));
     void loadPieceHistory(p.id, history, generation, sessionToken);
-  } catch (err) { toast(err.message, 'error'); }
+  } catch (err) { if (options.active) { if (options.active()) throw err; } else toast(err.message, 'error'); }
 }
 function df(label, val) {
   return '<div class="detail-field"><div class="detail-label">' + label + '</div><div class="detail-value">' + (val ? esc(String(val)) : '—') + '</div></div>';
@@ -2052,6 +2061,7 @@ function invalidateTestTileAccess(refreshHistory = true) {
   }
   const body = document.getElementById('testTileViewBody');
   if (body) body.textContent = 'Test Tiles locked. Upgrade to Unlimited to use this feature.';
+  window.StudioSearch?.lockTiles();
 }
 function testTileSlotFilename(tile, slot) { return tile?.[slot === 1 ? 'photo_filename' : 'photo_filename' + slot] || null; }
 function testTileSlotDelivery(tile, slot) { return tile?.[slot === 1 ? 'photoDelivery' : 'photoDelivery' + slot] || 'legacy-ambiguous'; }
@@ -2155,7 +2165,7 @@ async function viewTestTileById(id, options = {}) {
       if (response.status === 403) { invalidateTestTileAccess(); return; }
       throw Object.assign(Error('Test Tile unavailable'), { status: response.status });
     }
-    if (String(t.id) !== String(id)) throw Error('Test Tile unavailable');
+    if (String(t.id) !== String(id) || (options.searchOrigin && String(t.user_id) !== String(account))) throw Object.assign(Error('Test Tile unavailable'), {status:404});
     renderTestTile(t, options, active);
   } catch (error) {
     if (!active()) return;
@@ -2580,10 +2590,10 @@ function viewFiring(id, options = {}) {
   viewerControl('firingViewEditBtn', false);
   viewerControl('firingViewDeleteBtn', false);
   openModal('firingViewModal');
-  const details = readOnly ? api('/api/firing-logs/' + encodeURIComponent(id)).then(f => [f]) : api('/api/firing-logs');
+  const details = readOnly ? api('/api/firing-logs/' + encodeURIComponent(id), {cache:'no-store'}).then(f => [f]) : api('/api/firing-logs');
   return details.then(async firings => {
     const f = firings.find(f => f.id === id);
-    if (active() && !f) throw Error('unavailable');
+    if (active() && (!f || (options.searchOrigin && String(f.user_id) !== String(account)))) throw Error('unavailable');
     if (!active() || !f) return;
     const df = (label, val) => val ? '<div class="detail-row"><span class="detail-label">' + esc(label) + '</span><span class="detail-value">' + esc(String(val)) + '</span></div>' : '';
     let photosHtml = '';
@@ -3019,11 +3029,11 @@ async function loadSales() {
 let _salePieces = [];
 let saleSavePending = false;
 async function viewSale(id, options = {}) {
-  rememberPieceViewer('saleDetailsModal', Boolean(options.pieceId));
+  rememberPieceViewer('saleDetailsModal', Boolean(options.pieceId) || options.readOnly === true);
   const requestActive = beginSaleRequest('saleDetailsContent');
   const pieceOrigin = options.pieceId != null;
   const pieceId = options.pieceId, generation = pieceViewGeneration, account = currentUser?.id;
-  const active = () => requestActive() && account === currentUser?.id && (!pieceOrigin ||
+  const active = () => requestActive() && account === currentUser?.id && (!options.active || options.active()) && (!pieceOrigin ||
     (token && account && generation === pieceViewGeneration && currentPage === 'pieceDetail' &&
       String(window._currentPieceId) === String(pieceId) && (!options.active || options.active())));
   clearSaleMedia('saleDetailsContent');
@@ -3036,7 +3046,7 @@ async function viewSale(id, options = {}) {
     const sales = await api('/api/sales', { cache: 'no-store' });
     if (!active()) return;
     const sale = sales.find(s => String(s.id) === String(id));
-    if (!sale || (pieceOrigin && (String(sale.user_id) !== String(account) || sale.piece_id == null || String(sale.piece_id) !== String(pieceId))))
+    if (!sale || (options.searchOrigin && String(sale.user_id) !== String(account)) || (pieceOrigin && (String(sale.user_id) !== String(account) || sale.piece_id == null || String(sale.piece_id) !== String(pieceId))))
       throw Object.assign(new Error('Sale unavailable'), { status: 404 });
     body.innerHTML =
       (sale.image_filename ? salePhotoMarkup(sale, 'width:100%;max-height:300px;object-fit:contain;margin-bottom:16px') : '') +
@@ -3045,8 +3055,9 @@ async function viewSale(id, options = {}) {
       df('Total', '$' + (WebsiteUtils.moneyCents(sale.price || 0) * (sale.quantity || 1) / 100).toFixed(2)) +
       df('Event', sale.event_name) + df('Venue', sale.venue) + df('Buyer', sale.buyer_name) + df('Notes', sale.notes);
     body.setAttribute('aria-busy', 'false');
-    edit.hidden = pieceOrigin; edit.disabled = pieceOrigin; edit.style.display = pieceOrigin ? 'none' : '';
-    edit.onclick = pieceOrigin ? null : () => { if (!active()) return; closeModal('saleDetailsModal'); editSale(id); };
+    const readOnly = pieceOrigin || options.readOnly === true;
+    edit.hidden = readOnly; edit.disabled = readOnly; edit.style.display = readOnly ? 'none' : '';
+    edit.onclick = readOnly ? null : () => { if (!active()) return; closeModal('saleDetailsModal'); editSale(id); };
     await loadSaleMedia('saleDetailsContent');
   } catch(e) {
     if (!active()) return;
@@ -4809,6 +4820,7 @@ async function redeemPromo() {
     const d = await api('/api/promo/redeem', { method:'POST', body: { code } });
     toast(d.message, 'success');
     if (d.token) { clearFiringMedia(); clearPricingMedia(); }
+    if (d.token) window.StudioSearch?.invalidate();
     if (d.token) { clearPieceHistory(); clearComboMedia(); token = d.token; localStorage.setItem('mudlog_token', d.token); }
     const me = await api('/api/auth/me'); currentUser = me.user; showApp(); navigate('upgrade');
   } catch(e) { toast(e.message,'error'); }
@@ -8124,6 +8136,7 @@ function restoreRoute() {
   if (restoredUrl === location.href) return;
   restoredUrl = location.href;
   const route = location.hash.slice(1).split('?')[0];
+  if (route.startsWith('studioSearch/') && token) return window.StudioSearch?.restore(route);
   if (route.startsWith('reset-password')) return checkResetPasswordHash();
   if (route === 'preview') return showGuestPreview('community', true);
   document.getElementById('previewPage').style.display = 'none';

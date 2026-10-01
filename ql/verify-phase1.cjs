@@ -6,6 +6,7 @@ const cleanEnv = { PATH: process.env.PATH, NODE_ENV: 'test' };
 for (const [args, extraEnv] of [
   [['ql/verify.cjs'], {}],
   [['--test','tests/ql-studio-search.cjs'], {}],
+  [['--test','tests/ql-studio-search-dom.cjs','tests/ql-studio-search-http.cjs'], {}],
   [['--test','tests/ql-admin-granted-billing.cjs'], {}],
   [['--test','tests/ql-shop-release-asset.cjs'], {}],
   [['--test','tests/ql-special-account-billing.cjs'], {}],

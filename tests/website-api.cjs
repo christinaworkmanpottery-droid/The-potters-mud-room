@@ -124,7 +124,7 @@ async function test(name,fn){await fn();console.log('PASS',name);}
  });
  await test('sample PDF is a real PDF; styles/scripts resolve from nested URLs',async()=>{
   const r=await fetch(base+'/shop/mud-log-preview.pdf');assert.match(r.headers.get('content-type'),/application\/pdf/);assert.equal((await r.text()).slice(0,5),'%PDF-');
-  const html=await (await fetch(base+'/nested/preview')).text();assert.match(html,/src="\/app.js\?v=20260925b"/);assert.match(html,/href="\/style.css/);
+  const html=await (await fetch(base+'/nested/preview')).text();assert.match(html,/src="\/app.js\?v=search2"/);assert.match(html,/href="\/style.css/);
  });
  if(process.env.QL_TEST_MIGRATION==='1')await test('old Piece API create/read/edit/delete remains compatible with QL links',async()=>{
   const ql=require('../ql/relationships.cjs');

@@ -153,7 +153,7 @@
   </script>
 
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏺</text></svg>">
-  <link rel="stylesheet" href="/style.css?v=20260925b">
+  <link rel="stylesheet" href="/style.css?v=search2">
   <style>
     .notif-badge{position:absolute;top:-4px;right:-6px;background:var(--danger);color:#fff;font-size:0.65rem;font-weight:700;border-radius:50%;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 4px}
     .notif-item{padding:12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.15s}
@@ -765,6 +765,7 @@
       <div class="nav-section">
         <div class="nav-section-title">Studio</div>
         <button class="nav-link" data-page="dashboard" onclick="navigate('dashboard'); closeNav()">Dashboard</button>
+        <button class="nav-link" data-page="studioSearch" onclick="navigate('studioSearch'); closeNav()">Search Studio</button>
         <button class="nav-link" data-page="pieces" onclick="navigate('pieces'); closeNav()">Pieces</button>
         <button class="nav-link" data-page="clayBodies" onclick="navigate('clayBodies'); closeNav()">Clay</button>
         <button class="nav-link" data-page="glazes" onclick="navigate('glazes'); closeNav()">Glazes</button>
@@ -875,6 +876,31 @@
         <p>Log your first piece to start tracking.</p>
       </div>
     </div>
+
+    <section id="pageStudioSearch" class="page studio-search" aria-labelledby="studioSearchHeading">
+      <div class="page-header"><h2 id="studioSearchHeading">Search your studio</h2></div>
+      <p>Find the pieces, materials, and plans you’ve saved.</p>
+      <form id="studioSearchForm" role="search">
+        <label for="studioSearchInput">Search text</label>
+        <div class="studio-search-input-row">
+          <input id="studioSearchInput" type="search" class="form-input" minlength="2" maxlength="120" required aria-describedby="studioSearchHelp" placeholder="Try a glaze, clay, or project name">
+          <button class="btn btn-primary" type="submit">Search</button>
+          <button class="btn btn-secondary" type="button" id="studioSearchClear">Clear</button>
+        </div>
+        <p id="studioSearchHelp" class="text-sm">Search saved text using 2–120 characters and up to eight unique words.</p>
+        <label for="studioSearchType">Record type</label>
+        <select id="studioSearchType" class="form-input"><option value="">All</option></select>
+      </form>
+      <p id="studioSearchLocked" role="status"></p>
+      <p id="studioSearchStatus" role="status" aria-live="polite"></p>
+      <button type="button" class="btn btn-secondary" id="studioSearchRetry" hidden>Retry search</button>
+      <ul id="studioSearchResults" class="studio-search-results" aria-label="Search results"></ul>
+      <button type="button" class="btn btn-secondary" id="studioSearchMore" hidden>Load more</button>
+    </section>
+    <section id="pageSearchRecord" class="page studio-search" aria-label="Saved record">
+      <button type="button" class="detail-back" onclick="StudioSearch.back()">← Back to Search</button>
+      <div id="studioSearchDetail" tabindex="-1" aria-live="polite"></div>
+    </section>
 
     <!-- PIECE DETAIL -->
     <div id="pagePieceDetail" class="page">
@@ -3353,7 +3379,8 @@
 </div>
 
 <script src="/website-utils.js?v=20260925b"></script>
-<script src="/app.js?v=20260925b"></script>
+<script src="/app.js?v=search2"></script>
+<script src="/studio-search.js?v=search2"></script>
 
   <!-- Studio Note Modal -->
   <div id="studioNoteModal" class="modal-overlay" onclick="if(event.target===this)closeModal('studioNoteModal')">
