@@ -153,7 +153,7 @@
   </script>
 
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏺</text></svg>">
-  <link rel="stylesheet" href="/style.css?v=search2">
+  <link rel="stylesheet" href="/style.css?v=4c">
   <style>
     .notif-badge{position:absolute;top:-4px;right:-6px;background:var(--danger);color:#fff;font-size:0.65rem;font-weight:700;border-radius:50%;min-width:16px;height:16px;display:flex;align-items:center;justify-content:center;padding:0 4px}
     .notif-item{padding:12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.15s}
@@ -1488,16 +1488,13 @@
       <div class="page-header"><h2>Find by Photo</h2></div>
       <div style="max-width:480px;margin:0 auto">
         <p class="text-sm" style="color:var(--text-light);margin-bottom:16px">Snap or upload a photo of a piece and we will find it in your library.</p>
-        <div style="border:2px dashed var(--border);border-radius:var(--radius);padding:40px;text-align:center;cursor:pointer;background:var(--bg-card)" onclick="document.getElementById('visualSearchInput').click()">
-          <div style="font-size:2.5rem">📷</div>
-          <div style="margin-top:8px;font-weight:600">Tap to choose a photo</div>
-          <div class="text-sm" style="color:var(--text-light);margin-top:4px">or drag and drop</div>
-          <input type="file" id="visualSearchInput" accept="image/*" style="display:none" onchange="runVisualSearch(this)">
-        </div>
+        <button type="button" id="visualSearchChoose" class="btn btn-secondary" style="width:100%;padding:40px" onclick="document.getElementById('visualSearchInput').click()">📷 Choose a photo to search</button>
+        <input type="file" id="visualSearchInput" accept="image/*" hidden onchange="runVisualSearch(this)">
         <div id="visualSearchPreview" style="margin-top:16px;display:none">
           <img id="visualSearchImg" style="width:100%;max-height:240px;object-fit:contain;border-radius:var(--radius);border:1px solid var(--border)">
-          <div id="visualSearchStatus" class="text-sm" style="margin-top:8px;color:var(--text-light);text-align:center">Searching...</div>
+          <div id="visualSearchStatus" role="status" aria-live="polite" class="text-sm" style="margin-top:8px;color:var(--text-light);text-align:center">Searching...</div>
         </div>
+        <button type="button" id="visualSearchRetry" class="btn btn-secondary" hidden>Retry this photo</button>
         <div id="visualSearchResults" style="margin-top:16px"></div>
       </div>
     </div>
@@ -3379,8 +3376,9 @@
 </div>
 
 <script src="/website-utils.js?v=20260925b"></script>
-<script src="/app.js?v=search2"></script>
+<script src="/app.js?v=4c"></script>
 <script src="/studio-search.js?v=search2"></script>
+<script src="/ql-assistant.js?v=4d"></script>
 
   <!-- Studio Note Modal -->
   <div id="studioNoteModal" class="modal-overlay" onclick="if(event.target===this)closeModal('studioNoteModal')">

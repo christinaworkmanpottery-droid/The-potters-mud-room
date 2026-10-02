@@ -1,0 +1,142 @@
+node:internal/process/promises:394
+    triggerUncaughtException(err, true /* fromPromise */);
+    ^
+
+browserType.launch: Target page, context or browser has been closed
+Browser logs:
+
+<launching> /workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,BlockOriginHeaderModificationOnRedirect,Translate,AutoDeElevate,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --no-sandbox --no-zygote --single-process --disable-gpu --user-data-dir=/tmp/playwright_chromiumdev_profile-tTJXHS --remote-debugging-pipe --no-startup-window
+<launched> pid=17
+[pid=17][err] [17:17:1002/002948.499941:FATAL:chrome/browser/process_singleton_posix.cc:297] Check failed: . socket() failed: Operation not permitted (1)
+[pid=17][err] [1002/002948.500348:ERROR:third_party/crashpad/crashpad/util/linux/scoped_ptrace_attach.cc:27] ptrace: Operation not permitted (1)
+[pid=17][err] [1002/002948.500404:ERROR:third_party/crashpad/crashpad/util/file/directory_reader_posix.cc:43] opendir /proc/17/task: No such file or directory (2)
+[pid=17][err] Received signal 6
+[pid=17][err] #0 0x56484e6756f3 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x69f56f2)
+[pid=17][err] #1 0x5648530ed0e4 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0xb46d0e3)
+[pid=17][err] #2 0x7ff6d0b6d330 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x4532f)
+[pid=17][err] #3 0x7ff6d0b6d27e (/usr/lib/x86_64-linux-gnu/libc.so.6+0x4527d)
+[pid=17][err] #4 0x7ff6d0b508ff (/usr/lib/x86_64-linux-gnu/libc.so.6+0x288fe)
+[pid=17][err] #5 0x5648530e4ea5 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0xb464ea4)
+[pid=17][err] #6 0x5648530a7e3d (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0xb427e3c)
+[pid=17][err] #7 0x5648530a7dce (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0xb427dcd)
+[pid=17][err] #8 0x56484e3062a8 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x66862a7)
+[pid=17][err] #9 0x56484b7216a9 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x3aa16a8)
+[pid=17][err] #10 0x5648530a7fb0 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0xb427faf)
+[pid=17][err] #11 0x56484dc82cd9 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x6002cd8)
+[pid=17][err] #12 0x56484d31eec8 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x569eec7)
+[pid=17][err] #13 0x56484e2df1c7 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x665f1c6)
+[pid=17][err] #14 0x56484e37de23 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x66fde22)
+[pid=17][err] #15 0x56484e37dde4 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x66fdde3)
+[pid=17][err] #16 0x56484dd9778b (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x611778a)
+[pid=17][err] #17 0x56484dd96aa3 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x6116aa2)
+[pid=17][err] #18 0x56484dd92ba6 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x6112ba5)
+[pid=17][err] #19 0x56484dd921ce (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x61121cd)
+[pid=17][err] #20 0x56484dd918a5 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x61118a4)
+[pid=17][err] #21 0x7ff6d0b521ca (/usr/lib/x86_64-linux-gnu/libc.so.6+0x2a1c9)
+[pid=17][err] #22 0x7ff6d0b5228b (/usr/lib/x86_64-linux-gnu/libc.so.6+0x2a28a)
+[pid=17][err] #23 0x56484e872fba (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x6bf2fb9)
+[pid=17][err]   r8: 00001b580006850b  r9: 0000000000000001 r10: 0000000000000008 r11: 0000000000000246
+[pid=17][err]  r12: 0000000000000006 r13: 000000000000008c r14: 0000000000000016 r15: 00001b58000dc3c0
+[pid=17][err]   di: 0000000000000011  si: 0000000000000011  bp: 00007ffd03adedd0  bx: 0000000000000011
+[pid=17][err]   dx: 0000000000000006  ax: 0000000000000000  cx: 00007ff6d0bc6b2c  sp: 00007ffd03aded90
+[pid=17][err]   ip: 00007ff6d0bc6b2c efl: 0000000000000246 cgf: 002b000000000033 erf: 0000000000000000
+[pid=17][err]  trp: 0000000000000000 msk: 0000000000000000 cr2: 0000000000000000
+[pid=17][err] [end of stack trace]
+Call log:
+[2m  - <launching> /workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,BlockOriginHeaderModificationOnRedirect,Translate,AutoDeElevate,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --no-sandbox --no-zygote --single-process --disable-gpu --user-data-dir=/tmp/playwright_chromiumdev_profile-tTJXHS --remote-debugging-pipe --no-startup-window[22m
+[2m  - <launched> pid=17[22m
+[2m  - [pid=17][err] [17:17:1002/002948.499941:FATAL:chrome/browser/process_singleton_posix.cc:297] Check failed: . socket() failed: Operation not permitted (1)[22m
+[2m  - [pid=17][err] [1002/002948.500348:ERROR:third_party/crashpad/crashpad/util/linux/scoped_ptrace_attach.cc:27] ptrace: Operation not permitted (1)[22m
+[2m  - [pid=17][err] [1002/002948.500404:ERROR:third_party/crashpad/crashpad/util/file/directory_reader_posix.cc:43] opendir /proc/17/task: No such file or directory (2)[22m
+[2m  - [pid=17][err] Received signal 6[22m
+[2m  - [pid=17][err] #0 0x56484e6756f3 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x69f56f2)[22m
+[2m  - [pid=17][err] #1 0x5648530ed0e4 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0xb46d0e3)[22m
+[2m  - [pid=17][err] #2 0x7ff6d0b6d330 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x4532f)[22m
+[2m  - [pid=17][err] #3 0x7ff6d0b6d27e (/usr/lib/x86_64-linux-gnu/libc.so.6+0x4527d)[22m
+[2m  - [pid=17][err] #4 0x7ff6d0b508ff (/usr/lib/x86_64-linux-gnu/libc.so.6+0x288fe)[22m
+[2m  - [pid=17][err] #5 0x5648530e4ea5 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0xb464ea4)[22m
+[2m  - [pid=17][err] #6 0x5648530a7e3d (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0xb427e3c)[22m
+[2m  - [pid=17][err] #7 0x5648530a7dce (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0xb427dcd)[22m
+[2m  - [pid=17][err] #8 0x56484e3062a8 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x66862a7)[22m
+[2m  - [pid=17][err] #9 0x56484b7216a9 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x3aa16a8)[22m
+[2m  - [pid=17][err] #10 0x5648530a7fb0 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0xb427faf)[22m
+[2m  - [pid=17][err] #11 0x56484dc82cd9 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x6002cd8)[22m
+[2m  - [pid=17][err] #12 0x56484d31eec8 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x569eec7)[22m
+[2m  - [pid=17][err] #13 0x56484e2df1c7 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x665f1c6)[22m
+[2m  - [pid=17][err] #14 0x56484e37de23 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x66fde22)[22m
+[2m  - [pid=17][err] #15 0x56484e37dde4 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x66fdde3)[22m
+[2m  - [pid=17][err] #16 0x56484dd9778b (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x611778a)[22m
+[2m  - [pid=17][err] #17 0x56484dd96aa3 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x6116aa2)[22m
+[2m  - [pid=17][err] #18 0x56484dd92ba6 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x6112ba5)[22m
+[2m  - [pid=17][err] #19 0x56484dd921ce (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x61121cd)[22m
+[2m  - [pid=17][err] #20 0x56484dd918a5 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x61118a4)[22m
+[2m  - [pid=17][err] #21 0x7ff6d0b521ca (/usr/lib/x86_64-linux-gnu/libc.so.6+0x2a1c9)[22m
+[2m  - [pid=17][err] #22 0x7ff6d0b5228b (/usr/lib/x86_64-linux-gnu/libc.so.6+0x2a28a)[22m
+[2m  - [pid=17][err] #23 0x56484e872fba (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x6bf2fb9)[22m
+[2m  - [pid=17][err]   r8: 00001b580006850b  r9: 0000000000000001 r10: 0000000000000008 r11: 0000000000000246[22m
+[2m  - [pid=17][err]  r12: 0000000000000006 r13: 000000000000008c r14: 0000000000000016 r15: 00001b58000dc3c0[22m
+[2m  - [pid=17][err]   di: 0000000000000011  si: 0000000000000011  bp: 00007ffd03adedd0  bx: 0000000000000011[22m
+[2m  - [pid=17][err]   dx: 0000000000000006  ax: 0000000000000000  cx: 00007ff6d0bc6b2c  sp: 00007ffd03aded90[22m
+[2m  - [pid=17][err]   ip: 00007ff6d0bc6b2c efl: 0000000000000246 cgf: 002b000000000033 erf: 0000000000000000[22m
+[2m  - [pid=17][err]  trp: 0000000000000000 msk: 0000000000000000 cr2: 0000000000000000[22m
+[2m  - [pid=17][err] [end of stack trace][22m
+[2m  - [pid=17] <gracefully close start>[22m
+[2m  - [pid=17] <kill>[22m
+[2m  - [pid=17] <will force kill>[22m
+[2m  - [pid=17] <process did exit: exitCode=null, signal=SIGABRT>[22m
+[2m  - [pid=17] starting temporary directories cleanup[22m
+[2m  - [pid=17] finished temporary directories cleanup[22m
+[2m  - [pid=17] <gracefully close end>[22m
+
+    at [stdin]:1:115
+    at [stdin]:1:322
+    at [stdin]-wrapper:6:24 {
+  log: [
+    '  - <launching> /workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome --disable-field-trial-config --disable-background-networking --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-back-forward-cache --disable-breakpad --disable-client-side-phishing-detection --disable-component-extensions-with-background-pages --disable-component-update --no-default-browser-check --disable-default-apps --disable-dev-shm-usage --disable-edgeupdater --disable-extensions --disable-features=AvoidUnnecessaryBeforeUnloadCheckSync,BoundaryEventDispatchTracksNodeRemoval,DestroyProfileOnBrowserClose,DialMediaRouteProvider,GlobalMediaControls,HttpsUpgrades,LensOverlay,MediaRouter,PaintHolding,ThirdPartyStoragePartitioning,BlockOriginHeaderModificationOnRedirect,Translate,AutoDeElevate,OptimizationHints,msForceBrowserSignIn,msEdgeUpdateLaunchServicesPreferredVersion --enable-features=CDPScreenshotNewSurface --allow-pre-commit-input --disable-hang-monitor --disable-ipc-flooding-protection --disable-popup-blocking --disable-prompt-on-repost --disable-renderer-backgrounding --disable-updater-scheduler --force-color-profile=srgb --metrics-recording-only --no-first-run --password-store=basic --use-mock-keychain --no-service-autorun --export-tagged-pdf --disable-search-engine-choice-screen --unsafely-disable-devtools-self-xss-warnings --edge-skip-compat-layer-relaunch --disable-infobars --disable-search-engine-choice-screen --disable-sync --enable-unsafe-swiftshader --headless --hide-scrollbars --mute-audio --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4 --no-sandbox --no-sandbox --no-zygote --single-process --disable-gpu --user-data-dir=/tmp/playwright_chromiumdev_profile-tTJXHS --remote-debugging-pipe --no-startup-window',
+    '  - <launched> pid=17',
+    '  - [pid=17][err] [17:17:1002/002948.499941:FATAL:chrome/browser/process_singleton_posix.cc:297] Check failed: . socket() failed: Operation not permitted (1)',
+    '  - [pid=17][err] [1002/002948.500348:ERROR:third_party/crashpad/crashpad/util/linux/scoped_ptrace_attach.cc:27] ptrace: Operation not permitted (1)',
+    '  - [pid=17][err] [1002/002948.500404:ERROR:third_party/crashpad/crashpad/util/file/directory_reader_posix.cc:43] opendir /proc/17/task: No such file or directory (2)',
+    '  - [pid=17][err] Received signal 6',
+    '  - [pid=17][err] #0 0x56484e6756f3 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x69f56f2)',
+    '  - [pid=17][err] #1 0x5648530ed0e4 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0xb46d0e3)',
+    '  - [pid=17][err] #2 0x7ff6d0b6d330 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x4532f)',
+    '  - [pid=17][err] #3 0x7ff6d0b6d27e (/usr/lib/x86_64-linux-gnu/libc.so.6+0x4527d)',
+    '  - [pid=17][err] #4 0x7ff6d0b508ff (/usr/lib/x86_64-linux-gnu/libc.so.6+0x288fe)',
+    '  - [pid=17][err] #5 0x5648530e4ea5 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0xb464ea4)',
+    '  - [pid=17][err] #6 0x5648530a7e3d (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0xb427e3c)',
+    '  - [pid=17][err] #7 0x5648530a7dce (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0xb427dcd)',
+    '  - [pid=17][err] #8 0x56484e3062a8 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x66862a7)',
+    '  - [pid=17][err] #9 0x56484b7216a9 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x3aa16a8)',
+    '  - [pid=17][err] #10 0x5648530a7fb0 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0xb427faf)',
+    '  - [pid=17][err] #11 0x56484dc82cd9 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x6002cd8)',
+    '  - [pid=17][err] #12 0x56484d31eec8 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x569eec7)',
+    '  - [pid=17][err] #13 0x56484e2df1c7 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x665f1c6)',
+    '  - [pid=17][err] #14 0x56484e37de23 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x66fde22)',
+    '  - [pid=17][err] #15 0x56484e37dde4 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x66fdde3)',
+    '  - [pid=17][err] #16 0x56484dd9778b (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x611778a)',
+    '  - [pid=17][err] #17 0x56484dd96aa3 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x6116aa2)',
+    '  - [pid=17][err] #18 0x56484dd92ba6 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x6112ba5)',
+    '  - [pid=17][err] #19 0x56484dd921ce (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x61121cd)',
+    '  - [pid=17][err] #20 0x56484dd918a5 (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x61118a4)',
+    '  - [pid=17][err] #21 0x7ff6d0b521ca (/usr/lib/x86_64-linux-gnu/libc.so.6+0x2a1c9)',
+    '  - [pid=17][err] #22 0x7ff6d0b5228b (/usr/lib/x86_64-linux-gnu/libc.so.6+0x2a28a)',
+    '  - [pid=17][err] #23 0x56484e872fba (/workspace/scratch/0917e8fa527e/browser-runtime/chrome-linux64/chrome+0x6bf2fb9)',
+    '  - [pid=17][err]   r8: 00001b580006850b  r9: 0000000000000001 r10: 0000000000000008 r11: 0000000000000246',
+    '  - [pid=17][err]  r12: 0000000000000006 r13: 000000000000008c r14: 0000000000000016 r15: 00001b58000dc3c0',
+    '  - [pid=17][err]   di: 0000000000000011  si: 0000000000000011  bp: 00007ffd03adedd0  bx: 0000000000000011',
+    '  - [pid=17][err]   dx: 0000000000000006  ax: 0000000000000000  cx: 00007ff6d0bc6b2c  sp: 00007ffd03aded90',
+    '  - [pid=17][err]   ip: 00007ff6d0bc6b2c efl: 0000000000000246 cgf: 002b000000000033 erf: 0000000000000000',
+    '  - [pid=17][err]  trp: 0000000000000000 msk: 0000000000000000 cr2: 0000000000000000',
+    '  - [pid=17][err] [end of stack trace]',
+    '  - [pid=17] <gracefully close start>',
+    '  - [pid=17] <kill>',
+    '  - [pid=17] <will force kill>',
+    '  - [pid=17] <process did exit: exitCode=null, signal=SIGABRT>',
+    '  - [pid=17] starting temporary directories cleanup',
+    '  - [pid=17] finished temporary directories cleanup',
+    '  - [pid=17] <gracefully close end>'
+  ]
+}
+
+Node.js v24.19.0

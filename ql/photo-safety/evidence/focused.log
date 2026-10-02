@@ -1,0 +1,190 @@
+TAP version 13
+# Subtest: valid search keeps API and protected candidate metadata
+ok 1 - valid search keeps API and protected candidate metadata
+  ---
+  duration_ms: 1302.117474
+  type: 'test'
+  ...
+# Subtest: reject unauthorized null
+ok 2 - reject unauthorized null
+  ---
+  duration_ms: 12.259074
+  type: 'test'
+  ...
+# Subtest: reject unauthorized invalid
+ok 3 - reject unauthorized invalid
+  ---
+  duration_ms: 4.544284
+  type: 'test'
+  ...
+# Subtest: reject unauthorized missing
+ok 4 - reject unauthorized missing
+  ---
+  duration_ms: 6.148756
+  type: 'test'
+  ...
+# Subtest: deleted account token rejected
+ok 5 - deleted account token rejected
+  ---
+  duration_ms: 5.936595
+  type: 'test'
+  ...
+# Subtest: empty
+ok 6 - empty
+  ---
+  duration_ms: 11.50739
+  type: 'test'
+  ...
+# Subtest: text disguised as PNG
+ok 7 - text disguised as PNG
+  ---
+  duration_ms: 22.904798
+  type: 'test'
+  ...
+# Subtest: truncated PNG
+ok 8 - truncated PNG
+  ---
+  duration_ms: 15.377814
+  type: 'test'
+  ...
+# Subtest: SVG
+ok 9 - SVG
+  ---
+  duration_ms: 9.531818
+  type: 'test'
+  ...
+# Subtest: nonimage MIME
+ok 10 - nonimage MIME
+  ---
+  duration_ms: 12.70799
+  type: 'test'
+  ...
+# Subtest: missing photo
+ok 11 - missing photo
+  ---
+  duration_ms: 8.378
+  type: 'test'
+  ...
+# Subtest: multiple files rejected
+ok 12 - multiple files rejected
+  ---
+  duration_ms: 7.0652
+  type: 'test'
+  ...
+# Subtest: encoded size limit
+ok 13 - encoded size limit
+  ---
+  duration_ms: 278.307466
+  type: 'test'
+  ...
+# Subtest: dimension limit
+ok 14 - dimension limit
+  ---
+  duration_ms: 34.706092
+  type: 'test'
+  ...
+# Subtest: pixel count limit
+ok 15 - pixel count limit
+  ---
+  duration_ms: 334.499166
+  type: 'test'
+  ...
+# Subtest: actual decoder type cannot be hidden by MIME
+ok 16 - actual decoder type cannot be hidden by MIME
+  ---
+  duration_ms: 17.845737
+  type: 'test'
+  ...
+# Subtest: corrupt compressed image rejected
+ok 17 - corrupt compressed image rejected
+  ---
+  duration_ms: 9.177728
+  type: 'test'
+  ...
+# Subtest: retired debug uploader null
+ok 18 - retired debug uploader null
+  ---
+  duration_ms: 2.885155
+  type: 'test'
+  ...
+# Subtest: retired debug uploader A
+ok 19 - retired debug uploader A
+  ---
+  duration_ms: 3.24221
+  type: 'test'
+  ...
+# Subtest: retired debug uploader B
+ok 20 - retired debug uploader B
+  ---
+  duration_ms: 3.548199
+  type: 'test'
+  ...
+# Subtest: stored debug colors require a live account
+ok 21 - stored debug colors require a live account
+  ---
+  duration_ms: 6.17982
+  type: 'test'
+  ...
+# Subtest: query filename cannot be fetched by any account
+ok 22 - query filename cannot be fetched by any account
+  ---
+  duration_ms: 283.130126
+  type: 'test'
+  ...
+# Subtest: two accounts retrieve only their own pieces
+ok 23 - two accounts retrieve only their own pieces
+  ---
+  duration_ms: 182.053246
+  type: 'test'
+  ...
+# Subtest: protected candidate media retains owner and foreign behavior
+ok 24 - protected candidate media retains owner and foreign behavior
+  ---
+  duration_ms: 10.071691
+  type: 'test'
+  ...
+# Subtest: ranking failure cleans query and releases capacity
+ok 25 - ranking failure cleans query and releases capacity
+  ---
+  duration_ms: 221.911936
+  type: 'test'
+  ...
+# Subtest: partial upload is private, same-account concurrency bounded, abort releases capacity
+ok 26 - partial upload is private, same-account concurrency bounded, abort releases capacity
+  ---
+  duration_ms: 372.674941
+  type: 'test'
+  ...
+# Subtest: malformed multipart cleans and permits retry
+ok 27 - malformed multipart cleans and permits retry
+  ---
+  duration_ms: 274.616049
+  type: 'test'
+  ...
+# Subtest: release wipes memory, is idempotent, and clears request reference
+ok 28 - release wipes memory, is idempotent, and clears request reference
+  ---
+  duration_ms: 95.243668
+  type: 'test'
+  ...
+# Subtest: frozen Eval-1 feature extraction, crops, weights and hashes
+ok 29 - frozen Eval-1 feature extraction, crops, weights and hashes
+  ---
+  duration_ms: 2.693609
+  type: 'test'
+  ...
+# Subtest: frozen Eval-1 scoring, ordering and per-Piece selection
+ok 30 - frozen Eval-1 scoring, ordering and per-Piece selection
+  ---
+  duration_ms: 1.799076
+  type: 'test'
+  ...
+1..30
+# tests 30
+# suites 0
+# pass 30
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3772.206574

@@ -1,0 +1,62 @@
+(node:6) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+TAP version 13
+# (node:13) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: capability fallback none
+not ok 1 - capability fallback none
+  ---
+  duration_ms: 537.036941
+  type: 'test'
+  location: '/workspace/scratch/0917e8fa527e/repo/tests/ql-assistant-voice-web.cjs:48:43'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'inline-flex'
+    - 'none'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'none'
+  actual: 'inline-flex'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/scratch/0917e8fa527e/repo/tests/ql-assistant-voice-web.cjs:48:191)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# Subtest: capability fallback insecure
+not ok 2 - capability fallback insecure
+  ---
+  duration_ms: 300.644219
+  type: 'test'
+  location: '/workspace/scratch/0917e8fa527e/repo/tests/ql-assistant-voice-web.cjs:48:43'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'inline-flex'
+    - 'none'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'none'
+  actual: 'inline-flex'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/workspace/scratch/0917e8fa527e/repo/tests/ql-assistant-voice-web.cjs:48:191)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:744:7)
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 0
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1160.259565

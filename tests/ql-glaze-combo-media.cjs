@@ -15,10 +15,10 @@ test('runtime website clears displayed Combo blobs and rejects late downloads on
   const late=context.loadComboPrivateMedia(document);context.clearComboMedia();context.token='B';
   assert.equal(img.src,'');assert.ok(revoked.includes('blob:1'));release();await late;
   assert.equal(img.src,'');assert.ok(revoked.includes('blob:2'));
-  assert.match(app,/clearComboMedia\(\);\s*clearPieceHistory\(\);\s*token = data.token/);
-  assert.match(app,/function logout\(\) \{[^}]*clearComboMedia\(\);[^}]*token = null/);
-  assert.match(app,/clearComboMedia\(\);\s*token = null;\s*localStorage.removeItem/);
-  assert.match(app,/if \(d.token\) \{ clearPieceHistory\(\); clearComboMedia\(\); token = d.token/);
+  assert.match(app,/clearComboMedia\(\);\s*clearPieceHistory\(\);\s*setAuthToken\(data.token\)/);
+  assert.match(app,/function logout\(\) \{[^}]*clearComboMedia\(\);[^}]*setAuthToken\(null\)/);
+  assert.match(app,/clearComboMedia\(\);\s*setAuthToken\(null\);\s*localStorage.removeItem/);
+  assert.match(app,/if \(d.token\) \{ clearPieceHistory\(\); clearComboMedia\(\); setAuthToken\(d.token\)/);
   assert.match(app,/const combos = await api\(u\);\s*if \(requestedToken !== token \|\| requestedGeneration !== comboMediaGeneration\) return;/);
 });
 function comboHarness() {

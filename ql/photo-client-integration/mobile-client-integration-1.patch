@@ -1,0 +1,308 @@
+diff --git a/.github/workflows/ql-phase2e-mobile.yml b/.github/workflows/ql-phase2e-mobile.yml
+index 698a53c..b9c4a8d 100644
+--- a/.github/workflows/ql-phase2e-mobile.yml
++++ b/.github/workflows/ql-phase2e-mobile.yml
+@@ -2,7 +2,7 @@ name: QL Phase 2E Mobile Verify
+ # Phase 2W Test Tile and Glaze Combo post-edit media closure
+ 'on':
+   push:
+-    branches: [ql/search-3-mobile-search, ql/testflight-isolated-validation, ql/phase-2e-private-piece-mobile, ql/phase-2f-upload-audit, ql/phase-2g-clay-media, ql/phase-2h-glaze-media, ql/phase-2i-glaze-clay-test-media, ql/phase-2j-test-tile-media, ql/phase-2k-glaze-combo-media, ql/phase-2l-firing-media, ql/phase-2m-pricing-media, ql/phase-2n-sales-media, ql/phase-2o-project-media, ql/phase-2p-event-media, ql/phase-2q-profile-media, ql/phase-2r-forum-media, ql/phase-2s-shop-media, ql/phase-2t-upload-readiness, ql/phase-2u-piece-public-edges, ql/phase-2v-casualty-sale-previews, ql/phase-2w-test-tile-combo-post-edit, ql/phase-3a-piece-pricing-manual, ql/phase-3b-piece-firing-manual, ql/phase-3c-piece-test-tile-manual, ql/phase-3d-piece-sales-readonly, ql/phase-3e-workflow-hardening, ql/phase-3f-piece-clay-readonly, ql/phase-3g-piece-glaze-readonly, ql/phase-3h-lifecycle-recovery, ql/pre-release-piece-editor-preservation]
++    branches: [ql/photo-lookup-results-1, ql/search-3-mobile-search, ql/testflight-isolated-validation, ql/phase-2e-private-piece-mobile, ql/phase-2f-upload-audit, ql/phase-2g-clay-media, ql/phase-2h-glaze-media, ql/phase-2i-glaze-clay-test-media, ql/phase-2j-test-tile-media, ql/phase-2k-glaze-combo-media, ql/phase-2l-firing-media, ql/phase-2m-pricing-media, ql/phase-2n-sales-media, ql/phase-2o-project-media, ql/phase-2p-event-media, ql/phase-2q-profile-media, ql/phase-2r-forum-media, ql/phase-2s-shop-media, ql/phase-2t-upload-readiness, ql/phase-2u-piece-public-edges, ql/phase-2v-casualty-sale-previews, ql/phase-2w-test-tile-combo-post-edit, ql/phase-3a-piece-pricing-manual, ql/phase-3b-piece-firing-manual, ql/phase-3c-piece-test-tile-manual, ql/phase-3d-piece-sales-readonly, ql/phase-3e-workflow-hardening, ql/phase-3f-piece-clay-readonly, ql/phase-3g-piece-glaze-readonly, ql/phase-3h-lifecycle-recovery, ql/pre-release-piece-editor-preservation]
+   workflow_dispatch:
+ jobs:
+   verify:
+@@ -14,7 +14,7 @@ jobs:
+           node-version: 22
+           cache: npm
+       - run: npm ci --ignore-scripts --no-audit --no-fund
+-      - run: node --test tests/ql-studio-search.cjs tests/ql-testflight-isolation.cjs tests/ql-editor-preservation.cjs tests/ql-lifecycle-recovery.cjs tests/ql-piece-glaze.cjs tests/ql-piece-clay.cjs tests/ql-workflow-hardening.cjs tests/android-parity.mjs tests/android-parity.test.mjs tests/android-billing.cjs tests/device-repairs.cjs tests/ql-piece-media.cjs tests/ql-piece-public-edges.cjs tests/ql-casualty-sale-previews.cjs tests/ql-phase-2w-post-edit-media.cjs tests/ql-piece-pricing.cjs tests/ql-piece-firings.cjs tests/ql-piece-test-tiles.cjs tests/ql-piece-sales.cjs tests/ql-upload-restriction-readiness.cjs tests/ql-clay-media.cjs tests/ql-glaze-media.cjs tests/ql-test-tile-media.cjs tests/ql-glaze-combo-media.cjs tests/ql-firing-media.cjs tests/ql-pricing-media.cjs tests/ql-sales-media.cjs tests/ql-project-media.cjs tests/ql-event-media.cjs tests/ql-profile-media.cjs tests/ql-forum-media.cjs tests/ql-shop-media.cjs
++      - run: node --test tests/ql-photo-client.cjs tests/ql-photo-results.cjs tests/ql-studio-search.cjs tests/ql-testflight-isolation.cjs tests/ql-editor-preservation.cjs tests/ql-lifecycle-recovery.cjs tests/ql-piece-glaze.cjs tests/ql-piece-clay.cjs tests/ql-workflow-hardening.cjs tests/android-parity.mjs tests/android-parity.test.mjs tests/android-billing.cjs tests/device-repairs.cjs tests/ql-piece-media.cjs tests/ql-piece-public-edges.cjs tests/ql-casualty-sale-previews.cjs tests/ql-phase-2w-post-edit-media.cjs tests/ql-piece-pricing.cjs tests/ql-piece-firings.cjs tests/ql-piece-test-tiles.cjs tests/ql-piece-sales.cjs tests/ql-upload-restriction-readiness.cjs tests/ql-clay-media.cjs tests/ql-glaze-media.cjs tests/ql-test-tile-media.cjs tests/ql-glaze-combo-media.cjs tests/ql-firing-media.cjs tests/ql-pricing-media.cjs tests/ql-sales-media.cjs tests/ql-project-media.cjs tests/ql-event-media.cjs tests/ql-profile-media.cjs tests/ql-forum-media.cjs tests/ql-shop-media.cjs
+       - name: Parse shared JavaScript
+         run: |
+           node - <<'NODE'
+diff --git a/src/screens/PhotoSearchScreen.js b/src/screens/PhotoSearchScreen.js
+index 3c02c0d..7eb775c 100644
+--- a/src/screens/PhotoSearchScreen.js
++++ b/src/screens/PhotoSearchScreen.js
+@@ -29,15 +29,40 @@ export default function PhotoSearchScreen({ navigation }) {
+   const { handleSessionExpired } = useAuth();
+ 
+   const requestId = React.useRef(0);
+-  React.useEffect(() => subscribePrivateMediaSession(() => {
+-    requestId.current++; setResults(null); setSelectedImage(null); setError(null); setLoading(false);
+-  }), []);
++  const selectedImageRef = React.useRef(null);
++  const selectedMimeRef = React.useRef(null);
++  const requestController = React.useRef(null);
++  const pickerId = React.useRef(0);
++  const mounted = React.useRef(true);
++  const invalidateQuery = () => {
++    requestId.current++;
++    requestController.current?.abort(); requestController.current = null;
++    setResults(null); setError(null); setLoading(false);
++  };
++  const replaceQueryImage = (uri, mimeType) => {
++    invalidateQuery();
++    selectedImageRef.current = uri;
++    selectedMimeRef.current = mimeType;
++    setSelectedImage(uri);
++  };
++  React.useEffect(() => {
++    mounted.current = true;
++    const unsubscribe = subscribePrivateMediaSession(() => {
++      pickerId.current++; invalidateQuery(); selectedImageRef.current = null; setSelectedImage(null);
++    });
++    return () => {
++      mounted.current = false; pickerId.current++; requestId.current++;
++      requestController.current?.abort(); unsubscribe();
++    };
++  }, []);
+   const pickImage = async (useCamera = false) => {
+-    const generation = getPrivatePieceMediaSession().generation;
++    const generation = getPrivatePieceMediaSession().generation, picker = ++pickerId.current;
++    const currentPicker = () => mounted.current && picker === pickerId.current && generation === getPrivatePieceMediaSession().generation;
+     try {
+       let result;
+       if (useCamera) {
+         const permission = await ImagePicker.requestCameraPermissionsAsync();
++        if (!currentPicker()) return;
+         if (!permission.granted) {
+           Alert.alert('Permission needed', 'Please allow camera access to take photos.');
+           return;
+@@ -50,6 +75,7 @@ export default function PhotoSearchScreen({ navigation }) {
+         });
+       } else {
+         const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
++        if (!currentPicker()) return;
+         if (!permission.granted) {
+           Alert.alert('Permission needed', 'Please allow photo library access.');
+           return;
+@@ -62,31 +88,33 @@ export default function PhotoSearchScreen({ navigation }) {
+         });
+       }
+ 
+-      if (generation !== getPrivatePieceMediaSession().generation) return;
++      if (!currentPicker()) return;
+       if (!result.canceled && result.assets?.[0]) {
+-        setSelectedImage(result.assets[0].uri);
+-        setResults(null);
+-        setError(null);
++        replaceQueryImage(result.assets[0].uri, result.assets[0].mimeType);
+       }
+     } catch (err) {
++      if (!currentPicker()) return;
+       Alert.alert('Error', 'Could not access photos. Please try again.');
+     }
+   };
+ 
+   const handleSearch = async () => {
++    if (requestController.current && !requestController.current.signal.aborted) return;
+     if (!selectedImage) {
+       Alert.alert('No photo', 'Please take or choose a photo first.');
+       return;
+     }
+ 
++    requestController.current?.abort();
++    const controller = new AbortController(); requestController.current = controller;
+     const generation = getPrivatePieceMediaSession().generation, request = ++requestId.current;
+-    const active = () => generation === getPrivatePieceMediaSession().generation && request === requestId.current;
++    const active = () => mounted.current && !controller.signal.aborted && generation === getPrivatePieceMediaSession().generation && request === requestId.current;
+     setLoading(true);
+     setError(null);
+     setResults(null);
+ 
+     try {
+-      const data = await searchByPhoto(selectedImage);
++      const data = await searchByPhoto(selectedImageRef.current, { signal: controller.signal, mimeType: selectedMimeRef.current });
+       if (active()) setResults(data);
+     } catch (err) {
+       if (!active()) return;
+@@ -100,7 +128,7 @@ export default function PhotoSearchScreen({ navigation }) {
+         setError(err.message || 'Search failed. Please try again.');
+       }
+     } finally {
+-      if (active()) setLoading(false);
++      if (active()) { requestController.current = null; setLoading(false); }
+     }
+   };
+ 
+@@ -118,10 +146,8 @@ export default function PhotoSearchScreen({ navigation }) {
+   };
+ 
+   const renderResult = ({ item }) => {
+-    const photo = item.photos?.[0];
+-    const confidence = item.matchScore
+-      ? `${Math.round(item.matchScore * 100)}% match`
+-      : null;
++    const photo = item.matchedPhotoId ? item.photos?.find(p => p.id === item.matchedPhotoId) : item.photos?.[0];
++    const confidence = item.confidence?.label || 'Possible match';
+ 
+     return (
+       <TouchableOpacity
+@@ -167,7 +193,7 @@ export default function PhotoSearchScreen({ navigation }) {
+         <Ionicons name="camera-outline" size={48} color={Colors.darkBrown} />
+         <Text style={styles.headerTitle}>Photo Lookup</Text>
+         <Text style={styles.headerSub}>
+-          Take a photo of a piece or choose from your gallery — we'll find it in your collection and show you all the details.
++          Take or choose a photo to find similar pieces in your collection. Compare the suggestions before choosing.
+         </Text>
+       </View>
+ 
+@@ -196,7 +222,7 @@ export default function PhotoSearchScreen({ navigation }) {
+       {/* Selected image preview */}
+       {selectedImage && (
+         <View style={styles.previewSection}>
+-          <EditablePhoto uri={selectedImage} imageStyle={styles.previewImage} onEdited={(edited) => setSelectedImage(edited.uri)} />
++          <EditablePhoto uri={selectedImage} imageStyle={styles.previewImage} onEdited={(edited) => { if (mounted.current && selectedImageRef.current === selectedImage) replaceQueryImage(edited.uri, edited.mimeType); }} />
+           <TouchableOpacity
+             style={styles.searchButton}
+             onPress={handleSearch}
+@@ -220,8 +246,9 @@ export default function PhotoSearchScreen({ navigation }) {
+       {results && results.matches?.length > 0 && (
+         <View style={styles.resultsSection}>
+           <Text style={styles.resultsTitle}>
+-            {results.matches.length === 1 ? '1 Match Found' : `${results.matches.length} Matches Found`}
++            {results.confidence?.label || 'Possible matches'}
+           </Text>
++          <Text style={styles.headerSub}>{results.confidence?.message || 'Compare the photos and piece details before choosing.'}</Text>
+           {results.matches.map((item, index) => (
+             <View key={item._id || item.id || index}>
+               {renderResult({ item })}
+@@ -233,9 +260,9 @@ export default function PhotoSearchScreen({ navigation }) {
+       {results && results.matches?.length === 0 && (
+         <View style={styles.emptySection}>
+           <Ionicons name="help-circle-outline" size={48} color={Colors.mediumGray} />
+-          <Text style={styles.emptyTitle}>No matches found</Text>
++          <Text style={styles.emptyTitle}>No confident match</Text>
+           <Text style={styles.emptySub}>
+-            We couldn't find this piece in your collection. Make sure you've logged it with a photo first.
++            Try another view, or check that your piece has a photo saved in your collection.
+           </Text>
+         </View>
+       )}
+diff --git a/src/services/api.js b/src/services/api.js
+index 2ad546a..41f022b 100644
+--- a/src/services/api.js
++++ b/src/services/api.js
+@@ -100,6 +100,10 @@ export const apiRequest = async (endpoint, options = {}) => {
+   }
+ 
+   const controller = new AbortController();
++  const callerSignal = fetchOptions.signal;
++  const abortFromCaller = () => controller.abort();
++  if (callerSignal?.aborted) controller.abort();
++  else callerSignal?.addEventListener('abort', abortFromCaller, { once: true });
+   // Give multipart uploads more time, with an endpoint-specific override for
+   // workflows that send several full-size photos in one request.
+   const timeoutMs = requestedTimeoutMs || (isFormData ? 60000 : 15000);
+@@ -111,12 +115,15 @@ export const apiRequest = async (endpoint, options = {}) => {
+     signal: controller.signal,
+   }).catch(err => {
+     clearTimeout(timeoutId);
++    callerSignal?.removeEventListener('abort', abortFromCaller);
++    if (callerSignal?.aborted) throw Object.assign(new Error('Request cancelled.'), { name: 'AbortError' });
+     if (err.name === 'AbortError') {
+       throw new Error('Request timed out. The server may be waking up — please try again in a moment.');
+     }
+     throw new Error('Network error. Please check your connection and try again.');
+   });
+   clearTimeout(timeoutId);
++  callerSignal?.removeEventListener('abort', abortFromCaller);
+ 
+   validateSession?.();
+   // Handle token expiry
+@@ -350,14 +357,21 @@ export const rotatePhoto = async (photoId, clockwise = true) => {
+ 
+ // ─── Photo Search ────────────────────────────────────────────────────────────
+ 
+-export const searchByPhoto = async (imageUri) => {
++export const searchByPhoto = async (imageUri, { signal, mimeType } = {}) => {
++  const sessionGuard = profileSessionGuard();
++  const validateSession = () => {
++    sessionGuard();
++    if (signal?.aborted) throw Object.assign(new Error('Photo query replaced.'), { name: 'AbortError' });
++  };
++  validateSession();
+   const formData = new FormData();
+-  const filename = imageUri.split('/').pop() || 'search.jpg';
++  const filename = imageUri.split(/[?#]/)[0].split('/').pop() || 'search.jpg';
+   const match = /\.(\w+)$/.exec(filename);
+-  const type = match ? `image/${match[1]}` : 'image/jpeg';
++  const suppliedType = mimeType || (match ? `image/${match[1].toLowerCase()}` : 'image/jpeg');
++  const type = /^image\/jpe?g$/i.test(suppliedType) ? 'image/jpeg' : suppliedType;
+   if (Platform.OS === 'web') {
+     // On web, convert blob URI to actual File object for FormData
+-    const response = await fetch(imageUri);
++    const response = await fetch(imageUri, { signal });
+     const blob = await response.blob();
+     formData.append('photo', blob, filename);
+   } else {
+@@ -368,6 +382,8 @@ export const searchByPhoto = async (imageUri) => {
+     });
+   }
+   return await apiRequest(ENDPOINTS.photoSearch, {
++    signal,
++    validateSession,
+     method: 'POST',
+     body: formData,
+   });
+diff --git a/tests/ql-photo-client.cjs b/tests/ql-photo-client.cjs
+new file mode 100644
+index 0000000..42d4dd8
+--- /dev/null
++++ b/tests/ql-photo-client.cjs
+@@ -0,0 +1,20 @@
++const test=require('node:test'),assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),{transformSync}=require('@babel/core');
++const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return{promise,resolve,reject}};
++const flush=()=>new Promise(r=>setImmediate(r));
++function fixture(){
++ let slots=[],index=0,effects=[],pending=[],generation=1,listener,uri='A',picker=null;const calls=[],alerts=[];
++ const React={useRef:v=>{const i=index++;return slots[i]||(slots[i]={current:v})},useState:v=>{const i=index++;if(!(i in slots))slots[i]=v;return[slots[i],v=>{slots[i]=v}]},useEffect:(f,deps)=>{const i=index++;if(!effects[i]){effects[i]={};pending.push(()=>effects[i].cleanup=f())}},createElement:(type,props,...children)=>({type,props:props||{},children})};
++ const deps={react:React,'react-native':{View:'View',Text:'Text',StyleSheet:{create:x=>x},TouchableOpacity:'Button',Image:'Image',ActivityIndicator:'Loading',FlatList:'List',Alert:{alert:(...a)=>alerts.push(a)},ScrollView:'Scroll'},'@expo/vector-icons':{Ionicons:'Icon'},'../components/PiecePhoto':{PiecePhotoImage:'PiecePhoto'},'../services/pieceMedia':{getPrivatePieceMediaSession:()=>({generation}),subscribePrivateMediaSession:f=>{listener=f;return()=>listener=null}},'../components/EditablePhoto':{default:'EditablePhoto',__esModule:true},'../utils/editableImagePicker':{requestCameraPermissionsAsync:async()=>({granted:true}),requestMediaLibraryPermissionsAsync:async()=>({granted:true}),launchCameraAsync:async()=>picker?picker.promise:({assets:[{uri}]}),launchImageLibraryAsync:async()=>picker?picker.promise:({assets:[{uri}]})},'../constants/colors':{Colors:{}},'../constants/typography':{Fonts:{},FontSizes:{}},'../services/api':{searchByPhoto:(uri,options)=>{const d=deferred();calls.push({uri,options,...d});return d.promise}},'../constants/api':{},'../context/AuthContext':{useAuth:()=>({handleSessionExpired:()=>alerts.push('expired')})}};
++ const module={exports:{}};vm.runInNewContext(transformSync(fs.readFileSync('src/screens/PhotoSearchScreen.js','utf8'),{configFile:false,babelrc:false,plugins:['@babel/plugin-transform-modules-commonjs','@babel/plugin-transform-react-jsx']}).code,{module,exports:module.exports,require:n=>deps[n],AbortController});
++ const render=()=>{index=0;const t=module.exports.default({navigation:{getParent:()=>null,navigate(){}}});pending.splice(0).forEach(f=>f());return t};
++ const walk=(t,a=[])=>{if(Array.isArray(t))t.forEach(x=>walk(x,a));else if(t&&typeof t==='object'){a.push(t);walk(t.children,a)}return a};
++ const nodes=()=>walk(render()); const button=label=>nodes().find(n=>n.props.accessibilityLabel===label);
++ return{calls,alerts,nodes,render,async pick(v,camera=false){uri=v;await button(camera?'Take a photo':'Choose from gallery').props.onPress();render()},search(){return button('Search for matching pieces').props.onPress()},edit(v){nodes().find(n=>n.type==='EditablePhoto').props.onEdited({uri:v});render()},switch(){generation++;listener?.();render()},unmount(){effects.forEach(e=>e?.cleanup?.())},picker(d){picker=d},text:()=>JSON.stringify(render())};
++}
++const result={matches:[{id:'p',title:'OLD RESULT',matchedPhotoId:'winning',photos:[{id:'first'},{id:'winning'}],confidence:{label:'Possible match'}}],confidence:{label:'Several pieces look similar',message:'Compare these suggestions'}};
++
++test('retry uses current selection after failure and rejects duplicate submit',async()=>{const f=fixture();await f.pick('A.jpg');const first=f.search();f.search();assert.equal(f.calls.length,1);f.calls[0].reject(Error('offline'));await first;const retry=f.search();assert.equal(f.calls[1].uri,'A.jpg');f.calls[1].reject(Error('offline'));await retry;await f.pick('B.png');const next=f.search();assert.equal(f.calls[2].uri,'B.png');f.calls[2].resolve({matches:[]});await next});
++function uploader(platform){let s=fs.readFileSync('src/services/api.js','utf8');s=s.slice(s.indexOf('export const searchByPhoto'),s.indexOf('\n};',s.indexOf('export const searchByPhoto'))+3).replace('export const searchByPhoto','this.search');let asset;const ctx={profileSessionGuard:()=>()=>{},FormData:class{append(k,v){asset=v}},Platform:{OS:platform},ENDPOINTS:{photoSearch:'/photo'},apiRequest:async()=>({})};vm.runInNewContext(s,ctx);return{search:ctx.search,asset:()=>asset};}
++for(const platform of ['ios','android'])for(const [extension,mime,expected]of [['jpg',undefined,'image/jpeg'],['JPG',undefined,'image/jpeg'],['jpeg','image/jpeg','image/jpeg'],['jpg','image/jpg','image/jpeg'],['png','image/png','image/png'],['gif','image/gif','image/gif']])test(platform+' '+extension+' '+mime+' metadata',async()=>{const f=uploader(platform);await f.search('file:///cache/query.'+extension,{mimeType:mime});assert.equal(f.asset().type,expected);assert.equal(f.asset().name,'query.'+extension)});
++
++for(const camera of [true,false])test((camera?'camera':'gallery')+' selection reaches uploader with JPEG metadata',async()=>{const f=fixture(),d=deferred();f.picker(d);const pick=f.pick('ignored',camera);d.resolve({assets:[{uri:'file:///picked.jpg',mimeType:'image/jpeg'}]});await pick;const p=f.search();assert.equal(f.calls[0].uri,'file:///picked.jpg');assert.equal(f.calls[0].options.mimeType,'image/jpeg');f.calls[0].resolve({matches:[]});await p});
+diff --git a/tests/ql-photo-results.cjs b/tests/ql-photo-results.cjs
+new file mode 100644
+index 0000000..e4b80d3
+--- /dev/null
++++ b/tests/ql-photo-results.cjs
+@@ -0,0 +1,28 @@
++const test=require('node:test'),assert=require('node:assert/strict'),fs=require('fs'),vm=require('vm'),{transformSync}=require('@babel/core');
++const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b});return{promise,resolve,reject}};
++const flush=()=>new Promise(r=>setImmediate(r));
++function fixture(){
++ let slots=[],index=0,effects=[],pending=[],generation=1,listener,uri='A',picker=null;const calls=[],alerts=[];
++ const React={useRef:v=>{const i=index++;return slots[i]||(slots[i]={current:v})},useState:v=>{const i=index++;if(!(i in slots))slots[i]=v;return[slots[i],v=>{slots[i]=v}]},useEffect:(f,deps)=>{const i=index++;if(!effects[i]){effects[i]={};pending.push(()=>effects[i].cleanup=f())}},createElement:(type,props,...children)=>({type,props:props||{},children})};
++ const deps={react:React,'react-native':{View:'View',Text:'Text',StyleSheet:{create:x=>x},TouchableOpacity:'Button',Image:'Image',ActivityIndicator:'Loading',FlatList:'List',Alert:{alert:(...a)=>alerts.push(a)},ScrollView:'Scroll'},'@expo/vector-icons':{Ionicons:'Icon'},'../components/PiecePhoto':{PiecePhotoImage:'PiecePhoto'},'../services/pieceMedia':{getPrivatePieceMediaSession:()=>({generation}),subscribePrivateMediaSession:f=>{listener=f;return()=>listener=null}},'../components/EditablePhoto':{default:'EditablePhoto',__esModule:true},'../utils/editableImagePicker':{requestCameraPermissionsAsync:async()=>({granted:true}),requestMediaLibraryPermissionsAsync:async()=>({granted:true}),launchCameraAsync:async()=>picker?picker.promise:({assets:[{uri}]}),launchImageLibraryAsync:async()=>picker?picker.promise:({assets:[{uri}]})},'../constants/colors':{Colors:{}},'../constants/typography':{Fonts:{},FontSizes:{}},'../services/api':{searchByPhoto:(uri,options)=>{const d=deferred();calls.push({uri,options,...d});return d.promise}},'../constants/api':{},'../context/AuthContext':{useAuth:()=>({handleSessionExpired:()=>alerts.push('expired')})}};
++ const module={exports:{}};vm.runInNewContext(transformSync(fs.readFileSync('src/screens/PhotoSearchScreen.js','utf8'),{configFile:false,babelrc:false,plugins:['@babel/plugin-transform-modules-commonjs','@babel/plugin-transform-react-jsx']}).code,{module,exports:module.exports,require:n=>deps[n],AbortController});
++ const render=()=>{index=0;const t=module.exports.default({navigation:{getParent:()=>null,navigate(){}}});pending.splice(0).forEach(f=>f());return t};
++ const walk=(t,a=[])=>{if(Array.isArray(t))t.forEach(x=>walk(x,a));else if(t&&typeof t==='object'){a.push(t);walk(t.children,a)}return a};
++ const nodes=()=>walk(render()); const button=label=>nodes().find(n=>n.props.accessibilityLabel===label);
++ return{calls,alerts,nodes,render,async pick(v){uri=v;await button('Choose from gallery').props.onPress();render()},search(){return button('Search for matching pieces').props.onPress()},edit(v){nodes().find(n=>n.type==='EditablePhoto').props.onEdited({uri:v});render()},switch(){generation++;listener?.();render()},unmount(){effects.forEach(e=>e?.cleanup?.())},picker(d){picker=d},text:()=>JSON.stringify(render())};
++}
++const result={matches:[{id:'p',title:'OLD RESULT',matchedPhotoId:'winning',photos:[{id:'first'},{id:'winning'}],confidence:{label:'Possible match'}}],confidence:{label:'Several pieces look similar',message:'Compare these suggestions'}};
++for(const action of ['pick','edit'])for(const settlement of ['resolve','reject'])test(action+' clears old query and suppresses stale '+settlement,async()=>{const f=fixture();await f.pick('A');const a=f.search();if(action==='pick')await f.pick('B');else f.edit('B');assert.equal(f.calls[0].options.signal.aborted,true);assert.doesNotMatch(f.text(),/OLD RESULT/);const b=f.search();f.calls[0][settlement](settlement==='resolve'?result:new Error('old failure'));await a;assert.doesNotMatch(f.text(),/OLD RESULT|old failure/);assert.ok(f.nodes().some(n=>n.type==='Loading'));f.calls[1].resolve({matches:[]});await b;assert.ok(!f.nodes().some(n=>n.type==='Loading'));});
++for(const action of ['pick','edit'])test(action+' clears settled results immediately',async()=>{const f=fixture();await f.pick('A');const p=f.search();f.calls[0].resolve(result);await p;assert.match(f.text(),/OLD RESULT/);if(action==='pick')await f.pick('B');else f.edit('B');assert.doesNotMatch(f.text(),/OLD RESULT|Compare these suggestions/)});
++for(const action of ['switch','unmount'])test(action+' aborts request and suppresses old 401',async()=>{const f=fixture();await f.pick('A');const p=f.search();f[action]();f.calls[0].reject(Object.assign(new Error('old'),{status:401}));await p;assert.equal(f.calls[0].options.signal.aborted,true);assert.equal(f.alerts.length,0);});
++test('winning photo and uncertainty rendered without percentages',async()=>{const f=fixture();await f.pick('A');const p=f.search();f.calls[0].resolve(result);await p;assert.equal(f.nodes().find(n=>n.type==='PiecePhoto').props.photo.id,'winning');assert.match(f.text(),/Several pieces look similar/);assert.doesNotMatch(f.text(),/% match|Matches Found/)});
++test('older API still renders candidate photo with uncertain label',async()=>{const f=fixture();await f.pick('A');const p=f.search();f.calls[0].resolve({matches:[{id:'p',matchScore:1,photos:[{id:'first'}]}]});await p;assert.equal(f.nodes().find(n=>n.type==='PiecePhoto').props.photo.id,'first');assert.match(f.text(),/Possible match/);assert.doesNotMatch(f.text(),/% match/)});
++test('missing claimed winning photo does not substitute wrong first photo',async()=>{const f=fixture();await f.pick('A');const p=f.search();f.calls[0].resolve({matches:[{id:'p',matchedPhotoId:'gone',photos:[{id:'first'}]}]});await p;assert.equal(f.nodes().filter(n=>n.type==='PiecePhoto').length,0)});
++test('late picker result after session change is ignored',async()=>{const f=fixture(),d=deferred();f.picker(d);const p=f.pick('B');await flush();f.switch();d.resolve({assets:[{uri:'foreign'}]});await p;assert.doesNotMatch(f.text(),/foreign/)});
++test('late older picker cannot replace newer selection',async()=>{const f=fixture(),d=deferred();f.picker(d);const p=f.pick('A');await flush();f.picker(null);await f.pick('B');d.resolve({assets:[{uri:'A'}]});await p;assert.equal(f.nodes().find(n=>n.type==='EditablePhoto').props.uri,'B')});
++test('photo API forwards abort through blob loading and POST',async()=>{let source=fs.readFileSync('src/services/api.js','utf8');source=source.slice(source.indexOf('export const searchByPhoto'),source.indexOf('\n};',source.indexOf('export const searchByPhoto'))+3).replace('export const searchByPhoto','this.search');const c=new AbortController(),seen=[];const ctx={profileSessionGuard:()=>()=>{},FormData,Platform:{OS:'web'},ENDPOINTS:{photoSearch:'/photo'},fetch:async(u,o)=>{seen.push(o.signal);return{blob:async()=>new Blob(['x'])}},apiRequest:async(u,o)=>{seen.push(o.signal);return{matches:[]}}};vm.runInNewContext(source,ctx);await ctx.search('blob:x',{signal:c.signal});assert.deepEqual(seen,[c.signal,c.signal])});
++function apiFixture(){const original=fs.readFileSync('src/services/api.js','utf8');let block=original.slice(original.indexOf('export const apiRequest ='),original.indexOf('\n};',original.indexOf('export const apiRequest ='))+3).replace('export const apiRequest =','this.request =');let generation=1;const d=deferred(),removed=[],calls=[];const c=new AbortController();const ctx={AbortController,setTimeout,clearTimeout,API_BASE_URL:'https://example.invalid',TOKEN_KEY:'token',USER_KEY:'user',AsyncStorage:{getItem:async()=> 'A',removeItem:async k=>removed.push(k)},fetch:async(u,o)=>{calls.push(o);return d.promise},profileSessionGuard:()=>()=>{},require:()=>({}),console};vm.runInNewContext(block,ctx);return{d,c,calls,removed,request:()=>ctx.request('/api/pieces/photo-search',{signal:c.signal,validateSession:()=>{if(c.signal.aborted||generation!==1)throw Error('stale')}}),switch(){generation++}};}
++test('API cancellation reaches actual fetch and stale 401 cannot clear credentials',async()=>{const f=apiFixture(),p=f.request();await flush();f.c.abort();assert.equal(f.calls[0].signal.aborted,true);f.d.resolve({status:401});await assert.rejects(p,/stale/);assert.equal(f.removed.length,0)});
++test('API account switch rejects old 401 before clearing new account credentials',async()=>{const f=apiFixture(),p=f.request();await flush();f.switch();f.d.resolve({status:401});await assert.rejects(p,/stale/);assert.equal(f.removed.length,0)});
++
++test('late edit of old image cannot replace a newer selection',async()=>{const f=fixture();await f.pick('A');const editor=f.nodes().find(n=>n.type==='EditablePhoto');await f.pick('B');editor.props.onEdited({uri:'edited-A'});assert.equal(f.nodes().find(n=>n.type==='EditablePhoto').props.uri,'B')});

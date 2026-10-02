@@ -2,6 +2,15 @@
 const API = '';
 let token = localStorage.getItem('mudlog_token');
 let currentUser = null;
+// QL proof observes every application-owned credential/account replacement synchronously.
+function setAuthToken(value) {
+  if (value !== token) window.QLAssistant?.invalidate();
+  token = value;
+}
+function setAuthUser(value) {
+  if (value?.id !== currentUser?.id) window.QLAssistant?.invalidate();
+  currentUser = value;
+}
 let guestMode = false;
 let clayBodies = [];
 let glazes = [];
@@ -133,7 +142,7 @@ async function api(path, opts = {}) {
   if (res.status === 401 && /^\/api\/projects(?:[/?]|$)/.test(path) && requestToken === token) clearProjectMedia();
   if (res.status === 401 && /^\/api\/sales(?:[/?]|$)/.test(path) && requestToken === token) clearSaleMedia();
   if (res.status === 401 && /^\/api\/(?:ql\/)?events(?:[/?]|$)/.test(path) && requestToken === token) clearEventMedia();
-  if (res.status === 401 && requestToken === token) window.StudioSearch?.invalidate();
+  if (res.status === 401 && requestToken === token) { window.StudioSearch?.invalidate(); window.QLAssistant?.sessionInvalid(); }
   const d = await res.json();
   if (/^\/api\/shop(?:[/?]|$)/.test(path) && requestToken !== token) throw Error('Session changed');
   if (/^\/api\/shop(?:[/?]|$)/.test(path) && res.status === 401 && requestToken === token) clearShopMedia();
@@ -464,9 +473,9 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     clearTestTileMedia();
     clearShopMedia(); clearForumMedia(); clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
     clearPieceHistory();
-    token = data.token;
+    setAuthToken(data.token);
     localStorage.setItem('mudlog_token', token);
-    currentUser = data.user;
+    setAuthUser(data.user);
     _loggedInThisSession = true;
     dbg('Token saved. Loading app...');
   } catch (err) { errEl.textContent = 'Login error: ' + err.message; errEl.classList.remove('hidden'); errEl.style.color = 'red'; return; }
@@ -479,13 +488,14 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
   }
 });
 function logout() {
+  window.QLAssistant?.invalidate();
   window.StudioSearch?.invalidate();
   clearClayMedia();
   clearGlazeMedia();
   clearTestTileMedia();
   clearShopMedia(); clearForumMedia(); clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
   clearPieceHistory();
-  token = null; currentUser = null;
+  setAuthToken(null); setAuthUser(null);
   localStorage.removeItem('mudlog_token');
   document.getElementById('landingPage').style.display = '';
   document.getElementById('authScreen').style.display = 'none';
@@ -502,7 +512,7 @@ async function checkAuth() {
     document.getElementById('landingPage').style.display = 'none';
     const d = await api('/api/auth/me');
     if (requestToken !== token) return;
-    currentUser = d.user;
+    setAuthUser(d.user);
     showApp();
   } catch(e) {
     const msg = (e.message || '').toLowerCase();
@@ -510,7 +520,7 @@ async function checkAuth() {
       window.StudioSearch?.invalidate();
       // Token is bad — clear it and show auth screen (not landing page)
       clearShopMedia(); clearForumMedia(); clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
-      token = null;
+      setAuthToken(null);
       localStorage.removeItem('mudlog_token');
       document.getElementById('landingPage').style.display = 'none';
       document.getElementById('authScreen').style.display = 'flex';
@@ -522,6 +532,7 @@ async function checkAuth() {
   }
 }
 function showApp() {
+  window.QLAssistant?.syncSession();
   window.StudioSearch?.syncSession();
   try {
     guestMode = false;
@@ -537,7 +548,7 @@ function showApp() {
     });
     checkUrlParams();
     const hashPage = window.location.hash.replace('#', '').split('?')[0];
-    const validPages = ['studioSearch','dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','myStore','projects','events','contacts','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog','studioNotes','visualSearch','testTiles','findPotter'];
+    const validPages = ['qlAssistant','studioSearch','dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','myStore','projects','events','contacts','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog','studioNotes','visualSearch','testTiles','findPotter'];
     if (hashPage.startsWith('studioSearch/')) { window.StudioSearch?.restore(hashPage); } else if (hashPage === 'preview') { showGuestPreview('community', true); } else if (hashPage === 'profile/find-potter') { navigate('profile', { fromHistory: true }); document.getElementById('findPotterSettings').scrollIntoView(); } else if (hashPage && hashPage.startsWith('blog/')) {
       const slug = hashPage.replace('blog/', '');
       if (slug) viewBlogPost(slug);
@@ -564,6 +575,8 @@ function showApp() {
 let currentPage = 'dashboard';
 let restoredUrl = '';
 function navigate(page, options = {}) {
+  if (page === 'qlAssistant' && !window.QLAssistant?.available()) return;
+  window.QLAssistant?.onNavigate(page);
   window.StudioSearch?.onNavigate(page, options);
   if (page !== 'glazes') { clearGlazeMedia('glazeList'); clearGlazeMedia('glazeViewBody'); }
   if (page !== 'clayBodies') { clearClayMedia('clayList'); clearClayMedia('clayViewBody'); }
@@ -598,7 +611,7 @@ function navigate(page, options = {}) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
     const map = {
-      studioSearch:'pageStudioSearch', searchRecord:'pageSearchRecord',
+      qlAssistant:'pageQLAssistant', studioSearch:'pageStudioSearch', searchRecord:'pageSearchRecord',
       dashboard:'pageDashboard', pieces:'pagePieces', pieceDetail:'pagePieceDetail',
       clayBodies:'pageClayBodies', glazes:'pageGlazes', firings:'pageFirings',
       casualties:'pageCasualties',
@@ -618,6 +631,7 @@ function navigate(page, options = {}) {
     const el = document.getElementById(map[page]); if (el) el.classList.add('active');
     try { const nb = document.querySelector('.nav-link[data-page="' + page + '"]'); if (nb) nb.classList.add('active'); } catch(e) {}
   const loaders = {
+    qlAssistant:() => window.QLAssistant?.enter(),
     studioSearch:() => window.StudioSearch?.enter(),
     dashboard:loadDashboard, pieces:loadPieces, clayBodies:loadClayBodies,
     glazes:loadGlazes, firings:loadFirings, casualties:loadCasualties, sales:loadSales, pricingCalculator:loadPricingCalculator, testTiles:loadTestTiles, findPotter:loadFindPotter,
@@ -713,7 +727,16 @@ function clearPieceEdgeMediaScope(root) {
   }
 }
 let pieceSearchPreviewUrl = null;
+let pieceSearchController = null;
+let pieceSearchRetry = null;
+let pieceSearchQuerySerial = 0;
 function clearPieceEdgeMedia() {
+  pieceSearchRetry = null;
+  const retry = document.getElementById('visualSearchRetry');
+  if (retry) { retry.hidden = true; retry.disabled = false; retry.onclick = null; }
+  pieceSearchController?.abort(); pieceSearchController = null;
+  const searchStatus = document.getElementById('visualSearchStatus');
+  if (searchStatus) searchStatus.textContent = '';
   pieceEdgeGeneration++;
   pieceEdgeControllers.forEach(c => c.abort()); pieceEdgeControllers.clear();
   pieceEdgeNodes.clear();
@@ -4550,7 +4573,7 @@ async function loadProfile() {
   try {
     const d = await api('/api/auth/me');
     if (requestToken !== token) return;
-    currentUser = d.user;
+    setAuthUser(d.user);
     refreshAccountStatus();
     document.getElementById('profileName').value = d.user.display_name || '';
     document.getElementById('profileUsername').value = d.user.username || '';
@@ -4821,8 +4844,8 @@ async function redeemPromo() {
     toast(d.message, 'success');
     if (d.token) { clearFiringMedia(); clearPricingMedia(); }
     if (d.token) window.StudioSearch?.invalidate();
-    if (d.token) { clearPieceHistory(); clearComboMedia(); token = d.token; localStorage.setItem('mudlog_token', d.token); }
-    const me = await api('/api/auth/me'); currentUser = me.user; showApp(); navigate('upgrade');
+    if (d.token) { clearPieceHistory(); clearComboMedia(); setAuthToken(d.token); localStorage.setItem('mudlog_token', d.token); }
+    const me = await api('/api/auth/me'); setAuthUser(me.user); showApp(); navigate('upgrade');
   } catch(e) { toast(e.message,'error'); }
 }
 
@@ -4882,7 +4905,7 @@ async function cancelSubscription() {
   try {
     const result = await api('/api/billing/cancel', { method:'POST' });
     toast(result.message || 'Subscription cancelled successfully.', 'success');
-    const me = await api('/api/auth/me'); currentUser = me.user; loadProfile();
+    const me = await api('/api/auth/me'); setAuthUser(me.user); loadProfile();
   } catch(e) { toast(e.message,'error'); }
 }
 
@@ -7590,13 +7613,17 @@ async function deleteStudioNote(id) {
 async function runVisualSearch(input) {
   const file = input.files[0];
   if (!file) return;
+  input.value = ''; // Selecting the same file again must dispatch change.
+  const querySerial = ++pieceSearchQuerySerial;
   const preview = document.getElementById('visualSearchPreview');
   const img = document.getElementById('visualSearchImg');
   const status = document.getElementById('visualSearchStatus');
   const results = document.getElementById('visualSearchResults');
   clearPieceEdgeMedia();
+  const retry = document.getElementById('visualSearchRetry');
   const edgeGeneration = pieceEdgeGeneration, sessionToken = token;
-  const active = () => edgeGeneration === pieceEdgeGeneration && token === sessionToken;
+  const controller = new AbortController(); pieceSearchController = controller;
+  const active = () => !controller.signal.aborted && edgeGeneration === pieceEdgeGeneration && token === sessionToken;
   // Show preview
   pieceSearchPreviewUrl = URL.createObjectURL(file);
   img.src = pieceSearchPreviewUrl;
@@ -7609,28 +7636,59 @@ async function runVisualSearch(input) {
     const res = await fetch('/api/pieces/photo-search', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + sessionToken },
-      body: formData
+      body: formData,
+      signal: controller.signal
     });
     const data = await res.json();
     if (!active()) return;
     if (!res.ok) throw new Error(data.error || 'Search failed');
     if (!data.matches || !data.matches.length) {
-      status.textContent = 'No matches found in your library.';
+      status.textContent = 'No confident match. Try another photo of your piece.';
       return;
     }
-    status.textContent = data.matches.length + ' match' + (data.matches.length > 1 ? 'es' : '') + ' found:';
+    status.textContent = (data.confidence?.label || 'Possible matches') + '. ' + (data.confidence?.message || 'Compare the photos and piece details before choosing.');
     results.innerHTML = data.matches.map(m => {
-      const photo = m.photos && m.photos[0];
-      return '<div class="card" style="cursor:pointer;display:flex;gap:12px;align-items:center" onclick="openPieceDetail(\'' + m.id + '\')">' +
+      const photo = m.matchedPhotoId ? m.photos?.find(p => p.id === m.matchedPhotoId) : m.photos?.[0];
+      return '<button type="button" class="card" style="width:100%;text-align:left;cursor:pointer;display:flex;gap:12px;align-items:center">' +
         (photo ? '<img ' + pieceEdgePhotoAttrs(m, photo) + ' style="width:64px;height:64px;object-fit:cover;border-radius:var(--radius-sm);flex-shrink:0">' : '<div style="width:64px;height:64px;background:var(--bg-dark);border-radius:var(--radius-sm);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.5rem">🏺</div>') +
         '<div><div class="card-title">' + esc(m.title || 'Untitled') + '</div>' +
         (m.clay_body_name ? '<div class="text-sm" style="color:var(--text-light)">🪨 ' + esc(m.clay_body_name) + '</div>' : '') +
         (m.status ? '<div class="text-sm" style="color:var(--text-light)">' + esc(m.status) + '</div>' : '') +
-        '<div class="text-sm" style="color:var(--accent);font-weight:600">' + Math.round((m.matchScore||0)*100) + '% match</div>' +
-        '</div></div>';
+        '<div class="text-sm" style="color:var(--accent);font-weight:600">' + esc(m.confidence?.label || 'Possible match') + '</div>' +
+        '</div></button>';
     }).join('');
+    results.querySelectorAll('button.card').forEach((button, index) => {
+      const id = data.matches[index].id;
+      button.onclick = async () => {
+        if (!active() || !button.isConnected || button.disabled) return;
+        button.disabled = true;
+        const viewerActive = () => querySerial === pieceSearchQuerySerial && token === sessionToken;
+        try {
+          // The canonical viewer clears edge media on entry. Bind its fresh
+          // detail fetch to the query separately so that cleanup cannot cancel
+          // this handoff; viewPiece also guards navigation/session generations.
+          await viewPiece(id, { active: viewerActive });
+        }
+        catch (err) { if (viewerActive()) status.textContent = 'Error: ' + err.message; }
+        finally { if (viewerActive()) button.disabled = false; }
+      };
+    });
     void loadPieceEdgeMedia(results);
-  } catch(err) { if (active()) status.textContent = 'Error: ' + err.message; }
+  } catch(err) {
+    if (active()) {
+      status.textContent = 'Error: ' + err.message;
+      pieceSearchRetry = { file, active };
+      if (retry) {
+        retry.hidden = false;
+        retry.onclick = () => {
+          const target = pieceSearchRetry;
+          if (!target || !target.active() || retry.disabled) return;
+          retry.disabled = true;
+          void runVisualSearch({ files: [target.file] });
+        };
+      }
+    }
+  }
 }
 
 async function loadContacts() {

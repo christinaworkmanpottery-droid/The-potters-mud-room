@@ -1,0 +1,49 @@
+(node:6) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+PASS standard: entry active; no automatic recognition
+PASS standard: typed path reaches factual DB result
+PASS standard: explicit start has visible listening and typed input
+PASS standard: stop; one speech request; identical typed/speech factual answer
+PASS standard: unsupported speech equals typed safe response
+PASS standard: cancel then second attempt drops stale transcript; exactly one new turn
+PASS standard: simulated permission denial is visible
+PASS standard: typed fallback after denial reaches backend
+PASS standard: navigation cancels engine and late transcript
+PASS standard: account cancels engine and late transcript
+PASS standard: logout cancels engine and late transcript
+PASS standard: session cancels engine and late transcript
+PASS standard: no chat-history writes or persisted transcripts
+PASS standard: assistant requests use only existing turn endpoint
+PASS prefixed: entry active; no automatic recognition
+PASS prefixed: typed path reaches factual DB result
+PASS prefixed: explicit start has visible listening and typed input
+PASS prefixed: stop; one speech request; identical typed/speech factual answer
+PASS prefixed: unsupported speech equals typed safe response
+PASS prefixed: cancel then second attempt drops stale transcript; exactly one new turn
+PASS prefixed: simulated permission denial is visible
+PASS prefixed: typed fallback after denial reaches backend
+PASS prefixed: navigation cancels engine and late transcript
+PASS prefixed: account cancels engine and late transcript
+PASS prefixed: logout cancels engine and late transcript
+PASS prefixed: session cancels engine and late transcript
+PASS prefixed: no chat-history writes or persisted transcripts
+PASS prefixed: assistant requests use only existing turn endpoint
+PASS none: entry active; no automatic recognition
+PASS none: typed path reaches factual DB result
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ 'inline-flex'
+- 'none'
+
+    at /workspace/scratch/0917e8fa527e/repo/ql/assistant-voice-validation/runtime.cjs:34:88
+    at check (/workspace/scratch/0917e8fa527e/repo/ql/assistant-voice-validation/runtime.cjs:10:25)
+    at c (/workspace/scratch/0917e8fa527e/repo/ql/assistant-voice-validation/runtime.cjs:30:23)
+    at /workspace/scratch/0917e8fa527e/repo/ql/assistant-voice-validation/runtime.cjs:34:25 {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 'inline-flex',
+  expected: 'none',
+  operator: 'strictEqual',
+  diff: 'simple'
+}

@@ -61,7 +61,7 @@ test.before(async () => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ql-events-contact-api-'));
   for (const file of ['server.js', 'database.js', 'iap.js', 'directory-search.js', 'calendar-export.js', 'deletion-lifecycle.cjs']) fs.copyFileSync(path.join(root, file), path.join(dir, file));
   fs.mkdirSync(path.join(dir, 'ql'));
-  for (const file of ['relationships.cjs', 'piece-history.cjs', 'piece-editor.cjs']) fs.copyFileSync(path.join(root, 'ql', file), path.join(dir, 'ql', file));
+  for (const file of ['relationships.cjs', 'piece-history.cjs', 'piece-editor.cjs', 'photo-query-safety.cjs','photo-result-confidence.cjs']) fs.copyFileSync(path.join(root, 'ql', file), path.join(dir, 'ql', file));
   fs.cpSync(path.join(root, 'geodata'), path.join(dir, 'geodata'), { recursive: true });
   for (const file of ['node_modules', 'public']) fs.symlinkSync(path.join(root, file), path.join(dir, file), 'dir');
   fs.writeFileSync(path.join(dir, 'loopback.cjs'), "const net=require('node:net'),listen=net.Server.prototype.listen;net.Server.prototype.listen=function(...args){if(args[1]==='0.0.0.0')args[1]='127.0.0.1';this.once('listening',()=>require('fs').writeFileSync(require('path').join(__dirname,'port'),String(this.address().port)));return listen.apply(this,args)};");

@@ -1,7 +1,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{spawn}=require('node:child_process'),Database=require('better-sqlite3'),jwt=require('jsonwebtoken'),crypto=require('node:crypto');
 const root=path.resolve(__dirname,'..'),tmp=fs.mkdtempSync(path.join(os.tmpdir(),'ql-history-api-')),port=43000+crypto.randomInt(1000),base='http://127.0.0.1:'+port,secret=crypto.randomBytes(32).toString('hex');let server,db,out='';
 (async()=>{for(const n of ['server.js','database.js','iap.js','directory-search.js','calendar-export.js','deletion-lifecycle.cjs'])fs.copyFileSync(path.join(root,n),path.join(tmp,n));
- fs.mkdirSync(path.join(tmp,'ql'));for(const n of ['relationships.cjs','piece-history.cjs','piece-editor.cjs'])fs.copyFileSync(path.join(root,'ql',n),path.join(tmp,'ql',n));
+ fs.mkdirSync(path.join(tmp,'ql'));for(const n of ['relationships.cjs','piece-history.cjs','piece-editor.cjs','photo-query-safety.cjs','photo-result-confidence.cjs'])fs.copyFileSync(path.join(root,'ql',n),path.join(tmp,'ql',n));
  fs.cpSync(path.join(root,'geodata'),path.join(tmp,'geodata'),{recursive:true});for(const n of ['node_modules','public'])fs.symlinkSync(path.join(root,n),path.join(tmp,n),'dir');
  server=spawn(process.execPath,['server.js'],{cwd:tmp,env:{PATH:process.env.PATH,PORT:String(port),JWT_SECRET:secret,NODE_ENV:'test'},stdio:['ignore','pipe','pipe']});server.stdout.on('data',c=>out+=c);server.stderr.on('data',c=>out+=c);
  for(let i=0;i<100&&!out.includes('running on');i++)await new Promise(r=>setTimeout(r,100));assert.ok(out.includes('running on'),out);db=new Database(path.join(tmp,'data/pottery.db'));require('../ql/relationships.cjs').migrate(db);

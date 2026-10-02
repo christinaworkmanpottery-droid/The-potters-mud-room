@@ -1,0 +1,36 @@
+{
+  "serverSha256": "9ee1c2f61b70e7faa3cb3cc03b91da3dd9d3c054cbafe7ede06bd71947926d22",
+  "fullTapTests": 1421,
+  "newRegressions": 25,
+  "fullSuite": "PASS",
+  "strict": {
+    "passed": 37,
+    "failed": 0
+  },
+  "recovery": {
+    "passed": 114,
+    "failed": 0,
+    "blocked": 1,
+    "cancellations": 0,
+    "skips": 0,
+    "todos": 0
+  },
+  "accuracyGate": {
+    "pass": true,
+    "failures": [],
+    "mode": "future-release",
+    "improvementClaimed": false,
+    "tolerance": "Same runtime/hardware, warmed HTTP, sequential concurrency=1: p50 and p95 <=110% baseline; rerun matched samples to investigate environmental variance, never silently relax."
+  },
+  "pairedGate": {
+    "pass": true,
+    "failures": [],
+    "mode": "future-release",
+    "improvementClaimed": false,
+    "tolerance": "Same runtime/hardware, warmed HTTP, sequential concurrency=1: p50 and p95 <=110% baseline; rerun matched samples to investigate environmental variance, never silently relax."
+  },
+  "newBlockers": [],
+  "publication": "deferred",
+  "productionChanged": false,
+  "testFlightChanged": false
+}

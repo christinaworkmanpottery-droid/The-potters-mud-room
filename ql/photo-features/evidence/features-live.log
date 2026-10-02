@@ -1,0 +1,92 @@
+TAP version 13
+# Subtest: cold request evaluates all 144 photos and all 48 eligible Pieces
+ok 1 - cold request evaluates all 144 photos and all 48 eligible Pieces
+  ---
+  duration_ms: 3012.522214
+  type: 'test'
+  ...
+# Subtest: warm request uses complete existing feature pairs without backfill
+ok 2 - warm request uses complete existing feature pairs without backfill
+  ---
+  duration_ms: 55.88602
+  type: 'test'
+  ...
+# Subtest: partial legacy feature pairs complete and do not omit tail Piece
+ok 3 - partial legacy feature pairs complete and do not omit tail Piece
+  ---
+  duration_ms: 50.805974
+  type: 'test'
+  ...
+# Subtest: hidden Pieces excluded consistently from cold and warm snapshots
+not ok 4 - hidden Pieces excluded consistently from cold and warm snapshots
+  ---
+  duration_ms: 0.551382
+  type: 'test'
+  location: '/workspace/scratch/f52683b17faa/mudroom/tests/ql-photo-features.cjs:14:1'
+  failureType: 'testCodeFailure'
+  error: 'no such column: hide_from_photo_search'
+  code: 'SQLITE_ERROR'
+  ...
+# Subtest: missing candidate fails explicitly instead of returning a partial ranking
+ok 5 - missing candidate fails explicitly instead of returning a partial ranking
+  ---
+  duration_ms: 90.579822
+  type: 'test'
+  ...
+# Subtest: corrupt candidate fails explicitly instead of returning a partial ranking
+ok 6 - corrupt candidate fails explicitly instead of returning a partial ranking
+  ---
+  duration_ms: 84.58846
+  type: 'test'
+  ...
+# Subtest: oversized candidate fails explicitly instead of returning a partial ranking
+ok 7 - oversized candidate fails explicitly instead of returning a partial ranking
+  ---
+  duration_ms: 78.683113
+  type: 'test'
+  ...
+# Subtest: unsafe candidate fails explicitly instead of returning a partial ranking
+ok 8 - unsafe candidate fails explicitly instead of returning a partial ranking
+  ---
+  duration_ms: 96.405417
+  type: 'test'
+  ...
+# Subtest: multi-photo evidence remains MAX with an actual winning photo ID
+ok 9 - multi-photo evidence remains MAX with an actual winning photo ID
+  ---
+  duration_ms: 51.482592
+  type: 'test'
+  ...
+# Subtest: cold and warm rankings repeat exactly
+ok 10 - cold and warm rankings repeat exactly
+  ---
+  duration_ms: 2385.513275
+  type: 'test'
+  ...
+# Subtest: identical other-account images never enter candidate snapshot
+ok 11 - identical other-account images never enter candidate snapshot
+  ---
+  duration_ms: 2609.02859
+  type: 'test'
+  ...
+# Subtest: no persistent schema or index is added by search
+ok 12 - no persistent schema or index is added by search
+  ---
+  duration_ms: 45.878985
+  type: 'test'
+  ...
+# Subtest: color extraction and selection remain byte-identical to frozen algorithm
+ok 13 - color extraction and selection remain byte-identical to frozen algorithm
+  ---
+  duration_ms: 0.782776
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 12
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8835.007707

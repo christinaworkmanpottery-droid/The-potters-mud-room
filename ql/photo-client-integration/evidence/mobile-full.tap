@@ -1,0 +1,5462 @@
+(node:5) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+TAP version 13
+# (node:12) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: Android verifies raw token before acknowledging a non-consumable subscription
+ok 1 - Android verifies raw token before acknowledging a non-consumable subscription
+  ---
+  duration_ms: 345.260698
+  type: 'test'
+  ...
+# Subtest: failed verification leaves purchase unacknowledged for restore retry
+ok 2 - failed verification leaves purchase unacknowledged for restore retry
+  ---
+  duration_ms: 56.317864
+  type: 'test'
+  ...
+# Subtest: pending payments do not grant access or get acknowledged
+ok 3 - pending payments do not grant access or get acknowledged
+  ---
+  duration_ms: 52.576846
+  type: 'test'
+  ...
+# Subtest: duplicate native purchase events share one verification request
+ok 4 - duplicate native purchase events share one verification request
+  ---
+  duration_ms: 35.375911
+  type: 'test'
+  ...
+# Subtest: purchase waits for native callback and uses the store offer token
+ok 5 - purchase waits for native callback and uses the store offer token
+  ---
+  duration_ms: 85.942939
+  type: 'test'
+  ...
+# Subtest: Google Play cancellation returns without verifying a payment
+ok 6 - Google Play cancellation returns without verifying a payment
+  ---
+  duration_ms: 59.493198
+  type: 'test'
+  ...
+# Subtest: restore verifies owned subscriptions and reports failures honestly
+ok 7 - restore verifies owned subscriptions and reports failures honestly
+  ---
+  duration_ms: 26.70125
+  type: 'test'
+  ...
+# Subtest: print documents escape user content and retain all firing fields
+ok 8 - print documents escape user content and retain all firing fields
+  ---
+  duration_ms: 16.642996
+  type: 'test'
+  ...
+# (node:13) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: calendar uses saved local times rather than a hard-coded working day
+ok 9 - calendar uses saved local times rather than a hard-coded working day
+  ---
+  duration_ms: 2.228638
+  type: 'test'
+  ...
+# Subtest: calendar rolls overnight events into the following year
+ok 10 - calendar rolls overnight events into the following year
+  ---
+  duration_ms: 0.158629
+  type: 'test'
+  ...
+# Subtest: calendar uses an exclusive all-day end date and preserves leap days
+ok 11 - calendar uses an exclusive all-day end date and preserves leap days
+  ---
+  duration_ms: 0.157368
+  type: 'test'
+  ...
+# Subtest: calendar gives events without an end time one hour, across midnight
+ok 12 - calendar gives events without an end time one hour, across midnight
+  ---
+  duration_ms: 0.107322
+  type: 'test'
+  ...
+# Subtest: calendar rejects missing or invalid dates and times
+ok 13 - calendar rejects missing or invalid dates and times
+  ---
+  duration_ms: 0.295585
+  type: 'test'
+  ...
+# Subtest: calendar encodes punctuation and uses the actual venue address
+ok 14 - calendar encodes punctuation and uses the actual venue address
+  ---
+  duration_ms: 0.382687
+  type: 'test'
+  ...
+# Subtest: website fields accept bare domains, www and existing HTTPS links
+ok 15 - website fields accept bare domains, www and existing HTTPS links
+  ---
+  duration_ms: 0.472572
+  type: 'test'
+  ...
+# Subtest: website fields reject executable schemes and credential-bearing links
+ok 16 - website fields reject executable schemes and credential-bearing links
+  ---
+  duration_ms: 0.194092
+  type: 'test'
+  ...
+# Subtest: missing directory settings never opt a user into discovery or publication
+ok 17 - missing directory settings never opt a user into discovery or publication
+  ---
+  duration_ms: 0.456108
+  type: 'test'
+  ...
+# Subtest: directory preserves existing independent privacy and opt-in choices
+ok 18 - directory preserves existing independent privacy and opt-in choices
+  ---
+  duration_ms: 2.431954
+  type: 'test'
+  ...
+# Subtest: Google Play subscriptions are never described as lifetime/no billing
+ok 19 - Google Play subscriptions are never described as lifetime/no billing
+  ---
+  duration_ms: 0.267162
+  type: 'test'
+  ...
+# Subtest: Apple subscriptions retain Apple management on Android
+ok 20 - Apple subscriptions retain Apple management on Android
+  ---
+  duration_ms: 0.093652
+  type: 'test'
+  ...
+# Subtest: lifetime requires active non-expiring promotional entitlement
+ok 21 - lifetime requires active non-expiring promotional entitlement
+  ---
+  duration_ms: 0.09269
+  type: 'test'
+  ...
+# Subtest: membership fetch failure is not misrepresented as Free
+ok 22 - membership fetch failure is not misrepresented as Free
+  ---
+  duration_ms: 0.05976
+  type: 'test'
+  ...
+# Subtest: admin and free labels reflect actual account information
+ok 23 - admin and free labels reflect actual account information
+  ---
+  duration_ms: 0.078047
+  type: 'test'
+  ...
+# (node:14) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: bare domains become HTTPS and existing HTTP URLs remain usable
+ok 24 - bare domains become HTTPS and existing HTTP URLs remain usable
+  ---
+  duration_ms: 12.375996
+  type: 'test'
+  ...
+# Subtest: website links reject executable schemes and credentials
+ok 25 - website links reject executable schemes and credentials
+  ---
+  duration_ms: 0.576108
+  type: 'test'
+  ...
+# Subtest: directory starts private with discovery disabled
+ok 26 - directory starts private with discovery disabled
+  ---
+  duration_ms: 1.059666
+  type: 'test'
+  ...
+# Subtest: directory hydrates saved SQLite flags without silently changing opt-in
+ok 27 - directory hydrates saved SQLite flags without silently changing opt-in
+  ---
+  duration_ms: 3.764141
+  type: 'test'
+  ...
+# Subtest: failed subscription lookup never reports a free membership
+ok 28 - failed subscription lookup never reports a free membership
+  ---
+  duration_ms: 0.356787
+  type: 'test'
+  ...
+# Subtest: admin and lifetime labels use authenticated entitlement fields
+ok 29 - admin and lifetime labels use authenticated entitlement fields
+  ---
+  duration_ms: 0.201503
+  type: 'test'
+  ...
+# Subtest: billing provider follows the subscription rather than the current device
+ok 30 - billing provider follows the subscription rather than the current device
+  ---
+  duration_ms: 0.160262
+  type: 'test'
+  ...
+# Subtest: all-day events use an exclusive next-day end, including year boundaries
+ok 31 - all-day events use an exclusive next-day end, including year boundaries
+  ---
+  duration_ms: 0.653825
+  type: 'test'
+  ...
+# Subtest: timed calendar events preserve real times and handle midnight
+ok 32 - timed calendar events preserve real times and handle midnight
+  ---
+  duration_ms: 0.608477
+  type: 'test'
+  ...
+# Subtest: invalid dates and times are rejected and calendar text is URL-encoded
+ok 33 - invalid dates and times are rejected and calendar text is URL-encoded
+  ---
+  duration_ms: 0.947027
+  type: 'test'
+  ...
+# (node:15) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: SQLite UTC timestamps display in Pacific time and honor explicit offsets
+ok 34 - SQLite UTC timestamps display in Pacific time and honor explicit offsets
+  ---
+  duration_ms: 331.16462
+  type: 'test'
+  ...
+# Subtest: purchase links are optional and Amazon product/query/short links survive normalization
+ok 35 - purchase links are optional and Amazon product/query/short links survive normalization
+  ---
+  duration_ms: 84.616716
+  type: 'test'
+  ...
+# Subtest: listing save uses the website profile route and keeps unrelated returned account fields
+ok 36 - listing save uses the website profile route and keeps unrelated returned account fields
+  ---
+  duration_ms: 348.865257
+  type: 'test'
+  ...
+# (node:21) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: 2V Casualties collapsed render passes Piece and primary photo to shared loader
+ok 37 - 2V Casualties collapsed render passes Piece and primary photo to shared loader
+  ---
+  duration_ms: 279.175112
+  type: 'test'
+  ...
+# Subtest: 2V Casualties expanded render shares protected-aware editable loader
+ok 38 - 2V Casualties expanded render shares protected-aware editable loader
+  ---
+  duration_ms: 71.868533
+  type: 'test'
+  ...
+# Subtest: 2V expanded primary-only fallback retains same Piece identity
+ok 39 - 2V expanded primary-only fallback retains same Piece identity
+  ---
+  duration_ms: 33.342457
+  type: 'test'
+  ...
+# Subtest: 2V all four mobile render branches have no static construction
+ok 40 - 2V all four mobile render branches have no static construction
+  ---
+  duration_ms: 0.434534
+  type: 'test'
+  ...
+# Subtest: 2V AddCasualty local unsaved previews remain local and editable
+ok 41 - 2V AddCasualty local unsaved previews remain local and editable
+  ---
+  duration_ms: 0.279491
+  type: 'test'
+  ...
+# Subtest: 2V AddCasualty changing route Piece remounts independent preview state
+ok 42 - 2V AddCasualty changing route Piece remounts independent preview state
+  ---
+  duration_ms: 0.198379
+  type: 'test'
+  ...
+# Subtest: 2V AddSale selects complete Piece/photo metadata without mutation
+ok 43 - 2V AddSale selects complete Piece/photo metadata without mutation
+  ---
+  duration_ms: 3.646013
+  type: 'test'
+  ...
+# Subtest: 2V AddSale removal clears preview and Piece ID
+ok 44 - 2V AddSale removal clears preview and Piece ID
+  ---
+  duration_ms: 0.593534
+  type: 'test'
+  ...
+# Subtest: 2V AddSale Piece replacement clears old image even if new Piece has none
+ok 45 - 2V AddSale Piece replacement clears old image even if new Piece has none
+  ---
+  duration_ms: 0.671722
+  type: 'test'
+  ...
+# Subtest: 2V migrated private preview requests authenticate and never use uploads
+ok 46 - 2V migrated private preview requests authenticate and never use uploads
+  ---
+  duration_ms: 148.28576
+  type: 'test'
+  ...
+# Subtest: 2V public casualty uses owner history; eligible public and legacy behavior preserved
+ok 47 - 2V public casualty uses owner history; eligible public and legacy behavior preserved
+  ---
+  duration_ms: 88.559372
+  type: 'test'
+  ...
+# Subtest: 2V stale mobile preview cannot cross accounts and stale blob is revoked
+ok 48 - 2V stale mobile preview cannot cross accounts and stale blob is revoked
+  ---
+  duration_ms: 38.187947
+  type: 'test'
+  ...
+# Subtest: 2V logout cleans controlled native preview files on both platforms
+ok 49 - 2V logout cleans controlled native preview files on both platforms
+  ---
+  duration_ms: 95.251966
+  type: 'test'
+  ...
+# Subtest: 2V replacement session changes cache identity and revokes previous blob
+ok 50 - 2V replacement session changes cache identity and revokes previous blob
+  ---
+  duration_ms: 34.761525
+  type: 'test'
+  ...
+# Subtest: 2V protected errors stay local and do not request static fallback
+ok 51 - 2V protected errors stay local and do not request static fallback
+  ---
+  duration_ms: 63.714448
+  type: 'test'
+  ...
+# Subtest: 2V Piece change immediately masks loaded private hook image
+ok 52 - 2V Piece change immediately masks loaded private hook image
+  ---
+  duration_ms: 66.115876
+  type: 'test'
+  ...
+# Subtest: 2V stale previous Piece hook completion cannot restore its image
+ok 53 - 2V stale previous Piece hook completion cannot restore its image
+  ---
+  duration_ms: 35.4548
+  type: 'test'
+  ...
+# Subtest: 2V Account A images hidden synchronously during replacement
+ok 54 - 2V Account A images hidden synchronously during replacement
+  ---
+  duration_ms: 33.907969
+  type: 'test'
+  ...
+# Subtest: 2V screen session cleanup drops records and existing/local preview references
+ok 55 - 2V screen session cleanup drops records and existing/local preview references
+  ---
+  duration_ms: 0.191178
+  type: 'test'
+  ...
+# Subtest: 2V Sale copy semantics and Casualty deletion paths unchanged
+ok 56 - 2V Sale copy semantics and Casualty deletion paths unchanged
+  ---
+  duration_ms: 0.141884
+  type: 'test'
+  ...
+# Subtest: 2V edited Piece filename invalidates protected cache without static fallback
+ok 57 - 2V edited Piece filename invalidates protected cache without static fallback
+  ---
+  duration_ms: 33.342248
+  type: 'test'
+  ...
+# Subtest: 2V native edited previews use distinct controlled files
+ok 58 - 2V native edited previews use distinct controlled files
+  ---
+  duration_ms: 29.21634
+  type: 'test'
+  ...
+# Subtest: 2V Piece render decode failures stay local and editable child identity resets
+ok 59 - 2V Piece render decode failures stay local and editable child identity resets
+  ---
+  duration_ms: 0.182435
+  type: 'test'
+  ...
+# Subtest: 2V Casualty edit replacement retains photo ID for save/removal
+ok 60 - 2V Casualty edit replacement retains photo ID for save/removal
+  ---
+  duration_ms: 0.248515
+  type: 'test'
+  ...
+# Subtest: 2V audit reproduction is closed by Phase 2W category-aware callers
+ok 61 - 2V audit reproduction is closed by Phase 2W category-aware callers
+  ---
+  duration_ms: 15.159911
+  type: 'test'
+  ...
+# Subtest: 2V saving edited Casualty does not delete replacement photo with retained ID
+ok 62 - 2V saving edited Casualty does not delete replacement photo with retained ID
+  ---
+  duration_ms: 1.437325
+  type: 'test'
+  ...
+# Subtest: 2V explicit Casualty photo removal still deletes only removed photo ID
+ok 63 - 2V explicit Casualty photo removal still deletes only removed photo ID
+  ---
+  duration_ms: 0.880256
+  type: 'test'
+  ...
+# (node:22) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: mobile private Clay uses protected authenticated URL and no-store
+ok 64 - mobile private Clay uses protected authenticated URL and no-store
+  ---
+  duration_ms: 289.578402
+  type: 'test'
+  ...
+# Subtest: mobile Clay delivery contract never guesses historical visibility
+ok 65 - mobile Clay delivery contract never guesses historical visibility
+  ---
+  duration_ms: 60.099531
+  type: 'test'
+  ...
+# Subtest: mobile cached blob reused only within current account session
+ok 66 - mobile cached blob reused only within current account session
+  ---
+  duration_ms: 51.091359
+  type: 'test'
+  ...
+# Subtest: mobile late Account A blob is revoked and cannot populate Account B
+ok 67 - mobile late Account A blob is revoked and cannot populate Account B
+  ---
+  duration_ms: 54.458582
+  type: 'test'
+  ...
+# Subtest: mobile native local filename is session-scoped and removed on logout
+ok 68 - mobile native local filename is session-scoped and removed on logout
+  ---
+  duration_ms: 34.081415
+  type: 'test'
+  ...
+# Subtest: mobile native stale downloads are deleted on both platforms
+ok 69 - mobile native stale downloads are deleted on both platforms
+  ---
+  duration_ms: 107.64645
+  type: 'test'
+  ...
+# Subtest: mobile native partial failed download is cleaned without global logout
+ok 70 - mobile native partial failed download is cleaned without global logout
+  ---
+  duration_ms: 43.220279
+  type: 'test'
+  ...
+# Subtest: mobile missing auth and failed photo never fall back to uploads
+ok 71 - mobile missing auth and failed photo never fall back to uploads
+  ---
+  duration_ms: 45.385482
+  type: 'test'
+  ...
+# Subtest: mobile same-account session replacement also invalidates private cache
+ok 72 - mobile same-account session replacement also invalidates private cache
+  ---
+  duration_ms: 30.396618
+  type: 'test'
+  ...
+# Subtest: mobile replacement filename invalidates cached Clay pixels
+ok 73 - mobile replacement filename invalidates cached Clay pixels
+  ---
+  duration_ms: 17.289891
+  type: 'test'
+  ...
+# Subtest: mobile Clay list detail and edit all use protected-aware component
+ok 74 - mobile Clay list detail and edit all use protected-aware component
+  ---
+  duration_ms: 1.704538
+  type: 'test'
+  ...
+# Subtest: mobile Clay edit keeps persisted protected previews out of new-upload state
+ok 75 - mobile Clay edit keeps persisted protected previews out of new-upload state
+  ---
+  duration_ms: 0.440293
+  type: 'test'
+  ...
+# Subtest: Clay editor opened in Account A cannot save after session replacement
+ok 76 - Clay editor opened in Account A cannot save after session replacement
+  ---
+  duration_ms: 1.042941
+  type: 'test'
+  ...
+# Subtest: Clay editor saves by parent and photo identity rather than shared filename
+ok 77 - Clay editor saves by parent and photo identity rather than shared filename
+  ---
+  duration_ms: 0.824181
+  type: 'test'
+  ...
+# (node:23) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: mobile no-op saved omits relationships
+ok 78 - mobile no-op saved omits relationships
+  ---
+  duration_ms: 494.185213
+  type: 'test'
+  ...
+# Subtest: mobile no-op manual omits relationships
+ok 79 - mobile no-op manual omits relationships
+  ---
+  duration_ms: 196.68238
+  type: 'test'
+  ...
+# Subtest: mobile no-op mixed omits relationships
+ok 80 - mobile no-op mixed omits relationships
+  ---
+  duration_ms: 243.350162
+  type: 'test'
+  ...
+# Subtest: snapshot preserves method dip
+ok 81 - snapshot preserves method dip
+  ---
+  duration_ms: 0.82354
+  type: 'test'
+  ...
+# Subtest: snapshot preserves method brush
+ok 82 - snapshot preserves method brush
+  ---
+  duration_ms: 0.125289
+  type: 'test'
+  ...
+# Subtest: snapshot preserves method spray
+ok 83 - snapshot preserves method spray
+  ---
+  duration_ms: 0.162144
+  type: 'test'
+  ...
+# Subtest: snapshot preserves method pour
+ok 84 - snapshot preserves method pour
+  ---
+  duration_ms: 0.083717
+  type: 'test'
+  ...
+# Subtest: snapshot preserves method wax-resist
+ok 85 - snapshot preserves method wax-resist
+  ---
+  duration_ms: 0.11883
+  type: 'test'
+  ...
+# Subtest: snapshot preserves method other
+ok 86 - snapshot preserves method other
+  ---
+  duration_ms: 0.274643
+  type: 'test'
+  ...
+# Subtest: snapshot preserves method null
+ok 87 - snapshot preserves method null
+  ---
+  duration_ms: 0.286662
+  type: 'test'
+  ...
+# Subtest: specific layer manual replacement 0
+ok 88 - specific layer manual replacement 0
+  ---
+  duration_ms: 223.497781
+  type: 'test'
+  ...
+# Subtest: specific layer manual replacement 1
+ok 89 - specific layer manual replacement 1
+  ---
+  duration_ms: 218.111716
+  type: 'test'
+  ...
+# Subtest: specific layer manual replacement 2
+ok 90 - specific layer manual replacement 2
+  ---
+  duration_ms: 191.521944
+  type: 'test'
+  ...
+# Subtest: specific layer saved transition 0
+ok 91 - specific layer saved transition 0
+  ---
+  duration_ms: 203.010613
+  type: 'test'
+  ...
+# Subtest: specific layer saved transition 1
+ok 92 - specific layer saved transition 1
+  ---
+  duration_ms: 144.56212
+  type: 'test'
+  ...
+# Subtest: specific layer saved transition 2
+ok 93 - specific layer saved transition 2
+  ---
+  duration_ms: 133.039178
+  type: 'test'
+  ...
+# Subtest: mobile picker adds repeated saved Glaze independently
+ok 94 - mobile picker adds repeated saved Glaze independently
+  ---
+  duration_ms: 121.845543
+  type: 'test'
+  ...
+# Subtest: mobile blank edited label removes only that row
+ok 95 - mobile blank edited label removes only that row
+  ---
+  duration_ms: 110.095849
+  type: 'test'
+  ...
+# Subtest: mobile explicit remove-all emits empty array
+ok 96 - mobile explicit remove-all emits empty array
+  ---
+  duration_ms: 86.873787
+  type: 'test'
+  ...
+# Subtest: mobile Clay manual transition Typed
+ok 97 - mobile Clay manual transition Typed
+  ---
+  duration_ms: 117.391308
+  type: 'test'
+  ...
+# Subtest: mobile Clay manual transition Paste
+ok 98 - mobile Clay manual transition Paste
+  ---
+  duration_ms: 164.761444
+  type: 'test'
+  ...
+# Subtest: mobile Clay manual transition 
+ok 99 - mobile Clay manual transition 
+  ---
+  duration_ms: 125.928355
+  type: 'test'
+  ...
+# Subtest: mobile Clay saved transition {}
+ok 100 - mobile Clay saved transition {}
+  ---
+  duration_ms: 71.679489
+  type: 'test'
+  ...
+# Subtest: mobile Clay saved transition {"clay_body_id":null,"clay":"Manual","clay_body_name":null}
+ok 101 - mobile Clay saved transition {"clay_body_id":null,"clay":"Manual","clay_body_name":null}
+  ---
+  duration_ms: 93.683942
+  type: 'test'
+  ...
+# Subtest: mobile failed save retains edited metadata for retry
+ok 102 - mobile failed save retains edited metadata for retry
+  ---
+  duration_ms: 187.046181
+  type: 'test'
+  ...
+# Subtest: duplicate strips existing Piece layer IDs but keeps metadata
+ok 103 - duplicate strips existing Piece layer IDs but keeps metadata
+  ---
+  duration_ms: 0.262455
+  type: 'test'
+  ...
+# Subtest: API relationship mapping preserves explicit and omitted fields {}
+ok 104 - API relationship mapping preserves explicit and omitted fields {}
+  ---
+  duration_ms: 0.247012
+  type: 'test'
+  ...
+# Subtest: API relationship mapping preserves explicit and omitted fields {"clayBodyId":null,"clay":""}
+ok 105 - API relationship mapping preserves explicit and omitted fields {"clayBodyId":null,"clay":""}
+  ---
+  duration_ms: 0.171599
+  type: 'test'
+  ...
+# Subtest: API relationship mapping preserves explicit and omitted fields {"clay_body_id":"c","studio":"Historical"}
+ok 106 - API relationship mapping preserves explicit and omitted fields {"clay_body_id":"c","studio":"Historical"}
+  ---
+  duration_ms: 0.108243
+  type: 'test'
+  ...
+# Subtest: API relationship mapping preserves explicit and omitted fields {"clayIntent":"manual","clay":"Typed"}
+ok 107 - API relationship mapping preserves explicit and omitted fields {"clayIntent":"manual","clay":"Typed"}
+  ---
+  duration_ms: 0.076595
+  type: 'test'
+  ...
+# Subtest: API relationship mapping preserves explicit and omitted fields {"glaze_ids":"[]"}
+ok 108 - API relationship mapping preserves explicit and omitted fields {"glaze_ids":"[]"}
+  ---
+  duration_ms: 0.117908
+  type: 'test'
+  ...
+# Subtest: API relationship mapping preserves explicit and omitted fields {"glazeIds":[]}
+ok 109 - API relationship mapping preserves explicit and omitted fields {"glazeIds":[]}
+  ---
+  duration_ms: 0.140381
+  type: 'test'
+  ...
+# Subtest: legacy ownerless queue create blocked
+ok 110 - legacy ownerless queue create blocked
+  ---
+  duration_ms: 11.855453
+  type: 'test'
+  ...
+# Subtest: legacy ownerless queue update blocked
+ok 111 - legacy ownerless queue update blocked
+  ---
+  duration_ms: 8.928202
+  type: 'test'
+  ...
+# Subtest: legacy ownerless queue delete blocked
+ok 112 - legacy ownerless queue delete blocked
+  ---
+  duration_ms: 8.558855
+  type: 'test'
+  ...
+# Subtest: legacy owned update without intent version rejected
+ok 113 - legacy owned update without intent version rejected
+  ---
+  duration_ms: 8.206284
+  type: 'test'
+  ...
+# Subtest: malformed queued structure rejected "[object Object]"
+ok 114 - malformed queued structure rejected "[object Object]"
+  ---
+  duration_ms: 6.337528
+  type: 'test'
+  ...
+# Subtest: malformed queued structure rejected null
+ok 115 - malformed queued structure rejected null
+  ---
+  duration_ms: 9.260673
+  type: 'test'
+  ...
+# Subtest: malformed queued structure rejected {}
+ok 116 - malformed queued structure rejected {}
+  ---
+  duration_ms: 9.353172
+  type: 'test'
+  ...
+# Subtest: queue JSON and multipart glazeIds false
+ok 117 - queue JSON and multipart glazeIds false
+  ---
+  duration_ms: 12.890432
+  type: 'test'
+  ...
+# Subtest: queue JSON and multipart glazeIds true
+ok 118 - queue JSON and multipart glazeIds true
+  ---
+  duration_ms: 25.519561
+  type: 'test'
+  ...
+# Subtest: queue JSON and multipart glaze_ids false
+ok 119 - queue JSON and multipart glaze_ids false
+  ---
+  duration_ms: 8.644144
+  type: 'test'
+  ...
+# Subtest: queue JSON and multipart glaze_ids true
+ok 120 - queue JSON and multipart glaze_ids true
+  ---
+  duration_ms: 5.36919
+  type: 'test'
+  ...
+# Subtest: queue session replacement rejected b
+ok 121 - queue session replacement rejected b
+  ---
+  duration_ms: 12.721347
+  type: 'test'
+  ...
+# Subtest: queue session replacement rejected a
+ok 122 - queue session replacement rejected a
+  ---
+  duration_ms: 9.256277
+  type: 'test'
+  ...
+# Subtest: queue session replacement rejected null
+ok 123 - queue session replacement rejected null
+  ---
+  duration_ms: 7.497066
+  type: 'test'
+  ...
+# Subtest: known original account can replay full intent update
+ok 124 - known original account can replay full intent update
+  ---
+  duration_ms: 11.005131
+  type: 'test'
+  ...
+# Subtest: legacy flat Glaze create rejected without silently losing it
+ok 125 - legacy flat Glaze create rejected without silently losing it
+  ---
+  duration_ms: 10.77873
+  type: 'test'
+  ...
+# Subtest: ambiguous queue entry retained and surfaced, never marked complete
+ok 126 - ambiguous queue entry retained and surfaced, never marked complete
+  ---
+  duration_ms: 90.53637
+  type: 'test'
+  ...
+# Subtest: queue reconnect retries complete metadata without destructive reconstruction
+ok 127 - queue reconnect retries complete metadata without destructive reconstruction
+  ---
+  duration_ms: 28.73879
+  type: 'test'
+  ...
+# Subtest: queue original account item never applied under replacement account
+ok 128 - queue original account item never applied under replacement account
+  ---
+  duration_ms: 25.695605
+  type: 'test'
+  ...
+# Subtest: mobile partial scalar edit Piece name omits relationships
+ok 129 - mobile partial scalar edit Piece name omits relationships
+  ---
+  duration_ms: 129.18455
+  type: 'test'
+  ...
+# Subtest: mobile partial scalar edit Notes about this piece omits relationships
+ok 130 - mobile partial scalar edit Notes about this piece omits relationships
+  ---
+  duration_ms: 160.053331
+  type: 'test'
+  ...
+# Subtest: mobile partial scalar edit Piece dimensions omits relationships
+ok 131 - mobile partial scalar edit Piece dimensions omits relationships
+  ---
+  duration_ms: 155.923063
+  type: 'test'
+  ...
+# Subtest: mobile status-only save omits relationships
+ok 132 - mobile status-only save omits relationships
+  ---
+  duration_ms: 92.666414
+  type: 'test'
+  ...
+# Subtest: mobile unsaved changes do not issue any mutation
+ok 133 - mobile unsaved changes do not issue any mutation
+  ---
+  duration_ms: 138.979389
+  type: 'test'
+  ...
+# Subtest: actual queue multipart create serializes glazeIds
+ok 134 - actual queue multipart create serializes glazeIds
+  ---
+  duration_ms: 63.730141
+  type: 'test'
+  ...
+# Subtest: actual queue multipart create serializes glaze_ids
+ok 135 - actual queue multipart create serializes glaze_ids
+  ---
+  duration_ms: 40.647703
+  type: 'test'
+  ...
+# Subtest: actual API mapper relationship omission/explicit values {"name":"Title"}
+ok 136 - actual API mapper relationship omission/explicit values {"name":"Title"}
+  ---
+  duration_ms: 0.415336
+  type: 'test'
+  ...
+# Subtest: actual API mapper relationship omission/explicit values {"status":"done"}
+ok 137 - actual API mapper relationship omission/explicit values {"status":"done"}
+  ---
+  duration_ms: 0.077026
+  type: 'test'
+  ...
+# Subtest: actual API mapper relationship omission/explicit values {"notes":"Piece notes"}
+ok 138 - actual API mapper relationship omission/explicit values {"notes":"Piece notes"}
+  ---
+  duration_ms: 0.061643
+  type: 'test'
+  ...
+# Subtest: actual API mapper relationship omission/explicit values {"clayIntent":"manual","clay":"Typed","clayBodyId":null}
+ok 139 - actual API mapper relationship omission/explicit values {"clayIntent":"manual","clay":"Typed","clayBodyId":null}
+  ---
+  duration_ms: 0.088323
+  type: 'test'
+  ...
+# Subtest: actual API mapper relationship omission/explicit values {"clay_body_id":"c","studio":"Historical"}
+ok 140 - actual API mapper relationship omission/explicit values {"clay_body_id":"c","studio":"Historical"}
+  ---
+  duration_ms: 0.069875
+  type: 'test'
+  ...
+# Subtest: actual API mapper relationship omission/explicit values {"glaze_ids":"[{\\"glaze_id\\":\\"g\\",\\"notes\\":\\"Notes\\",\\"coats\\":0}]"}
+ok 141 - actual API mapper relationship omission/explicit values {"glaze_ids":"[{\\"glaze_id\\":\\"g\\",\\"notes\\":\\"Notes\\",\\"coats\\":0}]"}
+  ---
+  duration_ms: 0.060681
+  type: 'test'
+  ...
+# (node:76) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: mobile private Event loader uses authenticated protected route
+ok 142 - mobile private Event loader uses authenticated protected route
+  ---
+  duration_ms: 1.218927
+  type: 'test'
+  ...
+# Subtest: private Event cache identity is account and session scoped
+ok 143 - private Event cache identity is account and session scoped
+  ---
+  duration_ms: 0.157917
+  type: 'test'
+  ...
+# Subtest: private Event cache clears on session replacement
+ok 144 - private Event cache clears on session replacement
+  ---
+  duration_ms: 0.106731
+  type: 'test'
+  ...
+# Subtest: stale private Event downloads are rejected and disposed
+ok 145 - stale private Event downloads are rejected and disposed
+  ---
+  duration_ms: 0.141033
+  type: 'test'
+  ...
+# Subtest: legacy Event media retains static uploads compatibility
+ok 146 - legacy Event media retains static uploads compatibility
+  ---
+  duration_ms: 0.209666
+  type: 'test'
+  ...
+# Subtest: Event image component never falls back after known-private failure
+ok 147 - Event image component never falls back after known-private failure
+  ---
+  duration_ms: 0.122154
+  type: 'test'
+  ...
+# Subtest: Event list and detail use shared protected-aware component
+ok 148 - Event list and detail use shared protected-aware component
+  ---
+  duration_ms: 0.155164
+  type: 'test'
+  ...
+# Subtest: Event edit preview uses protected component for stored image
+ok 149 - Event edit preview uses protected component for stored image
+  ---
+  duration_ms: 0.180221
+  type: 'test'
+  ...
+# Subtest: Event list is cleared when private media session changes
+ok 150 - Event list is cleared when private media session changes
+  ---
+  duration_ms: 0.242976
+  type: 'test'
+  ...
+# Subtest: Event API reads reject stale session completion
+ok 151 - Event API reads reject stale session completion
+  ---
+  duration_ms: 0.396978
+  type: 'test'
+  ...
+# Subtest: Event sharing and calendar actions do not include image URLs
+ok 152 - Event sharing and calendar actions do not include image URLs
+  ---
+  duration_ms: 365.199667
+  type: 'test'
+  ...
+# Subtest: mobile private Event uses protected authenticated URL and no-store
+ok 153 - mobile private Event uses protected authenticated URL and no-store
+  ---
+  duration_ms: 33.898815
+  type: 'test'
+  ...
+# Subtest: mobile Event delivery contract never guesses historical visibility
+ok 154 - mobile Event delivery contract never guesses historical visibility
+  ---
+  duration_ms: 26.443972
+  type: 'test'
+  ...
+# Subtest: mobile cached blob reused only within current account session
+ok 155 - mobile cached blob reused only within current account session
+  ---
+  duration_ms: 48.267985
+  type: 'test'
+  ...
+# Subtest: mobile late Account A blob is revoked and cannot populate Account B
+ok 156 - mobile late Account A blob is revoked and cannot populate Account B
+  ---
+  duration_ms: 40.560311
+  type: 'test'
+  ...
+# Subtest: mobile native local filename is session-scoped and removed on logout
+ok 157 - mobile native local filename is session-scoped and removed on logout
+  ---
+  duration_ms: 28.907776
+  type: 'test'
+  ...
+# Subtest: mobile native stale downloads are deleted on both platforms
+ok 158 - mobile native stale downloads are deleted on both platforms
+  ---
+  duration_ms: 34.228532
+  type: 'test'
+  ...
+# Subtest: mobile native partial failed download is cleaned without global logout
+ok 159 - mobile native partial failed download is cleaned without global logout
+  ---
+  duration_ms: 31.873053
+  type: 'test'
+  ...
+# Subtest: mobile missing auth and failed photo never fall back to uploads
+ok 160 - mobile missing auth and failed photo never fall back to uploads
+  ---
+  duration_ms: 12.451772
+  type: 'test'
+  ...
+# Subtest: mobile same-account session replacement also invalidates private cache
+ok 161 - mobile same-account session replacement also invalidates private cache
+  ---
+  duration_ms: 16.459819
+  type: 'test'
+  ...
+# Subtest: mobile replacement filename invalidates cached Event pixels
+ok 162 - mobile replacement filename invalidates cached Event pixels
+  ---
+  duration_ms: 40.742917
+  type: 'test'
+  ...
+# Subtest: Event hook renders authenticated photo and immediately hides Account A pixels on replacement
+ok 163 - Event hook renders authenticated photo and immediately hides Account A pixels on replacement
+  ---
+  duration_ms: 61.046518
+  type: 'test'
+  ...
+# Subtest: Event hook rejects late Account A completion and stale auth failure
+ok 164 - Event hook rejects late Account A completion and stale auth failure
+  ---
+  duration_ms: 79.992974
+  type: 'test'
+  ...
+# Subtest: Event image decode failure replaces only that image with local placeholder
+ok 165 - Event image decode failure replaces only that image with local placeholder
+  ---
+  duration_ms: 32.572136
+  type: 'test'
+  ...
+# Subtest: Event request rejects account switch during token lookup
+ok 166 - Event request rejects account switch during token lookup
+  ---
+  duration_ms: 200.546651
+  type: 'test'
+  ...
+# Subtest: late Event 401 cannot erase replacement account credentials
+ok 167 - late Event 401 cannot erase replacement account credentials
+  ---
+  duration_ms: 262.154
+  type: 'test'
+  ...
+# Subtest: Event cache separates record identity for identical filenames
+ok 168 - Event cache separates record identity for identical filenames
+  ---
+  duration_ms: 6.606194
+  type: 'test'
+  ...
+# (node:83) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: mobile private Firing uses protected authenticated URL and no-store
+ok 169 - mobile private Firing uses protected authenticated URL and no-store
+  ---
+  duration_ms: 426.337348
+  type: 'test'
+  ...
+# Subtest: mobile Firing delivery contract never guesses historical visibility
+ok 170 - mobile Firing delivery contract never guesses historical visibility
+  ---
+  duration_ms: 71.376592
+  type: 'test'
+  ...
+# Subtest: mobile cached blob reused only within current account session
+ok 171 - mobile cached blob reused only within current account session
+  ---
+  duration_ms: 44.862784
+  type: 'test'
+  ...
+# Subtest: mobile late Account A blob is revoked and cannot populate Account B
+ok 172 - mobile late Account A blob is revoked and cannot populate Account B
+  ---
+  duration_ms: 38.467038
+  type: 'test'
+  ...
+# Subtest: mobile native local filename is session-scoped and removed on logout
+ok 173 - mobile native local filename is session-scoped and removed on logout
+  ---
+  duration_ms: 37.245702
+  type: 'test'
+  ...
+# Subtest: mobile native stale downloads are deleted on both platforms
+ok 174 - mobile native stale downloads are deleted on both platforms
+  ---
+  duration_ms: 76.070825
+  type: 'test'
+  ...
+# Subtest: mobile native partial failed download is cleaned without global logout
+ok 175 - mobile native partial failed download is cleaned without global logout
+  ---
+  duration_ms: 24.288625
+  type: 'test'
+  ...
+# Subtest: mobile missing auth and failed photo never fall back to uploads
+ok 176 - mobile missing auth and failed photo never fall back to uploads
+  ---
+  duration_ms: 35.249099
+  type: 'test'
+  ...
+# Subtest: mobile same-account session replacement also invalidates private cache
+ok 177 - mobile same-account session replacement also invalidates private cache
+  ---
+  duration_ms: 22.687915
+  type: 'test'
+  ...
+# Subtest: mobile replacement filename invalidates cached Firing pixels
+ok 178 - mobile replacement filename invalidates cached Firing pixels
+  ---
+  duration_ms: 37.331417
+  type: 'test'
+  ...
+# Subtest: Firing cache separates parent ID and photo ID even for duplicate filenames
+ok 179 - Firing cache separates parent ID and photo ID even for duplicate filenames
+  ---
+  duration_ms: 37.465128
+  type: 'test'
+  ...
+# Subtest: Firing hook renders authenticated photo and immediately hides Account A pixels on replacement
+ok 180 - Firing hook renders authenticated photo and immediately hides Account A pixels on replacement
+  ---
+  duration_ms: 103.082122
+  type: 'test'
+  ...
+# Subtest: Firing hook rejects late Account A completion and stale auth failure
+ok 181 - Firing hook rejects late Account A completion and stale auth failure
+  ---
+  duration_ms: 135.145182
+  type: 'test'
+  ...
+# Subtest: Firing image decode failure replaces only that image with local placeholder
+ok 182 - Firing image decode failure replaces only that image with local placeholder
+  ---
+  duration_ms: 66.152541
+  type: 'test'
+  ...
+# Subtest: Firing editor sends parent and photo identity and cannot save after session switch
+ok 183 - Firing editor sends parent and photo identity and cannot save after session switch
+  ---
+  duration_ms: 98.694757
+  type: 'test'
+  ...
+# Subtest: Firing detail edit and reorder use shared component; list and exported documents contain no photos
+ok 184 - Firing detail edit and reorder use shared component; list and exported documents contain no photos
+  ---
+  duration_ms: 3.098328
+  type: 'test'
+  ...
+# (node:92) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: shared mobile post image is authenticated and token-free URL
+ok 185 - shared mobile post image is authenticated and token-free URL
+  ---
+  duration_ms: 324.342408
+  type: 'test'
+  ...
+# Subtest: reply image identity includes thread and reply
+ok 186 - reply image identity includes thread and reply
+  ---
+  duration_ms: 34.597648
+  type: 'test'
+  ...
+# Subtest: same session deduplicates image downloads
+ok 187 - same session deduplicates image downloads
+  ---
+  duration_ms: 60.243207
+  type: 'test'
+  ...
+# Subtest: image cache identity separates accounts sessions and parent references
+ok 188 - image cache identity separates accounts sessions and parent references
+  ---
+  duration_ms: 58.289354
+  type: 'test'
+  ...
+# Subtest: late image blob rejected and disposed after account switch
+ok 189 - late image blob rejected and disposed after account switch
+  ---
+  duration_ms: 53.822564
+  type: 'test'
+  ...
+# Subtest: same-account new session invalidates cached image
+ok 190 - same-account new session invalidates cached image
+  ---
+  duration_ms: 33.189567
+  type: 'test'
+  ...
+# Subtest: both native platforms download images to session-scoped disposable files
+ok 191 - both native platforms download images to session-scoped disposable files
+  ---
+  duration_ms: 77.33498
+  type: 'test'
+  ...
+# Subtest: late native files cannot cross sessions
+ok 192 - late native files cannot cross sessions
+  ---
+  duration_ms: 102.252958
+  type: 'test'
+  ...
+# Subtest: incomplete native download cleans partial file
+ok 193 - incomplete native download cleans partial file
+  ---
+  duration_ms: 24.232531
+  type: 'test'
+  ...
+# Subtest: protected failure never falls back to uploads
+ok 194 - protected failure never falls back to uploads
+  ---
+  duration_ms: 43.233625
+  type: 'test'
+  ...
+# Subtest: missing credentials produce session-expiry signal
+ok 195 - missing credentials produce session-expiry signal
+  ---
+  duration_ms: 16.1813
+  type: 'test'
+  ...
+# Subtest: old media with explicit ambiguous semantics keeps legacy path
+ok 196 - old media with explicit ambiguous semantics keeps legacy path
+  ---
+  duration_ms: 18.629349
+  type: 'test'
+  ...
+# Subtest: missing IDs fail closed without filename fallback
+ok 197 - missing IDs fail closed without filename fallback
+  ---
+  duration_ms: 37.650598
+  type: 'test'
+  ...
+# Subtest: native video uses same-origin player header, never file download or bearer URL
+ok 198 - native video uses same-origin player header, never file download or bearer URL
+  ---
+  duration_ms: 54.17873
+  type: 'test'
+  ...
+# Subtest: native video logout revokes session using original credentials
+ok 199 - native video logout revokes session using original credentials
+  ---
+  duration_ms: 15.546554
+  type: 'test'
+  ...
+# Subtest: web video uses cookie bootstrap followed by streaming with no blob
+ok 200 - web video uses cookie bootstrap followed by streaming with no blob
+  ---
+  duration_ms: 52.848657
+  type: 'test'
+  ...
+# Subtest: late web video grant rejected after session replacement
+ok 201 - late web video grant rejected after session replacement
+  ---
+  duration_ms: 27.713105
+  type: 'test'
+  ...
+# Subtest: video bootstrap failure stays local and never retries legacy
+ok 202 - video bootstrap failure stays local and never retries legacy
+  ---
+  duration_ms: 17.167576
+  type: 'test'
+  ...
+# Subtest: reply video route retains relationship identity
+ok 203 - reply video route retains relationship identity
+  ---
+  duration_ms: 122.763106
+  type: 'test'
+  ...
+# Subtest: Forum image component renders protected result and hides immediately on account switch
+ok 204 - Forum image component renders protected result and hides immediately on account switch
+  ---
+  duration_ms: 87.165306
+  type: 'test'
+  ...
+# Subtest: Forum component ignores stale completions and stale 401
+ok 205 - Forum component ignores stale completions and stale 401
+  ---
+  duration_ms: 83.854603
+  type: 'test'
+  ...
+# Subtest: current 401 expires session but media decode failure stays local
+ok 206 - current 401 expires session but media decode failure stays local
+  ---
+  duration_ms: 101.121439
+  type: 'test'
+  ...
+# Subtest: native video component uses ephemeral WebView and blocks external navigation
+ok 207 - native video component uses ephemeral WebView and blocks external navigation
+  ---
+  duration_ms: 27.915179
+  type: 'test'
+  ...
+# Subtest: web video component preserves controls without embedding credentials
+ok 208 - web video component preserves controls without embedding credentials
+  ---
+  duration_ms: 23.642072
+  type: 'test'
+  ...
+# Subtest: owner image edit delegates targeted replacement and stays protected
+ok 209 - owner image edit delegates targeted replacement and stays protected
+  ---
+  duration_ms: 34.987856
+  type: 'test'
+  ...
+# Subtest: Forum screen uses shared component everywhere without duplicating avatars
+ok 210 - Forum screen uses shared component everywhere without duplicating avatars
+  ---
+  duration_ms: 0.76995
+  type: 'test'
+  ...
+# Subtest: late native player 401 cannot expire replacement session
+ok 211 - late native player 401 cannot expire replacement session
+  ---
+  duration_ms: 37.422173
+  type: 'test'
+  ...
+# (node:100) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: runtime loader maps public/legacy slots and isolates cached private photos across accounts
+ok 212 - runtime loader maps public/legacy slots and isolates cached private photos across accounts
+  ---
+  duration_ms: 12.996262
+  type: 'test'
+  ...
+# Subtest: runtime stale web and native Combo downloads are discarded after session replacement
+ok 213 - runtime stale web and native Combo downloads are discarded after session replacement
+  ---
+  duration_ms: 16.542695
+  type: 'test'
+  ...
+# Subtest: Combo service classifies public private legacy
+ok 214 - Combo service classifies public private legacy
+  ---
+  duration_ms: 0.240673
+  type: 'test'
+  ...
+# Subtest: public photos use anonymous public route
+ok 215 - public photos use anonymous public route
+  ---
+  duration_ms: 0.124407
+  type: 'test'
+  ...
+# Subtest: private photos use bearer protected delivery no-store
+ok 216 - private photos use bearer protected delivery no-store
+  ---
+  duration_ms: 0.11969
+  type: 'test'
+  ...
+# Subtest: private cache identity includes account combo slot filename
+ok 217 - private cache identity includes account combo slot filename
+  ---
+  duration_ms: 0.134793
+  type: 'test'
+  ...
+# Subtest: session replacement clears Combo files and rejects stale
+ok 218 - session replacement clears Combo files and rejects stale
+  ---
+  duration_ms: 3.831443
+  type: 'test'
+  ...
+# Subtest: mobile list uses visibility-aware photo with local failure
+ok 219 - mobile list uses visibility-aware photo with local failure
+  ---
+  duration_ms: 0.174032
+  type: 'test'
+  ...
+# Subtest: mobile detail maps both slots independently
+ok 220 - mobile detail maps both slots independently
+  ---
+  duration_ms: 0.379372
+  type: 'test'
+  ...
+# Subtest: mobile editor protects existing previews and observes session
+ok 221 - mobile editor protects existing previews and observes session
+  ---
+  duration_ms: 0.512983
+  type: 'test'
+  ...
+# Subtest: mobile mutation sends explicit two-slot map
+ok 222 - mobile mutation sends explicit two-slot map
+  ---
+  duration_ms: 0.215715
+  type: 'test'
+  ...
+# Subtest: image failures remain local to Combo photo components
+ok 223 - image failures remain local to Combo photo components
+  ---
+  duration_ms: 0.099129
+  type: 'test'
+  ...
+# Subtest: existing protected services remain
+ok 224 - existing protected services remain
+  ---
+  duration_ms: 0.182425
+  type: 'test'
+  ...
+# (node:108) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: mobile private Glaze uses protected authenticated URL and no-store
+ok 225 - mobile private Glaze uses protected authenticated URL and no-store
+  ---
+  duration_ms: 402.905689
+  type: 'test'
+  ...
+# Subtest: mobile Glaze delivery contract never guesses historical visibility
+ok 226 - mobile Glaze delivery contract never guesses historical visibility
+  ---
+  duration_ms: 47.969164
+  type: 'test'
+  ...
+# Subtest: mobile cached blob reused only within current account session
+ok 227 - mobile cached blob reused only within current account session
+  ---
+  duration_ms: 35.965369
+  type: 'test'
+  ...
+# Subtest: mobile late Account A blob is revoked and cannot populate Account B
+ok 228 - mobile late Account A blob is revoked and cannot populate Account B
+  ---
+  duration_ms: 47.855283
+  type: 'test'
+  ...
+# Subtest: mobile native local filename is session-scoped and removed on logout
+ok 229 - mobile native local filename is session-scoped and removed on logout
+  ---
+  duration_ms: 28.916588
+  type: 'test'
+  ...
+# Subtest: mobile native stale downloads are deleted on both platforms
+ok 230 - mobile native stale downloads are deleted on both platforms
+  ---
+  duration_ms: 28.720783
+  type: 'test'
+  ...
+# Subtest: mobile native partial failed download is cleaned without global logout
+ok 231 - mobile native partial failed download is cleaned without global logout
+  ---
+  duration_ms: 14.77446
+  type: 'test'
+  ...
+# Subtest: mobile missing auth and failed photo never fall back to uploads
+ok 232 - mobile missing auth and failed photo never fall back to uploads
+  ---
+  duration_ms: 22.656136
+  type: 'test'
+  ...
+# Subtest: mobile same-account session replacement also invalidates private cache
+ok 233 - mobile same-account session replacement also invalidates private cache
+  ---
+  duration_ms: 40.69168
+  type: 'test'
+  ...
+# Subtest: mobile replacement filename invalidates cached Glaze pixels
+ok 234 - mobile replacement filename invalidates cached Glaze pixels
+  ---
+  duration_ms: 24.651723
+  type: 'test'
+  ...
+# Subtest: mobile Glaze detail/edit uses protected loader; list/create has no persisted photo consumer
+ok 235 - mobile Glaze detail/edit uses protected loader; list/create has no persisted photo consumer
+  ---
+  duration_ms: 2.03765
+  type: 'test'
+  ...
+# Subtest: mobile Glaze clay tests use shared protected delivery with legacy fallback
+ok 236 - mobile Glaze clay tests use shared protected delivery with legacy fallback
+  ---
+  duration_ms: 0.386553
+  type: 'test'
+  ...
+# Subtest: Glaze editor opened in Account A cannot save after session replacement
+ok 237 - Glaze editor opened in Account A cannot save after session replacement
+  ---
+  duration_ms: 0.693615
+  type: 'test'
+  ...
+# Subtest: Glaze editor saves by parent and photo identity rather than shared filename
+ok 238 - Glaze editor saves by parent and photo identity rather than shared filename
+  ---
+  duration_ms: 0.4777
+  type: 'test'
+  ...
+# Subtest: Glaze auth expiry clears session only for the current request generation
+ok 239 - Glaze auth expiry clears session only for the current request generation
+  ---
+  duration_ms: 0.531191
+  type: 'test'
+  ...
+# Subtest: mobile Glaze Clay Test loader uses dedicated authenticated protected route
+ok 240 - mobile Glaze Clay Test loader uses dedicated authenticated protected route
+  ---
+  duration_ms: 15.164568
+  type: 'test'
+  ...
+# Subtest: mobile Glaze Clay Test legacy classification never guesses visibility
+ok 241 - mobile Glaze Clay Test legacy classification never guesses visibility
+  ---
+  duration_ms: 21.431931
+  type: 'test'
+  ...
+# Subtest: mobile Glaze Clay Test account switch and stale request reuse shared cache protections
+ok 242 - mobile Glaze Clay Test account switch and stale request reuse shared cache protections
+  ---
+  duration_ms: 9.63036
+  type: 'test'
+  ...
+# Subtest: mobile Glaze Clay Test late Account A request cannot populate Account B
+ok 243 - mobile Glaze Clay Test late Account A request cannot populate Account B
+  ---
+  duration_ms: 47.867331
+  type: 'test'
+  ...
+# Subtest: mobile Piece Clay and Glaze protected loaders remain present beside test media
+ok 244 - mobile Piece Clay and Glaze protected loaders remain present beside test media
+  ---
+  duration_ms: 0.256176
+  type: 'test'
+  ...
+# (node:115) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: Piece-origin intentional Firing edit loads and saves normally
+ok 245 - Piece-origin intentional Firing edit loads and saves normally
+  ---
+  duration_ms: 589.017852
+  type: 'test'
+  ...
+# Subtest: normal standalone Firing edit loads and saves normally
+ok 246 - normal standalone Firing edit loads and saves normally
+  ---
+  duration_ms: 181.694387
+  type: 'test'
+  ...
+# Subtest: Piece-origin editor account removes form and makes old Save inert
+ok 247 - Piece-origin editor account removes form and makes old Save inert
+  ---
+  duration_ms: 114.807769
+  type: 'test'
+  ...
+# Subtest: Piece-origin editor logout removes form and makes old Save inert
+ok 248 - Piece-origin editor logout removes form and makes old Save inert
+  ---
+  duration_ms: 139.064582
+  type: 'test'
+  ...
+# Subtest: Piece-origin editor session removes form and makes old Save inert
+ok 249 - Piece-origin editor session removes form and makes old Save inert
+  ---
+  duration_ms: 126.707098
+  type: 'test'
+  ...
+# Subtest: Piece-origin editor blur removes form and makes old Save inert
+ok 250 - Piece-origin editor blur removes form and makes old Save inert
+  ---
+  duration_ms: 130.020325
+  type: 'test'
+  ...
+# Subtest: Piece-origin editor editor removes form and makes old Save inert
+ok 251 - Piece-origin editor editor removes form and makes old Save inert
+  ---
+  duration_ms: 76.706543
+  type: 'test'
+  ...
+# Subtest: late save ignored after account
+ok 252 - late save ignored after account
+  ---
+  duration_ms: 82.680884
+  type: 'test'
+  ...
+# Subtest: late error ignored after account
+ok 253 - late error ignored after account
+  ---
+  duration_ms: 73.687605
+  type: 'test'
+  ...
+# Subtest: late save ignored after logout
+ok 254 - late save ignored after logout
+  ---
+  duration_ms: 156.11024
+  type: 'test'
+  ...
+# Subtest: late error ignored after logout
+ok 255 - late error ignored after logout
+  ---
+  duration_ms: 96.679235
+  type: 'test'
+  ...
+# Subtest: late save ignored after session
+ok 256 - late save ignored after session
+  ---
+  duration_ms: 125.465738
+  type: 'test'
+  ...
+# Subtest: late error ignored after session
+ok 257 - late error ignored after session
+  ---
+  duration_ms: 131.332122
+  type: 'test'
+  ...
+# Subtest: late save ignored after blur
+ok 258 - late save ignored after blur
+  ---
+  duration_ms: 103.023364
+  type: 'test'
+  ...
+# Subtest: late error ignored after blur
+ok 259 - late error ignored after blur
+  ---
+  duration_ms: 129.540102
+  type: 'test'
+  ...
+# Subtest: late save ignored after unmount
+ok 260 - late save ignored after unmount
+  ---
+  duration_ms: 89.747051
+  type: 'test'
+  ...
+# Subtest: late error ignored after unmount
+ok 261 - late error ignored after unmount
+  ---
+  duration_ms: 64.634865
+  type: 'test'
+  ...
+# Subtest: late save ignored after editor
+ok 262 - late save ignored after editor
+  ---
+  duration_ms: 80.535913
+  type: 'test'
+  ...
+# Subtest: late error ignored after editor
+ok 263 - late error ignored after editor
+  ---
+  duration_ms: 48.267734
+  type: 'test'
+  ...
+# Subtest: late Piece selector load cannot hydrate replacement-account editor
+ok 264 - late Piece selector load cannot hydrate replacement-account editor
+  ---
+  duration_ms: 51.434896
+  type: 'test'
+  ...
+# Subtest: normal standalone create retains validation and create navigation
+ok 265 - normal standalone create retains validation and create navigation
+  ---
+  duration_ms: 70.851331
+  type: 'test'
+  ...
+# Subtest: firing verifies current Piece association before detail
+ok 266 - firing verifies current Piece association before detail
+  ---
+  duration_ms: 7.105717
+  type: 'test'
+  ...
+# Subtest: firing disconnect rejects late relationship and reconnect freshly authorizes
+ok 267 - firing disconnect rejects late relationship and reconnect freshly authorizes
+  ---
+  duration_ms: 14.496105
+  type: 'test'
+  ...
+# Subtest: firing disconnect rejects late detail and reconnect freshly authorizes
+ok 268 - firing disconnect rejects late detail and reconnect freshly authorizes
+  ---
+  duration_ms: 14.507067
+  type: 'test'
+  ...
+# Subtest: firing reconnect rejects reassigned association
+ok 269 - firing reconnect rejects reassigned association
+  ---
+  duration_ms: 7.298327
+  type: 'test'
+  ...
+# Subtest: firing reconnect deleted detail unavailable
+ok 270 - firing reconnect deleted detail unavailable
+  ---
+  duration_ms: 8.894481
+  type: 'test'
+  ...
+# Subtest: firing older online response cannot race newer reconnect response
+ok 271 - firing older online response cannot race newer reconnect response
+  ---
+  duration_ms: 6.023115
+  type: 'test'
+  ...
+# Subtest: testTile verifies current Piece association before detail
+ok 272 - testTile verifies current Piece association before detail
+  ---
+  duration_ms: 6.342016
+  type: 'test'
+  ...
+# Subtest: testTile disconnect rejects late relationship and reconnect freshly authorizes
+ok 273 - testTile disconnect rejects late relationship and reconnect freshly authorizes
+  ---
+  duration_ms: 16.49292
+  type: 'test'
+  ...
+# Subtest: testTile disconnect rejects late detail and reconnect freshly authorizes
+ok 274 - testTile disconnect rejects late detail and reconnect freshly authorizes
+  ---
+  duration_ms: 12.377168
+  type: 'test'
+  ...
+# Subtest: testTile reconnect rejects reassigned association
+ok 275 - testTile reconnect rejects reassigned association
+  ---
+  duration_ms: 7.810608
+  type: 'test'
+  ...
+# Subtest: testTile reconnect deleted detail unavailable
+ok 276 - testTile reconnect deleted detail unavailable
+  ---
+  duration_ms: 7.384756
+  type: 'test'
+  ...
+# Subtest: testTile older online response cannot race newer reconnect response
+ok 277 - testTile older online response cannot race newer reconnect response
+  ---
+  duration_ms: 8.93935
+  type: 'test'
+  ...
+# Subtest: Test Tile downgrade offline locks on fresh reconnect, re-entitlement requires fresh reads
+ok 278 - Test Tile downgrade offline locks on fresh reconnect, re-entitlement requires fresh reads
+  ---
+  duration_ms: 23.560468
+  type: 'test'
+  ...
+# Subtest: firing web invalidated viewer cleans late download without caching it
+ok 279 - firing web invalidated viewer cleans late download without caching it
+  ---
+  duration_ms: 24.85888
+  type: 'test'
+  ...
+# Subtest: firing web scoped cleanup preserves unrelated same-session cached photo
+ok 280 - firing web scoped cleanup preserves unrelated same-session cached photo
+  ---
+  duration_ms: 14.144321
+  type: 'test'
+  ...
+# Subtest: firing ios invalidated viewer cleans late download without caching it
+ok 281 - firing ios invalidated viewer cleans late download without caching it
+  ---
+  duration_ms: 14.45536
+  type: 'test'
+  ...
+# Subtest: firing ios scoped cleanup preserves unrelated same-session cached photo
+ok 282 - firing ios scoped cleanup preserves unrelated same-session cached photo
+  ---
+  duration_ms: 13.627312
+  type: 'test'
+  ...
+# Subtest: firing android invalidated viewer cleans late download without caching it
+ok 283 - firing android invalidated viewer cleans late download without caching it
+  ---
+  duration_ms: 32.311183
+  type: 'test'
+  ...
+# Subtest: firing android scoped cleanup preserves unrelated same-session cached photo
+ok 284 - firing android scoped cleanup preserves unrelated same-session cached photo
+  ---
+  duration_ms: 12.278049
+  type: 'test'
+  ...
+# Subtest: testTile web invalidated viewer cleans late download without caching it
+ok 285 - testTile web invalidated viewer cleans late download without caching it
+  ---
+  duration_ms: 30.704912
+  type: 'test'
+  ...
+# Subtest: testTile web scoped cleanup preserves unrelated same-session cached photo
+ok 286 - testTile web scoped cleanup preserves unrelated same-session cached photo
+  ---
+  duration_ms: 35.976445
+  type: 'test'
+  ...
+# Subtest: testTile ios invalidated viewer cleans late download without caching it
+ok 287 - testTile ios invalidated viewer cleans late download without caching it
+  ---
+  duration_ms: 48.717552
+  type: 'test'
+  ...
+# Subtest: testTile ios scoped cleanup preserves unrelated same-session cached photo
+ok 288 - testTile ios scoped cleanup preserves unrelated same-session cached photo
+  ---
+  duration_ms: 34.647633
+  type: 'test'
+  ...
+# Subtest: testTile android invalidated viewer cleans late download without caching it
+ok 289 - testTile android invalidated viewer cleans late download without caching it
+  ---
+  duration_ms: 40.170094
+  type: 'test'
+  ...
+# Subtest: testTile android scoped cleanup preserves unrelated same-session cached photo
+ok 290 - testTile android scoped cleanup preserves unrelated same-session cached photo
+  ---
+  duration_ms: 13.169593
+  type: 'test'
+  ...
+# Subtest: Firing rendered Piece viewer disconnect unmounts authorized content and reconnect fetches
+ok 291 - Firing rendered Piece viewer disconnect unmounts authorized content and reconnect fetches
+  ---
+  duration_ms: 48.851354
+  type: 'test'
+  ...
+# Subtest: TestTile rendered Piece viewer disconnect unmounts authorized content and reconnect fetches
+ok 292 - TestTile rendered Piece viewer disconnect unmounts authorized content and reconnect fetches
+  ---
+  duration_ms: 33.628031
+  type: 'test'
+  ...
+# Subtest: intentional Firing Edit carries immutable origin IDs and distinct editor generation
+ok 293 - intentional Firing Edit carries immutable origin IDs and distinct editor generation
+  ---
+  duration_ms: 32.897667
+  type: 'test'
+  ...
+# Subtest: rendered Test Tile downgrade removes content and upgrade creates fresh loader
+ok 294 - rendered Test Tile downgrade removes content and upgrade creates fresh loader
+  ---
+  duration_ms: 52.345288
+  type: 'test'
+  ...
+# (node:124) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: 2W TestTileDetail protected post-edit reload
+ok 295 - 2W TestTileDetail protected post-edit reload
+  ---
+  duration_ms: 1.367711
+  type: 'test'
+  ...
+# Subtest: 2W TestTileDetail session and slot guard
+ok 296 - 2W TestTileDetail session and slot guard
+  ---
+  duration_ms: 0.207432
+  type: 'test'
+  ...
+# Subtest: 2W AddTestTile unsaved preview remains local
+ok 297 - 2W AddTestTile unsaved preview remains local
+  ---
+  duration_ms: 0.205089
+  type: 'test'
+  ...
+# Subtest: 2W AddTestTile saved media returns to protected loader
+ok 298 - 2W AddTestTile saved media returns to protected loader
+  ---
+  duration_ms: 0.16578
+  type: 'test'
+  ...
+# Subtest: 2W Test Tile slot and order integrity stay explicit
+ok 299 - 2W Test Tile slot and order integrity stay explicit
+  ---
+  duration_ms: 0.21253
+  type: 'test'
+  ...
+# Subtest: 2W Test Tile failures stay local
+ok 300 - 2W Test Tile failures stay local
+  ---
+  duration_ms: 0.128694
+  type: 'test'
+  ...
+# Subtest: 2W Test Tile invalidation is account record slot scoped
+ok 301 - 2W Test Tile invalidation is account record slot scoped
+  ---
+  duration_ms: 0.244589
+  type: 'test'
+  ...
+# Subtest: 2W Combo public route remains explicit and revision keyed
+ok 302 - 2W Combo public route remains explicit and revision keyed
+  ---
+  duration_ms: 0.133431
+  type: 'test'
+  ...
+# Subtest: 2W ComboDetail private post-edit reload is protected
+ok 303 - 2W ComboDetail private post-edit reload is protected
+  ---
+  duration_ms: 0.362506
+  type: 'test'
+  ...
+# Subtest: 2W AddCombo unsaved local preview is separate
+ok 304 - 2W AddCombo unsaved local preview is separate
+  ---
+  duration_ms: 0.798964
+  type: 'test'
+  ...
+# Subtest: 2W AddCombo persisted media preserves slot and visibility
+ok 305 - 2W AddCombo persisted media preserves slot and visibility
+  ---
+  duration_ms: 0.270457
+  type: 'test'
+  ...
+# Subtest: 2W Combo visibility is metadata based
+ok 306 - 2W Combo visibility is metadata based
+  ---
+  duration_ms: 0.253202
+  type: 'test'
+  ...
+# Subtest: 2W stale responses cannot cross sessions
+ok 307 - 2W stale responses cannot cross sessions
+  ---
+  duration_ms: 0.589749
+  type: 'test'
+  ...
+# Subtest: 2W account switching clears editor media state
+ok 308 - 2W account switching clears editor media state
+  ---
+  duration_ms: 0.199831
+  type: 'test'
+  ...
+# Subtest: 2W Combo invalidation cleans prior protected state
+ok 309 - 2W Combo invalidation cleans prior protected state
+  ---
+  duration_ms: 0.094362
+  type: 'test'
+  ...
+# Subtest: 2W generic EditablePhoto static replacement remains only opt-out compatibility
+ok 310 - 2W generic EditablePhoto static replacement remains only opt-out compatibility
+  ---
+  duration_ms: 0.116806
+  type: 'test'
+  ...
+# Subtest: 2W global uploads remains unrestricted compatibility
+ok 311 - 2W global uploads remains unrestricted compatibility
+  ---
+  duration_ms: 0.061292
+  type: 'test'
+  ...
+# (node:132) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: retry uses current selection after failure and rejects duplicate submit
+ok 312 - retry uses current selection after failure and rejects duplicate submit
+  ---
+  duration_ms: 510.194094
+  type: 'test'
+  ...
+# Subtest: ios jpg undefined metadata
+ok 313 - ios jpg undefined metadata
+  ---
+  duration_ms: 1.367991
+  type: 'test'
+  ...
+# Subtest: ios JPG undefined metadata
+ok 314 - ios JPG undefined metadata
+  ---
+  duration_ms: 0.678502
+  type: 'test'
+  ...
+# Subtest: ios jpeg image/jpeg metadata
+ok 315 - ios jpeg image/jpeg metadata
+  ---
+  duration_ms: 0.623189
+  type: 'test'
+  ...
+# Subtest: ios jpg image/jpg metadata
+ok 316 - ios jpg image/jpg metadata
+  ---
+  duration_ms: 0.521536
+  type: 'test'
+  ...
+# Subtest: ios png image/png metadata
+ok 317 - ios png image/png metadata
+  ---
+  duration_ms: 0.536449
+  type: 'test'
+  ...
+# Subtest: ios gif image/gif metadata
+ok 318 - ios gif image/gif metadata
+  ---
+  duration_ms: 0.687566
+  type: 'test'
+  ...
+# Subtest: android jpg undefined metadata
+ok 319 - android jpg undefined metadata
+  ---
+  duration_ms: 6.03278
+  type: 'test'
+  ...
+# Subtest: android JPG undefined metadata
+ok 320 - android JPG undefined metadata
+  ---
+  duration_ms: 1.058885
+  type: 'test'
+  ...
+# Subtest: android jpeg image/jpeg metadata
+ok 321 - android jpeg image/jpeg metadata
+  ---
+  duration_ms: 1.064583
+  type: 'test'
+  ...
+# Subtest: android jpg image/jpg metadata
+ok 322 - android jpg image/jpg metadata
+  ---
+  duration_ms: 0.865574
+  type: 'test'
+  ...
+# Subtest: android png image/png metadata
+ok 323 - android png image/png metadata
+  ---
+  duration_ms: 0.738543
+  type: 'test'
+  ...
+# Subtest: android gif image/gif metadata
+ok 324 - android gif image/gif metadata
+  ---
+  duration_ms: 0.753316
+  type: 'test'
+  ...
+# Subtest: camera selection reaches uploader with JPEG metadata
+ok 325 - camera selection reaches uploader with JPEG metadata
+  ---
+  duration_ms: 153.197481
+  type: 'test'
+  ...
+# Subtest: gallery selection reaches uploader with JPEG metadata
+ok 326 - gallery selection reaches uploader with JPEG metadata
+  ---
+  duration_ms: 106.623133
+  type: 'test'
+  ...
+# (node:140) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: pick clears old query and suppresses stale resolve
+ok 327 - pick clears old query and suppresses stale resolve
+  ---
+  duration_ms: 655.596526
+  type: 'test'
+  ...
+# Subtest: pick clears old query and suppresses stale reject
+ok 328 - pick clears old query and suppresses stale reject
+  ---
+  duration_ms: 122.564477
+  type: 'test'
+  ...
+# Subtest: edit clears old query and suppresses stale resolve
+ok 329 - edit clears old query and suppresses stale resolve
+  ---
+  duration_ms: 47.34883
+  type: 'test'
+  ...
+# Subtest: edit clears old query and suppresses stale reject
+ok 330 - edit clears old query and suppresses stale reject
+  ---
+  duration_ms: 53.681491
+  type: 'test'
+  ...
+# Subtest: pick clears settled results immediately
+ok 331 - pick clears settled results immediately
+  ---
+  duration_ms: 61.037725
+  type: 'test'
+  ...
+# Subtest: edit clears settled results immediately
+ok 332 - edit clears settled results immediately
+  ---
+  duration_ms: 62.936265
+  type: 'test'
+  ...
+# Subtest: switch aborts request and suppresses old 401
+ok 333 - switch aborts request and suppresses old 401
+  ---
+  duration_ms: 61.719993
+  type: 'test'
+  ...
+# Subtest: unmount aborts request and suppresses old 401
+ok 334 - unmount aborts request and suppresses old 401
+  ---
+  duration_ms: 113.75988
+  type: 'test'
+  ...
+# Subtest: winning photo and uncertainty rendered without percentages
+ok 335 - winning photo and uncertainty rendered without percentages
+  ---
+  duration_ms: 71.096585
+  type: 'test'
+  ...
+# Subtest: older API still renders candidate photo with uncertain label
+ok 336 - older API still renders candidate photo with uncertain label
+  ---
+  duration_ms: 41.633949
+  type: 'test'
+  ...
+# Subtest: missing claimed winning photo does not substitute wrong first photo
+ok 337 - missing claimed winning photo does not substitute wrong first photo
+  ---
+  duration_ms: 69.018169
+  type: 'test'
+  ...
+# Subtest: late picker result after session change is ignored
+ok 338 - late picker result after session change is ignored
+  ---
+  duration_ms: 88.959484
+  type: 'test'
+  ...
+# Subtest: late older picker cannot replace newer selection
+ok 339 - late older picker cannot replace newer selection
+  ---
+  duration_ms: 78.932142
+  type: 'test'
+  ...
+# Subtest: photo API forwards abort through blob loading and POST
+ok 340 - photo API forwards abort through blob loading and POST
+  ---
+  duration_ms: 3.583469
+  type: 'test'
+  ...
+# Subtest: API cancellation reaches actual fetch and stale 401 cannot clear credentials
+ok 341 - API cancellation reaches actual fetch and stale 401 cannot clear credentials
+  ---
+  duration_ms: 3.390699
+  type: 'test'
+  ...
+# Subtest: API account switch rejects old 401 before clearing new account credentials
+ok 342 - API account switch rejects old 401 before clearing new account credentials
+  ---
+  duration_ms: 2.690043
+  type: 'test'
+  ...
+# Subtest: late edit of old image cannot replace a newer selection
+ok 343 - late edit of old image cannot replace a newer selection
+  ---
+  duration_ms: 48.426464
+  type: 'test'
+  ...
+# (node:142) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: fresh ID-based Clay detail followed by current Piece confirmation preserves protected metadata
+ok 344 - fresh ID-based Clay detail followed by current Piece confirmation preserves protected metadata
+  ---
+  duration_ms: 254.039409
+  type: 'test'
+  ...
+# Subtest: cached/local/manual/unverified does not grant View {"id":"local_1","synced":1,"clay_body_id":"c"}
+ok 345 - cached/local/manual/unverified does not grant View {"id":"local_1","synced":1,"clay_body_id":"c"}
+  ---
+  duration_ms: 39.939146
+  type: 'test'
+  ...
+# Subtest: cached/local/manual/unverified does not grant View {"id":"p","clay_body_id":"c"}
+ok 346 - cached/local/manual/unverified does not grant View {"id":"p","clay_body_id":"c"}
+  ---
+  duration_ms: 31.602474
+  type: 'test'
+  ...
+# Subtest: cached/local/manual/unverified does not grant View {"id":"p","synced":0,"clay_body_id":"c"}
+ok 347 - cached/local/manual/unverified does not grant View {"id":"p","synced":0,"clay_body_id":"c"}
+  ---
+  duration_ms: 18.570891
+  type: 'test'
+  ...
+# Subtest: cached/local/manual/unverified does not grant View {"id":"p","synced":false,"clay_body_id":"c"}
+ok 348 - cached/local/manual/unverified does not grant View {"id":"p","synced":false,"clay_body_id":"c"}
+  ---
+  duration_ms: 26.558405
+  type: 'test'
+  ...
+# Subtest: cached/local/manual/unverified does not grant View {"id":"p","synced":1,"studio":"Clay"}
+ok 349 - cached/local/manual/unverified does not grant View {"id":"p","synced":1,"studio":"Clay"}
+  ---
+  duration_ms: 17.520859
+  type: 'test'
+  ...
+# Subtest: cached/local/manual/unverified does not grant View {}
+ok 350 - cached/local/manual/unverified does not grant View {}
+  ---
+  duration_ms: 20.040915
+  type: 'test'
+  ...
+# Subtest: verified current server Piece with saved ID is eligible
+ok 351 - verified current server Piece with saved ID is eligible
+  ---
+  duration_ms: 25.736187
+  type: 'test'
+  ...
+# Subtest: Piece origin rejects {"id":"other","user_id":"a","clay_body_id":"c"}
+ok 352 - Piece origin rejects {"id":"other","user_id":"a","clay_body_id":"c"}
+  ---
+  duration_ms: 13.839312
+  type: 'test'
+  ...
+# Subtest: Piece origin rejects {"id":"p","user_id":"b","clay_body_id":"c"}
+ok 353 - Piece origin rejects {"id":"p","user_id":"b","clay_body_id":"c"}
+  ---
+  duration_ms: 29.331974
+  type: 'test'
+  ...
+# Subtest: Piece origin rejects {"id":"p","user_id":"a","clay_body_id":null}
+ok 354 - Piece origin rejects {"id":"p","user_id":"a","clay_body_id":null}
+  ---
+  duration_ms: 27.865955
+  type: 'test'
+  ...
+# Subtest: Piece origin rejects {"id":"p","user_id":"a","clay_body_id":"other"}
+ok 355 - Piece origin rejects {"id":"p","user_id":"a","clay_body_id":"other"}
+  ---
+  duration_ms: 34.601063
+  type: 'test'
+  ...
+# Subtest: Piece origin rejects null
+ok 356 - Piece origin rejects null
+  ---
+  duration_ms: 27.316297
+  type: 'test'
+  ...
+# Subtest: Clay identity rejects {"id":"c","user_id":"b","name":"Secret"}
+ok 357 - Clay identity rejects {"id":"c","user_id":"b","name":"Secret"}
+  ---
+  duration_ms: 32.585546
+  type: 'test'
+  ...
+# Subtest: Clay identity rejects {"id":"wrong","user_id":"a"}
+ok 358 - Clay identity rejects {"id":"wrong","user_id":"a"}
+  ---
+  duration_ms: 28.103934
+  type: 'test'
+  ...
+# Subtest: Clay identity rejects null
+ok 359 - Clay identity rejects null
+  ---
+  duration_ms: 15.118839
+  type: 'test'
+  ...
+# Subtest: failure 401 clears prior detail and Retry fresh-fetches both
+ok 360 - failure 401 clears prior detail and Retry fresh-fetches both
+  ---
+  duration_ms: 22.202262
+  type: 'test'
+  ...
+# Subtest: failure 403 clears prior detail and Retry fresh-fetches both
+ok 361 - failure 403 clears prior detail and Retry fresh-fetches both
+  ---
+  duration_ms: 48.50412
+  type: 'test'
+  ...
+# Subtest: failure 404 clears prior detail and Retry fresh-fetches both
+ok 362 - failure 404 clears prior detail and Retry fresh-fetches both
+  ---
+  duration_ms: 16.488854
+  type: 'test'
+  ...
+# Subtest: failure 500 clears prior detail and Retry fresh-fetches both
+ok 363 - failure 500 clears prior detail and Retry fresh-fetches both
+  ---
+  duration_ms: 12.628036
+  type: 'test'
+  ...
+# Subtest: late Clay rejected on logout
+ok 364 - late Clay rejected on logout
+  ---
+  duration_ms: 23.87342
+  type: 'test'
+  ...
+# Subtest: late Clay rejected on account
+ok 365 - late Clay rejected on account
+  ---
+  duration_ms: 10.5531
+  type: 'test'
+  ...
+# Subtest: late Clay rejected on session
+ok 366 - late Clay rejected on session
+  ---
+  duration_ms: 21.399346
+  type: 'test'
+  ...
+# Subtest: late Clay rejected on dispose
+ok 367 - late Clay rejected on dispose
+  ---
+  duration_ms: 17.147656
+  type: 'test'
+  ...
+# Subtest: late Clay rejected on newer
+ok 368 - late Clay rejected on newer
+  ---
+  duration_ms: 30.718137
+  type: 'test'
+  ...
+# Subtest: relationship changed during Clay fetch cannot render
+ok 369 - relationship changed during Clay fetch cannot render
+  ---
+  duration_ms: 15.008693
+  type: 'test'
+  ...
+# Subtest: same-generation retry clears Clay before request resolves
+ok 370 - same-generation retry clears Clay before request resolves
+  ---
+  duration_ms: 24.367053
+  type: 'test'
+  ...
+# Subtest: Piece Clay UI hides access offline
+ok 371 - Piece Clay UI hides access offline
+  ---
+  duration_ms: 67.123715
+  type: 'test'
+  ...
+# Subtest: Piece Clay UI hides access blur
+ok 372 - Piece Clay UI hides access blur
+  ---
+  duration_ms: 21.403168
+  type: 'test'
+  ...
+# Subtest: Piece Clay UI hides access unverified
+ok 373 - Piece Clay UI hides access unverified
+  ---
+  duration_ms: 29.452005
+  type: 'test'
+  ...
+# Subtest: Piece Clay UI hides access local
+ok 374 - Piece Clay UI hides access local
+  ---
+  duration_ms: 28.871099
+  type: 'test'
+  ...
+# Subtest: Piece Clay UI hides access unsynced
+ok 375 - Piece Clay UI hides access unsynced
+  ---
+  duration_ms: 27.921529
+  type: 'test'
+  ...
+# Subtest: Piece Clay UI hides access manual
+ok 376 - Piece Clay UI hides access manual
+  ---
+  duration_ms: 35.512446
+  type: 'test'
+  ...
+# Subtest: Piece Clay navigation passes IDs/session only and reconnect remount requires fresh preflight
+ok 377 - Piece Clay navigation passes IDs/session only and reconnect remount requires fresh preflight
+  ---
+  duration_ms: 24.792905
+  type: 'test'
+  ...
+# Subtest: Clay detail identity isolates offline
+ok 378 - Clay detail identity isolates offline
+  ---
+  duration_ms: 98.632869
+  type: 'test'
+  ...
+# Subtest: Clay detail identity isolates blur
+ok 379 - Clay detail identity isolates blur
+  ---
+  duration_ms: 80.524901
+  type: 'test'
+  ...
+# Subtest: Clay detail identity isolates session
+ok 380 - Clay detail identity isolates session
+  ---
+  duration_ms: 75.843167
+  type: 'test'
+  ...
+# Subtest: Clay detail identity isolates clay
+ok 381 - Clay detail identity isolates clay
+  ---
+  duration_ms: 57.548838
+  type: 'test'
+  ...
+# Subtest: Clay detail identity isolates piece
+ok 382 - Clay detail identity isolates piece
+  ---
+  duration_ms: 63.866978
+  type: 'test'
+  ...
+# Subtest: Piece-origin Clay reuses renderer without any mutation controls or editable photos; dispose on Back
+ok 383 - Piece-origin Clay reuses renderer without any mutation controls or editable photos; dispose on Back
+  ---
+  duration_ms: 78.433606
+  type: 'test'
+  ...
+# Subtest: normal library viewer keeps editable rendering
+ok 384 - normal library viewer keeps editable rendering
+  ---
+  duration_ms: 74.657401
+  type: 'test'
+  ...
+# Subtest: reconnect re-fetches Piece and replaces Clay reference while offline retains confirmed description
+ok 385 - reconnect re-fetches Piece and replaces Clay reference while offline retains confirmed description
+  ---
+  duration_ms: 325.921127
+  type: 'test'
+  ...
+# (node:156) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: linked list confirms server Piece and retains empty ready state
+ok 386 - linked list confirms server Piece and retains empty ready state
+  ---
+  duration_ms: 324.114319
+  type: 'test'
+  ...
+# Subtest: multiple links use canonical details and exclude linked picker entries
+ok 387 - multiple links use canonical details and exclude linked picker entries
+  ---
+  duration_ms: 64.99018
+  type: 'test'
+  ...
+# Subtest: Link sends explicit ID and refetches server state
+ok 388 - Link sends explicit ID and refetches server state
+  ---
+  duration_ms: 53.612778
+  type: 'test'
+  ...
+# Subtest: Unlink sends target route and refetches
+ok 389 - Unlink sends target route and refetches
+  ---
+  duration_ms: 50.675713
+  type: 'test'
+  ...
+# Subtest: View loads saved firing without mutation or refiring
+ok 390 - View loads saved firing without mutation or refiring
+  ---
+  duration_ms: 63.87544
+  type: 'test'
+  ...
+# Subtest: ineligible Piece makes no relationship request {"id":"local_123"}
+ok 391 - ineligible Piece makes no relationship request {"id":"local_123"}
+  ---
+  duration_ms: 59.563824
+  type: 'test'
+  ...
+# Subtest: ineligible Piece makes no relationship request {"id":"p","synced":0}
+ok 392 - ineligible Piece makes no relationship request {"id":"p","synced":0}
+  ---
+  duration_ms: 46.882031
+  type: 'test'
+  ...
+# Subtest: ineligible Piece makes no relationship request {"id":"p","synced":false}
+ok 393 - ineligible Piece makes no relationship request {"id":"p","synced":false}
+  ---
+  duration_ms: 29.998809
+  type: 'test'
+  ...
+# Subtest: ineligible Piece makes no relationship request {"id":"p","synced":"0"}
+ok 394 - ineligible Piece makes no relationship request {"id":"p","synced":"0"}
+  ---
+  duration_ms: 28.307821
+  type: 'test'
+  ...
+# Subtest: ineligible Piece makes no relationship request {}
+ok 395 - ineligible Piece makes no relationship request {}
+  ---
+  duration_ms: 37.190955
+  type: 'test'
+  ...
+# Subtest: synced local record uses its serverId and confirms it
+ok 396 - synced local record uses its serverId and confirms it
+  ---
+  duration_ms: 28.510176
+  type: 'test'
+  ...
+# Subtest: unconfirmed server Piece cannot mutate
+ok 397 - unconfirmed server Piece cannot mutate
+  ---
+  duration_ms: 49.997862
+  type: 'test'
+  ...
+# Subtest: legacy availability does not masquerade as empty
+ok 398 - legacy availability does not masquerade as empty
+  ---
+  duration_ms: 15.154934
+  type: 'test'
+  ...
+# Subtest: offline failure neither fabricates nor queues association and Retry recovers
+ok 399 - offline failure neither fabricates nor queues association and Retry recovers
+  ---
+  duration_ms: 16.827053
+  type: 'test'
+  ...
+# Subtest: rapid repeated mutation sends once
+ok 400 - rapid repeated mutation sends once
+  ---
+  duration_ms: 24.592403
+  type: 'test'
+  ...
+# Subtest: list rejects stale Account A response
+ok 401 - list rejects stale Account A response
+  ---
+  duration_ms: 31.325718
+  type: 'test'
+  ...
+# Subtest: POST rejects stale Account A response
+ok 402 - POST rejects stale Account A response
+  ---
+  duration_ms: 34.770688
+  type: 'test'
+  ...
+# Subtest: DELETE rejects stale Account A response
+ok 403 - DELETE rejects stale Account A response
+  ---
+  duration_ms: 31.327942
+  type: 'test'
+  ...
+# Subtest: view rejects stale Account A response
+ok 404 - view rejects stale Account A response
+  ---
+  duration_ms: 14.961912
+  type: 'test'
+  ...
+# Subtest: same-account token generation change rejects old response
+ok 405 - same-account token generation change rejects old response
+  ---
+  duration_ms: 14.698365
+  type: 'test'
+  ...
+# Subtest: navigation disposal rejects late response
+ok 406 - navigation disposal rejects late response
+  ---
+  duration_ms: 33.927338
+  type: 'test'
+  ...
+# Subtest: navigation rejects stale POST
+ok 407 - navigation rejects stale POST
+  ---
+  duration_ms: 13.946332
+  type: 'test'
+  ...
+# Subtest: navigation rejects stale DELETE
+ok 408 - navigation rejects stale DELETE
+  ---
+  duration_ms: 28.324156
+  type: 'test'
+  ...
+# Subtest: logout prevents subsequent requests
+ok 409 - logout prevents subsequent requests
+  ---
+  duration_ms: 36.697001
+  type: 'test'
+  ...
+# Subtest: shared mobile controls render selection Link View and Unlink
+ok 410 - shared mobile controls render selection Link View and Unlink
+  ---
+  duration_ms: 131.634858
+  type: 'test'
+  ...
+# Subtest: mobile linked View navigates to the existing read-only Firing screen
+ok 411 - mobile linked View navigates to the existing read-only Firing screen
+  ---
+  duration_ms: 28.064114
+  type: 'test'
+  ...
+# Subtest: mobile account session offline and navigation changes remount private controls
+ok 412 - mobile account session offline and navigation changes remount private controls
+  ---
+  duration_ms: 103.766689
+  type: 'test'
+  ...
+# Subtest: Piece detail retains edit delete and protected photo workflows
+ok 413 - Piece detail retains edit delete and protected photo workflows
+  ---
+  duration_ms: 0.320463
+  type: 'test'
+  ...
+# Subtest: legacy-only canonical server union requires no client synchronization
+ok 414 - legacy-only canonical server union requires no client synchronization
+  ---
+  duration_ms: 24.51715
+  type: 'test'
+  ...
+# Subtest: QL-only canonical server union requires no client synchronization
+ok 415 - QL-only canonical server union requires no client synchronization
+  ---
+  duration_ms: 21.067142
+  type: 'test'
+  ...
+# Subtest: dual canonical server union requires no client synchronization
+ok 416 - dual canonical server union requires no client synchronization
+  ---
+  duration_ms: 32.418014
+  type: 'test'
+  ...
+# Subtest: stale cached Piece ID rejected by server confirmation
+ok 417 - stale cached Piece ID rejected by server confirmation
+  ---
+  duration_ms: 17.544845
+  type: 'test'
+  ...
+# Subtest: duplicate Unlink cannot race refresh
+ok 418 - duplicate Unlink cannot race refresh
+  ---
+  duration_ms: 13.707703
+  type: 'test'
+  ...
+# Subtest: Firing viewer loads fresh canonical protected photos with no mutation
+ok 419 - Firing viewer loads fresh canonical protected photos with no mutation
+  ---
+  duration_ms: 34.289324
+  type: 'test'
+  ...
+# Subtest: Firing viewer failure and Retry
+ok 420 - Firing viewer failure and Retry
+  ---
+  duration_ms: 4.779762
+  type: 'test'
+  ...
+# Subtest: Firing viewer ignores late session response
+ok 421 - Firing viewer ignores late session response
+  ---
+  duration_ms: 7.186798
+  type: 'test'
+  ...
+# Subtest: Firing viewer ignores late navigation response
+ok 422 - Firing viewer ignores late navigation response
+  ---
+  duration_ms: 10.424206
+  type: 'test'
+  ...
+# Subtest: Firing viewer only newest request renders
+ok 423 - Firing viewer only newest request renders
+  ---
+  duration_ms: 19.591639
+  type: 'test'
+  ...
+# Subtest: old relationship session cannot request Firing for replacement account
+ok 424 - old relationship session cannot request Firing for replacement account
+  ---
+  duration_ms: 6.402556
+  type: 'test'
+  ...
+# Subtest: existing detail screen read-only mode uses protected image and explicit Edit entry
+ok 425 - existing detail screen read-only mode uses protected image and explicit Edit entry
+  ---
+  duration_ms: 1.192837
+  type: 'test'
+  ...
+# (node:164) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: fresh owned list then Piece layer recheck preserves full protected detail
+ok 426 - fresh owned list then Piece layer recheck preserves full protected detail
+  ---
+  duration_ms: 401.626541
+  type: 'test'
+  ...
+# Subtest: ineligible Piece {"id":"local_1","synced":1}
+ok 427 - ineligible Piece {"id":"local_1","synced":1}
+  ---
+  duration_ms: 38.250265
+  type: 'test'
+  ...
+# Subtest: ineligible Piece {"id":"p"}
+ok 428 - ineligible Piece {"id":"p"}
+  ---
+  duration_ms: 29.100466
+  type: 'test'
+  ...
+# Subtest: ineligible Piece {"id":"p","synced":0}
+ok 429 - ineligible Piece {"id":"p","synced":0}
+  ---
+  duration_ms: 32.370487
+  type: 'test'
+  ...
+# Subtest: ineligible Piece {"id":"p","synced":false}
+ok 430 - ineligible Piece {"id":"p","synced":false}
+  ---
+  duration_ms: 26.283121
+  type: 'test'
+  ...
+# Subtest: ineligible Piece {}
+ok 431 - ineligible Piece {}
+  ---
+  duration_ms: 26.719108
+  type: 'test'
+  ...
+# Subtest: current layer identity rejects removed
+ok 432 - current layer identity rejects removed
+  ---
+  duration_ms: 27.940488
+  type: 'test'
+  ...
+# Subtest: current layer identity rejects recreated
+ok 433 - current layer identity rejects recreated
+  ---
+  duration_ms: 22.438068
+  type: 'test'
+  ...
+# Subtest: current layer identity rejects reordered
+ok 434 - current layer identity rejects reordered
+  ---
+  duration_ms: 25.970779
+  type: 'test'
+  ...
+# Subtest: current layer identity rejects position
+ok 435 - current layer identity rejects position
+  ---
+  duration_ms: 10.902227
+  type: 'test'
+  ...
+# Subtest: current layer identity rejects assigned
+ok 436 - current layer identity rejects assigned
+  ---
+  duration_ms: 15.067743
+  type: 'test'
+  ...
+# Subtest: current layer identity rejects manual
+ok 437 - current layer identity rejects manual
+  ---
+  duration_ms: 18.507655
+  type: 'test'
+  ...
+# Subtest: current layer identity rejects foreign-piece
+ok 438 - current layer identity rejects foreign-piece
+  ---
+  duration_ms: 36.347625
+  type: 'test'
+  ...
+# Subtest: current layer identity rejects other-piece
+ok 439 - current layer identity rejects other-piece
+  ---
+  duration_ms: 26.683704
+  type: 'test'
+  ...
+# Subtest: current layer identity rejects missing-piece
+ok 440 - current layer identity rejects missing-piece
+  ---
+  duration_ms: 16.401792
+  type: 'test'
+  ...
+# Subtest: independent Glaze ownership {"id":"g","user_id":"b","name":"Secret"}
+ok 441 - independent Glaze ownership {"id":"g","user_id":"b","name":"Secret"}
+  ---
+  duration_ms: 21.94214
+  type: 'test'
+  ...
+# Subtest: independent Glaze ownership {"id":"other","user_id":"a"}
+ok 442 - independent Glaze ownership {"id":"other","user_id":"a"}
+  ---
+  duration_ms: 23.792122
+  type: 'test'
+  ...
+# Subtest: independent Glaze ownership null
+ok 443 - independent Glaze ownership null
+  ---
+  duration_ms: 19.517627
+  type: 'test'
+  ...
+# Subtest: generic failure clears detail and Retry 401
+ok 444 - generic failure clears detail and Retry 401
+  ---
+  duration_ms: 20.369029
+  type: 'test'
+  ...
+# Subtest: generic failure clears detail and Retry 403
+ok 445 - generic failure clears detail and Retry 403
+  ---
+  duration_ms: 24.725003
+  type: 'test'
+  ...
+# Subtest: generic failure clears detail and Retry 404
+ok 446 - generic failure clears detail and Retry 404
+  ---
+  duration_ms: 45.881689
+  type: 'test'
+  ...
+# Subtest: generic failure clears detail and Retry 500
+ok 447 - generic failure clears detail and Retry 500
+  ---
+  duration_ms: 21.542037
+  type: 'test'
+  ...
+# Subtest: late response rejected logout
+ok 448 - late response rejected logout
+  ---
+  duration_ms: 34.220991
+  type: 'test'
+  ...
+# Subtest: late response rejected account
+ok 449 - late response rejected account
+  ---
+  duration_ms: 31.264646
+  type: 'test'
+  ...
+# Subtest: late response rejected session
+ok 450 - late response rejected session
+  ---
+  duration_ms: 18.784047
+  type: 'test'
+  ...
+# Subtest: late response rejected dispose
+ok 451 - late response rejected dispose
+  ---
+  duration_ms: 17.097842
+  type: 'test'
+  ...
+# Subtest: late response rejected newer
+ok 452 - late response rejected newer
+  ---
+  duration_ms: 16.475723
+  type: 'test'
+  ...
+# Subtest: same Glaze in layers 1 and 3 remains independently authorized
+ok 453 - same Glaze in layers 1 and 3 remains independently authorized
+  ---
+  duration_ms: 45.959286
+  type: 'test'
+  ...
+# Subtest: duplicate layer positions require both row ID and returned array position
+ok 454 - duplicate layer positions require both row ID and returned array position
+  ---
+  duration_ms: 32.377873
+  type: 'test'
+  ...
+# Subtest: name matches with no saved ID never authorize
+ok 455 - name matches with no saved ID never authorize
+  ---
+  duration_ms: 15.071668
+  type: 'test'
+  ...
+# Subtest: ordered descriptive content without View offline
+ok 456 - ordered descriptive content without View offline
+  ---
+  duration_ms: 68.417894
+  type: 'test'
+  ...
+# Subtest: ordered descriptive content without View blur
+ok 457 - ordered descriptive content without View blur
+  ---
+  duration_ms: 14.102658
+  type: 'test'
+  ...
+# Subtest: ordered descriptive content without View unverified
+ok 458 - ordered descriptive content without View unverified
+  ---
+  duration_ms: 34.279634
+  type: 'test'
+  ...
+# Subtest: ordered descriptive content without View local
+ok 459 - ordered descriptive content without View local
+  ---
+  duration_ms: 11.279334
+  type: 'test'
+  ...
+# Subtest: ordered descriptive content without View unsynced
+ok 460 - ordered descriptive content without View unsynced
+  ---
+  duration_ms: 28.859863
+  type: 'test'
+  ...
+# Subtest: ordered descriptive content without View manual
+ok 461 - ordered descriptive content without View manual
+  ---
+  duration_ms: 11.400667
+  type: 'test'
+  ...
+# Subtest: ordered repeated layer launchers pass IDs only and reconnect preflights again
+ok 462 - ordered repeated layer launchers pass IDs only and reconnect preflights again
+  ---
+  duration_ms: 25.59211
+  type: 'test'
+  ...
+# Subtest: viewer isolates identity offline
+ok 463 - viewer isolates identity offline
+  ---
+  duration_ms: 96.161115
+  type: 'test'
+  ...
+# Subtest: viewer isolates identity blur
+ok 464 - viewer isolates identity blur
+  ---
+  duration_ms: 116.607912
+  type: 'test'
+  ...
+# Subtest: viewer isolates identity session
+ok 465 - viewer isolates identity session
+  ---
+  duration_ms: 118.622753
+  type: 'test'
+  ...
+# Subtest: viewer isolates identity glaze
+ok 466 - viewer isolates identity glaze
+  ---
+  duration_ms: 97.752993
+  type: 'test'
+  ...
+# Subtest: viewer isolates identity piece
+ok 467 - viewer isolates identity piece
+  ---
+  duration_ms: 105.399054
+  type: 'test'
+  ...
+# Subtest: viewer isolates identity layer
+ok 468 - viewer isolates identity layer
+  ---
+  duration_ms: 74.148579
+  type: 'test'
+  ...
+# Subtest: viewer isolates identity position
+ok 469 - viewer isolates identity position
+  ---
+  duration_ms: 36.402197
+  type: 'test'
+  ...
+# Subtest: viewer isolates identity index
+ok 470 - viewer isolates identity index
+  ---
+  duration_ms: 58.733954
+  type: 'test'
+  ...
+# Subtest: Piece Glaze viewer reuses full renderer with noneditable photos and exactly one read-only child component
+ok 471 - Piece Glaze viewer reuses full renderer with noneditable photos and exactly one read-only child component
+  ---
+  duration_ms: 102.872837
+  type: 'test'
+  ...
+# Subtest: normal library controls and editable photos preserved without duplicate child component
+ok 472 - normal library controls and editable photos preserved without duplicate child component
+  ---
+  duration_ms: 68.779449
+  type: 'test'
+  ...
+# Subtest: child-test runtime uses canonical session helpers; read-only mounts no editor data or actions
+ok 473 - child-test runtime uses canonical session helpers; read-only mounts no editor data or actions
+  ---
+  duration_ms: 25.858331
+  type: 'test'
+  ...
+# Subtest: reconnect confirms current server layer rows and retains permitted offline descriptions
+ok 474 - reconnect confirms current server layer rows and retains permitted offline descriptions
+  ---
+  duration_ms: 241.801711
+  type: 'test'
+  ...
+# Subtest: local screen is not promoted by sync completion notification
+ok 475 - local screen is not promoted by sync completion notification
+  ---
+  duration_ms: 154.00055
+  type: 'test'
+  ...
+# (node:172) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: private Piece media uses authenticated protected delivery
+ok 476 - private Piece media uses authenticated protected delivery
+  ---
+  duration_ms: 1.131044
+  type: 'test'
+  ...
+# Subtest: public and legacy Piece media retain uploads compatibility
+ok 477 - public and legacy Piece media retain uploads compatibility
+  ---
+  duration_ms: 0.135504
+  type: 'test'
+  ...
+# Subtest: classification is never inferred from filenames
+ok 478 - classification is never inferred from filenames
+  ---
+  duration_ms: 0.282075
+  type: 'test'
+  ...
+# Subtest: private cache keys include generation account Piece and photo identities
+ok 479 - private cache keys include generation account Piece and photo identities
+  ---
+  duration_ms: 0.186531
+  type: 'test'
+  ...
+# Subtest: logout expiry login and account replacement clear or rotate private media state
+ok 480 - logout expiry login and account replacement clear or rotate private media state
+  ---
+  duration_ms: 0.144818
+  type: 'test'
+  ...
+# Subtest: stale Account A download cannot repopulate Account B state
+ok 481 - stale Account A download cannot repopulate Account B state
+  ---
+  duration_ms: 0.135985
+  type: 'test'
+  ...
+# Subtest: Piece list detail edit and reorder use the shared protected-aware component
+ok 482 - Piece list detail edit and reorder use the shared protected-aware component
+  ---
+  duration_ms: 13.5661
+  type: 'test'
+  ...
+# Subtest: private-photo failure is local and does not invoke session expiry
+ok 483 - private-photo failure is local and does not invoke session expiry
+  ---
+  duration_ms: 0.436578
+  type: 'test'
+  ...
+# Subtest: protected photo editing does not manufacture a persistent public URL
+ok 484 - protected photo editing does not manufacture a persistent public URL
+  ---
+  duration_ms: 0.596319
+  type: 'test'
+  ...
+# (node:180) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: linked list confirms server Piece and retains empty ready state
+ok 485 - linked list confirms server Piece and retains empty ready state
+  ---
+  duration_ms: 300.009035
+  type: 'test'
+  ...
+# Subtest: multiple links use canonical details and exclude linked picker entries
+ok 486 - multiple links use canonical details and exclude linked picker entries
+  ---
+  duration_ms: 18.674507
+  type: 'test'
+  ...
+# Subtest: Link sends explicit ID and refetches server state
+ok 487 - Link sends explicit ID and refetches server state
+  ---
+  duration_ms: 13.555684
+  type: 'test'
+  ...
+# Subtest: Unlink sends target route and refetches
+ok 488 - Unlink sends target route and refetches
+  ---
+  duration_ms: 13.980954
+  type: 'test'
+  ...
+# Subtest: View loads saved calculation without mutation or recalculation
+ok 489 - View loads saved calculation without mutation or recalculation
+  ---
+  duration_ms: 20.616923
+  type: 'test'
+  ...
+# Subtest: ineligible Piece makes no relationship request {"id":"local_123"}
+ok 490 - ineligible Piece makes no relationship request {"id":"local_123"}
+  ---
+  duration_ms: 16.043112
+  type: 'test'
+  ...
+# Subtest: ineligible Piece makes no relationship request {"id":"p","synced":0}
+ok 491 - ineligible Piece makes no relationship request {"id":"p","synced":0}
+  ---
+  duration_ms: 18.39133
+  type: 'test'
+  ...
+# Subtest: ineligible Piece makes no relationship request {"id":"p","synced":false}
+ok 492 - ineligible Piece makes no relationship request {"id":"p","synced":false}
+  ---
+  duration_ms: 18.433844
+  type: 'test'
+  ...
+# Subtest: ineligible Piece makes no relationship request {"id":"p","synced":"0"}
+ok 493 - ineligible Piece makes no relationship request {"id":"p","synced":"0"}
+  ---
+  duration_ms: 15.445662
+  type: 'test'
+  ...
+# Subtest: ineligible Piece makes no relationship request {}
+ok 494 - ineligible Piece makes no relationship request {}
+  ---
+  duration_ms: 11.934091
+  type: 'test'
+  ...
+# Subtest: synced local record uses its serverId and confirms it
+ok 495 - synced local record uses its serverId and confirms it
+  ---
+  duration_ms: 15.425331
+  type: 'test'
+  ...
+# Subtest: unconfirmed server Piece cannot mutate
+ok 496 - unconfirmed server Piece cannot mutate
+  ---
+  duration_ms: 8.764265
+  type: 'test'
+  ...
+# Subtest: legacy availability does not masquerade as empty
+ok 497 - legacy availability does not masquerade as empty
+  ---
+  duration_ms: 16.801615
+  type: 'test'
+  ...
+# Subtest: offline failure neither fabricates nor queues association and Retry recovers
+ok 498 - offline failure neither fabricates nor queues association and Retry recovers
+  ---
+  duration_ms: 32.771506
+  type: 'test'
+  ...
+# Subtest: rapid repeated mutation sends once
+ok 499 - rapid repeated mutation sends once
+  ---
+  duration_ms: 15.620926
+  type: 'test'
+  ...
+# Subtest: list rejects stale Account A response
+ok 500 - list rejects stale Account A response
+  ---
+  duration_ms: 9.752894
+  type: 'test'
+  ...
+# Subtest: POST rejects stale Account A response
+ok 501 - POST rejects stale Account A response
+  ---
+  duration_ms: 19.912802
+  type: 'test'
+  ...
+# Subtest: DELETE rejects stale Account A response
+ok 502 - DELETE rejects stale Account A response
+  ---
+  duration_ms: 25.301818
+  type: 'test'
+  ...
+# Subtest: view rejects stale Account A response
+ok 503 - view rejects stale Account A response
+  ---
+  duration_ms: 12.114834
+  type: 'test'
+  ...
+# Subtest: same-account token generation change rejects old response
+ok 504 - same-account token generation change rejects old response
+  ---
+  duration_ms: 32.197231
+  type: 'test'
+  ...
+# Subtest: navigation disposal rejects late response
+ok 505 - navigation disposal rejects late response
+  ---
+  duration_ms: 18.097638
+  type: 'test'
+  ...
+# Subtest: navigation rejects stale POST
+ok 506 - navigation rejects stale POST
+  ---
+  duration_ms: 31.020999
+  type: 'test'
+  ...
+# Subtest: navigation rejects stale DELETE
+ok 507 - navigation rejects stale DELETE
+  ---
+  duration_ms: 11.19008
+  type: 'test'
+  ...
+# Subtest: logout prevents subsequent requests
+ok 508 - logout prevents subsequent requests
+  ---
+  duration_ms: 12.027772
+  type: 'test'
+  ...
+# Subtest: shared mobile controls render selection Link View and Unlink
+ok 509 - shared mobile controls render selection Link View and Unlink
+  ---
+  duration_ms: 100.415095
+  type: 'test'
+  ...
+# Subtest: mobile saved View uses shared breakdown and protected photo component
+ok 510 - mobile saved View uses shared breakdown and protected photo component
+  ---
+  duration_ms: 36.917904
+  type: 'test'
+  ...
+# Subtest: mobile account session offline and navigation changes remount private controls
+ok 511 - mobile account session offline and navigation changes remount private controls
+  ---
+  duration_ms: 30.945366
+  type: 'test'
+  ...
+# Subtest: Piece detail retains edit delete and protected photo workflows
+ok 512 - Piece detail retains edit delete and protected photo workflows
+  ---
+  duration_ms: 0.292991
+  type: 'test'
+  ...
+# (node:188) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: 2U mobile Home and Lookup service loads authenticated private media
+ok 513 - 2U mobile Home and Lookup service loads authenticated private media
+  ---
+  duration_ms: 313.321879
+  type: 'test'
+  ...
+# Subtest: 2U mobile public Gallery route requires explicit visibility status and record identity
+ok 514 - 2U mobile public Gallery route requires explicit visibility status and record identity
+  ---
+  duration_ms: 30.022355
+  type: 'test'
+  ...
+# Subtest: 2U mobile explicit raw Piece flags preserve private/public/legacy classification
+ok 515 - 2U mobile explicit raw Piece flags preserve private/public/legacy classification
+  ---
+  duration_ms: 20.009207
+  type: 'test'
+  ...
+# Subtest: 2U public but unfinished owner media uses authenticated history rather than uploads
+ok 516 - 2U public but unfinished owner media uses authenticated history rather than uploads
+  ---
+  duration_ms: 27.652313
+  type: 'test'
+  ...
+# Subtest: 2U same-session blobs reused and account switch revokes cache
+ok 517 - 2U same-session blobs reused and account switch revokes cache
+  ---
+  duration_ms: 30.386813
+  type: 'test'
+  ...
+# Subtest: 2U same-account replacement invalidates cache and notifies mounted surfaces
+ok 518 - 2U same-account replacement invalidates cache and notifies mounted surfaces
+  ---
+  duration_ms: 31.144255
+  type: 'test'
+  ...
+# Subtest: 2U stale web download cannot populate next-account cache
+ok 519 - 2U stale web download cannot populate next-account cache
+  ---
+  duration_ms: 167.434412
+  type: 'test'
+  ...
+# Subtest: 2U native stale files deleted on both iOS and Android
+ok 520 - 2U native stale files deleted on both iOS and Android
+  ---
+  duration_ms: 83.128339
+  type: 'test'
+  ...
+# Subtest: 2U native filenames session-scoped and logout removes files
+ok 521 - 2U native filenames session-scoped and logout removes files
+  ---
+  duration_ms: 37.322192
+  type: 'test'
+  ...
+# Subtest: 2U native failed partial downloads cleaned
+ok 522 - 2U native failed partial downloads cleaned
+  ---
+  duration_ms: 26.895023
+  type: 'test'
+  ...
+# Subtest: 2U protected failures and missing identity never fall back to uploads
+ok 523 - 2U protected failures and missing identity never fall back to uploads
+  ---
+  duration_ms: 30.559223
+  type: 'test'
+  ...
+# Subtest: 2U missing authentication never starts download
+ok 524 - 2U missing authentication never starts download
+  ---
+  duration_ms: 43.384151
+  type: 'test'
+  ...
+# Subtest: 2U Home and Photo Lookup use PiecePhotoImage without static construction
+ok 525 - 2U Home and Photo Lookup use PiecePhotoImage without static construction
+  ---
+  duration_ms: 0.708868
+  type: 'test'
+  ...
+# Subtest: 2U Reorder fetches missing record classification; no filename-only preview fallback
+ok 526 - 2U Reorder fetches missing record classification; no filename-only preview fallback
+  ---
+  duration_ms: 0.13297
+  type: 'test'
+  ...
+# Subtest: 2U Gallery cards modal and editable owner preview use explicit public route
+ok 527 - 2U Gallery cards modal and editable owner preview use explicit public route
+  ---
+  duration_ms: 0.396177
+  type: 'test'
+  ...
+# Subtest: 2U Piece hook hides previous-account and previous-session pixels synchronously
+ok 528 - 2U Piece hook hides previous-account and previous-session pixels synchronously
+  ---
+  duration_ms: 0.168444
+  type: 'test'
+  ...
+# Subtest: 2U hook immediately hides Account A loaded thumbnail when switching accounts
+ok 529 - 2U hook immediately hides Account A loaded thumbnail when switching accounts
+  ---
+  duration_ms: 61.556226
+  type: 'test'
+  ...
+# Subtest: 2U hook rejects stale resolution after same-account session replacement
+ok 530 - 2U hook rejects stale resolution after same-account session replacement
+  ---
+  duration_ms: 62.338275
+  type: 'test'
+  ...
+# Subtest: 2U hook photo identity change blanks old photo before new load
+ok 531 - 2U hook photo identity change blanks old photo before new load
+  ---
+  duration_ms: 25.974285
+  type: 'test'
+  ...
+# Subtest: 2U hook protected failure remains empty without legacy fallback
+ok 532 - 2U hook protected failure remains empty without legacy fallback
+  ---
+  duration_ms: 43.776478
+  type: 'test'
+  ...
+# (node:196) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: Sales list first confirms saved same-owner Piece then reads current membership
+ok 533 - Sales list first confirms saved same-owner Piece then reads current membership
+  ---
+  duration_ms: 392.367135
+  type: 'test'
+  ...
+# Subtest: empty Sales is ready rather than unavailable
+ok 534 - empty Sales is ready rather than unavailable
+  ---
+  duration_ms: 35.153145
+  type: 'test'
+  ...
+# Subtest: multiple Sales and formerly Quick Sale appear only while currently assigned
+ok 535 - multiple Sales and formerly Quick Sale appear only while currently assigned
+  ---
+  duration_ms: 28.47282
+  type: 'test'
+  ...
+# Subtest: local/unsynchronized Piece unavailable {"id":"local_1"}
+ok 536 - local/unsynchronized Piece unavailable {"id":"local_1"}
+  ---
+  duration_ms: 15.07268
+  type: 'test'
+  ...
+# Subtest: local/unsynchronized Piece unavailable {"id":"p","synced":0}
+ok 537 - local/unsynchronized Piece unavailable {"id":"p","synced":0}
+  ---
+  duration_ms: 20.811997
+  type: 'test'
+  ...
+# Subtest: local/unsynchronized Piece unavailable {"id":"p","synced":false}
+ok 538 - local/unsynchronized Piece unavailable {"id":"p","synced":false}
+  ---
+  duration_ms: 17.998849
+  type: 'test'
+  ...
+# Subtest: local/unsynchronized Piece unavailable {"id":"p","synced":"0"}
+ok 539 - local/unsynchronized Piece unavailable {"id":"p","synced":"0"}
+  ---
+  duration_ms: 21.344399
+  type: 'test'
+  ...
+# Subtest: local/unsynchronized Piece unavailable {}
+ok 540 - local/unsynchronized Piece unavailable {}
+  ---
+  duration_ms: 25.676196
+  type: 'test'
+  ...
+# Subtest: synchronized local record confirms serverId
+ok 541 - synchronized local record confirms serverId
+  ---
+  duration_ms: 18.969792
+  type: 'test'
+  ...
+# Subtest: stale/foreign Piece cannot produce membership {"id":"different","user_id":"a"}
+ok 542 - stale/foreign Piece cannot produce membership {"id":"different","user_id":"a"}
+  ---
+  duration_ms: 29.777025
+  type: 'test'
+  ...
+# Subtest: stale/foreign Piece cannot produce membership {"id":"p","user_id":"b"}
+ok 543 - stale/foreign Piece cannot produce membership {"id":"p","user_id":"b"}
+  ---
+  duration_ms: 25.893203
+  type: 'test'
+  ...
+# Subtest: stale/foreign Piece cannot produce membership null
+ok 544 - stale/foreign Piece cannot produce membership null
+  ---
+  duration_ms: 6.56365
+  type: 'test'
+  ...
+# Subtest: offline retry clears old list and re-confirms Piece
+ok 545 - offline retry clears old list and re-confirms Piece
+  ---
+  duration_ms: 8.64178
+  type: 'test'
+  ...
+# Subtest: viewer fetches fresh by Sale ID and keeps protected media metadata
+ok 546 - viewer fetches fresh by Sale ID and keeps protected media metadata
+  ---
+  duration_ms: 11.695842
+  type: 'test'
+  ...
+# Subtest: viewer deleted clears formerly valid Sale
+ok 547 - viewer deleted clears formerly valid Sale
+  ---
+  duration_ms: 9.467314
+  type: 'test'
+  ...
+# Subtest: viewer reassigned clears formerly valid Sale
+ok 548 - viewer reassigned clears formerly valid Sale
+  ---
+  duration_ms: 8.246385
+  type: 'test'
+  ...
+# Subtest: viewer cleared clears formerly valid Sale
+ok 549 - viewer cleared clears formerly valid Sale
+  ---
+  duration_ms: 21.252091
+  type: 'test'
+  ...
+# Subtest: viewer foreign clears formerly valid Sale
+ok 550 - viewer foreign clears formerly valid Sale
+  ---
+  duration_ms: 19.601955
+  type: 'test'
+  ...
+# Subtest: viewer missing owner clears formerly valid Sale
+ok 551 - viewer missing owner clears formerly valid Sale
+  ---
+  duration_ms: 9.642489
+  type: 'test'
+  ...
+# Subtest: viewer 401 clears content and Retry reauthorizes
+ok 552 - viewer 401 clears content and Retry reauthorizes
+  ---
+  duration_ms: 12.734527
+  type: 'test'
+  ...
+# Subtest: viewer 403 clears content and Retry reauthorizes
+ok 553 - viewer 403 clears content and Retry reauthorizes
+  ---
+  duration_ms: 8.550853
+  type: 'test'
+  ...
+# Subtest: viewer 404 clears content and Retry reauthorizes
+ok 554 - viewer 404 clears content and Retry reauthorizes
+  ---
+  duration_ms: 17.274297
+  type: 'test'
+  ...
+# Subtest: viewer 500 clears content and Retry reauthorizes
+ok 555 - viewer 500 clears content and Retry reauthorizes
+  ---
+  duration_ms: 11.84081
+  type: 'test'
+  ...
+# Subtest: viewer rejects stale logout
+ok 556 - viewer rejects stale logout
+  ---
+  duration_ms: 14.724785
+  type: 'test'
+  ...
+# Subtest: viewer rejects stale account
+ok 557 - viewer rejects stale account
+  ---
+  duration_ms: 20.879319
+  type: 'test'
+  ...
+# Subtest: viewer rejects stale refresh
+ok 558 - viewer rejects stale refresh
+  ---
+  duration_ms: 8.723193
+  type: 'test'
+  ...
+# Subtest: viewer rejects stale dispose
+ok 559 - viewer rejects stale dispose
+  ---
+  duration_ms: 13.302322
+  type: 'test'
+  ...
+# Subtest: newer retry wins over previous response
+ok 560 - newer retry wins over previous response
+  ---
+  duration_ms: 13.874094
+  type: 'test'
+  ...
+# Subtest: original route generation cannot load in replacement session
+ok 561 - original route generation cannot load in replacement session
+  ---
+  duration_ms: 34.564407
+  type: 'test'
+  ...
+# Subtest: Sales section renders compact View rows with no mutation controls
+ok 562 - Sales section renders compact View rows with no mutation controls
+  ---
+  duration_ms: 58.308684
+  type: 'test'
+  ...
+# Subtest: Sales section error includes Retry
+ok 563 - Sales section error includes Retry
+  ---
+  duration_ms: 64.001199
+  type: 'test'
+  ...
+# Subtest: Sales section unavailable includes Retry
+ok 564 - Sales section unavailable includes Retry
+  ---
+  duration_ms: 21.22497
+  type: 'test'
+  ...
+# Subtest: Sales section empty state contains no View or mutation controls
+ok 565 - Sales section empty state contains no View or mutation controls
+  ---
+  duration_ms: 40.419014
+  type: 'test'
+  ...
+# Subtest: Sales section account/focus/connectivity changes invalidate mounted content
+ok 566 - Sales section account/focus/connectivity changes invalidate mounted content
+  ---
+  duration_ms: 23.144421
+  type: 'test'
+  ...
+# Subtest: existing Sale viewer ignores Piece-origin route snapshot and hides Edit
+ok 567 - existing Sale viewer ignores Piece-origin route snapshot and hides Edit
+  ---
+  duration_ms: 49.336625
+  type: 'test'
+  ...
+# Subtest: Sale viewer error removes all details and photos
+ok 568 - Sale viewer error removes all details and photos
+  ---
+  duration_ms: 38.428219
+  type: 'test'
+  ...
+# Subtest: Sale viewer unavailable removes all details and photos
+ok 569 - Sale viewer unavailable removes all details and photos
+  ---
+  duration_ms: 60.866502
+  type: 'test'
+  ...
+# Subtest: normal Sales-origin viewer retains Edit and same renderer
+ok 570 - normal Sales-origin viewer retains Edit and same renderer
+  ---
+  duration_ms: 23.351243
+  type: 'test'
+  ...
+# Subtest: viewer identity changes on account logout focus and connectivity
+ok 571 - viewer identity changes on account logout focus and connectivity
+  ---
+  duration_ms: 76.730324
+  type: 'test'
+  ...
+# Subtest: Studio navigation reuses SaleDetail and Piece detail mounts Sales section
+ok 572 - Studio navigation reuses SaleDetail and Piece detail mounts Sales section
+  ---
+  duration_ms: 0.725864
+  type: 'test'
+  ...
+# (node:204) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: linked list confirms server Piece and retains empty ready state
+ok 573 - linked list confirms server Piece and retains empty ready state
+  ---
+  duration_ms: 340.794606
+  type: 'test'
+  ...
+# Subtest: multiple links use canonical details and exclude linked picker entries
+ok 574 - multiple links use canonical details and exclude linked picker entries
+  ---
+  duration_ms: 67.642456
+  type: 'test'
+  ...
+# Subtest: Link sends explicit ID and refetches server state
+ok 575 - Link sends explicit ID and refetches server state
+  ---
+  duration_ms: 31.946103
+  type: 'test'
+  ...
+# Subtest: Unlink sends target route and refetches
+ok 576 - Unlink sends target route and refetches
+  ---
+  duration_ms: 64.017204
+  type: 'test'
+  ...
+# Subtest: View emits only ID for existing read-only viewer authorization
+ok 577 - View emits only ID for existing read-only viewer authorization
+  ---
+  duration_ms: 52.255253
+  type: 'test'
+  ...
+# Subtest: ineligible Piece makes no relationship request {"id":"local_123"}
+ok 578 - ineligible Piece makes no relationship request {"id":"local_123"}
+  ---
+  duration_ms: 43.8578
+  type: 'test'
+  ...
+# Subtest: ineligible Piece makes no relationship request {"id":"p","synced":0}
+ok 579 - ineligible Piece makes no relationship request {"id":"p","synced":0}
+  ---
+  duration_ms: 40.438389
+  type: 'test'
+  ...
+# Subtest: ineligible Piece makes no relationship request {"id":"p","synced":false}
+ok 580 - ineligible Piece makes no relationship request {"id":"p","synced":false}
+  ---
+  duration_ms: 28.011971
+  type: 'test'
+  ...
+# Subtest: ineligible Piece makes no relationship request {"id":"p","synced":"0"}
+ok 581 - ineligible Piece makes no relationship request {"id":"p","synced":"0"}
+  ---
+  duration_ms: 58.684509
+  type: 'test'
+  ...
+# Subtest: ineligible Piece makes no relationship request {}
+ok 582 - ineligible Piece makes no relationship request {}
+  ---
+  duration_ms: 28.607913
+  type: 'test'
+  ...
+# Subtest: synced local record uses its serverId and confirms it
+ok 583 - synced local record uses its serverId and confirms it
+  ---
+  duration_ms: 45.664872
+  type: 'test'
+  ...
+# Subtest: unconfirmed server Piece cannot mutate
+ok 584 - unconfirmed server Piece cannot mutate
+  ---
+  duration_ms: 26.901362
+  type: 'test'
+  ...
+# Subtest: legacy availability does not masquerade as empty
+ok 585 - legacy availability does not masquerade as empty
+  ---
+  duration_ms: 80.623866
+  type: 'test'
+  ...
+# Subtest: offline failure neither fabricates nor queues association and Retry recovers
+ok 586 - offline failure neither fabricates nor queues association and Retry recovers
+  ---
+  duration_ms: 27.864993
+  type: 'test'
+  ...
+# Subtest: rapid repeated mutation sends once
+ok 587 - rapid repeated mutation sends once
+  ---
+  duration_ms: 25.760193
+  type: 'test'
+  ...
+# Subtest: list rejects stale Account A response
+ok 588 - list rejects stale Account A response
+  ---
+  duration_ms: 34.917109
+  type: 'test'
+  ...
+# Subtest: POST rejects stale Account A response
+ok 589 - POST rejects stale Account A response
+  ---
+  duration_ms: 55.886534
+  type: 'test'
+  ...
+# Subtest: DELETE rejects stale Account A response
+ok 590 - DELETE rejects stale Account A response
+  ---
+  duration_ms: 30.270999
+  type: 'test'
+  ...
+# Subtest: same-account token generation change rejects old response
+ok 591 - same-account token generation change rejects old response
+  ---
+  duration_ms: 32.170972
+  type: 'test'
+  ...
+# Subtest: navigation disposal rejects late response
+ok 592 - navigation disposal rejects late response
+  ---
+  duration_ms: 23.147325
+  type: 'test'
+  ...
+# Subtest: navigation rejects stale POST
+ok 593 - navigation rejects stale POST
+  ---
+  duration_ms: 31.88442
+  type: 'test'
+  ...
+# Subtest: navigation rejects stale DELETE
+ok 594 - navigation rejects stale DELETE
+  ---
+  duration_ms: 34.389674
+  type: 'test'
+  ...
+# Subtest: logout prevents subsequent requests
+ok 595 - logout prevents subsequent requests
+  ---
+  duration_ms: 39.786396
+  type: 'test'
+  ...
+# Subtest: 403 list locks and clears linked and picker data
+ok 596 - 403 list locks and clears linked and picker data
+  ---
+  duration_ms: 35.140206
+  type: 'test'
+  ...
+# Subtest: 403 POST locks and clears linked and picker data
+ok 597 - 403 POST locks and clears linked and picker data
+  ---
+  duration_ms: 25.858251
+  type: 'test'
+  ...
+# Subtest: 403 DELETE locks and clears linked and picker data
+ok 598 - 403 DELETE locks and clears linked and picker data
+  ---
+  duration_ms: 71.217192
+  type: 'test'
+  ...
+# Subtest: same account entitlement event clears selection state and blocks mutation
+ok 599 - same account entitlement event clears selection state and blocks mutation
+  ---
+  duration_ms: 25.545719
+  type: 'test'
+  ...
+# Subtest: entitlement event rejects pending relationship response
+ok 600 - entitlement event rejects pending relationship response
+  ---
+  duration_ms: 26.773349
+  type: 'test'
+  ...
+# Subtest: failed fresh Piece confirmation invalidates prior permission
+ok 601 - failed fresh Piece confirmation invalidates prior permission
+  ---
+  duration_ms: 38.994753
+  type: 'test'
+  ...
+# Subtest: viewer loads fresh detail and clears while loading
+ok 602 - viewer loads fresh detail and clears while loading
+  ---
+  duration_ms: 19.502474
+  type: 'test'
+  ...
+# Subtest: viewer 403 clears all old content and retry reauthorizes
+ok 603 - viewer 403 clears all old content and retry reauthorizes
+  ---
+  duration_ms: 57.869872
+  type: 'test'
+  ...
+# Subtest: viewer 404 clears all old content and retry reauthorizes
+ok 604 - viewer 404 clears all old content and retry reauthorizes
+  ---
+  duration_ms: 22.879953
+  type: 'test'
+  ...
+# Subtest: viewer 500 clears all old content and retry reauthorizes
+ok 605 - viewer 500 clears all old content and retry reauthorizes
+  ---
+  duration_ms: 33.866707
+  type: 'test'
+  ...
+# Subtest: viewer rejects pending account
+ok 606 - viewer rejects pending account
+  ---
+  duration_ms: 28.051915
+  type: 'test'
+  ...
+# Subtest: viewer rejects pending close
+ok 607 - viewer rejects pending close
+  ---
+  duration_ms: 16.270335
+  type: 'test'
+  ...
+# Subtest: viewer rejects pending loss
+ok 608 - viewer rejects pending loss
+  ---
+  duration_ms: 23.36267
+  type: 'test'
+  ...
+# Subtest: viewer newest request wins
+ok 609 - viewer newest request wins
+  ---
+  duration_ms: 15.67668
+  type: 'test'
+  ...
+# Subtest: relationship originating session cannot load in another account
+ok 610 - relationship originating session cannot load in another account
+  ---
+  duration_ms: 35.739898
+  type: 'test'
+  ...
+# Subtest: same-account downgrade clears cached bytes and re-upgrade fetches again
+ok 611 - same-account downgrade clears cached bytes and re-upgrade fetches again
+  ---
+  duration_ms: 39.491742
+  type: 'test'
+  ...
+# Subtest: entitlement loss prevents in-flight media from recaching
+ok 612 - entitlement loss prevents in-flight media from recaching
+  ---
+  duration_ms: 85.192309
+  type: 'test'
+  ...
+# Subtest: protected photo 403 emits entitlement loss
+ok 613 - protected photo 403 emits entitlement loss
+  ---
+  duration_ms: 27.410259
+  type: 'test'
+  ...
+# Subtest: viewer screen gates stale route payload and all edit actions
+ok 614 - viewer screen gates stale route payload and all edit actions
+  ---
+  duration_ms: 0.164018
+  type: 'test'
+  ...
+# Subtest: mobile controls follow focus connectivity session and navigate by ID
+ok 615 - mobile controls follow focus connectivity session and navigate by ID
+  ---
+  duration_ms: 1.212897
+  type: 'test'
+  ...
+# Subtest: shared mobile controls render selection Link View and Unlink
+ok 616 - shared mobile controls render selection Link View and Unlink
+  ---
+  duration_ms: 55.132468
+  type: 'test'
+  ...
+# Subtest: mobile linked View navigates to the existing read-only Test Tile screen
+ok 617 - mobile linked View navigates to the existing read-only Test Tile screen
+  ---
+  duration_ms: 62.623624
+  type: 'test'
+  ...
+# Subtest: mobile account session offline and navigation changes remount private controls
+ok 618 - mobile account session offline and navigation changes remount private controls
+  ---
+  duration_ms: 42.821669
+  type: 'test'
+  ...
+# Subtest: Piece detail retains edit delete and protected photo workflows
+ok 619 - Piece detail retains edit delete and protected photo workflows
+  ---
+  duration_ms: 0.194774
+  type: 'test'
+  ...
+# Subtest: mobile locked renders Retry without tile payload or picker
+ok 620 - mobile locked renders Retry without tile payload or picker
+  ---
+  duration_ms: 27.700787
+  type: 'test'
+  ...
+# Subtest: mobile unavailable renders Retry without tile payload or picker
+ok 621 - mobile unavailable renders Retry without tile payload or picker
+  ---
+  duration_ms: 47.745338
+  type: 'test'
+  ...
+# Subtest: mobile error renders Retry without tile payload or picker
+ok 622 - mobile error renders Retry without tile payload or picker
+  ---
+  duration_ms: 31.129002
+  type: 'test'
+  ...
+# Subtest: mobile explicit picker selection enables Link and sends selected ID
+ok 623 - mobile explicit picker selection enables Link and sends selected ID
+  ---
+  duration_ms: 48.466033
+  type: 'test'
+  ...
+# (node:212) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: mobile private Pricing uses protected authenticated URL and no-store
+ok 624 - mobile private Pricing uses protected authenticated URL and no-store
+  ---
+  duration_ms: 267.563094
+  type: 'test'
+  ...
+# Subtest: mobile Pricing delivery contract never guesses historical visibility
+ok 625 - mobile Pricing delivery contract never guesses historical visibility
+  ---
+  duration_ms: 77.529874
+  type: 'test'
+  ...
+# Subtest: mobile cached blob reused only within current account session
+ok 626 - mobile cached blob reused only within current account session
+  ---
+  duration_ms: 34.814615
+  type: 'test'
+  ...
+# Subtest: mobile late Account A blob is revoked and cannot populate Account B
+ok 627 - mobile late Account A blob is revoked and cannot populate Account B
+  ---
+  duration_ms: 59.517594
+  type: 'test'
+  ...
+# Subtest: mobile native local filename is session-scoped and removed on logout
+ok 628 - mobile native local filename is session-scoped and removed on logout
+  ---
+  duration_ms: 28.540302
+  type: 'test'
+  ...
+# Subtest: mobile native stale downloads are deleted on both platforms
+ok 629 - mobile native stale downloads are deleted on both platforms
+  ---
+  duration_ms: 79.28573
+  type: 'test'
+  ...
+# Subtest: mobile native partial failed download is cleaned without global logout
+ok 630 - mobile native partial failed download is cleaned without global logout
+  ---
+  duration_ms: 16.12153
+  type: 'test'
+  ...
+# Subtest: mobile missing auth and failed photo never fall back to uploads
+ok 631 - mobile missing auth and failed photo never fall back to uploads
+  ---
+  duration_ms: 22.229634
+  type: 'test'
+  ...
+# Subtest: mobile same-account session replacement also invalidates private cache
+ok 632 - mobile same-account session replacement also invalidates private cache
+  ---
+  duration_ms: 31.989038
+  type: 'test'
+  ...
+# Subtest: mobile replacement filename invalidates cached Pricing pixels
+ok 633 - mobile replacement filename invalidates cached Pricing pixels
+  ---
+  duration_ms: 21.982
+  type: 'test'
+  ...
+# Subtest: Pricing cache separates parent ID and photo ID even for duplicate filenames
+ok 634 - Pricing cache separates parent ID and photo ID even for duplicate filenames
+  ---
+  duration_ms: 32.004401
+  type: 'test'
+  ...
+# Subtest: Pricing hook renders authenticated photo and immediately hides Account A pixels on replacement
+ok 635 - Pricing hook renders authenticated photo and immediately hides Account A pixels on replacement
+  ---
+  duration_ms: 105.613867
+  type: 'test'
+  ...
+# Subtest: Pricing hook rejects late Account A completion and stale auth failure
+ok 636 - Pricing hook rejects late Account A completion and stale auth failure
+  ---
+  duration_ms: 102.076638
+  type: 'test'
+  ...
+# Subtest: Pricing image decode failure replaces only that image with local placeholder
+ok 637 - Pricing image decode failure replaces only that image with local placeholder
+  ---
+  duration_ms: 38.511455
+  type: 'test'
+  ...
+# Subtest: Pricing list and reopened editor share loader; no new photo export
+ok 638 - Pricing list and reopened editor share loader; no new photo export
+  ---
+  duration_ms: 2.150029
+  type: 'test'
+  ...
+# Subtest: Pricing save cannot cross accounts during local image preparation
+ok 639 - Pricing save cannot cross accounts during local image preparation
+  ---
+  duration_ms: 218.564138
+  type: 'test'
+  ...
+# Subtest: Pricing request rejects account switch during token lookup
+ok 640 - Pricing request rejects account switch during token lookup
+  ---
+  duration_ms: 160.865955
+  type: 'test'
+  ...
+# Subtest: late Pricing 401 cannot erase replacement account credentials
+ok 641 - late Pricing 401 cannot erase replacement account credentials
+  ---
+  duration_ms: 142.981549
+  type: 'test'
+  ...
+# (node:220) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: mobile private Profile uses protected authenticated URL and no-store
+ok 642 - mobile private Profile uses protected authenticated URL and no-store
+  ---
+  duration_ms: 353.595148
+  type: 'test'
+  ...
+# Subtest: mobile Profile delivery contract never guesses historical visibility
+ok 643 - mobile Profile delivery contract never guesses historical visibility
+  ---
+  duration_ms: 32.008167
+  type: 'test'
+  ...
+# Subtest: mobile cached blob reused only within current account session
+ok 644 - mobile cached blob reused only within current account session
+  ---
+  duration_ms: 30.999757
+  type: 'test'
+  ...
+# Subtest: mobile late Account A blob is revoked and cannot populate Account B
+ok 645 - mobile late Account A blob is revoked and cannot populate Account B
+  ---
+  duration_ms: 39.762209
+  type: 'test'
+  ...
+# Subtest: mobile native local filename is session-scoped and removed on logout
+ok 646 - mobile native local filename is session-scoped and removed on logout
+  ---
+  duration_ms: 27.907889
+  type: 'test'
+  ...
+# Subtest: mobile native stale downloads are deleted on both platforms
+ok 647 - mobile native stale downloads are deleted on both platforms
+  ---
+  duration_ms: 52.366
+  type: 'test'
+  ...
+# Subtest: mobile native partial failed download is cleaned without global logout
+ok 648 - mobile native partial failed download is cleaned without global logout
+  ---
+  duration_ms: 23.197862
+  type: 'test'
+  ...
+# Subtest: mobile missing auth and failed photo never fall back to uploads
+ok 649 - mobile missing auth and failed photo never fall back to uploads
+  ---
+  duration_ms: 9.242075
+  type: 'test'
+  ...
+# Subtest: mobile same-account session replacement also invalidates private cache
+ok 650 - mobile same-account session replacement also invalidates private cache
+  ---
+  duration_ms: 20.278674
+  type: 'test'
+  ...
+# Subtest: mobile replacement filename invalidates cached Profile pixels
+ok 651 - mobile replacement filename invalidates cached Profile pixels
+  ---
+  duration_ms: 18.56431
+  type: 'test'
+  ...
+# Subtest: Profile hook renders authenticated photo and immediately hides Account A pixels on replacement
+ok 652 - Profile hook renders authenticated photo and immediately hides Account A pixels on replacement
+  ---
+  duration_ms: 102.762742
+  type: 'test'
+  ...
+# Subtest: Profile hook rejects late Account A completion and stale auth failure
+ok 653 - Profile hook rejects late Account A completion and stale auth failure
+  ---
+  duration_ms: 91.34567
+  type: 'test'
+  ...
+# Subtest: Profile image decode failure replaces only that image with local placeholder
+ok 654 - Profile image decode failure replaces only that image with local placeholder
+  ---
+  duration_ms: 27.773897
+  type: 'test'
+  ...
+# Subtest: mobile explicitly public avatar uses token-free directory URL
+ok 655 - mobile explicitly public avatar uses token-free directory URL
+  ---
+  duration_ms: 7.500511
+  type: 'test'
+  ...
+# Subtest: mobile community uses authenticated route and separate cache context
+ok 656 - mobile community uses authenticated route and separate cache context
+  ---
+  duration_ms: 22.477337
+  type: 'test'
+  ...
+# Subtest: owner editing never produces persistent credential or static fallback URLs
+ok 657 - owner editing never produces persistent credential or static fallback URLs
+  ---
+  duration_ms: 0.753755
+  type: 'test'
+  ...
+# Subtest: Profile request rejects account switch during token lookup
+ok 658 - Profile request rejects account switch during token lookup
+  ---
+  duration_ms: 197.940895
+  type: 'test'
+  ...
+# Subtest: late Profile 401 cannot erase replacement account credentials
+ok 659 - late Profile 401 cannot erase replacement account credentials
+  ---
+  duration_ms: 143.362693
+  type: 'test'
+  ...
+# Subtest: avatar upload rejects account switch during local file preparation
+ok 660 - avatar upload rejects account switch during local file preparation
+  ---
+  duration_ms: 240.947358
+  type: 'test'
+  ...
+# Subtest: Profile hook expires only current session on 401
+ok 661 - Profile hook expires only current session on 401
+  ---
+  duration_ms: 21.560384
+  type: 'test'
+  ...
+# Subtest: owner avatar hook never displays another profile even with a late resolved blob
+ok 662 - owner avatar hook never displays another profile even with a late resolved blob
+  ---
+  duration_ms: 37.16748
+  type: 'test'
+  ...
+# (node:228) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: mobile private Project uses protected authenticated URL and no-store
+ok 663 - mobile private Project uses protected authenticated URL and no-store
+  ---
+  duration_ms: 374.069221
+  type: 'test'
+  ...
+# Subtest: mobile Project delivery contract never guesses historical visibility
+ok 664 - mobile Project delivery contract never guesses historical visibility
+  ---
+  duration_ms: 59.079395
+  type: 'test'
+  ...
+# Subtest: mobile cached blob reused only within current account session
+ok 665 - mobile cached blob reused only within current account session
+  ---
+  duration_ms: 34.974996
+  type: 'test'
+  ...
+# Subtest: mobile late Account A blob is revoked and cannot populate Account B
+ok 666 - mobile late Account A blob is revoked and cannot populate Account B
+  ---
+  duration_ms: 57.999838
+  type: 'test'
+  ...
+# Subtest: mobile native local filename is session-scoped and removed on logout
+ok 667 - mobile native local filename is session-scoped and removed on logout
+  ---
+  duration_ms: 31.205317
+  type: 'test'
+  ...
+# Subtest: mobile native stale downloads are deleted on both platforms
+ok 668 - mobile native stale downloads are deleted on both platforms
+  ---
+  duration_ms: 59.624126
+  type: 'test'
+  ...
+# Subtest: mobile native partial failed download is cleaned without global logout
+ok 669 - mobile native partial failed download is cleaned without global logout
+  ---
+  duration_ms: 19.172216
+  type: 'test'
+  ...
+# Subtest: mobile missing auth and failed photo never fall back to uploads
+ok 670 - mobile missing auth and failed photo never fall back to uploads
+  ---
+  duration_ms: 26.020185
+  type: 'test'
+  ...
+# Subtest: mobile same-account session replacement also invalidates private cache
+ok 671 - mobile same-account session replacement also invalidates private cache
+  ---
+  duration_ms: 28.981546
+  type: 'test'
+  ...
+# Subtest: mobile replacement filename invalidates cached Project pixels
+ok 672 - mobile replacement filename invalidates cached Project pixels
+  ---
+  duration_ms: 28.425199
+  type: 'test'
+  ...
+# Subtest: Project cache separates parent ID and photo ID even for duplicate filenames
+ok 673 - Project cache separates parent ID and photo ID even for duplicate filenames
+  ---
+  duration_ms: 27.279862
+  type: 'test'
+  ...
+# Subtest: Project hook renders authenticated photo and immediately hides Account A pixels on replacement
+ok 674 - Project hook renders authenticated photo and immediately hides Account A pixels on replacement
+  ---
+  duration_ms: 100.225168
+  type: 'test'
+  ...
+# Subtest: Project hook rejects late Account A completion and stale auth failure
+ok 675 - Project hook rejects late Account A completion and stale auth failure
+  ---
+  duration_ms: 101.744498
+  type: 'test'
+  ...
+# Subtest: Project image decode failure replaces only that image with local placeholder
+ok 676 - Project image decode failure replaces only that image with local placeholder
+  ---
+  duration_ms: 50.520749
+  type: 'test'
+  ...
+# Subtest: Project editor sends parent and photo identity and cannot save after session switch
+ok 677 - Project editor sends parent and photo identity and cannot save after session switch
+  ---
+  duration_ms: 54.824102
+  type: 'test'
+  ...
+# Subtest: Project existing detail gallery uses protected editor; list and shares omit photos
+ok 678 - Project existing detail gallery uses protected editor; list and shares omit photos
+  ---
+  duration_ms: 3.156967
+  type: 'test'
+  ...
+# Subtest: Project save cannot cross accounts during local image preparation
+ok 679 - Project save cannot cross accounts during local image preparation
+  ---
+  duration_ms: 204.696554
+  type: 'test'
+  ...
+# Subtest: Project request rejects account switch during token lookup
+ok 680 - Project request rejects account switch during token lookup
+  ---
+  duration_ms: 172.51054
+  type: 'test'
+  ...
+# Subtest: late Project 401 cannot erase replacement account credentials
+ok 681 - late Project 401 cannot erase replacement account credentials
+  ---
+  duration_ms: 147.197811
+  type: 'test'
+  ...
+# (node:236) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: mobile private Sale uses protected authenticated URL and no-store
+ok 682 - mobile private Sale uses protected authenticated URL and no-store
+  ---
+  duration_ms: 392.926778
+  type: 'test'
+  ...
+# Subtest: mobile Sale delivery contract never guesses historical visibility
+ok 683 - mobile Sale delivery contract never guesses historical visibility
+  ---
+  duration_ms: 60.932206
+  type: 'test'
+  ...
+# Subtest: mobile cached blob reused only within current account session
+ok 684 - mobile cached blob reused only within current account session
+  ---
+  duration_ms: 26.378354
+  type: 'test'
+  ...
+# Subtest: mobile late Account A blob is revoked and cannot populate Account B
+ok 685 - mobile late Account A blob is revoked and cannot populate Account B
+  ---
+  duration_ms: 41.068387
+  type: 'test'
+  ...
+# Subtest: mobile native local filename is session-scoped and removed on logout
+ok 686 - mobile native local filename is session-scoped and removed on logout
+  ---
+  duration_ms: 28.013578
+  type: 'test'
+  ...
+# Subtest: mobile native stale downloads are deleted on both platforms
+ok 687 - mobile native stale downloads are deleted on both platforms
+  ---
+  duration_ms: 37.521855
+  type: 'test'
+  ...
+# Subtest: mobile native partial failed download is cleaned without global logout
+ok 688 - mobile native partial failed download is cleaned without global logout
+  ---
+  duration_ms: 30.491041
+  type: 'test'
+  ...
+# Subtest: mobile missing auth and failed photo never fall back to uploads
+ok 689 - mobile missing auth and failed photo never fall back to uploads
+  ---
+  duration_ms: 19.876058
+  type: 'test'
+  ...
+# Subtest: mobile same-account session replacement also invalidates private cache
+ok 690 - mobile same-account session replacement also invalidates private cache
+  ---
+  duration_ms: 17.762412
+  type: 'test'
+  ...
+# Subtest: mobile replacement filename invalidates cached Sale pixels
+ok 691 - mobile replacement filename invalidates cached Sale pixels
+  ---
+  duration_ms: 22.741044
+  type: 'test'
+  ...
+# Subtest: Sale cache separates parent ID and photo ID even for duplicate filenames
+ok 692 - Sale cache separates parent ID and photo ID even for duplicate filenames
+  ---
+  duration_ms: 25.671049
+  type: 'test'
+  ...
+# Subtest: Sale hook renders authenticated photo and immediately hides Account A pixels on replacement
+ok 693 - Sale hook renders authenticated photo and immediately hides Account A pixels on replacement
+  ---
+  duration_ms: 68.705568
+  type: 'test'
+  ...
+# Subtest: Sale hook rejects late Account A completion and stale auth failure
+ok 694 - Sale hook rejects late Account A completion and stale auth failure
+  ---
+  duration_ms: 67.818632
+  type: 'test'
+  ...
+# Subtest: Sale image decode failure replaces only that image with local placeholder
+ok 695 - Sale image decode failure replaces only that image with local placeholder
+  ---
+  duration_ms: 32.033043
+  type: 'test'
+  ...
+# Subtest: Sale list detail and editor use shared protected media; CSV exports unchanged
+ok 696 - Sale list detail and editor use shared protected media; CSV exports unchanged
+  ---
+  duration_ms: 1.435693
+  type: 'test'
+  ...
+# Subtest: Sale save cannot cross accounts during local image preparation
+ok 697 - Sale save cannot cross accounts during local image preparation
+  ---
+  duration_ms: 219.034762
+  type: 'test'
+  ...
+# Subtest: Sale request rejects account switch during token lookup
+ok 698 - Sale request rejects account switch during token lookup
+  ---
+  duration_ms: 193.222467
+  type: 'test'
+  ...
+# Subtest: late Sale 401 cannot erase replacement account credentials
+ok 699 - late Sale 401 cannot erase replacement account credentials
+  ---
+  duration_ms: 193.737007
+  type: 'test'
+  ...
+# Subtest: regular Sale with local photo sends exactly one atomic multipart create
+ok 700 - regular Sale with local photo sends exactly one atomic multipart create
+  ---
+  duration_ms: 113.805184
+  type: 'test'
+  ...
+# Subtest: Quick Sale saved row uses same atomic photo replacement without a Piece
+ok 701 - Quick Sale saved row uses same atomic photo replacement without a Piece
+  ---
+  duration_ms: 93.378943
+  type: 'test'
+  ...
+# Subtest: regular Piece-linked and Quick Sale photos use Sale ID authority
+ok 702 - regular Piece-linked and Quick Sale photos use Sale ID authority
+  ---
+  duration_ms: 11.503262
+  type: 'test'
+  ...
+# (node:244) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: catalog URL is product scoped and anonymous
+ok 703 - catalog URL is product scoped and anonymous
+  ---
+  duration_ms: 302.607666
+  type: 'test'
+  ...
+# Subtest: merchant media carries header only
+ok 704 - merchant media carries header only
+  ---
+  duration_ms: 28.833833
+  type: 'test'
+  ...
+# Subtest: purchased download uses order scoped authenticated route
+ok 705 - purchased download uses order scoped authenticated route
+  ---
+  duration_ms: 36.343798
+  type: 'test'
+  ...
+# Subtest: repeat download reauthorizes entitlement instead of returning cached bytes
+ok 706 - repeat download reauthorizes entitlement instead of returning cached bytes
+  ---
+  duration_ms: 31.029912
+  type: 'test'
+  ...
+# Subtest: ambiguous client media identity denied
+ok 707 - ambiguous client media identity denied
+  ---
+  duration_ms: 21.50735
+  type: 'test'
+  ...
+# Subtest: logout clears private images and purchased downloads
+ok 708 - logout clears private images and purchased downloads
+  ---
+  duration_ms: 21.487455
+  type: 'test'
+  ...
+# Subtest: account identity cannot be supplied for a different session
+ok 709 - account identity cannot be supplied for a different session
+  ---
+  duration_ms: 16.978292
+  type: 'test'
+  ...
+# Subtest: late image never crosses sessions
+ok 710 - late image never crosses sessions
+  ---
+  duration_ms: 31.080579
+  type: 'test'
+  ...
+# Subtest: late download never crosses sessions
+ok 711 - late download never crosses sessions
+  ---
+  duration_ms: 25.71883
+  type: 'test'
+  ...
+# Subtest: same-account replacement is a fresh media session
+ok 712 - same-account replacement is a fresh media session
+  ---
+  duration_ms: 10.691379
+  type: 'test'
+  ...
+# Subtest: protected 401 has no static fallback
+ok 713 - protected 401 has no static fallback
+  ---
+  duration_ms: 14.187487
+  type: 'test'
+  ...
+# Subtest: protected 404 has no static fallback
+ok 714 - protected 404 has no static fallback
+  ---
+  duration_ms: 28.477496
+  type: 'test'
+  ...
+# Subtest: missing credentials do not attempt private fetch
+ok 715 - missing credentials do not attempt private fetch
+  ---
+  duration_ms: 13.545824
+  type: 'test'
+  ...
+# Subtest: ios uses ephemeral session files and removes on logout
+ok 716 - ios uses ephemeral session files and removes on logout
+  ---
+  duration_ms: 10.133629
+  type: 'test'
+  ...
+# Subtest: ios late file rejected and partial failure removed
+ok 717 - ios late file rejected and partial failure removed
+  ---
+  duration_ms: 48.661928
+  type: 'test'
+  ...
+# Subtest: android uses ephemeral session files and removes on logout
+ok 718 - android uses ephemeral session files and removes on logout
+  ---
+  duration_ms: 18.967668
+  type: 'test'
+  ...
+# Subtest: android late file rejected and partial failure removed
+ok 719 - android late file rejected and partial failure removed
+  ---
+  duration_ms: 26.009158
+  type: 'test'
+  ...
+# Subtest: caller can release a completed private resource immediately
+ok 720 - caller can release a completed private resource immediately
+  ---
+  duration_ms: 10.980885
+  type: 'test'
+  ...
+# Subtest: shared catalog list detail and public sample retain their roles
+ok 721 - shared catalog list detail and public sample retain their roles
+  ---
+  duration_ms: 0.864392
+  type: 'test'
+  ...
+# Subtest: catalog component renders product URL without auth headers
+ok 722 - catalog component renders product URL without auth headers
+  ---
+  duration_ms: 38.142889
+  type: 'test'
+  ...
+# Subtest: catalog decode failure stays local and another product still renders
+ok 723 - catalog decode failure stays local and another product still renders
+  ---
+  duration_ms: 29.21672
+  type: 'test'
+  ...
+# Subtest: late download error cannot expire a replacement session
+ok 724 - late download error cannot expire a replacement session
+  ---
+  duration_ms: 19.427842
+  type: 'test'
+  ...
+# Subtest: current expiry clears prior private files and rejects concurrent completion
+ok 725 - current expiry clears prior private files and rejects concurrent completion
+  ---
+  duration_ms: 9.925755
+  type: 'test'
+  ...
+# (node:252) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: literal successful Search is read-only, no-store and preserves backend order
+ok 726 - literal successful Search is read-only, no-store and preserves backend order
+  ---
+  duration_ms: 366.38906
+  type: 'test'
+  ...
+# Subtest: piece filter, label and ID-only canonical destination
+ok 727 - piece filter, label and ID-only canonical destination
+  ---
+  duration_ms: 95.329932
+  type: 'test'
+  ...
+# Subtest: piece freshly authorizes canonical record, ignoring card data
+ok 728 - piece freshly authorizes canonical record, ignoring card data
+  ---
+  duration_ms: 49.381633
+  type: 'test'
+  ...
+# Subtest: piece owner change or deleted record fails closed
+ok 729 - piece owner change or deleted record fails closed
+  ---
+  duration_ms: 49.621865
+  type: 'test'
+  ...
+# Subtest: clay filter, label and ID-only canonical destination
+ok 730 - clay filter, label and ID-only canonical destination
+  ---
+  duration_ms: 36.569689
+  type: 'test'
+  ...
+# Subtest: clay freshly authorizes canonical record, ignoring card data
+ok 731 - clay freshly authorizes canonical record, ignoring card data
+  ---
+  duration_ms: 38.82684
+  type: 'test'
+  ...
+# Subtest: clay owner change or deleted record fails closed
+ok 732 - clay owner change or deleted record fails closed
+  ---
+  duration_ms: 58.101241
+  type: 'test'
+  ...
+# Subtest: glaze filter, label and ID-only canonical destination
+ok 733 - glaze filter, label and ID-only canonical destination
+  ---
+  duration_ms: 22.009852
+  type: 'test'
+  ...
+# Subtest: glaze freshly authorizes canonical record, ignoring card data
+ok 734 - glaze freshly authorizes canonical record, ignoring card data
+  ---
+  duration_ms: 34.317435
+  type: 'test'
+  ...
+# Subtest: glaze owner change or deleted record fails closed
+ok 735 - glaze owner change or deleted record fails closed
+  ---
+  duration_ms: 46.153495
+  type: 'test'
+  ...
+# Subtest: raw-material filter, label and ID-only canonical destination
+ok 736 - raw-material filter, label and ID-only canonical destination
+  ---
+  duration_ms: 25.631649
+  type: 'test'
+  ...
+# Subtest: raw-material freshly authorizes canonical record, ignoring card data
+ok 737 - raw-material freshly authorizes canonical record, ignoring card data
+  ---
+  duration_ms: 24.778343
+  type: 'test'
+  ...
+# Subtest: raw-material owner change or deleted record fails closed
+ok 738 - raw-material owner change or deleted record fails closed
+  ---
+  duration_ms: 32.859409
+  type: 'test'
+  ...
+# Subtest: test-tile filter, label and ID-only canonical destination
+ok 739 - test-tile filter, label and ID-only canonical destination
+  ---
+  duration_ms: 22.655024
+  type: 'test'
+  ...
+# Subtest: test-tile freshly authorizes canonical record, ignoring card data
+ok 740 - test-tile freshly authorizes canonical record, ignoring card data
+  ---
+  duration_ms: 29.002578
+  type: 'test'
+  ...
+# Subtest: test-tile owner change or deleted record fails closed
+ok 741 - test-tile owner change or deleted record fails closed
+  ---
+  duration_ms: 16.773532
+  type: 'test'
+  ...
+# Subtest: firing filter, label and ID-only canonical destination
+ok 742 - firing filter, label and ID-only canonical destination
+  ---
+  duration_ms: 35.100156
+  type: 'test'
+  ...
+# Subtest: firing freshly authorizes canonical record, ignoring card data
+ok 743 - firing freshly authorizes canonical record, ignoring card data
+  ---
+  duration_ms: 23.728632
+  type: 'test'
+  ...
+# Subtest: firing owner change or deleted record fails closed
+ok 744 - firing owner change or deleted record fails closed
+  ---
+  duration_ms: 34.781415
+  type: 'test'
+  ...
+# Subtest: pricing filter, label and ID-only canonical destination
+ok 745 - pricing filter, label and ID-only canonical destination
+  ---
+  duration_ms: 41.841803
+  type: 'test'
+  ...
+# Subtest: pricing freshly authorizes canonical record, ignoring card data
+ok 746 - pricing freshly authorizes canonical record, ignoring card data
+  ---
+  duration_ms: 26.542631
+  type: 'test'
+  ...
+# Subtest: pricing owner change or deleted record fails closed
+ok 747 - pricing owner change or deleted record fails closed
+  ---
+  duration_ms: 31.396285
+  type: 'test'
+  ...
+# Subtest: sale filter, label and ID-only canonical destination
+ok 748 - sale filter, label and ID-only canonical destination
+  ---
+  duration_ms: 13.404005
+  type: 'test'
+  ...
+# Subtest: sale freshly authorizes canonical record, ignoring card data
+ok 749 - sale freshly authorizes canonical record, ignoring card data
+  ---
+  duration_ms: 46.916809
+  type: 'test'
+  ...
+# Subtest: sale owner change or deleted record fails closed
+ok 750 - sale owner change or deleted record fails closed
+  ---
+  duration_ms: 15.901248
+  type: 'test'
+  ...
+# Subtest: project filter, label and ID-only canonical destination
+ok 751 - project filter, label and ID-only canonical destination
+  ---
+  duration_ms: 33.859085
+  type: 'test'
+  ...
+# Subtest: project freshly authorizes canonical record, ignoring card data
+ok 752 - project freshly authorizes canonical record, ignoring card data
+  ---
+  duration_ms: 19.031454
+  type: 'test'
+  ...
+# Subtest: project owner change or deleted record fails closed
+ok 753 - project owner change or deleted record fails closed
+  ---
+  duration_ms: 25.257215
+  type: 'test'
+  ...
+# Subtest: contact filter, label and ID-only canonical destination
+ok 754 - contact filter, label and ID-only canonical destination
+  ---
+  duration_ms: 16.624778
+  type: 'test'
+  ...
+# Subtest: contact freshly authorizes canonical record, ignoring card data
+ok 755 - contact freshly authorizes canonical record, ignoring card data
+  ---
+  duration_ms: 16.142482
+  type: 'test'
+  ...
+# Subtest: contact owner change or deleted record fails closed
+ok 756 - contact owner change or deleted record fails closed
+  ---
+  duration_ms: 29.841012
+  type: 'test'
+  ...
+# Subtest: event filter, label and ID-only canonical destination
+ok 757 - event filter, label and ID-only canonical destination
+  ---
+  duration_ms: 18.904453
+  type: 'test'
+  ...
+# Subtest: event freshly authorizes canonical record, ignoring card data
+ok 758 - event freshly authorizes canonical record, ignoring card data
+  ---
+  duration_ms: 34.410652
+  type: 'test'
+  ...
+# Subtest: event owner change or deleted record fails closed
+ok 759 - event owner change or deleted record fails closed
+  ---
+  duration_ms: 15.056485
+  type: 'test'
+  ...
+# Subtest: invalid query blocked: ""
+ok 760 - invalid query blocked: ""
+  ---
+  duration_ms: 25.83109
+  type: 'test'
+  ...
+# Subtest: invalid query blocked: "x"
+ok 761 - invalid query blocked: "x"
+  ---
+  duration_ms: 31.643307
+  type: 'test'
+  ...
+# Subtest: invalid query blocked: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+ok 762 - invalid query blocked: "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  ---
+  duration_ms: 13.992833
+  type: 'test'
+  ...
+# Subtest: invalid query blocked: "one two three four five six seven eight nine"
+ok 763 - invalid query blocked: "one two three four five six seven eight nine"
+  ---
+  duration_ms: 20.779959
+  type: 'test'
+  ...
+# Subtest: invalid query blocked: "a\\nb"
+ok 764 - invalid query blocked: "a\\nb"
+  ---
+  duration_ms: 17.928583
+  type: 'test'
+  ...
+# Subtest: invalid query blocked: "\\tHi"
+ok 765 - invalid query blocked: "\\tHi"
+  ---
+  duration_ms: 15.054637
+  type: 'test'
+  ...
+# Subtest: literal valid query: clay clay CLAY
+ok 766 - literal valid query: clay clay CLAY
+  ---
+  duration_ms: 24.234264
+  type: 'test'
+  ...
+# Subtest: literal valid query:   clay  
+ok 767 - literal valid query:   clay  
+  ---
+  duration_ms: 16.087279
+  type: 'test'
+  ...
+# Subtest: literal valid query: éé
+ok 768 - literal valid query: éé
+  ---
+  duration_ms: 25.538789
+  type: 'test'
+  ...
+# Subtest: literal valid query: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+ok 769 - literal valid query: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  ---
+  duration_ms: 17.821541
+  type: 'test'
+  ...
+# Subtest: literal valid query: a%_b
+ok 770 - literal valid query: a%_b
+  ---
+  duration_ms: 26.253456
+  type: 'test'
+  ...
+# Subtest: literal valid query: <b>clay</b>
+ok 771 - literal valid query: <b>clay</b>
+  ---
+  duration_ms: 14.801811
+  type: 'test'
+  ...
+# Subtest: safe card projection drops metadata, unknown types and malformed IDs
+ok 772 - safe card projection drops metadata, unknown types and malformed IDs
+  ---
+  duration_ms: 17.004681
+  type: 'test'
+  ...
+# Subtest: locked Types purge every Test Tile field before card projection and counting
+ok 773 - locked Types purge every Test Tile field before card projection and counting
+  ---
+  duration_ms: 12.861298
+  type: 'test'
+  ...
+# Subtest: entitlement loss clears prior Tile results, pagination and in-flight response
+ok 774 - entitlement loss clears prior Tile results, pagination and in-flight response
+  ---
+  duration_ms: 39.114624
+  type: 'test'
+  ...
+# Subtest: denied Tile canonical read revokes metadata and signals access loss
+ok 775 - denied Tile canonical read revokes metadata and signals access loss
+  ---
+  duration_ms: 15.217899
+  type: 'test'
+  ...
+# Subtest: deleted canonical record is removed from selectable search metadata
+ok 776 - deleted canonical record is removed from selectable search metadata
+  ---
+  duration_ms: 19.919943
+  type: 'test'
+  ...
+# Subtest: Pricing relies on owner-scoped canonical endpoint when owner field omitted
+ok 777 - Pricing relies on owner-scoped canonical endpoint when owner field omitted
+  ---
+  duration_ms: 12.471491
+  type: 'test'
+  ...
+# Subtest: Project uses canonical protected photos from the existing detail endpoint
+ok 778 - Project uses canonical protected photos from the existing detail endpoint
+  ---
+  duration_ms: 17.137681
+  type: 'test'
+  ...
+# Subtest: loading, no-results, failure and retry states contain no server error text
+ok 779 - loading, no-results, failure and retry states contain no server error text
+  ---
+  duration_ms: 21.358921
+  type: 'test'
+  ...
+# Subtest: pagination uses nextOffset, keeps order, retries failed page without duplicating prior page
+ok 780 - pagination uses nextOffset, keeps order, retries failed page without duplicating prior page
+  ---
+  duration_ms: 16.746141
+  type: 'test'
+  ...
+# Subtest: cap prevents further requests and retains capped signal for narrow-search prompt
+ok 781 - cap prevents further requests and retains capped signal for narrow-search prompt
+  ---
+  duration_ms: 20.572737
+  type: 'test'
+  ...
+# Subtest: late response suppressed: logout
+ok 782 - late response suppressed: logout
+  ---
+  duration_ms: 18.622198
+  type: 'test'
+  ...
+# Subtest: late response suppressed: account switch
+ok 783 - late response suppressed: account switch
+  ---
+  duration_ms: 28.307971
+  type: 'test'
+  ...
+# Subtest: late response suppressed: login replacement
+ok 784 - late response suppressed: login replacement
+  ---
+  duration_ms: 14.858217
+  type: 'test'
+  ...
+# Subtest: late response suppressed: token replacement
+ok 785 - late response suppressed: token replacement
+  ---
+  duration_ms: 31.545359
+  type: 'test'
+  ...
+# Subtest: late response suppressed: clear
+ok 786 - late response suppressed: clear
+  ---
+  duration_ms: 15.334705
+  type: 'test'
+  ...
+# Subtest: late response suppressed: dispose
+ok 787 - late response suppressed: dispose
+  ---
+  duration_ms: 21.477671
+  type: 'test'
+  ...
+# Subtest: late response suppressed: newer search
+ok 788 - late response suppressed: newer search
+  ---
+  duration_ms: 20.1501
+  type: 'test'
+  ...
+# Subtest: late response suppressed: blur
+ok 789 - late response suppressed: blur
+  ---
+  duration_ms: 21.390128
+  type: 'test'
+  ...
+# Subtest: late response suppressed: disconnect
+ok 790 - late response suppressed: disconnect
+  ---
+  duration_ms: 20.525796
+  type: 'test'
+  ...
+# Subtest: late canonical record suppressed: account
+ok 791 - late canonical record suppressed: account
+  ---
+  duration_ms: 28.696737
+  type: 'test'
+  ...
+# Subtest: late canonical record suppressed: token
+ok 792 - late canonical record suppressed: token
+  ---
+  duration_ms: 18.837132
+  type: 'test'
+  ...
+# Subtest: late canonical record suppressed: logout
+ok 793 - late canonical record suppressed: logout
+  ---
+  duration_ms: 19.761885
+  type: 'test'
+  ...
+# Subtest: search no cache crosses accounts or controller instances
+ok 794 - search no cache crosses accounts or controller instances
+  ---
+  duration_ms: 12.551582
+  type: 'test'
+  ...
+# Subtest: disconnect clears results; reconnect requires fresh read and never queues a search
+ok 795 - disconnect clears results; reconnect requires fresh read and never queues a search
+  ---
+  duration_ms: 12.596008
+  type: 'test'
+  ...
+# Subtest: credential storage lifecycle invalidates before write/delete and keeps namespace
+ok 796 - credential storage lifecycle invalidates before write/delete and keeps namespace
+  ---
+  duration_ms: 18.781268
+  type: 'test'
+  ...
+# Subtest: Search component supports keyboard submit/dismissal, accessible input, scrolling and clear/focus
+ok 797 - Search component supports keyboard submit/dismissal, accessible input, scrolling and clear/focus
+  ---
+  duration_ms: 73.324407
+  type: 'test'
+  ...
+# Subtest: all 11 filters plus All are available in compact horizontal control and change submitted filter
+ok 798 - all 11 filters plus All are available in compact horizontal control and change submitted filter
+  ---
+  duration_ms: 48.267917
+  type: 'test'
+  ...
+# Subtest: result tapping passes only locator/session to canonical screen and dismisses keyboard
+ok 799 - result tapping passes only locator/session to canonical screen and dismisses keyboard
+  ---
+  duration_ms: 55.561282
+  type: 'test'
+  ...
+# Subtest: rendered cards expose only type, title, excerpt as plain Text; no IDs/HTML/paths/metadata
+ok 800 - rendered cards expose only type, title, excerpt as plain Text; no IDs/HTML/paths/metadata
+  ---
+  duration_ms: 51.953586
+  type: 'test'
+  ...
+# Subtest: locked Tile component shows explanation but no counts/title/excerpt/ID
+ok 801 - locked Tile component shows explanation but no counts/title/excerpt/ID
+  ---
+  duration_ms: 42.251737
+  type: 'test'
+  ...
+# Subtest: component renders loading, no-results, error and successful Retry
+ok 802 - component renders loading, no-results, error and successful Retry
+  ---
+  duration_ms: 58.051425
+  type: 'test'
+  ...
+# Subtest: component renders pagination, cap guidance, reconnect and retry
+ok 803 - component renders pagination, cap guidance, reconnect and retry
+  ---
+  duration_ms: 35.767446
+  type: 'test'
+  ...
+# Subtest: component remount removes text/results immediately on account
+ok 804 - component remount removes text/results immediately on account
+  ---
+  duration_ms: 37.82741
+  type: 'test'
+  ...
+# Subtest: component remount removes text/results immediately on logout
+ok 805 - component remount removes text/results immediately on logout
+  ---
+  duration_ms: 31.152853
+  type: 'test'
+  ...
+# Subtest: component remount removes text/results immediately on token
+ok 806 - component remount removes text/results immediately on token
+  ---
+  duration_ms: 32.705472
+  type: 'test'
+  ...
+# Subtest: component gate routes authorized piece to existing/gap viewer only after fresh read
+ok 807 - component gate routes authorized piece to existing/gap viewer only after fresh read
+  ---
+  duration_ms: 53.228767
+  type: 'test'
+  ...
+# Subtest: component gate routes authorized clay to existing/gap viewer only after fresh read
+ok 808 - component gate routes authorized clay to existing/gap viewer only after fresh read
+  ---
+  duration_ms: 34.741285
+  type: 'test'
+  ...
+# Subtest: component gate routes authorized glaze to existing/gap viewer only after fresh read
+ok 809 - component gate routes authorized glaze to existing/gap viewer only after fresh read
+  ---
+  duration_ms: 24.465856
+  type: 'test'
+  ...
+# Subtest: component gate routes authorized raw-material to existing/gap viewer only after fresh read
+ok 810 - component gate routes authorized raw-material to existing/gap viewer only after fresh read
+  ---
+  duration_ms: 27.094027
+  type: 'test'
+  ...
+# Subtest: component gate routes authorized test-tile to existing/gap viewer only after fresh read
+ok 811 - component gate routes authorized test-tile to existing/gap viewer only after fresh read
+  ---
+  duration_ms: 33.972242
+  type: 'test'
+  ...
+# Subtest: component gate routes authorized firing to existing/gap viewer only after fresh read
+ok 812 - component gate routes authorized firing to existing/gap viewer only after fresh read
+  ---
+  duration_ms: 26.757861
+  type: 'test'
+  ...
+# Subtest: component gate routes authorized pricing to existing/gap viewer only after fresh read
+ok 813 - component gate routes authorized pricing to existing/gap viewer only after fresh read
+  ---
+  duration_ms: 22.668438
+  type: 'test'
+  ...
+# Subtest: component gate routes authorized sale to existing/gap viewer only after fresh read
+ok 814 - component gate routes authorized sale to existing/gap viewer only after fresh read
+  ---
+  duration_ms: 30.650886
+  type: 'test'
+  ...
+# Subtest: component gate routes authorized project to existing/gap viewer only after fresh read
+ok 815 - component gate routes authorized project to existing/gap viewer only after fresh read
+  ---
+  duration_ms: 32.166831
+  type: 'test'
+  ...
+# Subtest: component gate routes authorized contact to existing/gap viewer only after fresh read
+ok 816 - component gate routes authorized contact to existing/gap viewer only after fresh read
+  ---
+  duration_ms: 27.286186
+  type: 'test'
+  ...
+# Subtest: component gate routes authorized event to existing/gap viewer only after fresh read
+ok 817 - component gate routes authorized event to existing/gap viewer only after fresh read
+  ---
+  duration_ms: 30.552343
+  type: 'test'
+  ...
+# Subtest: gate removes stale detail and protected-media subtree on account
+ok 818 - gate removes stale detail and protected-media subtree on account
+  ---
+  duration_ms: 33.244875
+  type: 'test'
+  ...
+# Subtest: gate removes stale detail and protected-media subtree on token
+ok 819 - gate removes stale detail and protected-media subtree on token
+  ---
+  duration_ms: 25.81493
+  type: 'test'
+  ...
+# Subtest: gate removes stale detail and protected-media subtree on logout
+ok 820 - gate removes stale detail and protected-media subtree on logout
+  ---
+  duration_ms: 21.643704
+  type: 'test'
+  ...
+# Subtest: gate removes stale detail and protected-media subtree on blur
+ok 821 - gate removes stale detail and protected-media subtree on blur
+  ---
+  duration_ms: 28.19104
+  type: 'test'
+  ...
+# Subtest: gate removes stale detail and protected-media subtree on offline
+ok 822 - gate removes stale detail and protected-media subtree on offline
+  ---
+  duration_ms: 25.051695
+  type: 'test'
+  ...
+# Subtest: gate removes stale detail and protected-media subtree on background
+ok 823 - gate removes stale detail and protected-media subtree on background
+  ---
+  duration_ms: 19.566784
+  type: 'test'
+  ...
+# Subtest: gate reauthorizes on reconnect and foreground; deleted record shows error without stale subtree
+ok 824 - gate reauthorizes on reconnect and foreground; deleted record shows error without stale subtree
+  ---
+  duration_ms: 25.23165
+  type: 'test'
+  ...
+# Subtest: gate handles Back, failed read Retry, and no snapshot fabrication
+ok 825 - gate handles Back, failed read Retry, and no snapshot fabrication
+  ---
+  duration_ms: 25.268075
+  type: 'test'
+  ...
+# Subtest: gate fails closed on Tile entitlement loss without repeated forbidden requests
+ok 826 - gate fails closed on Tile entitlement loss without repeated forbidden requests
+  ---
+  duration_ms: 23.301793
+  type: 'test'
+  ...
+# Subtest: gate preserves normal legacy route flow without Search network activity
+ok 827 - gate preserves normal legacy route flow without Search network activity
+  ---
+  duration_ms: 18.448099
+  type: 'test'
+  ...
+# Subtest: navigator registers every canonical Search destination on Studio stack with stable authorization wrapper
+ok 828 - navigator registers every canonical Search destination on Studio stack with stable authorization wrapper
+  ---
+  duration_ms: 15.875862
+  type: 'test'
+  ...
+# Subtest: new gap renderer is read-only and excludes raw metadata while reusing Pricing breakdown
+ok 829 - new gap renderer is read-only and excludes raw metadata while reusing Pricing breakdown
+  ---
+  duration_ms: 5.182469
+  type: 'test'
+  ...
+# Subtest: search refuses to read the old token while credential storage replacement is pending
+ok 830 - search refuses to read the old token while credential storage replacement is pending
+  ---
+  duration_ms: 10.828747
+  type: 'test'
+  ...
+# Subtest: failed credential persistence still closes pending-change window and invalidates old routes
+ok 831 - failed credential persistence still closes pending-change window and invalidates old routes
+  ---
+  duration_ms: 6.070688
+  type: 'test'
+  ...
+# Subtest: credential change immediately revokes protected media and guards an old 401 before persistence finishes
+ok 832 - credential change immediately revokes protected media and guards an old 401 before persistence finishes
+  ---
+  duration_ms: 20.415703
+  type: 'test'
+  ...
+# Subtest: secondary canonical Piece read forwards guard and rejects late 401 without clearing replacement credentials
+ok 833 - secondary canonical Piece read forwards guard and rejects late 401 without clearing replacement credentials
+  ---
+  duration_ms: 66.447076
+  type: 'test'
+  ...
+# Subtest: read-only Raw Material and Pricing canonical errors never construct detail from search card
+ok 834 - read-only Raw Material and Pricing canonical errors never construct detail from search card
+  ---
+  duration_ms: 55.921896
+  type: 'test'
+  ...
+# (node:260) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: shared Test Tile loader uses authenticated protected route and no credential URL
+ok 835 - shared Test Tile loader uses authenticated protected route and no credential URL
+  ---
+  duration_ms: 0.811943
+  type: 'test'
+  ...
+# Subtest: cache identity includes account tile slot and filename
+ok 836 - cache identity includes account tile slot and filename
+  ---
+  duration_ms: 0.11934
+  type: 'test'
+  ...
+# Subtest: visibility is explicit owner-protected only and legacy fallback remains
+ok 837 - visibility is explicit owner-protected only and legacy fallback remains
+  ---
+  duration_ms: 0.11922
+  type: 'test'
+  ...
+# Subtest: session replacement clears private Test Tile cache and stale downloads are rejected
+ok 838 - session replacement clears private Test Tile cache and stale downloads are rejected
+  ---
+  duration_ms: 0.090606
+  type: 'test'
+  ...
+# Subtest: list uses protected slot 1 and local failure placeholder
+ok 839 - list uses protected slot 1 and local failure placeholder
+  ---
+  duration_ms: 0.15278
+  type: 'test'
+  ...
+# Subtest: detail loads all three protected slots independently
+ok 840 - detail loads all three protected slots independently
+  ---
+  duration_ms: 0.19928
+  type: 'test'
+  ...
+# Subtest: editor existing previews use protected slot identities and preserve reorder controls
+ok 841 - editor existing previews use protected slot identities and preserve reorder controls
+  ---
+  duration_ms: 0.149305
+  type: 'test'
+  ...
+# Subtest: account/session generation is observed by list detail and editor
+ok 842 - account/session generation is observed by list detail and editor
+  ---
+  duration_ms: 0.098368
+  type: 'test'
+  ...
+# Subtest: existing Piece Clay Glaze and Glaze Clay Test media services remain present
+ok 843 - existing Piece Clay Glaze and Glaze Clay Test media services remain present
+  ---
+  duration_ms: 0.381655
+  type: 'test'
+  ...
+# (node:268) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: default and explicit production resolve original URL and storage names
+ok 844 - default and explicit production resolve original URL and storage names
+  ---
+  duration_ms: 212.828365
+  type: 'test'
+  ...
+# Subtest: QL runtime resolves only isolated URL, namespace and database
+ok 845 - QL runtime resolves only isolated URL, namespace and database
+  ---
+  duration_ms: 7.237305
+  type: 'test'
+  ...
+# Subtest: QL rejects missing/malformed/unapproved URL: undefined
+ok 846 - QL rejects missing/malformed/unapproved URL: undefined
+  ---
+  duration_ms: 6.722198
+  type: 'test'
+  ...
+# Subtest: QL rejects missing/malformed/unapproved URL: 
+ok 847 - QL rejects missing/malformed/unapproved URL: 
+  ---
+  duration_ms: 8.006013
+  type: 'test'
+  ...
+# Subtest: QL rejects missing/malformed/unapproved URL: not a URL
+ok 848 - QL rejects missing/malformed/unapproved URL: not a URL
+  ---
+  duration_ms: 3.985845
+  type: 'test'
+  ...
+# Subtest: QL rejects missing/malformed/unapproved URL: http://potters-mud-room-testing.onrender.com
+ok 849 - QL rejects missing/malformed/unapproved URL: http://potters-mud-room-testing.onrender.com
+  ---
+  duration_ms: 3.692093
+  type: 'test'
+  ...
+# Subtest: QL rejects missing/malformed/unapproved URL: https://potters-mud-room-testing.onrender.com/
+ok 850 - QL rejects missing/malformed/unapproved URL: https://potters-mud-room-testing.onrender.com/
+  ---
+  duration_ms: 11.013875
+  type: 'test'
+  ...
+# Subtest: QL rejects missing/malformed/unapproved URL: https://potters-mud-room-testing.onrender.com@evil.invalid
+ok 851 - QL rejects missing/malformed/unapproved URL: https://potters-mud-room-testing.onrender.com@evil.invalid
+  ---
+  duration_ms: 7.328282
+  type: 'test'
+  ...
+# Subtest: QL rejects missing/malformed/unapproved URL: https://the-potters-mud-room.onrender.com
+ok 852 - QL rejects missing/malformed/unapproved URL: https://the-potters-mud-room.onrender.com
+  ---
+  duration_ms: 5.719358
+  type: 'test'
+  ...
+# Subtest: unrecognized mode and test override on production fail clearly
+ok 853 - unrecognized mode and test override on production fail clearly
+  ---
+  duration_ms: 7.512549
+  type: 'test'
+  ...
+# Subtest: all persisted keys isolate read/write/delete without migration or production mutation
+ok 854 - all persisted keys isolate read/write/delete without migration or production mutation
+  ---
+  duration_ms: 26.793089
+  type: 'test'
+  ...
+# Subtest: production actual API logout and 401 clean only active namespace
+ok 855 - production actual API logout and 401 clean only active namespace
+  ---
+  duration_ms: 181.563686
+  type: 'test'
+  ...
+# Subtest: ql-test actual API logout and 401 clean only active namespace
+ok 856 - ql-test actual API logout and 401 clean only active namespace
+  ---
+  duration_ms: 94.134671
+  type: 'test'
+  ...
+# Subtest: actual SQLite adapter and offline queued edits use separate databases
+ok 857 - actual SQLite adapter and offline queued edits use separate databases
+  ---
+  duration_ms: 27.327193
+  type: 'test'
+  ...
+# Subtest: normal Expo config is exactly unchanged including Android and production identity
+ok 858 - normal Expo config is exactly unchanged including Android and production identity
+  ---
+  duration_ms: 0.295806
+  type: 'test'
+  ...
+# Subtest: QL Expo profile keeps existing identity, increments iOS only, embeds backend, disables OTA
+ok 859 - QL Expo profile keeps existing identity, increments iOS only, embeds backend, disables OTA
+  ---
+  duration_ms: 0.157006
+  type: 'test'
+  ...
+# Subtest: QL profile fails build without mode or URL and rejects Android and other profiles
+ok 860 - QL profile fails build without mode or URL and rejects Android and other profiles
+  ---
+  duration_ms: 1.006046
+  type: 'test'
+  ...
+# Subtest: complete runtime source has no direct storage bypass or hardcoded production URL
+ok 861 - complete runtime source has no direct storage bypass or hardcoded production URL
+  ---
+  duration_ms: 14.916876
+  type: 'test'
+  ...
+# Subtest: private media namespace flows through shared nonce and caches are memory-only
+ok 862 - private media namespace flows through shared nonce and caches are memory-only
+  ---
+  duration_ms: 0.665062
+  type: 'test'
+  ...
+# (node:269) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: mobile Piece visibility contract remains explicit and filename-independent
+ok 863 - mobile Piece visibility contract remains explicit and filename-independent
+  ---
+  duration_ms: 0.98217
+  type: 'test'
+  ...
+# Subtest: mobile public and legacy Piece compatibility still uses uploads
+ok 864 - mobile public and legacy Piece compatibility still uses uploads
+  ---
+  duration_ms: 0.128264
+  type: 'test'
+  ...
+# Subtest: Clay now has protected delivery while legacy clients remain a blocker
+ok 865 - Clay now has protected delivery while legacy clients remain a blocker
+  ---
+  duration_ms: 0.251509
+  type: 'test'
+  ...
+# Subtest: public Gallery uses record-aware delivery while Forum uses authenticated media with legacy compatibility
+ok 866 - public Gallery uses record-aware delivery while Forum uses authenticated media with legacy compatibility
+  ---
+  duration_ms: 0.249757
+  type: 'test'
+  ...
+# Subtest: Phase 2F records old-client compatibility as a restriction blocker
+ok 867 - Phase 2F records old-client compatibility as a restriction blocker
+  ---
+  duration_ms: 0.136796
+  type: 'test'
+  ...
+# Subtest: Phase 2U migrates the shared-mobile edges identified by Phase 2T
+ok 868 - Phase 2U migrates the shared-mobile edges identified by Phase 2T
+  ---
+  duration_ms: 0.227192
+  type: 'test'
+  ...
+# Subtest: Phase 2T distinguishes current blockers from protected and legacy-ambiguous paths
+ok 869 - Phase 2T distinguishes current blockers from protected and legacy-ambiguous paths
+  ---
+  duration_ms: 0.27893
+  type: 'test'
+  ...
+# Subtest: Phase 2T exact Phase 2U mobile closure slice is documented
+ok 870 - Phase 2T exact Phase 2U mobile closure slice is documented
+  ---
+  duration_ms: 0.103536
+  type: 'test'
+  ...
+# (node:284) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: server route text photos and legacy never render before confirmation
+ok 871 - server route text photos and legacy never render before confirmation
+  ---
+  duration_ms: 423.069018
+  type: 'test'
+  ...
+# Subtest: entire Piece remounts on account/logout/session replacement b
+ok 872 - entire Piece remounts on account/logout/session replacement b
+  ---
+  duration_ms: 111.133974
+  type: 'test'
+  ...
+# Subtest: entire Piece remounts on account/logout/session replacement null
+ok 873 - entire Piece remounts on account/logout/session replacement null
+  ---
+  duration_ms: 90.913569
+  type: 'test'
+  ...
+# Subtest: entire Piece remounts on account/logout/session replacement a
+ok 874 - entire Piece remounts on account/logout/session replacement a
+  ---
+  duration_ms: 69.511332
+  type: 'test'
+  ...
+# Subtest: late A response cannot restore text under B, fresh B server truth can render
+ok 875 - late A response cannot restore text under B, fresh B server truth can render
+  ---
+  duration_ms: 82.779423
+  type: 'test'
+  ...
+# Subtest: replacement rejects non-confirming payload WRONG A
+ok 876 - replacement rejects non-confirming payload WRONG A
+  ---
+  duration_ms: 81.149026
+  type: 'test'
+  ...
+# Subtest: replacement rejects non-confirming payload WRONG ID
+ok 877 - replacement rejects non-confirming payload WRONG ID
+  ---
+  duration_ms: 78.296799
+  type: 'test'
+  ...
+# Subtest: replacement rejects non-confirming payload NO OWNER
+ok 878 - replacement rejects non-confirming payload NO OWNER
+  ---
+  duration_ms: 62.566458
+  type: 'test'
+  ...
+# Subtest: valid local draft survives authentication change without server reads
+ok 879 - valid local draft survives authentication change without server reads
+  ---
+  duration_ms: 63.706086
+  type: 'test'
+  ...
+# Subtest: authenticated unsynchronized snapshot cannot masquerade as a local draft
+ok 880 - authenticated unsynchronized snapshot cannot masquerade as a local draft
+  ---
+  duration_ms: 94.475695
+  type: 'test'
+  ...
+# Subtest: initially unsynchronized server Piece becomes eligible from verified current state
+ok 881 - initially unsynchronized server Piece becomes eligible from verified current state
+  ---
+  duration_ms: 74.123021
+  type: 'test'
+  ...
+# Subtest: local route gaining serverId obtains fresh server-backed lifecycle
+ok 882 - local route gaining serverId obtains fresh server-backed lifecycle
+  ---
+  duration_ms: 64.456256
+  type: 'test'
+  ...
+# Subtest: already confirmed same-session content remains usable after offline refresh
+ok 883 - already confirmed same-session content remains usable after offline refresh
+  ---
+  duration_ms: 94.64471
+  type: 'test'
+  ...
+# Subtest: qualifying tier preserved starter
+ok 884 - qualifying tier preserved starter
+  ---
+  duration_ms: 6.320292
+  type: 'test'
+  ...
+# Subtest: qualifying tier preserved basic
+ok 885 - qualifying tier preserved basic
+  ---
+  duration_ms: 5.147376
+  type: 'test'
+  ...
+# Subtest: qualifying tier preserved mid
+ok 886 - qualifying tier preserved mid
+  ---
+  duration_ms: 4.411396
+  type: 'test'
+  ...
+# Subtest: qualifying tier preserved top
+ok 887 - qualifying tier preserved top
+  ---
+  duration_ms: 3.780326
+  type: 'test'
+  ...
+# Subtest: nonqualifying tier remains locked free
+ok 888 - nonqualifying tier remains locked free
+  ---
+  duration_ms: 3.842069
+  type: 'test'
+  ...
+# Subtest: nonqualifying tier remains locked unknown
+ok 889 - nonqualifying tier remains locked unknown
+  ---
+  duration_ms: 4.69209
+  type: 'test'
+  ...
+# Subtest: nonqualifying tier remains locked null
+ok 890 - nonqualifying tier remains locked null
+  ---
+  duration_ms: 3.605673
+  type: 'test'
+  ...
+# Subtest: known downgrade immediately clears ready viewer without 403; upgrade requires fresh request
+ok 891 - known downgrade immediately clears ready viewer without 403; upgrade requires fresh request
+  ---
+  duration_ms: 12.317909
+  type: 'test'
+  ...
+# Subtest: known downgrade invalidates pending tile request
+ok 892 - known downgrade invalidates pending tile request
+  ---
+  duration_ms: 10.593011
+  type: 'test'
+  ...
+# Subtest: qualifying to qualifying does not clear unrelated content or rotate media session
+ok 893 - qualifying to qualifying does not clear unrelated content or rotate media session
+  ---
+  duration_ms: 22.366159
+  type: 'test'
+  ...
+# Subtest: refreshUser publishes same-account tier loss before exposing new user; unrelated session stays intact
+ok 894 - refreshUser publishes same-account tier loss before exposing new user; unrelated session stays intact
+  ---
+  duration_ms: 19.527622
+  type: 'test'
+  ...
+# Subtest: src/components/LinkedTestTiles.js immediately removes rendered child on known downgrade and remounts on upgrade
+ok 895 - src/components/LinkedTestTiles.js immediately removes rendered child on known downgrade and remounts on upgrade
+  ---
+  duration_ms: 21.054703
+  type: 'test'
+  ...
+# Subtest: src/screens/TestTileDetailScreen.js immediately removes rendered child on known downgrade and remounts on upgrade
+ok 896 - src/screens/TestTileDetailScreen.js immediately removes rendered child on known downgrade and remounts on upgrade
+  ---
+  duration_ms: 44.280988
+  type: 'test'
+  ...
+# Subtest: unchanged legacy refresh preserves Piece object and cannot trigger a relationship fetch loop
+ok 897 - unchanged legacy refresh preserves Piece object and cannot trigger a relationship fetch loop
+  ---
+  duration_ms: 85.114544
+  type: 'test'
+  ...
+1..897
+# tests 897
+# suites 0
+# pass 897
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 9561.949618

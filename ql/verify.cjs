@@ -19,7 +19,8 @@ for (const file of ['tests/directory-calendar.cjs', 'tests/website-api.cjs', 'te
     for (const file of ['server.js', 'database.js', 'iap.js', 'directory-search.js', 'calendar-export.js','deletion-lifecycle.cjs']) {
       fs.copyFileSync(path.join(root, file), path.join(tmp, file));
     }
-  fs.mkdirSync(path.join(tmp,'ql'), {recursive:true}); fs.copyFileSync(path.join(root,'ql/relationships.cjs'),path.join(tmp,'ql/relationships.cjs'));fs.copyFileSync(path.join(root,'ql/piece-editor.cjs'),path.join(tmp,'ql/piece-editor.cjs'));
+  fs.mkdirSync(path.join(tmp,'ql'), {recursive:true}); fs.copyFileSync(path.join(root,'ql/relationships.cjs'),path.join(tmp,'ql/relationships.cjs'));fs.copyFileSync(path.join(root,'ql/piece-editor.cjs'),path.join(tmp,'ql/piece-editor.cjs'));fs.copyFileSync(path.join(root,'ql/photo-query-safety.cjs'),path.join(tmp,'ql/photo-query-safety.cjs'));
+  fs.copyFileSync(path.join(root,'ql/photo-result-confidence.cjs'),path.join(tmp,'ql/photo-result-confidence.cjs'));
     fs.cpSync(path.join(root, 'geodata'), path.join(tmp, 'geodata'), { recursive: true });
     fs.cpSync(path.join(root, 'public'), path.join(tmp, 'public'), { recursive: true });
     fs.symlinkSync(path.join(root, 'node_modules'), path.join(tmp, 'node_modules'), 'dir');

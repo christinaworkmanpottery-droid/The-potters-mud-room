@@ -1,0 +1,16 @@
+{
+  "baseCommit": "fffdf32b4d9085dd16782b4157bfc8cf2edcf6d8",
+  "repository": "christinaworkmanpottery-droid/potters-mudroom-app",
+  "baseBlobs": {
+    "src/screens/PhotoSearchScreen.js": "3c02c0d45e88e1232b27621ca348cd75c1a9f9f2",
+    "src/services/api.js": "2ad546abe43380f6d66fdc02414bf2b5732d15b7",
+    ".github/workflows/ql-phase2e-mobile.yml": "698a53c6c60bec0bed6c23cf82ef6cc6f9db858e"
+  },
+  "files": [
+    "src/screens/PhotoSearchScreen.js",
+    "src/services/api.js",
+    ".github/workflows/ql-phase2e-mobile.yml",
+    "tests/ql-photo-results.cjs"
+  ],
+  "verification": "882/882 Node 22 local tests pass; native device/build not run; publication rejected by auto-review"
+}

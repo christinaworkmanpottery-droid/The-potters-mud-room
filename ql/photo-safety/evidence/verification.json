@@ -1,0 +1,42 @@
+{
+  "localFullSuite": {
+    "tests": 1396,
+    "pass": 1396,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "standalonePassLines": 250
+  },
+  "focusedRegressions": 30,
+  "strict": {
+    "passed": 37,
+    "failed": 0
+  },
+  "recovery": {
+    "passed": 114,
+    "failed": 0,
+    "blocked": 1,
+    "cancellations": 0,
+    "skips": 0,
+    "todos": 0
+  },
+  "node": "v22.16.0",
+  "packageLockSHA256": "7858df3f7f53bc1d76ed152c92331b54d68f232c7bd30fc0329229617d9e3c69",
+  "deferred": [
+    "Eval-1 publication and exact-head GitHub Actions",
+    "Safety-1 publication and exact-head GitHub Actions",
+    "non-root recovery permission verification"
+  ],
+  "newBlockers": [],
+  "finalValidation": "Final validation-only nearest-neighbor decode optimization reran all 30 focused regressions and the 516-query paired frozen-ranking comparison. Full suite and recovery ran before this local optimization.",
+  "serverSHA256": "1cd79757d492d0155a5b04edb943b8e014cc7cd99723ee73007ddf0676874945",
+  "safetyModuleSHA256": "a7ee190fa465825c231943cfb0aa828e21bb6247766d4adb64998dc9adfc0f32",
+  "sameMachineFinal": {
+    "pass": true,
+    "failures": [],
+    "mode": "baseline-self-consistency",
+    "improvementClaimed": false,
+    "tolerance": "Same runtime/hardware, warmed HTTP, sequential concurrency=1: p50 and p95 <=110% baseline; rerun matched samples to investigate environmental variance, never silently relax."
+  }
+}

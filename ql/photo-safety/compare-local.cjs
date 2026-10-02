@@ -1,0 +1,14 @@
+'use strict';
+// Same-machine sequential comparison; never writes the frozen Eval-1 evidence.
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {execFileSync}=require('node:child_process');
+const root=path.resolve(__dirname,'../..'),baseline=path.resolve(process.argv[2]||'');
+assert.ok(process.argv[2],'Pass a disposable checkout at the exact Eval-1 commit');
+assert.equal(execFileSync('git',['rev-parse','HEAD'],{cwd:baseline,encoding:'utf8'}).trim(),'4646f7b96454b2a1d1c4e641c58e6d2bae3b9d49');
+assert.equal(execFileSync('git',['diff','HEAD','--','server.js','ql/photo-eval'],{cwd:baseline,encoding:'utf8'}),'');
+const corpus=path.join(root,'ql/photo-eval/corpus');
+const manifest=JSON.parse(fs.readFileSync(path.join(corpus,'fixtures.json'))),queries=JSON.parse(fs.readFileSync(path.join(corpus,'queries.json')));
+const {summarize,gates}=require('../photo-eval/metrics.cjs');
+async function boot(dir){const rt=require(path.join(dir,'ql/photo-eval/runtime.cjs'));const s=await rt.start();try{rt.seed(s,corpus,manifest);const image=fs.readFileSync(path.join(corpus,queries[0].file));for(let i=0;i<15;i++)await rt.query(s,image);return {rt,s};}catch(e){await rt.stop(s);throw e;}}
+async function measurePair(){let old,current;try{old=await boot(baseline);current=await boot(root);const a=[],b=[];for(const [i,q] of queries.entries()){const bytes=fs.readFileSync(path.join(corpus,q.file));let x,y;if(i%2){y=await current.rt.query(current.s,bytes);x=await old.rt.query(old.s,bytes);}else{x=await old.rt.query(old.s,bytes);y=await current.rt.query(current.s,bytes);}a.push({...q,...x});b.push({...q,...y});}return [a,b];}finally{if(old)await old.rt.stop(old.s);if(current)await current.rt.stop(current.s);}}
+(async()=>{const [a,b]=await measurePair();assert.deepEqual(a.map(r=>[r.id,r.ranking]),b.map(r=>[r.id,r.ranking]));const out={method:'paired sequential requests with alternating order',node:process.version,cpu:require('node:os').cpus()[0].model,queries:queries.length,rankingDifferences:0,baseline:summarize(a),safety:summarize(b),gates:gates(a,b)};fs.writeFileSync(path.join(__dirname,'evidence/same-machine.json'),JSON.stringify(out,null,2)+'\n');console.log(JSON.stringify({queries:out.queries,rankingDifferences:0,baseline:out.baseline.latencyMs,safety:out.safety.latencyMs,gates:out.gates}));})().catch(e=>{console.error(e);process.exitCode=1});

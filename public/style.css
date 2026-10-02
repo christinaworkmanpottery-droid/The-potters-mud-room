@@ -288,3 +288,10 @@ body.nav-open { overflow: hidden; }
 #studioSearchDetail { overflow-wrap: anywhere; }
 #studioSearchDetail dt { font-weight: 600; margin-top: 14px; }
 #studioSearchDetail dd { margin: 4px 0 0; white-space: pre-wrap; }
+
+/* Isolated QL typed proof: preserve hidden semantics despite shared button styles. */
+#qlAssistantEntry[hidden], #pageQLAssistant [hidden] { display: none !important; }
+#pageQLAssistant form { display: flex; flex-wrap: wrap; gap: 10px; }
+#pageQLAssistant label, #pageQLAssistant input { width: 100%; }
+#pageQLAssistant button { min-height: 44px; }
+#qlAssistantResponse { white-space: pre-wrap; overflow-wrap: anywhere; }

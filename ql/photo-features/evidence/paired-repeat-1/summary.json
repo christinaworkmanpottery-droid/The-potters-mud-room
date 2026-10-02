@@ -1,0 +1,714 @@
+{
+  "baselineSourceSha256": "5a46db2025758bb37a760c1c60c13e5c3f16b411f307f018669108d992e85b28",
+  "featuresSourceSha256": "6492c67147c2e90db0f986d8f9c390f89a99fb78a2d6b5086d57ec3a94e0ee25",
+  "method": "paired sequential requests with alternating order",
+  "node": "v22.16.0",
+  "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+  "queries": 516,
+  "rankingDifferences": 269,
+  "baseline": {
+    "positive": {
+      "n": 384,
+      "top1": 0.4036458333333333,
+      "top3": 0.7708333333333334,
+      "rankFound": {
+        "n": 366,
+        "min": 1,
+        "p05": 1,
+        "p50": 2,
+        "p95": 12,
+        "max": 38,
+        "mean": 3.2923497267759565
+      },
+      "missing": 18,
+      "notEvaluated": 0
+    },
+    "subsets": {
+      "B": {
+        "n": 128,
+        "top1": 0.328125,
+        "top3": 0.7890625,
+        "rankFound": {
+          "n": 120,
+          "min": 1,
+          "p05": 1,
+          "p50": 2,
+          "p95": 6,
+          "max": 11,
+          "mean": 2.375
+        },
+        "missing": 8,
+        "notEvaluated": 0
+      },
+      "L": {
+        "n": 128,
+        "top1": 0.390625,
+        "top3": 0.6796875,
+        "rankFound": {
+          "n": 123,
+          "min": 1,
+          "p05": 1,
+          "p50": 2,
+          "p95": 27,
+          "max": 38,
+          "mean": 4.845528455284553
+        },
+        "missing": 5,
+        "notEvaluated": 0
+      },
+      "D": {
+        "n": 64,
+        "top1": 0.40625,
+        "top3": 0.765625,
+        "rankFound": {
+          "n": 64,
+          "min": 1,
+          "p05": 1,
+          "p50": 2,
+          "p95": 14,
+          "max": 24,
+          "mean": 3.796875
+        },
+        "missing": 0,
+        "notEvaluated": 0
+      },
+      "M": {
+        "n": 64,
+        "top1": 0.578125,
+        "top3": 0.921875,
+        "rankFound": {
+          "n": 59,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 2,
+          "max": 2,
+          "mean": 1.3728813559322033
+        },
+        "missing": 5,
+        "notEvaluated": 0
+      },
+      "nearDuplicate": {
+        "n": 384,
+        "top1": 0.4036458333333333,
+        "top3": 0.7708333333333334,
+        "rankFound": {
+          "n": 366,
+          "min": 1,
+          "p05": 1,
+          "p50": 2,
+          "p95": 12,
+          "max": 38,
+          "mean": 3.2923497267759565
+        },
+        "missing": 18,
+        "notEvaluated": 0
+      },
+      "lightingBackground": {
+        "n": 144,
+        "top1": 0.5069444444444444,
+        "top3": 0.8055555555555556,
+        "rankFound": {
+          "n": 128,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 4,
+          "max": 28,
+          "mean": 2.015625
+        },
+        "missing": 16,
+        "notEvaluated": 0
+      },
+      "cropOrientation": {
+        "n": 96,
+        "top1": 0.20833333333333334,
+        "top3": 0.4583333333333333,
+        "rankFound": {
+          "n": 95,
+          "min": 1,
+          "p05": 1,
+          "p50": 4,
+          "p95": 28,
+          "max": 38,
+          "mean": 7.273684210526316
+        },
+        "missing": 1,
+        "notEvaluated": 0
+      },
+      "duplicate": {
+        "n": 48,
+        "top1": 0.3541666666666667,
+        "top3": 0.9166666666666666,
+        "rankFound": {
+          "n": 48,
+          "min": 1,
+          "p05": 1,
+          "p50": 2,
+          "p95": 4,
+          "max": 6,
+          "mean": 2.0208333333333335
+        },
+        "missing": 0,
+        "notEvaluated": 0
+      },
+      "independentViews": {
+        "n": 336,
+        "top1": 0.4107142857142857,
+        "top3": 0.75,
+        "rankFound": {
+          "n": 318,
+          "min": 1,
+          "p05": 1,
+          "p50": 2,
+          "p95": 14,
+          "max": 38,
+          "mean": 3.4842767295597485
+        },
+        "missing": 18,
+        "notEvaluated": 0
+      },
+      "development": {
+        "n": 192,
+        "top1": 0.3802083333333333,
+        "top3": 0.7552083333333334,
+        "rankFound": {
+          "n": 181,
+          "min": 1,
+          "p05": 1,
+          "p50": 2,
+          "p95": 11,
+          "max": 38,
+          "mean": 3.3093922651933703
+        },
+        "missing": 11,
+        "notEvaluated": 0
+      },
+      "holdout": {
+        "n": 192,
+        "top1": 0.4270833333333333,
+        "top3": 0.7864583333333334,
+        "rankFound": {
+          "n": 185,
+          "min": 1,
+          "p05": 1,
+          "p50": 2,
+          "p95": 16,
+          "max": 34,
+          "mean": 3.2756756756756755
+        },
+        "missing": 7,
+        "notEvaluated": 0
+      }
+    },
+    "pieceMacroTop1": 0.4036458333333333,
+    "noMatch": {
+      "n": 100,
+      "falsePositives": 100,
+      "falsePositiveRate": 1,
+      "policy": "Any API-returned match is a positive; no added confidence threshold"
+    },
+    "ambiguous": {
+      "n": 32,
+      "acceptableTop1": 0.6875,
+      "acceptableTop3": 1,
+      "bothAcceptableTop3": 0.9375,
+      "explicitUncertainty": 0
+    },
+    "latencyMs": {
+      "n": 516,
+      "min": 20.726489000000583,
+      "p05": 23.992607000000135,
+      "p50": 32.33885399999963,
+      "p95": 54.02398800000083,
+      "max": 174.77819400000226,
+      "mean": 34.513824887596904
+    },
+    "scores": {
+      "correctTop1": {
+        "n": 155,
+        "min": 0.7659660097321381,
+        "p05": 0.8368680016460204,
+        "p50": 1,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.9581715972249449
+      },
+      "incorrectTop1": {
+        "n": 229,
+        "min": 0.7618812847978698,
+        "p05": 0.784887969465093,
+        "p50": 1,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.9336384304289078
+      },
+      "correctPiece": {
+        "n": 366,
+        "min": 0.602691348098099,
+        "p05": 0.7421875,
+        "p50": 1,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.9319993576253504
+      },
+      "ambiguous": {
+        "n": 32,
+        "min": 1,
+        "p05": 1,
+        "p50": 1,
+        "p95": 1,
+        "max": 1,
+        "mean": 1
+      },
+      "noMatch": {
+        "n": 100,
+        "min": 0.6369617423478788,
+        "p05": 0.6410191083669902,
+        "p50": 0.9028579136025369,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.8568861002065747
+      },
+      "bins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.5,
+          "to": 0.6,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.6,
+          "to": 0.7,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 20
+        },
+        {
+          "from": 0.7,
+          "to": 0.8,
+          "correct": 5,
+          "incorrect": 19,
+          "ambiguous": 0,
+          "noMatch": 15
+        },
+        {
+          "from": 0.8,
+          "to": 0.9,
+          "correct": 31,
+          "incorrect": 67,
+          "ambiguous": 0,
+          "noMatch": 14
+        },
+        {
+          "from": 0.9,
+          "to": 1,
+          "correct": 119,
+          "incorrect": 143,
+          "ambiguous": 32,
+          "noMatch": 51
+        }
+      ]
+    }
+  },
+  "features": {
+    "positive": {
+      "n": 384,
+      "top1": 0.4947916666666667,
+      "top3": 0.7838541666666666,
+      "rankFound": {
+        "n": 366,
+        "min": 1,
+        "p05": 1,
+        "p50": 1,
+        "p95": 12,
+        "max": 38,
+        "mean": 3.1448087431693987
+      },
+      "missing": 18,
+      "notEvaluated": 0
+    },
+    "subsets": {
+      "B": {
+        "n": 128,
+        "top1": 0.3671875,
+        "top3": 0.796875,
+        "rankFound": {
+          "n": 120,
+          "min": 1,
+          "p05": 1,
+          "p50": 2,
+          "p95": 6,
+          "max": 11,
+          "mean": 2.308333333333333
+        },
+        "missing": 8,
+        "notEvaluated": 0
+      },
+      "L": {
+        "n": 128,
+        "top1": 0.546875,
+        "top3": 0.703125,
+        "rankFound": {
+          "n": 123,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 27,
+          "max": 38,
+          "mean": 4.609756097560975
+        },
+        "missing": 5,
+        "notEvaluated": 0
+      },
+      "D": {
+        "n": 64,
+        "top1": 0.5625,
+        "top3": 0.78125,
+        "rankFound": {
+          "n": 64,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 14,
+          "max": 24,
+          "mean": 3.53125
+        },
+        "missing": 0,
+        "notEvaluated": 0
+      },
+      "M": {
+        "n": 64,
+        "top1": 0.578125,
+        "top3": 0.921875,
+        "rankFound": {
+          "n": 59,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 2,
+          "max": 2,
+          "mean": 1.3728813559322033
+        },
+        "missing": 5,
+        "notEvaluated": 0
+      },
+      "nearDuplicate": {
+        "n": 384,
+        "top1": 0.4947916666666667,
+        "top3": 0.7838541666666666,
+        "rankFound": {
+          "n": 366,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 12,
+          "max": 38,
+          "mean": 3.1448087431693987
+        },
+        "missing": 18,
+        "notEvaluated": 0
+      },
+      "lightingBackground": {
+        "n": 144,
+        "top1": 0.5833333333333334,
+        "top3": 0.8263888888888888,
+        "rankFound": {
+          "n": 128,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 4,
+          "max": 28,
+          "mean": 1.8828125
+        },
+        "missing": 16,
+        "notEvaluated": 0
+      },
+      "cropOrientation": {
+        "n": 96,
+        "top1": 0.20833333333333334,
+        "top3": 0.4583333333333333,
+        "rankFound": {
+          "n": 95,
+          "min": 1,
+          "p05": 1,
+          "p50": 4,
+          "p95": 28,
+          "max": 38,
+          "mean": 7.273684210526316
+        },
+        "missing": 1,
+        "notEvaluated": 0
+      },
+      "duplicate": {
+        "n": 48,
+        "top1": 0.6875,
+        "top3": 0.9375,
+        "rankFound": {
+          "n": 48,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 4,
+          "max": 6,
+          "mean": 1.5416666666666667
+        },
+        "missing": 0,
+        "notEvaluated": 0
+      },
+      "independentViews": {
+        "n": 336,
+        "top1": 0.46726190476190477,
+        "top3": 0.7619047619047619,
+        "rankFound": {
+          "n": 318,
+          "min": 1,
+          "p05": 1,
+          "p50": 2,
+          "p95": 14,
+          "max": 38,
+          "mean": 3.3867924528301887
+        },
+        "missing": 18,
+        "notEvaluated": 0
+      },
+      "development": {
+        "n": 192,
+        "top1": 0.4739583333333333,
+        "top3": 0.765625,
+        "rankFound": {
+          "n": 181,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 11,
+          "max": 38,
+          "mean": 3.149171270718232
+        },
+        "missing": 11,
+        "notEvaluated": 0
+      },
+      "holdout": {
+        "n": 192,
+        "top1": 0.515625,
+        "top3": 0.8020833333333334,
+        "rankFound": {
+          "n": 185,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 16,
+          "max": 34,
+          "mean": 3.1405405405405404
+        },
+        "missing": 7,
+        "notEvaluated": 0
+      }
+    },
+    "pieceMacroTop1": 0.4947916666666667,
+    "noMatch": {
+      "n": 100,
+      "falsePositives": 100,
+      "falsePositiveRate": 1,
+      "policy": "Any API-returned match is a positive; no added confidence threshold"
+    },
+    "ambiguous": {
+      "n": 32,
+      "acceptableTop1": 0.8125,
+      "acceptableTop3": 1,
+      "bothAcceptableTop3": 0.9375,
+      "explicitUncertainty": 0
+    },
+    "latencyMs": {
+      "n": 516,
+      "min": 22.437372000000323,
+      "p05": 25.74230300000636,
+      "p50": 34.687168999997084,
+      "p95": 60.20034399999895,
+      "max": 111.97827099999995,
+      "mean": 37.96932552325585
+    },
+    "scores": {
+      "correctTop1": {
+        "n": 190,
+        "min": 0.6383050081101151,
+        "p05": 0.7128960072182047,
+        "p50": 0.9668807289175834,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.9235695592397594
+      },
+      "incorrectTop1": {
+        "n": 194,
+        "min": 0.6349010706648915,
+        "p05": 0.651412332668157,
+        "p50": 0.8785827558114175,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.8546626409170434
+      },
+      "correctPiece": {
+        "n": 366,
+        "min": 0.5022427900817492,
+        "p05": 0.6184895833333334,
+        "p50": 0.9249999999999999,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.8818206690842579
+      },
+      "ambiguous": {
+        "n": 32,
+        "min": 0.9679122969895029,
+        "p05": 0.9679122969895029,
+        "p50": 0.9996725192560223,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.9903509401389472
+      },
+      "noMatch": {
+        "n": 100,
+        "min": 0.616459784909771,
+        "p05": 0.6250220340661516,
+        "p50": 0.8366361947467353,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.8113123136049433
+      },
+      "bins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.5,
+          "to": 0.6,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.6,
+          "to": 0.7,
+          "correct": 7,
+          "incorrect": 49,
+          "ambiguous": 0,
+          "noMatch": 41
+        },
+        {
+          "from": 0.7,
+          "to": 0.8,
+          "correct": 14,
+          "incorrect": 19,
+          "ambiguous": 0,
+          "noMatch": 6
+        },
+        {
+          "from": 0.8,
+          "to": 0.9,
+          "correct": 45,
+          "incorrect": 49,
+          "ambiguous": 0,
+          "noMatch": 11
+        },
+        {
+          "from": 0.9,
+          "to": 1,
+          "correct": 124,
+          "incorrect": 77,
+          "ambiguous": 32,
+          "noMatch": 42
+        }
+      ]
+    }
+  },
+  "gates": {
+    "pass": false,
+    "failures": [
+      "p95 latency >110% baseline"
+    ],
+    "mode": "future-release",
+    "improvementClaimed": false,
+    "tolerance": "Same runtime/hardware, warmed HTTP, sequential concurrency=1: p50 and p95 <=110% baseline; rerun matched samples to investigate environmental variance, never silently relax."
+  }
+}

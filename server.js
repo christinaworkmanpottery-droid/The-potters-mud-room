@@ -2723,25 +2723,13 @@ app.patch('/api/pieces/:id/photo-search-visibility', auth, (req, res) => {
   res.json({ success: true, hide_from_photo_search: hide });
 });
 
-// Debug: extract color from an uploaded photo (no auth needed, temp debug)
-app.post('/api/debug/extract-color', upload.single('photo'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No photo' });
-  try {
-    const buf = fs.readFileSync(req.file.path);
-    const sig = await computeColorSignature(buf);
-    const parsed = JSON.parse(sig);
-    const totalW = parsed.reduce((s, c) => s + (c.weight || 1), 0);
-    const avgR = parsed.reduce((s, c) => s + c.r * (c.weight || 1), 0) / totalW;
-    const avgG = parsed.reduce((s, c) => s + c.g * (c.weight || 1), 0) / totalW;
-    const avgB = parsed.reduce((s, c) => s + c.b * (c.weight || 1), 0) / totalW;
-    const hsl = rgbToHsl(avgR, avgG, avgB);
-    fs.unlinkSync(req.file.path);
-    res.json({ buckets: parsed, avgRgb: { r: Math.round(avgR), g: Math.round(avgG), b: Math.round(avgB) }, hsl: { h: hsl.h, s: hsl.s, l: hsl.l } });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
+// Retired diagnostic uploader: reject before parsing or storing any request bytes.
+app.post('/api/debug/extract-color', (req, res) => res.status(404).json({ error: 'Not found' }));
+
+const photoQuerySafety = require('./ql/photo-query-safety.cjs').createPhotoQuerySafety(db);
 
 // Debug: return stored avg_color for all photos belonging to user (auth required)
-app.get('/api/debug/photo-colors', auth, (req, res) => {
+app.get('/api/debug/photo-colors', auth, photoQuerySafety.account, (req, res) => {
   const photos = db.prepare(`
     SELECT pp.id, pp.filename, pp.avg_color, p.id as piece_id, p.title, p.hide_from_photo_search
     FROM piece_photos pp
@@ -3150,6 +3138,21 @@ function serializeFiring(log) {
   const photos = db.prepare('SELECT id,filename FROM firing_photos WHERE firing_id=? ORDER BY sort_order ASC').all(log.id);
   return { ...log, piece_title: piece?.title || null, photoDelivery: 'owner-protected', photoVisibility: 'legacy-ambiguous', photos: photos.map(firingPhotoContract) };
 }
+
+// QL studio assistant: isolated, read-only, disabled unless explicitly enabled.
+// Explicit opt-in for the bounded website proof; no user data or client override.
+app.get('/api/ql/assistant/config', (req, res) => {
+  res.set('Cache-Control', 'private, no-store').json({
+    enabled: process.env.QL_ASSISTANT_CORE_ENABLED === '1' && process.env.QL_ASSISTANT_WEB_ENABLED === '1',
+    voiceEnabled: process.env.QL_ASSISTANT_CORE_ENABLED === '1' && process.env.QL_ASSISTANT_WEB_ENABLED === '1' && process.env.QL_ASSISTANT_VOICE_WEB_ENABLED === '1'
+  });
+});
+if (process.env.QL_ASSISTANT_CORE_ENABLED === '1') {
+  app.post('/api/ql/assistant/turn', require('./ql/assistant/http.cjs').createAssistantHandler({
+    db, jwtSecret: JWT_SECRET, enabled: true
+  }));
+}
+
 
 app.get('/api/firing-logs', auth, (req, res) => {
   const { sort } = req.query;
@@ -6537,6 +6540,10 @@ const sharp = require('sharp');
 // pHash: DCT-based perceptual hash — captures structural/frequency information.
 // Far better than aHash at distinguishing plates from bowls, mugs from vases, etc.
 // Uses 32x32 resize, 8x8 DCT coefficients, median threshold → 16 hex chars (64 bits).
+// Memoize constants only: identical multiply/add order and bit-exact DCT output.
+// No image data, account data or feature version is cached here.
+const photoDctCos = Array.from({ length: 8 }, (_, u) =>
+  Float64Array.from({ length: 32 }, (_, x) => Math.cos((2 * x + 1) * u * Math.PI / 64)));
 async function computePHash(buffer) {
   const size = 32;
   // Compare the centered subject, not the full camera/gallery frame. The
@@ -6566,8 +6573,7 @@ async function computePHash(buffer) {
       for (let x = 0; x < size; x++) {
         for (let y = 0; y < size; y++) {
           sum += pixels[x * size + y] *
-            Math.cos((2 * x + 1) * u * Math.PI / (2 * size)) *
-            Math.cos((2 * y + 1) * v * Math.PI / (2 * size));
+            photoDctCos[u][x] * photoDctCos[v][y];
         }
       }
       dct.push((cu * cv * sum * 2) / size);
@@ -6746,41 +6752,14 @@ function parseColorSignature(signature) {
 // Select an object cluster when a very light dominant cluster is likely background.
 // The existing cluster distance, pHash, hue gate, score formula, and response stay unchanged.
 function selectObjectCluster(signature) {
-  if (!signature.length) {
-    console.log('[Photo Diagnostic] selector: no clusters available; selected=null');
-    return null;
-  }
+  if (!signature.length) return null;
   const dominant = signature.reduce((best, cluster) => cluster.weight > best.weight ? cluster : best, signature[0]);
   const dominantHsl = rgbToHsl(dominant.r, dominant.g, dominant.b);
-  const clusterDiagnostics = signature.map((cluster, index) => {
-    const hsl = rgbToHsl(cluster.r, cluster.g, cluster.b);
-    const lightPass = dominantHsl.l > 0.72;
-    const darkPass = hsl.l < 0.58;
-    const representationPass = cluster.weight >= dominant.weight * 0.12;
-    const reasons = [];
-    if (!lightPass) reasons.push('dominant lightness <= 0.72');
-    if (!darkPass) reasons.push('cluster lightness >= 0.58');
-    if (!representationPass) reasons.push('weight below dominant*0.12');
-    return { index, rgb: [cluster.r, cluster.g, cluster.b], hsl: { h: +hsl.h.toFixed(3), s: +hsl.s.toFixed(3), l: +hsl.l.toFixed(3) }, weight: cluster.weight, conditions: { dominantLightPass: lightPass, darkPass, representationPass }, result: lightPass && darkPass && representationPass ? 'passed' : 'failed', reasons };
-  });
-  console.log('[Photo Diagnostic] selector:', JSON.stringify({
-    clusterCount: signature.length,
-    dominantIndex: signature.indexOf(dominant),
-    dominant: { rgb: [dominant.r, dominant.g, dominant.b], hsl: { h: +dominantHsl.h.toFixed(3), s: +dominantHsl.s.toFixed(3), l: +dominantHsl.l.toFixed(3) }, weight: dominant.weight },
-    thresholds: { dominantLightnessGreaterThan: 0.72, objectLightnessLessThan: 0.58, minimumWeightRatio: 0.12 },
-    clusters: clusterDiagnostics
-  }));
   if (dominantHsl.l > 0.72) {
     const darkCluster = signature
       .filter(cluster => rgbToHsl(cluster.r, cluster.g, cluster.b).l < 0.58 && cluster.weight >= dominant.weight * 0.12)
       .sort((a, b) => b.weight - a.weight)[0];
-    if (darkCluster) {
-      console.log('[Photo Diagnostic] selector result: dark object cluster selected', JSON.stringify({ rgb: [darkCluster.r, darkCluster.g, darkCluster.b], weight: darkCluster.weight }));
-      return darkCluster;
-    }
-    console.log('[Photo Diagnostic] selector result: dominant selected; no cluster passed all object conditions');
-  } else {
-    console.log('[Photo Diagnostic] selector result: dominant selected; dominant lightness condition failed');
+    if (darkCluster) return darkCluster;
   }
   return dominant;
 }
@@ -6938,11 +6917,11 @@ try {
     console.log(`[Photo Search] Migration phash_v9b_dct: cleared ${cleared.changes} phashes — recomputing with pHash (DCT)`);
   }
 } catch(e) { console.warn('[Photo Search] Migration v9b error:', e.message); }
-app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, res) => {
+app.post('/api/pieces/photo-search', auth, photoQuerySafety.account, photoQuerySafety.upload, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo provided' });
 
   try {
-    const searchBuffer = fs.readFileSync(req.file.path);
+    const searchBuffer = req.file.buffer;
     const searchHash = await computePHash(searchBuffer);
     const searchColor = await computeColorSignature(searchBuffer);
 
@@ -6959,36 +6938,45 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       WHERE p.user_id = ? AND ${visibility}
     `).all(req.userId);
 
-    // Minimal inline backfill: compute up to 10 photos inline (~50-100ms total)
-    // so the first search after cold start returns *something* without blocking for minutes.
-    // Remaining photos are handled by the async startup backfill.
-    userPhotos = userPhotos.filter(ph => safeStoredUpload(ph.filename));
+    // Complete the eligible snapshot before ranking. Never return a partial ranking.
+    // Serial decoding bounds working memory; the request budget bounds cold work.
+    if (userPhotos.some(ph => !safeStoredUpload(ph.filename))) {
+      return res.status(503).json({ error: 'A candidate photo could not be evaluated. Please retry.' });
+    }
     const needsBackfill = userPhotos.filter(ph => !ph.phash || !ph.avg_color);
-    const INLINE_LIMIT = 10;
-    const inlineBatch = needsBackfill.slice(0, INLINE_LIMIT);
+    const inlineBatch = needsBackfill;
+    const featureDeadline = Date.now() + 25000;
     
     for (const ph of inlineBatch) {
+      if (req.aborted || res.destroyed) return;
+      if (Date.now() > featureDeadline) return res.status(503).json({ error: 'Photo features are still preparing. Please retry.' });
       try {
         const filePath = safeStoredUpload(ph.filename);
         if (!filePath) continue;
-        const buf = fs.readFileSync(filePath);
+        // Bound encoded and decoded work for stored media as well as query uploads.
+        const stat = fs.statSync(filePath);
+        if (!stat.isFile() || stat.size > 12 * 1024 * 1024) throw new Error('Candidate size limit');
+        const buf = await fs.promises.readFile(filePath);
+        if (buf.length > 12 * 1024 * 1024) throw new Error('Candidate size limit');
+        const meta = await sharp(buf, { limitInputPixels: 40e6, failOn: 'warning' }).metadata();
+        if (!meta.width || !meta.height || meta.width > 12000 || meta.height > 12000 || meta.width * meta.height > 40e6 || (meta.pages || 1) > 1) throw new Error('Candidate dimensions limit');
         if (!ph.phash) {
           const hash = await computePHash(buf);
-          db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ? AND filename = ?').run(hash, ph.id, ph.filename);
+          db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ? AND filename = ? AND piece_id IN (SELECT id FROM pieces WHERE user_id = ?)').run(hash, ph.id, ph.filename, req.userId);
           ph.phash = hash;
         }
         if (!ph.avg_color) {
           const color = await computeColorSignature(buf);
-          db.prepare('UPDATE piece_photos SET avg_color = ? WHERE id = ? AND filename = ?').run(color, ph.id, ph.filename);
+          db.prepare('UPDATE piece_photos SET avg_color = ? WHERE id = ? AND filename = ? AND piece_id IN (SELECT id FROM pieces WHERE user_id = ?)').run(color, ph.id, ph.filename, req.userId);
           ph.avg_color = color;
         }
       } catch (e) {
-        console.warn('[v9] Inline backfill error:', ph.filename, e.message);
+        console.warn('[Photo Search] Candidate feature unavailable:', ph.id);
+        return res.status(503).json({ error: 'A candidate photo could not be evaluated. Please retry.' });
       }
     }
 
     userPhotos = userPhotos.filter(ph => ph.avg_color && ph.phash);
-    console.log('[v9] Searching against', userPhotos.length, 'photos (backfilled', inlineBatch.length, 'inline,', Math.max(0, needsBackfill.length - inlineBatch.length), 'remaining)');
 
     // === CLUSTER-TO-CLUSTER MATCHING (v9) ===
     // Compare dominant color clusters directly instead of averaging them into a single hue.
@@ -6997,8 +6985,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
     const candidateMatches = [];
     const searchSig = parseColorSignature(searchColor);
     if (!searchSig.length) {
-      fs.unlinkSync(req.file.path);
-      return res.json({ matches: [], total: 0 });
+      return res.json({ matches: [], total: 0, confidence: require('./ql/photo-result-confidence.cjs').classifyPhotoResults([]) });
     }
 
     // Find dominant cluster (highest weight) from search photo
@@ -7008,10 +6995,13 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
     const scoringSearchSig = objectColorSearch ? [dominantSearch] : searchSig;
     const dominantHsl = rgbToHsl(dominantSearch.r, dominantSearch.g, dominantSearch.b);
 
-    console.log('[v9] Search dominant RGB:', dominantSearch.r, dominantSearch.g, dominantSearch.b, 'weight:', dominantSearch.weight.toFixed(3));
-    console.log('[v9] Search dominant HSL: h=', dominantHsl.h.toFixed(1), 's=', dominantHsl.s.toFixed(2), 'l=', dominantHsl.l.toFixed(2));
 
-    for (const ph of userPhotos) {
+    for (const [index, ph] of userPhotos.entries()) {
+      if (index % 32 === 0) {
+        await new Promise(resolve => setImmediate(resolve));
+        if (req.aborted || res.destroyed) return;
+        if (Date.now() > featureDeadline) return res.status(503).json({ error: 'Photo features are still preparing. Please retry.' });
+      }
       const photoSig = parseColorSignature(ph.avg_color);
       if (!photoSig.length) continue;
 
@@ -7026,7 +7016,6 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         let hueDiff = Math.abs(dominantHsl.h - photoHsl.h);
         if (hueDiff > 180) hueDiff = 360 - hueDiff;
         if (hueDiff > 50) {
-          console.log('[v9] REJECT:', ph.title, 'hueDiff=', hueDiff.toFixed(1), 'searchH=', dominantHsl.h.toFixed(1), 'photoH=', photoHsl.h.toFixed(1));
           continue;
         }
       }
@@ -7082,7 +7071,12 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       }
 
       const neutralToneWeight = avgSaturation < 0.15 ? 0.10 : 0;
-      const score = Math.min(1.0, (colorScore * colorWeight) + (shapeScore * shapeWeight) + (toneScore * neutralToneWeight) + nearDuplicateBonus);
+      const rawScore = (colorScore * colorWeight) + (shapeScore * shapeWeight) + (toneScore * neutralToneWeight) + nearDuplicateBonus;
+      // Low-saturation searches rely on structure: clipping erased the useful
+      // near-duplicate differences. Normalize by the analytical maximum instead.
+      // Keep the measured saturated-color path intact. These are similarity scores,
+      // not probabilities. Existing feature bytes and MAX-per-Piece remain valid.
+      const score = dominantHsl.s < 0.30 ? rawScore / 1.20 : Math.min(1.0, rawScore);
 
       // Hue diff for logging
       let hueDiff2 = Math.abs(dominantHsl.h - photoHsl.h);
@@ -7114,18 +7108,6 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
     }
 
     candidateMatches.sort((a, b) => b.score - a.score);
-    console.log('[v9] Candidates passed hue gate:', candidateMatches.length);
-    console.log('[v9] Top candidates:', candidateMatches.slice(0, 8).map((m) => ({
-      piece: m.title,
-      score: Number(m.score.toFixed(3)),
-      color: Number(m.colorScore.toFixed(3)),
-      shape: Number(m.shapeScore.toFixed(3)),
-      cW: Number(m.colorWeight.toFixed(2)),
-      sW: Number(m.shapeWeight.toFixed(2)),
-      sat: Number(m.avgSaturation.toFixed(2)),
-      hueDiff: Number(m.hueDiff.toFixed(1)),
-    })));
-
     const bestByPiece = new Map();
     for (const match of candidateMatches) {
       const existing = bestByPiece.get(match.piece_id);
@@ -7143,6 +7125,10 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       const current = db.prepare(`SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON cb.id=p.clay_body_id AND cb.user_id=p.user_id WHERE p.id=? AND p.user_id=? AND ${visibility}`).get(best.piece_id, req.userId);
       if (!current) continue;
       const piecePhotos = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order').all(current.id).filter(ph => safeStoredUpload(ph.filename));
+      // Resolve the winning photo against the current owned Piece, never a path.
+      // If it disappeared during async extraction, omit the stale identification.
+      const matchedPhoto = piecePhotos.find(photo => photo.id === best.photo_id);
+      if (!matchedPhoto) continue;
       const pieceGlazes = db.prepare('SELECT pg.*, COALESCE(g.name,pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON g.id=pg.glaze_id AND g.user_id=? WHERE pg.piece_id=? AND (pg.glaze_id IS NULL OR g.id IS NOT NULL) ORDER BY pg.layer_order').all(req.userId,current.id);
 
       matches.push({
@@ -7162,6 +7148,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         date_completed: current.date_completed,
         photos: piecePhotos,
         glazes: pieceGlazes,
+        matchedPhotoId: matchedPhoto.id,
         matchScore: best.score,
       });
     }
@@ -7169,14 +7156,16 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
     // Sort by score descending
     matches.sort((a, b) => b.matchScore - a.matchScore);
 
-    // Clean up uploaded search photo
-    fs.unlinkSync(req.file.path);
+    if (!photoQuerySafety.exists(req.userId)) return res.status(401).json({ error: 'Account authentication required' });
+    if (req.aborted || res.destroyed) return;
 
-    res.json({ matches, total: matches.length });
+    const confidence = require('./ql/photo-result-confidence.cjs').classifyPhotoResults(matches);
+    res.json({ matches, total: matches.length, confidence });
   } catch (err) {
     console.error('[Photo Search] Error:', err.message);
-    if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-    res.status(500).json({ error: 'Photo search failed. Please try again.' });
+    if (!res.destroyed) res.status(500).json({ error: 'Photo search failed. Please try again.' });
+  } finally {
+    req.releasePhotoQuery();
   }
 });
 

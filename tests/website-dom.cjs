@@ -139,8 +139,8 @@ async function test(name, fn){await fn();console.log('PASS',name);}
    w.exitPreviewToLanding();assert.equal(w.location.hash,'#sales');assert.equal(field('navTier').textContent,'ADMIN');
  });
  await test('root asset URLs survive nested paths; Help has only Mud Room links',async()=>{
-   assert.equal(w.document.querySelector('link[href*="style.css"]').getAttribute('href'),'/style.css?v=search2');
-   assert.ok(w.document.querySelector('script[src="/app.js?v=search2"]'));
+   assert.equal(w.document.querySelector('link[href*="style.css"]').getAttribute('href'),'/style.css?v=4c');
+   assert.ok(w.document.querySelector('script[src="/app.js?v=4c"]'));
    assert.equal(field('pageHelp').querySelectorAll('a[href*="lucehealing"],a[href*="christinaworkmanpottery"]').length,0);
  });
  await pause(); dom.window.close();

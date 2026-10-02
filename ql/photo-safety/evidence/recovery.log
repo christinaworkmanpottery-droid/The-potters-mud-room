@@ -1,0 +1,117 @@
+PASS tracked release original manifest before any startup
+PASS outbound isolation positive probes
+PASS genuine empty first startup, schema, seeds, registration, login and reads
+PASS complete Calendar/iCal regressions after fresh installation
+PASS fresh restart classified and second startup stable
+PASS representative decodable synthetic fixture
+PASS explicit current startup mutation classification
+PASS clean relationship Contact audit
+PASS cold paired backup checkpoint manifests exact offline restore
+PASS restored startup 0 stable before login
+PASS auth restored-cycle-0 login account switching
+PASS restored-cycle-0 media piece-a.jpg
+PASS restored-cycle-0 media clay-a.jpg
+PASS restored-cycle-0 media glaze-a.jpg
+PASS restored-cycle-0 media test-a.jpg
+PASS restored-cycle-0 media tile-a.jpg
+PASS restored-cycle-0 media tile-a-2.jpg
+PASS restored-cycle-0 media tile-a-3.jpg
+PASS restored-cycle-0 media combo-private.jpg
+PASS restored-cycle-0 media firing-a.jpg
+PASS restored-cycle-0 media pricing-a.jpg
+PASS restored-cycle-0 media sale-a.jpg
+PASS restored-cycle-0 media project-a.jpg
+PASS restored-cycle-0 media event-a.jpg
+PASS restored-cycle-0 media avatar.jpg
+PASS restored-cycle-0 media profile.jpg
+PASS restored-cycle-0 public/community media contracts
+PASS restored-cycle-0 relationships History and iCal
+PASS restored-cycle-0 Forum image video HEAD ranges binding grants
+PASS restored-cycle-0 Shop assets and purchaser isolation
+PASS restored-cycle-0 actual HTTP browser Clay Glaze read-only and late response guards
+PASS complete Calendar/iCal regressions after restored cycle 0
+PASS restored startup 1 stable before login
+PASS auth restored-cycle-1 login account switching
+PASS restored-cycle-1 media piece-a.jpg
+PASS restored-cycle-1 media clay-a.jpg
+PASS restored-cycle-1 media glaze-a.jpg
+PASS restored-cycle-1 media test-a.jpg
+PASS restored-cycle-1 media tile-a.jpg
+PASS restored-cycle-1 media tile-a-2.jpg
+PASS restored-cycle-1 media tile-a-3.jpg
+PASS restored-cycle-1 media combo-private.jpg
+PASS restored-cycle-1 media firing-a.jpg
+PASS restored-cycle-1 media pricing-a.jpg
+PASS restored-cycle-1 media sale-a.jpg
+PASS restored-cycle-1 media project-a.jpg
+PASS restored-cycle-1 media event-a.jpg
+PASS restored-cycle-1 media avatar.jpg
+PASS restored-cycle-1 media profile.jpg
+PASS restored-cycle-1 public/community media contracts
+PASS restored-cycle-1 relationships History and iCal
+PASS restored-cycle-1 Forum image video HEAD ranges binding grants
+PASS restored-cycle-1 Shop assets and purchaser isolation
+PASS restored-cycle-1 actual HTTP browser Clay Glaze read-only and late response guards
+PASS complete Calendar/iCal regressions after restored cycle 1
+PASS restored startup 2 stable before login
+PASS auth restored-cycle-2 login account switching
+PASS restored-cycle-2 media piece-a.jpg
+PASS restored-cycle-2 media clay-a.jpg
+PASS restored-cycle-2 media glaze-a.jpg
+PASS restored-cycle-2 media test-a.jpg
+PASS restored-cycle-2 media tile-a.jpg
+PASS restored-cycle-2 media tile-a-2.jpg
+PASS restored-cycle-2 media tile-a-3.jpg
+PASS restored-cycle-2 media combo-private.jpg
+PASS restored-cycle-2 media firing-a.jpg
+PASS restored-cycle-2 media pricing-a.jpg
+PASS restored-cycle-2 media sale-a.jpg
+PASS restored-cycle-2 media project-a.jpg
+PASS restored-cycle-2 media event-a.jpg
+PASS restored-cycle-2 media avatar.jpg
+PASS restored-cycle-2 media profile.jpg
+PASS restored-cycle-2 public/community media contracts
+PASS restored-cycle-2 relationships History and iCal
+PASS restored-cycle-2 Forum image video HEAD ranges binding grants
+PASS restored-cycle-2 Shop assets and purchaser isolation
+PASS restored-cycle-2 actual HTTP browser Clay Glaze read-only and late response guards
+PASS complete Calendar/iCal regressions after restored cycle 2
+PASS historical exact offline restore before intentional startup
+PASS historical compatibility rebuilds and every startup delta classified
+PASS historical stable restart then existing migrate helper only
+PASS guarded firing_logs rebuild required after QL refuses without mutation
+PASS guarded sales rebuild required after QL refuses without mutation
+PASS guarded test_tiles rebuild required after QL refuses without mutation
+PASS guarded piece_glazes rebuild required after QL refuses without mutation
+PASS entitlement matrix free
+PASS entitlement matrix starter
+PASS entitlement matrix basic
+PASS entitlement matrix mid
+PASS entitlement matrix top
+PASS entitlement matrix promo
+PASS entitlement matrix null
+PASS entitlement matrix unknown
+PASS missing account entitlement denied
+PASS full startup normalization retains qualifying effective access
+PASS separate secret rotation rejects old JWT and permits new login
+PASS Forum block unblock private merchant and Contact update on separate copy
+PASS failure copy interrupted-restore gate quarantine corrected restore
+PASS failure copy corrupt-db gate quarantine corrected restore
+PASS failure copy missing-media-subset gate quarantine corrected restore
+PASS failure copy empty-media gate quarantine corrected restore
+PASS failure copy orphan-media gate quarantine corrected restore
+PASS failure copy wrong-owner-filename gate quarantine corrected restore
+PASS failure copy dangling-relationship gate quarantine corrected restore
+PASS failure copy wrong-owner-contact gate quarantine corrected restore
+PASS failure copy missing-ql-table gate quarantine corrected restore
+PASS failure copy missing-trigger gate quarantine corrected restore
+PASS failure copy ledger-drift gate quarantine corrected restore
+PASS failure copy unreadable-media gate quarantine corrected restore
+PASS failure copy unwritable-db gate quarantine corrected restore
+PASS failure copy unwritable-directory gate quarantine corrected restore
+PASS failure copy missing-release-asset gate quarantine corrected restore
+BLOCKED nonroot permission failures preserve data: Nonroot process unavailable locally: EINVAL; must execute on nonroot CI runner
+PASS source-specific account startup assignment is CHECK-safe and compatibility-preserving
+PASS both current Admin upgrade writers are CHECK-safe under real requests
+Evidence: /workspace/scratch/1bad32e47cef/backend/ql/rehearsal/evidence
+Disposable evidence retained at /tmp/ql-rehearsal-y2MpGv

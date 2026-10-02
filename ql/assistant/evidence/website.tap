@@ -1,0 +1,244 @@
+(node:6) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+TAP version 13
+# (node:13) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: server flag combination core=0 web=0
+ok 1 - server flag combination core=0 web=0
+  ---
+  duration_ms: 545.508448
+  type: 'test'
+  ...
+# Subtest: server flag combination core=1 web=0
+ok 2 - server flag combination core=1 web=0
+  ---
+  duration_ms: 541.02936
+  type: 'test'
+  ...
+# Subtest: server flag combination core=0 web=1
+ok 3 - server flag combination core=0 web=1
+  ---
+  duration_ms: 459.098043
+  type: 'test'
+  ...
+# Subtest: server flag combination core=1 web=1
+ok 4 - server flag combination core=1 web=1
+  ---
+  duration_ms: 1176.892285
+  type: 'test'
+  ...
+# (node:14) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: flag OFF has no entry, page, or turn request even with direct navigation
+ok 5 - flag OFF has no entry, page, or turn request even with direct navigation
+  ---
+  duration_ms: 487.252116
+  type: 'test'
+  ...
+# Subtest: missing/failed config fails closed
+ok 6 - missing/failed config fails closed
+  ---
+  duration_ms: 344.267635
+  type: 'test'
+  ...
+# Subtest: non-boolean enabled fails closed
+ok 7 - non-boolean enabled fails closed
+  ---
+  duration_ms: 274.83151
+  type: 'test'
+  ...
+# Subtest: flag ON shows clearly marked separate entry and compact form
+ok 8 - flag ON shows clearly marked separate entry and compact form
+  ---
+  duration_ms: 219.443831
+  type: 'test'
+  ...
+# Subtest: supported question sends exact 4B contract and renders only factual response
+ok 9 - supported question sends exact 4B contract and renders only factual response
+  ---
+  duration_ms: 292.935808
+  type: 'test'
+  ...
+# Subtest: no-firing preserves core wording
+ok 10 - no-firing preserves core wording
+  ---
+  duration_ms: 256.488929
+  type: 'test'
+  ...
+# Subtest: undated preserves core wording
+ok 11 - undated preserves core wording
+  ---
+  duration_ms: 265.843977
+  type: 'test'
+  ...
+# Subtest: tied records preserves core wording
+ok 12 - tied records preserves core wording
+  ---
+  duration_ms: 238.983798
+  type: 'test'
+  ...
+# Subtest: unsupported question stays bounded
+ok 13 - unsupported question stays bounded
+  ---
+  duration_ms: 215.924181
+  type: 'test'
+  ...
+# Subtest: loading state ends after response
+ok 14 - loading state ends after response
+  ---
+  duration_ms: 198.994136
+  type: 'test'
+  ...
+# Subtest: error and retry use a fresh request identity
+ok 15 - error and retry use a fresh request identity
+  ---
+  duration_ms: 284.397032
+  type: 'test'
+  ...
+# Subtest: native form submission supports keyboard Enter without click dependency
+ok 16 - native form submission supports keyboard Enter without click dependency
+  ---
+  duration_ms: 202.182199
+  type: 'test'
+  ...
+# Subtest: duplicate sends while pending are ignored
+ok 17 - duplicate sends while pending are ignored
+  ---
+  duration_ms: 193.118565
+  type: 'test'
+  ...
+# Subtest: second question supersedes first even if transport ignores abort
+ok 18 - second question supersedes first even if transport ignores abort
+  ---
+  duration_ms: 281.387679
+  type: 'test'
+  ...
+# Subtest: navigation cancels and clears content
+ok 19 - navigation cancels and clears content
+  ---
+  duration_ms: 229.190275
+  type: 'test'
+  ...
+# Subtest: logout clears pending request and rendered answer immediately
+ok 20 - logout clears pending request and rendered answer immediately
+  ---
+  duration_ms: 214.110808
+  type: 'test'
+  ...
+# Subtest: account replacement clears synchronously and stale A cannot render under B
+ok 21 - account replacement clears synchronously and stale A cannot render under B
+  ---
+  duration_ms: 262.915916
+  type: 'test'
+  ...
+# Subtest: same-account token replacement clears immediately
+ok 22 - same-account token replacement clears immediately
+  ---
+  duration_ms: 208.445334
+  type: 'test'
+  ...
+# Subtest: cross-tab token replacement clears and hides entry
+ok 23 - cross-tab token replacement clears and hides entry
+  ---
+  duration_ms: 206.517215
+  type: 'test'
+  ...
+# Subtest: 401 clears content and blocks same invalid session
+ok 24 - 401 clears content and blocks same invalid session
+  ---
+  duration_ms: 248.442644
+  type: 'test'
+  ...
+# Subtest: other website API 401 also invalidates assistant
+ok 25 - other website API 401 also invalidates assistant
+  ---
+  duration_ms: 205.049794
+  type: 'test'
+  ...
+# Subtest: mismatched response rejected {"accountId":"b"}
+ok 26 - mismatched response rejected {"accountId":"b"}
+  ---
+  duration_ms: 221.360614
+  type: 'test'
+  ...
+# Subtest: mismatched response rejected {"requestId":"other"}
+ok 27 - mismatched response rejected {"requestId":"other"}
+  ---
+  duration_ms: 192.892593
+  type: 'test'
+  ...
+# Subtest: mismatched response rejected {"version":2}
+ok 28 - mismatched response rejected {"version":2}
+  ---
+  duration_ms: 194.24573
+  type: 'test'
+  ...
+# Subtest: mismatched response rejected {"response":{}}
+ok 29 - mismatched response rejected {"response":{}}
+  ---
+  duration_ms: 204.345058
+  type: 'test'
+  ...
+# Subtest: safe text rendering prevents markup interpretation
+ok 30 - safe text rendering prevents markup interpretation
+  ---
+  duration_ms: 204.470206
+  type: 'test'
+  ...
+# Subtest: pagehide cancels requests and clears ephemeral state
+ok 31 - pagehide cancels requests and clears ephemeral state
+  ---
+  duration_ms: 207.667861
+  type: 'test'
+  ...
+# Subtest: no external model calls or legacy history writes; manual fallback remains
+ok 32 - no external model calls or legacy history writes; manual fallback remains
+  ---
+  duration_ms: 260.878434
+  type: 'test'
+  ...
+# Subtest: legacy Ask a Potter source remains byte-identical to 4B
+ok 33 - legacy Ask a Potter source remains byte-identical to 4B
+  ---
+  duration_ms: 2.897373
+  type: 'test'
+  ...
+# Subtest: scoped CSS preserves hidden retry and signed-out entry
+ok 34 - scoped CSS preserves hidden retry and signed-out entry
+  ---
+  duration_ms: 229.851975
+  type: 'test'
+  ...
+# Subtest: hash navigation outside normal page router cancels
+ok 35 - hash navigation outside normal page router cancels
+  ---
+  duration_ms: 214.49401
+  type: 'test'
+  ...
+# Subtest: A to B to A cannot revive old request generation
+ok 36 - A to B to A cannot revive old request generation
+  ---
+  duration_ms: 232.902308
+  type: 'test'
+  ...
+# Subtest: session changes while JSON parses cannot render late answer
+ok 37 - session changes while JSON parses cannot render late answer
+  ---
+  duration_ms: 253.784372
+  type: 'test'
+  ...
+# Subtest: late 401 from A cannot invalidate B
+ok 38 - late 401 from A cannot invalidate B
+  ---
+  duration_ms: 229.917123
+  type: 'test'
+  ...
+1..38
+# tests 38
+# suites 0
+# pass 38
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8320.322052

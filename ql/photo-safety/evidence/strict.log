@@ -1,0 +1,232 @@
+TAP version 13
+# Subtest: H1a Pricing delete preserves a different account Piece photo
+ok 1 - H1a Pricing delete preserves a different account Piece photo
+  ---
+  duration_ms: 107.710947
+  type: 'test'
+  ...
+# Subtest: H1b Pricing replacement preserves another record photo
+ok 2 - H1b Pricing replacement preserves another record photo
+  ---
+  duration_ms: 57.09155
+  type: 'test'
+  ...
+# Subtest: H2a Gallery does not expand corrupt foreign Clay/Glaze references
+ok 3 - H2a Gallery does not expand corrupt foreign Clay/Glaze references
+  ---
+  duration_ms: 30.104705
+  type: 'test'
+  ...
+# Subtest: H3 Admin size cleanup preserves registered studio files
+ok 4 - H3 Admin size cleanup preserves registered studio files
+  ---
+  duration_ms: 10.738851
+  type: 'test'
+  ...
+# Subtest: H6 Editing a shared JPEG cannot overwrite another account photo bytes
+ok 5 - H6 Editing a shared JPEG cannot overwrite another account photo bytes
+  ---
+  duration_ms: 97.793488
+  type: 'test'
+  ...
+# Subtest: H4 Sale deletion rolls back Piece status if deleting Sale fails
+ok 6 - H4 Sale deletion rolls back Piece status if deleting Sale fails
+  ---
+  duration_ms: 13.186858
+  type: 'test'
+  ...
+# Subtest: H5 Sale contact write rejects foreign contact before mutation
+ok 7 - H5 Sale contact write rejects foreign contact before mutation
+  ---
+  duration_ms: 19.981228
+  type: 'test'
+  ...
+# Subtest: H7-firing Historical firing startup preserves installed QL relationships and photo metadata
+ok 8 - H7-firing Historical firing startup preserves installed QL relationships and photo metadata
+  ---
+  duration_ms: 140.098174
+  type: 'test'
+  ...
+# Subtest: H7-tile Historical tile startup preserves installed QL relationships and photo metadata
+ok 9 - H7-tile Historical tile startup preserves installed QL relationships and photo metadata
+  ---
+  duration_ms: 121.127982
+  type: 'test'
+  ...
+# Subtest: H2b Photo Lookup does not expand foreign Clay/Glaze references
+ok 10 - H2b Photo Lookup does not expand foreign Clay/Glaze references
+  ---
+  duration_ms: 128.861314
+  type: 'test'
+  ...
+# Subtest: I1 Pricing-only, Piece-only, missing and unsafe files use conservative post-commit cleanup
+ok 11 - I1 Pricing-only, Piece-only, missing and unsafe files use conservative post-commit cleanup
+  ---
+  duration_ms: 66.325369
+  type: 'test'
+  ...
+# Subtest: I1 Pricing SQL failure and foreign requests retain rows, QL links and bytes
+ok 12 - I1 Pricing SQL failure and foreign requests retain rows, QL links and bytes
+  ---
+  duration_ms: 30.592386
+  type: 'test'
+  ...
+# Subtest: I3 Admin video/size cleanup retains every registered slot and orphan metadata
+ok 13 - I3 Admin video/size cleanup retains every registered slot and orphan metadata
+  ---
+  duration_ms: 34.272821
+  type: 'test'
+  ...
+# Subtest: I1 Profile/avatar, Event, Sale, Project and forum cleanup preserve another account reference
+ok 14 - I1 Profile/avatar, Event, Sale, Project and forum cleanup preserve another account reference
+  ---
+  duration_ms: 78.096694
+  type: 'test'
+  ...
+# Subtest: I4 Piece update failure rolls Sale deletion back; surviving sales preserve sold history
+ok 15 - I4 Piece update failure rolls Sale deletion back; surviving sales preserve sold history
+  ---
+  duration_ms: 22.458925
+  type: 'test'
+  ...
+# Subtest: I5 Contact create/update rejection is indistinguishable, reads filter stale/foreign pointers
+ok 16 - I5 Contact create/update rejection is indistinguishable, reads filter stale/foreign pointers
+  ---
+  duration_ms: 48.176984
+  type: 'test'
+  ...
+# Subtest: I5 Contact deletion atomically detaches own Sales and rejects foreign inbound links
+ok 17 - I5 Contact deletion atomically detaches own Sales and rejects foreign inbound links
+  ---
+  duration_ms: 18.208208
+  type: 'test'
+  ...
+# Subtest: I5 Self/admin account deletion rejects corrupt Contact links before any change
+ok 18 - I5 Self/admin account deletion rejects corrupt Contact links before any change
+  ---
+  duration_ms: 13.726872
+  type: 'test'
+  ...
+# Subtest: I6 Same-account multi-record and multi-slot image edits reject without touching bytes
+ok 19 - I6 Same-account multi-record and multi-slot image edits reject without touching bytes
+  ---
+  duration_ms: 22.485
+  type: 'test'
+  ...
+# Subtest: I6 Pricing edits isolate cross-account bytes; SQL failure retains old references and bytes
+ok 20 - I6 Pricing edits isolate cross-account bytes; SQL failure retains old references and bytes
+  ---
+  duration_ms: 40.175876
+  type: 'test'
+  ...
+# Subtest: I6 Forum reply ownership cannot be inherited from someone else’s post
+ok 21 - I6 Forum reply ownership cannot be inherited from someone else’s post
+  ---
+  duration_ms: 36.116692
+  type: 'test'
+  ...
+# Subtest: I2 Private Piece IDs and photos never enter Gallery or another account Photo Lookup
+ok 22 - I2 Private Piece IDs and photos never enter Gallery or another account Photo Lookup
+  ---
+  duration_ms: 96.920474
+  type: 'test'
+  ...
+# Subtest: I3 Legacy migration HTTP runner is guarded with QL; emergency cleanup cannot delete files
+ok 23 - I3 Legacy migration HTTP runner is guarded with QL; emergency cleanup cannot delete files
+  ---
+  duration_ms: 10.382883
+  type: 'test'
+  ...
+# Subtest: I6 all existing editable studio photo slots copy on write, preserving foreign shared bytes
+ok 24 - I6 all existing editable studio photo slots copy on write, preserving foreign shared bytes
+  ---
+  duration_ms: 102.672902
+  type: 'test'
+  ...
+# Subtest: I1 profile and forum SQL failures never delete still-committed image bytes
+ok 25 - I1 profile and forum SQL failures never delete still-committed image bytes
+  ---
+  duration_ms: 28.930095
+  type: 'test'
+  ...
+# Subtest: I7 supported pre-QL firing startup preserves rows, photos, Contact and later time columns
+ok 26 - I7 supported pre-QL firing startup preserves rows, photos, Contact and later time columns
+  ---
+  duration_ms: 193.62177
+  type: 'test'
+  ...
+# Subtest: I7 supported pre-QL sales startup preserves rows, photos, Contact and later time columns
+ok 27 - I7 supported pre-QL sales startup preserves rows, photos, Contact and later time columns
+  ---
+  duration_ms: 215.659113
+  type: 'test'
+  ...
+# Subtest: I7 supported pre-QL tile startup preserves rows, photos, Contact and later time columns
+ok 28 - I7 supported pre-QL tile startup preserves rows, photos, Contact and later time columns
+  ---
+  duration_ms: 159.399574
+  type: 'test'
+  ...
+# Subtest: I7 post-QL historical firing rejects before any schema or row mutation
+ok 29 - I7 post-QL historical firing rejects before any schema or row mutation
+  ---
+  duration_ms: 110.673742
+  type: 'test'
+  ...
+# Subtest: I7 post-QL historical sales rejects before any schema or row mutation
+ok 30 - I7 post-QL historical sales rejects before any schema or row mutation
+  ---
+  duration_ms: 139.181038
+  type: 'test'
+  ...
+# Subtest: I7 post-QL historical tile rejects before any schema or row mutation
+ok 31 - I7 post-QL historical tile rejects before any schema or row mutation
+  ---
+  duration_ms: 150.052601
+  type: 'test'
+  ...
+# Subtest: I7 failure after dropping Firing parent rolls back parent, child rows and new table
+ok 32 - I7 failure after dropping Firing parent rolls back parent, child rows and new table
+  ---
+  duration_ms: 126.208038
+  type: 'test'
+  ...
+# Subtest: I7 leftover migration table is preserved and never overwritten
+ok 33 - I7 leftover migration table is preserved and never overwritten
+  ---
+  duration_ms: 121.370404
+  type: 'test'
+  ...
+# Subtest: I3 legacy CLI migration refuses installed QL without changing database
+ok 34 - I3 legacy CLI migration refuses installed QL without changing database
+  ---
+  duration_ms: 108.300683
+  type: 'test'
+  ...
+# Subtest: I1/I3 every registered file slot independently protects bytes, including orphan metadata
+ok 35 - I1/I3 every registered file slot independently protects bytes, including orphan metadata
+  ---
+  duration_ms: 13.776861
+  type: 'test'
+  ...
+# Subtest: I1 cleanup filesystem failure retains unreferenced file after metadata commits
+ok 36 - I1 cleanup filesystem failure retains unreferenced file after metadata commits
+  ---
+  duration_ms: 2.024952
+  type: 'test'
+  ...
+# Subtest: I5 internal Piece read model filters foreign Sale Contact pointers without mutating history
+ok 37 - I5 internal Piece read model filters foreign Sale Contact pointers without mutating history
+  ---
+  duration_ms: 31.908897
+  type: 'test'
+  ...
+1..37
+# tests 37
+# suites 0
+# pass 37
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2311.319519

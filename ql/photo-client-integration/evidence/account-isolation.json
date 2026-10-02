@@ -1,0 +1,9 @@
+{
+  "accountAPieces": 48,
+  "accountBPieces": 48,
+  "identicalBReferences": 144,
+  "queriesChecked": 2064,
+  "BControlResults": 36,
+  "leaks": 0,
+  "scope": "Candidate IDs and complete serialized API response; protected endpoint controls separately; legacy /uploads remains Safety-1"
+}

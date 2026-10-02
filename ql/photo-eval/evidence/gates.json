@@ -1,0 +1,18 @@
+{
+  "baseline": {
+    "pass": true,
+    "failures": [],
+    "mode": "baseline-self-consistency",
+    "improvementClaimed": false,
+    "tolerance": "Same runtime/hardware, warmed HTTP, sequential concurrency=1: p50 and p95 <=110% baseline; rerun matched samples to investigate environmental variance, never silently relax."
+  },
+  "futureReleaseAgainstUnchanged": {
+    "pass": false,
+    "failures": [
+      "light/plain +10 percentage-point improvement required"
+    ],
+    "mode": "future-release",
+    "improvementClaimed": false,
+    "tolerance": "Same runtime/hardware, warmed HTTP, sequential concurrency=1: p50 and p95 <=110% baseline; rerun matched samples to investigate environmental variance, never silently relax."
+  }
+}

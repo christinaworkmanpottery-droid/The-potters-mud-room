@@ -1,0 +1,25 @@
+cold 0
+cold 100
+cold 200
+cold 300
+cold 400
+cold 500
+warm 0
+warm 100
+warm 200
+warm 300
+warm 400
+warm 500
+repeat 0
+repeat 100
+repeat 200
+repeat 300
+repeat 400
+repeat 500
+plain 0
+plain 100
+plain 200
+plain 300
+plain 400
+plain 500
+{"counts":{"pieces":48,"referenceImages":144,"queries":516,"positive":384,"ambiguous":32,"noMatch":100,"privacyOnlyPieces":48,"privacyOnlyReferences":144},"top1":0.4947916666666667,"top3":0.7838541666666666,"coldAbsent":0,"latency":{"n":516,"min":21.88464599987492,"p05":24.302537000039592,"p50":30.120154000120237,"p95":45.458982000127435,"max":124.70609500003047,"mean":32.204431352707786}}

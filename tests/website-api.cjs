@@ -9,7 +9,8 @@ const jwt = require('jsonwebtoken');
 const root=path.resolve(__dirname,'..');
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'mudroom-master-test-'));
 for(const file of ['server.js','database.js','iap.js','directory-search.js','calendar-export.js','deletion-lifecycle.cjs'])fs.copyFileSync(path.join(root,file),path.join(tmp,file));
-  fs.mkdirSync(path.join(tmp,'ql'), {recursive:true}); fs.copyFileSync(path.join(root,'ql/relationships.cjs'),path.join(tmp,'ql/relationships.cjs'));fs.copyFileSync(path.join(root,'ql/piece-editor.cjs'),path.join(tmp,'ql/piece-editor.cjs'));
+  fs.mkdirSync(path.join(tmp,'ql'), {recursive:true}); fs.copyFileSync(path.join(root,'ql/relationships.cjs'),path.join(tmp,'ql/relationships.cjs'));fs.copyFileSync(path.join(root,'ql/piece-editor.cjs'),path.join(tmp,'ql/piece-editor.cjs'));fs.copyFileSync(path.join(root,'ql/photo-query-safety.cjs'),path.join(tmp,'ql/photo-query-safety.cjs'));
+  fs.copyFileSync(path.join(root,'ql/photo-result-confidence.cjs'),path.join(tmp,'ql/photo-result-confidence.cjs'));
 fs.cpSync(path.join(root,'geodata'),path.join(tmp,'geodata'),{recursive:true});
 fs.symlinkSync(path.join(root,'node_modules'),path.join(tmp,'node_modules'),'dir');
 fs.symlinkSync(path.join(root,'public'),path.join(tmp,'public'),'dir');
@@ -124,7 +125,7 @@ async function test(name,fn){await fn();console.log('PASS',name);}
  });
  await test('sample PDF is a real PDF; styles/scripts resolve from nested URLs',async()=>{
   const r=await fetch(base+'/shop/mud-log-preview.pdf');assert.match(r.headers.get('content-type'),/application\/pdf/);assert.equal((await r.text()).slice(0,5),'%PDF-');
-  const html=await (await fetch(base+'/nested/preview')).text();assert.match(html,/src="\/app.js\?v=search2"/);assert.match(html,/href="\/style.css/);
+  const html=await (await fetch(base+'/nested/preview')).text();assert.match(html,/src="\/app.js\?v=4c"/);assert.match(html,/href="\/style.css/);
  });
  if(process.env.QL_TEST_MIGRATION==='1')await test('old Piece API create/read/edit/delete remains compatible with QL links',async()=>{
   const ql=require('../ql/relationships.cjs');

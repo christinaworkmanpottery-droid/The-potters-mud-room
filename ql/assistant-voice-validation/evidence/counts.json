@@ -1,0 +1,44 @@
+{
+  "focused": {
+    "tests": 155,
+    "pass": 155,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "exitCode": 0
+  },
+  "full": {
+    "tests": 1632,
+    "pass": 1632,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "exitCode": 0
+  },
+  "strict": {
+    "tests": 37,
+    "pass": 37,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "exitCode": 0
+  },
+  "runtime": {
+    "passed": 31,
+    "failed": 0,
+    "realBrowser": false,
+    "realMicrophone": false
+  },
+  "recovery": {
+    "passed": 114,
+    "failed": 0,
+    "blocked": 1,
+    "cancellations": 0,
+    "skips": 0,
+    "todos": 0,
+    "exitCode": 1
+  }
+}
