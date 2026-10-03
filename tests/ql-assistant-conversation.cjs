@@ -255,3 +255,26 @@ test('save note cannot accidentally confirm a pending Piece clarification',async
  const piece=await ask('Open blue bowl');const clarification=await ask('What way is on blue phase',piece.context);
  const r=await ask('Save note',clarification.context);assert.equal(r.result.status,'clarification');assert.equal(r.response.navigation,undefined);assert.match(r.response.text,/no current Studio Note draft/);
 });
+test('natural new-note dialogue gathers actual words then confirms before save',async()=>{
+ const before=db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n;
+ let start=await ask('Create new note about glazing');assert.equal(start.result.status,'collecting');assert.match(start.response.text,/what.*note to say about glazing/i);assert.equal(start.response.navigation,undefined);
+ start=await ask('Save note',start.context);assert.equal(start.result.status,'collecting');
+ const draft=await ask('Try three coats of Ocean next time.',start.context);assert.equal(draft.result.status,'draft');assert.match(draft.response.text,/Try three coats of Ocean next time\./);
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n,before);
+ const saved=await ask('Save note',draft.context);assert.equal(saved.result.status,'saved');assert.equal(db.prepare('SELECT body FROM studio_notes WHERE id=?').get(saved.result.noteId).body,'Try three coats of Ocean next time.');
+ assert.notEqual((await ask('Save note',draft.context)).result.status,'saved');
+ for(const text of ['Create a new note','Make a studio note','Add a new studio note about firing']){
+  const collecting=await ask(text);assert.equal(collecting.result.status,'collecting');assert.equal((await ask('Cancel',collecting.context)).result.status,'canceled');
+ }
+});
+test('note dialogue rejects foreign/expired context, preserves commands and direct dictation',async()=>{
+ const start=await ask('Create new note about glazing');
+ await assert.rejects(ask('Try three coats.',start.context,'b'),{code:'UNSUPPORTED_INTENT'});
+ const nav=await ask('Open my pieces',start.context);assert.equal(nav.response.navigation.page,'pieces');
+ await assert.rejects(ask('Try three coats.',start.context),{code:'UNSUPPORTED_INTENT'});
+ const fresh=await ask('Create new note');await assert.rejects(ask('Delete all my pieces',fresh.context),{code:'ACTION_NOT_AVAILABLE'});
+ for(const text of ['Create a new note saying Exact Words','Add a note that Exact Words']){
+  const r=await ask(text);assert.equal(r.result.status,'draft');assert.match(r.response.text,/Exact Words/);await ask('Cancel',r.context);
+ }
+ let now=0;const drafts=require('../ql/assistant/notes.cjs').createNoteDrafts(db,{now:()=>now,ttl:10});const begin=drafts.begin('a','glazing');assert.equal(drafts.wantsText('a',begin.state),true);now=10;assert.equal(drafts.wantsText('a',begin.state),false);
+});

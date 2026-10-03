@@ -1,7 +1,7 @@
 'use strict';
 const {DOMAINS, DESTINATIONS, validQuery, resolve} = require('./intents.cjs');
 const {createContextStore, followup, createConversationTools} = require('./conversation.cjs');
-const {noteBody,confirmation,cancellation,createNoteDrafts}=require('./notes.cjs');
+const {noteStart,isNoteText,noteBody,confirmation,cancellation,createNoteDrafts}=require('./notes.cjs');
 const INTENT = 'studio.firing.latest';
 class AssistantError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }
@@ -14,7 +14,7 @@ function exact(value, keys) {
 function validateIntent(value) {
   if (!exact(value, ['name', 'arguments'])) fail(400, 'UNSUPPORTED_INTENT', 'Unsupported assistant intent.');
   const args = value.arguments;
-  const valid = (value.name === 'studio.note.draft' && exact(args,['body']) && typeof args.body==='string' && args.body.trim().length>0 && args.body.length<=200 && !/[\x00-\x1f\x7f]/.test(args.body)) ||
+  const valid = (value.name === 'studio.note.begin' && exact(args,['topic']) && typeof args.topic==='string' && args.topic.length<=200 && !/[\x00-\x1f\x7f]/.test(args.topic)) || (value.name === 'studio.note.draft' && exact(args,['body']) && typeof args.body==='string' && args.body.trim().length>0 && args.body.length<=200 && !/[\x00-\x1f\x7f]/.test(args.body)) ||
     (['studio.note.confirm','studio.note.cancel'].includes(value.name) && exact(args,[])) || (['studio.piece.glazes','studio.piece.firings','studio.piece.open','studio.piece.clarifyGlazes','studio.piece.repeatName'].includes(value.name) && exact(args, [])) ||
     (value.name === 'studio.piece.choose' && exact(args,['index']) && Number.isInteger(args.index) && args.index >= 1 && args.index <= 5) ||
     (value.name === 'studio.piece.confirmRead' && exact(args,['confirmed']) && typeof args.confirmed === 'boolean') ||
@@ -47,6 +47,8 @@ function validateRequest(value) {
 const deterministicProvider = Object.freeze({
   id: 'deterministic-v1',
   resolveIntent({text}) {
+    const start=noteStart(text);
+    if(start) return {name:'studio.note.begin',arguments:start};
     const body=noteBody(text);
     if(body) return {name:'studio.note.draft',arguments:{body}};
     if(confirmation(text)) return {name:'studio.note.confirm',arguments:{}};
@@ -111,8 +113,9 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
       const {requestId, input} = validateRequest(request);
       if (signal?.aborted) fail(409, 'CANCELLED', 'Assistant request cancelled.');
       const context = request.context ? contexts.read(request.context.token,userId) : null;
+      const capture=notes.wantsText(userId,context) && isNoteText(input.text);
       let proposed;
-      try { proposed = input.command || await intentProvider.resolveIntent({text: input.text}, {signal}); }
+      try { proposed = capture ? {name:'studio.note.draft',arguments:{body:input.text.trim()}} : input.command || await intentProvider.resolveIntent({text: input.text}, {signal}); }
       catch (error) {
         notes.clear(userId);
         if (error.code !== 'UNSUPPORTED_INTENT' || context?.scope !== 'piece' ||
@@ -124,8 +127,11 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
       if (authorize() !== userId) fail(401, 'SESSION_CHANGED', 'Account session changed.');
       requireAccount(db, userId);
       let result, response, nextState = {};
-      if (intent.name === 'studio.note.draft') {
-        if (!request.context || noteBody(input.text)!==intent.arguments.body) fail(400,'INVALID_REQUEST','A note draft requires your exact dictated text and an active conversation.');
+      if (intent.name === 'studio.note.begin') {
+        if(!request.context || noteStart(input.text)?.topic!==intent.arguments.topic) fail(400,'INVALID_REQUEST','Please request a note using your own words.');
+        ({result,response,state:nextState}=notes.begin(userId,intent.arguments.topic));
+      } else if (intent.name === 'studio.note.draft') {
+        if (!request.context || (capture ? input.text.trim() : noteBody(input.text))!==intent.arguments.body) fail(400,'INVALID_REQUEST','A note draft requires your exact dictated text and an active conversation.');
         ({result,response,state:nextState}=notes.draft(userId,intent.arguments.body));
       } else if (['studio.note.confirm','studio.note.cancel'].includes(intent.name)) {
         const save=intent.name==='studio.note.confirm';

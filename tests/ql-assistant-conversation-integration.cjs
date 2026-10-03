@@ -40,9 +40,12 @@ test('full website + actual HTTP + SQLite: hands-free Piece conversation and man
   assert.match(await say('Add a studio note that discard this'),/Draft studio note/);
   assert.match(await say('Cancel'),/Nothing was saved/);
   assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,1);
+  assert.match(await say('Create new note about glazing'),/note to say about glazing/);
+  assert.match(await say('Try three coats next time.'),/Draft studio note/);
+  assert.match(await say('Cancel'),/Nothing was saved/);
   await say('Add a studio note that Stop should discard this');
   engines.at(-1).result('Stop listening');await until(()=>el('qlAssistantSession').dataset.state==='stopped');
-  assert.equal(requests.filter(r=>r.url==='/api/ql/assistant/turn').length,14);
+  assert.equal(requests.filter(r=>r.url==='/api/ql/assistant/turn').length,17);
   assert.ok(requests.some(r=>r.url==='/api/pieces/blue'));assert.ok(requests.some(r=>r.url==='/api/ql/pieces/blue/history'));
   assert.equal(requests.some(r=>r.url==='/api/ai/chat'),false);
   w.navigate('qlAssistant');el('qlAssistantInput').value='Save note';el('qlAssistantForm').requestSubmit();await until(()=>el('qlAssistantForm').getAttribute('aria-busy')==='false');assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,1);
