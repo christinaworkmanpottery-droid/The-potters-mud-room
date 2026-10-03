@@ -173,6 +173,7 @@ test('device repair: choices and glaze answer remain visible when listening resu
  assert.equal(f.el('qlAssistantSessionCommand').textContent,'Heard: Show me the blue one');
  assert.match(f.el('qlAssistantSessionStatus').textContent,/Microphone ready/);
  assert.notEqual(f.w.getComputedStyle(f.el('qlAssistantSessionReply')).display,'none');
+ assert.ok(f.el('qlAssistantSessionReply').compareDocumentPosition(f.el('qlAssistantSessionStatus')) & f.w.Node.DOCUMENT_POSITION_FOLLOWING);
  f.engines[1].result('What glaze is on it?');assert.equal(f.el('qlAssistantSessionReply').textContent,'');
  f.reply(1,'Saved glaze: Ocean',{context:{token:'b'.repeat(48)}});await tick();restart(f);f.engines[2].onaudiostart();
  assert.equal(f.el('qlAssistantSessionReply').textContent,'Saved glaze: Ocean');
