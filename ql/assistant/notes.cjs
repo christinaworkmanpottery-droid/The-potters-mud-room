@@ -1,6 +1,6 @@
 'use strict';
 const {randomBytes}=require('node:crypto');
-const {createStudioNote}=require('../studio-notes.cjs');
+const {createStudioNote,updateStudioNote}=require('../studio-notes.cjs');
 // Extract dictated words; command suffixes are not note content. Material
 // alternatives are explicit proposals and never silently replace user words.
 function dictationBody(text) {
@@ -43,13 +43,38 @@ const isNoteText=text=>typeof text==='string' && noteRequest(text)===null && !co
 const cancellation=text=>typeof text==='string' && /^(?:no|no thanks|cancel|cancel (?:(?:the|this) )?note|never mind|discard (?:it|that|this|(?:the )?note)|do not save(?: (?:it|that|(?:the )?note))?|don[’']t save(?: (?:it|that|(?:the )?note))?)$/i.test(commandWords(text));
 // Deliberately bounded fragment guard; exact saved text is never rewritten.
 const incompleteNote = text => /(?:\b(?:and|or|because|with|for|to|the|my|buy|need)|\bi[’']ve been|\bi have been|\bi[’']m going to)[.!?]*$/i.test((text || '').trim());
+// Follow-up content stays literal. Explicit non-note destinations never become text.
+function noteAddition(text) {
+  if(typeof text!=='string' || /[\x00-\x1f\x7f]/.test(text))return null;
+  const words=commandWords(text).replace(/^(?:and\s+)?(?:also\s+)?/i,'');
+  const m=words.match(/^(?:add(?:\s+in)?|append|include|mention)\s+(.+)$/i);
+  if(!m)return null;
+  let body=m[1].replace(/\s+(?:to|in)\s+(?:(?:the|my|this|that)\s+)?(?:studio\s+)?note[.!?]*$/i,'').replace(/\s+to\s+(?:that|it|this)[.!?]*$/i,'').trim();
+  if(/\b(?:to|on|into|in)\s+(?:(?:the|my|a|this|that)\s+)?(?:piece|glaze collection|glaze library|shopping list|inventory|bowl|vase)\b/i.test(body))return null;
+  if(/^(?:a |another |new |studio )*note\b/i.test(body))return null;
+  return {body,ambiguous:/^(?:that|it|this)[.!?]*$/i.test(body)};
+}
 function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
   const drafts=new Map();
-  function clear(userId){drafts.delete(userId);}
-  function prune(){for(const [owner,d] of drafts)if(d.expires<=now())drafts.delete(owner);}
+  const saved=new Map();
+  function clear(userId){drafts.delete(userId);saved.delete(userId);}
+  function prune(){for(const entries of [drafts,saved])for(const [owner,d] of entries)if(d.expires<=now())entries.delete(owner);}
   const reply=(text,status,state={})=>({result:{tool:'studio.note',status},response:{text},state});
   return {
     clear,
+    canAmend(userId,state){prune();return !!(saved.get(userId)?.ref===state?.savedNoteRef && state?.savedNoteRef || state?.noteDraftId && drafts.get(userId)?.id===state.noteDraftId && drafts.get(userId)?.target);},
+    amend(userId,state,addition){
+      prune();
+      const d=drafts.get(userId);
+      const target=d && d.id===state?.noteDraftId ? d.target : saved.get(userId)?.ref===state?.savedNoteRef ? saved.get(userId) : null;
+      if(!target)return reply('Which note should I add that to? I do not have a current saved note in this conversation. Nothing changed.','clarification');
+      if(addition.ambiguous)return reply('What words should I add to your note? Please say the words you want included. Nothing changed.','clarification',state);
+      const current=db.prepare('SELECT body FROM studio_notes WHERE id=? AND user_id=?').get(target.noteId,userId);
+      if(!current || current.body!==target.originalBody){clear(userId);return reply('That note changed or is no longer available. Please open it to review the latest text. Nothing changed.','clarification');}
+      const body=(d && d.id===state?.noteDraftId ? d.body : current.body)+'\n'+addition.body;
+      if(body.length>10000)return reply('This addition would make the note too long. Nothing changed.','clarification',state);
+      return this.draft(userId,body,{target});
+    },
     wantsText(userId,state){prune();const d=drafts.get(userId);return !!(d && d.id===state?.noteDraftId && (d.collecting || d.body));},
     review(userId,state){
       prune();const d=drafts.get(userId);
@@ -58,22 +83,26 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
       if(d.body)result.result.draftText=d.body;
       return result;
     },
+    revise(userId,state,body){
+      const d=drafts.get(userId);
+      return this.draft(userId,body,{target:d && d.id===state?.noteDraftId ? d.target : null});
+    },
     begin(userId,topic){
       prune();clear(userId);while(drafts.size>=max)drafts.delete(drafts.keys().next().value);
       const id=randomBytes(24).toString('hex');drafts.set(userId,{id,collecting:true,expires:now()+ttl});
       return reply('What would you like the note to say'+(topic?' about '+topic:'')+'? Speak the note text next, or say “cancel”. Nothing has been saved.','collecting',{noteDraftId:id});
     },
-    draft(userId,body,{reviewMaterial=true}={}){
+    draft(userId,body,{reviewMaterial=true,target=null}={}){
       prune();clear(userId);
       while(drafts.size>=max)drafts.delete(drafts.keys().next().value);
       const id=randomBytes(24).toString('hex');
       const suggestion=reviewMaterial && /\bbmx(?=\s+clay\b)/i.test(body) ? body.replace(/\bbmx(?=\s+clay\b)/gi,'B-Mix') : null;
-      drafts.set(userId,{id,body,suggestion,expires:now()+ttl});
+      drafts.set(userId,{id,body,suggestion,target,expires:now()+ttl});
       if(suggestion){
         const result=reply('I heard “BMX clay”. Did you mean “B-Mix clay”? Your full note is: “'+body+'” Say “yes” or “use B mix” to correct the clay name, “keep original words”, or “replace note with” followed by the full corrected note. Nothing has been saved.','material-review',{noteDraftId:id});
         result.result.draftText=body;return result;
       }
-      const result=reply('Draft studio note: “'+body+'” Check all the words. Say “save note” to save, “replace note with” followed by the full corrected text, or “cancel”. Nothing has been saved yet.','draft',{noteDraftId:id});
+      const result=reply((target?'Updated note preview: “':'Draft studio note: “')+body+'” Check all the words. Say “save note” to save, “replace note with” followed by the full corrected text, or “cancel”. Nothing has been saved yet.','draft',{noteDraftId:id});
       result.result.draftText=body;return result;
     },
     confirm(userId,state,save,text=''){
@@ -81,7 +110,7 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
       if(!draft || draft.id!==state?.noteDraftId)return reply('There is no current Studio Note draft to confirm. Please dictate the note again.','clarification');
       if(save && draft.suggestion){
         const choice=materialChoice(text);
-        if(choice || /^yes$/i.test(commandWords(text))) return this.draft(userId,choice==='original'?draft.body:draft.suggestion,{reviewMaterial:false});
+        if(choice || /^yes$/i.test(commandWords(text))) return this.draft(userId,choice==='original'?draft.body:draft.suggestion,{reviewMaterial:false,target:draft.target});
         const result=reply('Please clarify the clay name first. Say “yes” to use B-Mix or “keep original words”. Your note is still: “'+draft.body+'” Nothing has been saved.','material-review',state);
         result.result.draftText=draft.body;return result;
       }
@@ -93,13 +122,16 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
       clear(userId);
       if(!save)return reply('Canceled the Studio Note draft. Nothing was saved.','canceled');
       let note;
-      try{note=createStudioNote(db,{userId,body:draft.body});}
-      catch{return reply('The Studio Note could not be saved. Please dictate it again to retry.','failed');}
-      const result=reply('Saved your Studio Note: “'+note.body+'”','saved');
+      try{note=draft.target ? updateStudioNote(db,{userId,id:draft.target.noteId,originalBody:draft.target.originalBody,body:draft.body}) : createStudioNote(db,{userId,body:draft.body});}
+      catch{return reply('The Studio Note could not be saved, or it changed since your preview. Please open the note and review it before retrying.','failed');}
+      const ref=randomBytes(24).toString('hex');
+      while(saved.size>=max)saved.delete(saved.keys().next().value);
+      saved.set(userId,{ref,noteId:note.id,originalBody:note.body,expires:now()+ttl});
+      const result=reply((draft.target?'Updated your Studio Note: “':'Saved your Studio Note: “')+note.body+'”','saved',{savedNoteRef:ref});
       result.result.noteId=note.id;
       result.response.navigation={kind:'page',page:'studioNotes'};
       return result;
     }
   };
 }
-module.exports={dictationBody,materialChoice,noteStart,isNoteText,noteBody,confirmation,cancellation,unclearNoteCommand,createNoteDrafts};
+module.exports={noteAddition,dictationBody,materialChoice,noteStart,isNoteText,noteBody,confirmation,cancellation,unclearNoteCommand,createNoteDrafts};

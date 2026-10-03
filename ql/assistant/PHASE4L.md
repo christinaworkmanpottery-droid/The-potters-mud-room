@@ -57,3 +57,17 @@ Real-iPhone acceptance (open /?test=4l#qlAssistant):
 7. Confirm words remain visible and listening resumes. Try a typed request too.
 
 Real-device acceptance remains pending. Preserve accepted 4K.2 as the rollback.
+
+
+## Phase 4L.1 — saved note follow-up repair
+User accepted everything tested except “Add in Sapphire Float” after saving a note.
+This slice retains an owner-bound, five-minute saved-note reference in memory.
+Natural additions to that note create an update preview; explicit save updates the
+same row with an owner/body compare-and-swap. Titles and other notes are preserved.
+Cancel, expiry, changed/deleted notes, account isolation, navigation, duplicate
+confirmation, full corrections, and starting a different note are protected.
+No new Piece/glaze inventory mutations or aesthetic changes. Production untouched.
+Regression tests include actual HTTP/website hands-free save → append → save →
+visible updated note. Real-iPhone acceptance still required for this repair.
+Test: create/save a note, say “Add in Sapphire Float”, review the combined text,
+say “Save note”, verify one updated note and resumed listening.

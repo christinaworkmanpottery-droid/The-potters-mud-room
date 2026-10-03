@@ -36,6 +36,11 @@ test('full website + actual HTTP + SQLite: hands-free Piece conversation and man
   assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,0);
   assert.match(await say('Save note'),/Saved your Studio Note/);assert.equal(w.eval('currentPage'),'studioNotes');
   await until(()=>el('studioNotesList').textContent.includes('I want to try this combination again'));
+  assert.match(await say('Add in Sapphire Float'),/Updated note preview/);
+  assert.doesNotMatch(db.prepare("SELECT body FROM studio_notes WHERE user_id='a'").get().body,/Sapphire/);
+  assert.match(await say('Save note'),/Updated your Studio Note/);
+  await until(()=>el('studioNotesList').textContent.includes('Sapphire Float'));
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,1);
   assert.match(await say('Yes'),/no pending question/i);
   assert.match(await say('Add a studio note that discard this'),/Draft studio note/);
   assert.match(await say('Cancel'),/Nothing was saved/);
