@@ -164,3 +164,24 @@ test('invalid or late response cannot replace conversation context',async t=>{
  f.reply(0,'secret',{context:{token:'not-a-token'}});await tick();assert.doesNotMatch(f.el('qlAssistantResponse').textContent,/secret/);restart(f);
  f.engines[1].result('Open pieces');f.el('qlAssistantSessionStop').click();f.reply(1,'late',{context:{token:'a'.repeat(48)}});await tick();start(f);f.engines[2].result('When did I fire it?');assert.equal(f.pending[2].body.context.token,null);
 });
+
+test('device repair: choices and glaze answer remain visible when listening resumes',async t=>{
+ const f=await fixture(t);start(f);f.engines[0].result('Show me the blue one');
+ const choices='2 Pieces match. 1. Blue bowl; 2. Blue vase. Say the first one.';
+ f.reply(0,choices,{context:{token:'a'.repeat(48)}});await tick();restart(f);f.engines[1].onaudiostart();
+ assert.equal(f.el('qlAssistantSessionReply').textContent,choices);
+ assert.equal(f.el('qlAssistantSessionCommand').textContent,'Heard: Show me the blue one');
+ assert.match(f.el('qlAssistantSessionStatus').textContent,/Microphone ready/);
+ assert.notEqual(f.w.getComputedStyle(f.el('qlAssistantSessionReply')).display,'none');
+ f.engines[1].result('What glaze is on it?');assert.equal(f.el('qlAssistantSessionReply').textContent,'');
+ f.reply(1,'Saved glaze: Ocean',{context:{token:'b'.repeat(48)}});await tick();restart(f);f.engines[2].onaudiostart();
+ assert.equal(f.el('qlAssistantSessionReply').textContent,'Saved glaze: Ocean');
+ assert.equal(f.el('qlAssistantSessionCommand').textContent,'Heard: What glaze is on it?');
+ f.w.logout();assert.equal(f.el('qlAssistantSessionReply').textContent,'');assert.equal(f.el('qlAssistantSessionCommand').textContent,'');
+});
+test('visible voice response is safe text and cleared on hidden/pagehide',async t=>{
+ const f=await fixture(t);start(f);f.engines[0].result('Open pieces');
+ f.reply(0,'<img src=x onerror=alert(1)>');await tick();restart(f);
+ assert.equal(f.el('qlAssistantSessionReply').children.length,0);
+ f.w.dispatchEvent(new f.w.Event('pagehide'));assert.equal(f.el('qlAssistantSessionReply').textContent,'');
+});

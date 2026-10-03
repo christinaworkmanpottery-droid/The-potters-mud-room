@@ -95,3 +95,25 @@ test('injected provider uses same bounded references with no history or data exp
  const seen=[];const c=createAssistantCore(db,{intentProvider:{resolveIntent(input){seen.push(input);return {name:'studio.piece.firings',arguments:{}};}}});
  const r=await ask('When did I fire it?',{token:null},'a',c);assert.deepEqual(seen,[{text:'When did I fire it?'}]);assert.equal(r.result.status,'clarification');
 });
+
+test('device wording: spoken ordinals and names select real saved Pieces',async()=>{
+ add('pieces',{id:'a-blue2',user_id:'a',title:'Blue vase'});
+ try {
+  const list=await ask('Find blue pieces');
+  assert.equal((await ask('Open blue vase',list.context)).response.navigation.id,'a-blue2');
+  for(const phrase of ['The 1st one.','The first 1.','Number one','Open number 1','The first piece'])assert.equal((await ask(phrase,list.context)).response.navigation.id,'a-blue');
+  for(const phrase of ['The 2nd one','Number two','Show me the second one'])assert.equal((await ask(phrase,list.context)).response.navigation.id,'a-blue2');
+  for(const phrase of ['Open the blue bowl','Show me my blue bowl']) {
+   const chosen=await ask(phrase,list.context);assert.equal(chosen.response.navigation.id,'a-blue');
+   for(const question of ['What glaze is on it?','What glaze did I use on that one?','Which glazes are on this piece?','What glaze was used on that?'])assert.deepEqual((await ask(question,chosen.context)).result.glazes,['Ocean']);
+   for(const question of ['When did I fire that one?','When was this one fired?'])assert.deepEqual((await ask(question,chosen.context)).result.dates,['2026-10-01']);
+  }
+ }finally{db.prepare("DELETE FROM pieces WHERE id='a-blue2'").run();}
+});
+test('new name and ordinal wording preserves empty and owner boundaries',async()=>{
+ assert.equal((await ask('The 1st one')).result.status,'clarification');
+ assert.equal((await ask('Open the purple bowl')).result.status,'empty');
+ const b=await ask('Open the blue bowl',{token:null},'b');assert.equal(b.response.navigation.id,'b-blue');
+ assert.deepEqual((await ask('What glaze is on it?',b.context,'b')).result.glazes,['Foreign private glaze']);
+ await assert.rejects(ask('Open the blue bowl and delete it'),e=>e.status===400);
+});

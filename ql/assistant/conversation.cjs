@@ -21,13 +21,20 @@ function createContextStore({now = Date.now, ttl = 15 * 60 * 1000, max = 1000} =
 const normalized = text => text.trim().toLowerCase().replace(/[?.!]$/, '').replace(/\s+/g,' ').replace(/^please /,'').replace(/ please$/,'');
 function followup(text) {
   if (/[\x00-\x1f\x7f]/.test(text)) return null;
-  const n = normalized(text);
+  const n = normalized(text).replace(/\b(1st|2nd|3rd|4th|5th)\b/g, word => ({'1st':'first','2nd':'second','3rd':'third','4th':'fourth','5th':'fifth'}[word]));
   const intent = (name,args={}) => ({name,arguments:args});
-  if (/^(?:what|which) glazes? did i use on (?:that|it|this)(?: piece)?$/.test(n)) return intent('studio.piece.glazes');
-  if (/^(?:when did i fire (?:it|that|this)(?: piece)?|when was (?:it|that|this)(?: piece)? fired)$/.test(n)) return intent('studio.piece.firings');
-  if (/^(?:open|show(?: me)?) (?:it|that|this)(?: piece)?$/.test(n)) return intent('studio.piece.open');
-  const ordinal = n.match(/^(?:(?:open|show(?: me)?|choose|select) )?(?:the )?(first|second|third|fourth|fifth|1|2|3|4|5)(?: one| piece)?$/);
-  if (ordinal) return intent('studio.piece.choose',{index:({'first':1,'second':2,'third':3,'fourth':4,'fifth':5}[ordinal[1]] || Number(ordinal[1]))});
+  const reference = '(?:that|it|this)(?: piece| one)?';
+  if (new RegExp('^(?:what|which) glazes? did i use on '+reference+'$').test(n) ||
+      new RegExp('^(?:what|which) glazes? (?:is|are) (?:on|used on) '+reference+'$').test(n) ||
+      new RegExp('^(?:what|which) glazes? (?:was|were) used on '+reference+'$').test(n)) return intent('studio.piece.glazes');
+  if (new RegExp('^(?:when did i fire '+reference+'|when was '+reference+' fired)$').test(n)) return intent('studio.piece.firings');
+  if (new RegExp('^(?:open|show(?: me)?) '+reference+'$').test(n)) return intent('studio.piece.open');
+  const ordinal = n.match(/^(?:(?:open|show(?: me)?|choose|select) )?(?:the )?(?:number |option |piece )?(first|second|third|fourth|fifth|one|two|three|four|five|1|2|3|4|5)(?: one| 1| piece| result| item)?$/);
+  if (ordinal) return intent('studio.piece.choose',{index:({'first':1,'second':2,'third':3,'fourth':4,'fifth':5,'one':1,'two':2,'three':3,'four':4,'five':5}[ordinal[1]] || Number(ordinal[1]))});
+  // Bounded named Piece phrases; ordinary feature navigation keeps its existing
+  // priority. A title/form cue is a text search, never photo interpretation.
+  const named = n.match(/^(?:open|show(?: me)?)(?: my| the)? (.+? (?:bowl|cup|mug|plate|vase|planter|pitcher|jar|sculpture))$/);
+  if (named) return intent('studio.search',{type:'piece',query:named[1]});
   const refine = n.match(/^(?:open|show(?: me)?|find) (?:the )?(.+?) (?:one|ones)$/);
   if (refine) return intent('studio.piece.refine',{query:refine[1]});
   return null;

@@ -23,7 +23,9 @@ test('full website + actual HTTP + SQLite: hands-free Piece conversation and man
   async function say(text){const count=engines.length;engines.at(-1).result(text);await until(()=>engines.length>count);return el('qlAssistantResponse').textContent;}
   await say('Open my pieces');assert.equal(w.eval('currentPage'),'pieces');
   await say('Show me the blue one');await until(()=>w.eval('currentPage')==='pieceDetail');assert.match(el('pieceDetailContent').textContent,/Blue bowl/);
-  assert.match(await say('What glaze did I use on that?'),/Ocean/);
+  assert.match(await say('What glaze is on it?'),/Ocean/);
+  assert.match(el('qlAssistantSessionReply').textContent,/Ocean/);
+  assert.equal(el('qlAssistantSessionCommand').textContent,'Heard: What glaze is on it?');
   assert.match(await say('When did I fire it?'),/2026-10-01/);
   await say('Go back to my glazes');assert.equal(w.eval('currentPage'),'glazes');
   assert.match(await say('When did I fire it?'),/Which Piece/);

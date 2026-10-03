@@ -1,7 +1,7 @@
 /* Bounded QL proof. Speech is transient input to the same typed turn path. */
 (() => {
   'use strict';
-  const displayName = 'QL assistant — testing';
+  const displayName = 'QL assistant — testing 4I.1';
   const identity = () => JSON.stringify([token, currentUser?.id, localStorage.getItem('mudlog_token')]);
   let conversationToken = null, recordNavigation = false;
   let session = identity(), invalidSession = null, generation = 0, serial = 0;
@@ -10,7 +10,7 @@
   let voiceEnabled = false, recognition = null, voiceTimer, stopTimer;
   let talk, stop, cancel, voiceStatus;
   let handsFreeEnabled = false, handsFree = false, sessionTimer, restartTimer, speechTimer, requestTimer;
-  let dock, dockStatus, sessionStart, sessionStop, spokenReplies, utterance;
+  let dock, dockStatus, dockCommand, dockReply, sessionStart, sessionStop, spokenReplies, utterance;
   let emptyAttempts = 0, voiceEpoch = 0, internalNavigation = false;
   const inVoiceContext = () => entered && (currentPage === 'qlAssistant' || handsFree);
   function sessionState(state, message) {
@@ -43,8 +43,9 @@
   }
   function voiceReply(text) {
     if (!handsFree) return;
-    sessionState('responding', text);
-    if (!spokenReplies.checked) { listenAgain(text + ' Ready for another command…'); return; }
+    dockReply.textContent = text;
+    sessionState('responding', 'Response ready.');
+    if (!spokenReplies.checked) { listenAgain('Ready for another command…'); return; }
     if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
       pauseSession('Spoken replies are unavailable. Turn off spoken replies and restart for text responses.', 'unavailable'); return;
     }
@@ -52,7 +53,7 @@
     const speech = new window.SpeechSynthesisUtterance(text.slice(0, 600)); utterance = speech;
     speech.lang = 'en-US';
     const active = () => handsFree && own === voiceEpoch && utterance === speech;
-    speech.onstart = () => { if (active()) sessionState('speaking', 'Speaking — microphone is off. ' + text); };
+    speech.onstart = () => { if (active()) sessionState('speaking', 'Speaking — microphone is off.'); };
     speech.onend = () => { if (active()) { clearTimeout(speechTimer); utterance = null; listenAgain(); } };
     speech.onerror = () => { if (active()) pauseSession('Audio could not play. Turn off spoken replies and restart the session.', 'unavailable'); };
     speechTimer = setTimeout(() => { if (active()) pauseSession('Audio did not finish. Turn off spoken replies and restart the session.', 'unavailable'); }, 30000);
@@ -199,6 +200,7 @@
   const available = () => enabled && authenticated();
   function invalidate() {
     endSession();
+    if (dockCommand) dockCommand.textContent = dockReply.textContent = '';
     generation++; serial++; controller?.abort(); controller = null; pendingText = null;
     if (input) { input.value = ''; output.textContent = ''; retry.hidden = true; fallback.hidden = true; form.setAttribute('aria-busy', 'false'); send.disabled = false; }
   }
@@ -241,7 +243,9 @@
         ownSerial === serial && ownSession === session && !abort.signal.aborted;
     };
     if (fromVoice) {
-      sessionState('processing', 'Processing: ' + text);
+      dockCommand.textContent = 'Heard: ' + text;
+      dockReply.textContent = '';
+      sessionState('processing', 'Processing your request…');
       requestTimer = setTimeout(() => { if (active()) pauseSession('The assistant did not respond. Start again or use the menu.', 'unavailable'); }, 30000);
     }
     pendingText = text; output.textContent = 'Looking up your studio request…';
@@ -347,7 +351,7 @@
     }
     if (handsFreeEnabled) {
       dock = node('aside'); dock.id = 'qlAssistantSession'; dock.setAttribute('aria-label', 'Voice session controls');
-      const note = node('p', 'Foreground voice — testing. Start once, wait for Microphone ready, then speak one command at a time. Say “stop listening” or use End session. Keep Safari visible and your screen unlocked.');
+      const note = node('p', 'Conversation test 4I.1. Start once, wait for Microphone ready, then speak one command at a time. Say “stop listening” or use End session. Keep Safari visible and your screen unlocked.');
       sessionStart = node('button', 'Start voice session'); sessionStart.id = 'qlAssistantSessionStart';
       sessionStop = node('button', 'End session'); sessionStop.id = 'qlAssistantSessionStop';
       for (const b of [sessionStart, sessionStop]) { b.type = 'button'; b.className = 'btn btn-secondary'; }
@@ -358,7 +362,9 @@
       spokenLabel.prepend(spokenReplies);
       spokenReplies.onchange = () => { if (handsFree) pauseSession('Reply preference changed. Start the session again.'); };
       dockStatus = node('p'); dockStatus.id = 'qlAssistantSessionStatus'; dockStatus.setAttribute('role', 'status');
-      dock.append(note, sessionStart, sessionStop, spokenLabel, dockStatus); document.body.append(dock);
+      dockCommand = node('p'); dockCommand.id = 'qlAssistantSessionCommand';
+      dockReply = node('p'); dockReply.id = 'qlAssistantSessionReply'; dockReply.setAttribute('role', 'status'); dockReply.setAttribute('aria-live', 'polite');
+      dock.append(note, sessionStart, sessionStop, spokenLabel, dockStatus, dockCommand, dockReply); document.body.append(dock);
       const css = node('style'); css.textContent = '#qlAssistantSession{position:fixed;left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom));z-index:10001;margin:auto;max-width:620px;padding:12px;background:#fff;color:#252525;border:2px solid #654536;border-radius:12px;box-shadow:0 4px 20px #0003;max-height:35vh;overflow:auto;font-size:15px}#qlAssistantSession p{margin:4px 0 8px}#qlAssistantSession button{min-height:44px;margin:0 8px 4px 0}#qlAssistantSession[data-state="listening"]{border-color:#24734a}';
       document.head.append(css);
       sessionState(speechSupported() ? 'stopped' : 'unavailable', speechSupported() ? 'Stopped — ready when you start.' : 'Voice unavailable. Typing and the menu remain available.');
