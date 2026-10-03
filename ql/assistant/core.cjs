@@ -1,5 +1,5 @@
 'use strict';
-const {DOMAINS, validQuery, resolve} = require('./intents.cjs');
+const {DOMAINS, DESTINATIONS, validQuery, resolve} = require('./intents.cjs');
 const INTENT = 'studio.firing.latest';
 class AssistantError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }
@@ -14,7 +14,7 @@ function validateIntent(value) {
   const args = value.arguments;
   const valid = ([INTENT, 'studio.firing.openLatest'].includes(value.name) && exact(args, [])) ||
     (value.name === 'studio.navigate' && exact(args, ['destination']) && typeof args.destination === 'string' &&
-      (Object.hasOwn(DOMAINS,args.destination) || ['search','photo-lookup'].includes(args.destination))) ||
+      Object.hasOwn(DESTINATIONS,args.destination)) ||
     (value.name === 'studio.search' && exact(args, ['type','query']) && typeof args.type === 'string' &&
       (Object.hasOwn(DOMAINS,args.type) || args.type === 'all') && validQuery(args.query));
   if (!valid) fail(400, 'UNSUPPORTED_INTENT', 'Unsupported assistant intent.');
@@ -110,10 +110,10 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
         }
       } else if (intent.name === 'studio.navigate') {
         const destination=intent.arguments.destination;
-        const page=DOMAINS[destination]?.page || (destination === 'search' ? 'studioSearch' : 'visualSearch');
+        const {page,label}=DESTINATIONS[destination];
         result={tool:intent.name,destination};
         // Feature loaders and canonical record APIs retain their normal entitlement gates.
-        response={text:'Opening '+(DOMAINS[destination]?.label || (destination === 'search' ? 'Studio Search' : 'Photo Lookup'))+'.',
+        response={text:'Opening '+label+'.',
           navigation:{kind:'page',page}};
       } else {
         searchService ||= require('../studio-search.cjs').createStudioSearchService(db);

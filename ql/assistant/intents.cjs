@@ -14,6 +14,33 @@ const DOMAINS = Object.freeze({
   contact: {label:'Contacts', page:'contacts', aliases:['contacts','contact']},
   event: {label:'Events / Calendar', page:'events', aliases:['events','event','calendar']}
 });
+// Navigation-only destinations do not widen saved-record search or write capabilities.
+// Audited against public/index.html and the canonical navigate() map/loaders.
+const DESTINATIONS = Object.freeze({
+  ...DOMAINS,
+  dashboard: {label:'Dashboard', page:'dashboard', aliases:['dashboard','home','studio dashboard']},
+  casualties: {label:'Casualties', page:'casualties', aliases:['casualties','casualty']},
+  community: {label:'Community Glaze Library', page:'community', aliases:['community','community library','community glaze library','glaze library','glaze combos','glaze combinations']},
+  shop: {label:'Shop', page:'shop', aliases:['shop']},
+  'ask-potter': {label:'Ask a Potter', page:'aiChat', aliases:['ask a potter','ask potter']},
+  'photo-lookup': {label:'Photo Lookup', page:'visualSearch', aliases:['photo lookup','photo look up','photo search','find by photo']},
+  search: {label:'Studio Search', page:'studioSearch', aliases:['search','studio search','search studio']},
+  store: {label:'My Store', page:'myStore', aliases:['store','my store','stores']},
+  shopping: {label:'Shopping List', page:'shoppingList', aliases:['shopping','shopping list','shopping lists']},
+  goals: {label:'Goals', page:'goals', aliases:['goals','goal']},
+  notes: {label:'Studio Notes', page:'studioNotes', aliases:['notes','studio notes','studio note']},
+  members: {label:'Members', page:'communityMembers', aliases:['members','community members']},
+  'find-potter': {label:'Find a Potter', page:'findPotter', aliases:['find a potter','find potter','potter directory']},
+  forum: {label:'Forum', page:'forum', aliases:['forum','forums']},
+  reviews: {label:'Reviews', page:'reviews', aliases:['reviews','review']},
+  blog: {label:'Blog', page:'blog', aliases:['blog','blogs']},
+  help: {label:'Help', page:'help', aliases:['help','help center']},
+  plans: {label:'Plans', page:'upgrade', aliases:['plans','membership','membership plans','upgrade']},
+  profile: {label:'Profile', page:'profile', aliases:['profile','account','account settings']},
+  notifications: {label:'Notifications', page:'notifications', aliases:['notifications','notification']},
+  messages: {label:'Messages', page:'messages', aliases:['messages','message','inbox']}
+});
+const navigationAliases = Object.entries(DESTINATIONS).flatMap(([type,d]) => d.aliases.map(alias=>[alias,type]));
 const aliases = Object.entries(DOMAINS).flatMap(([type,d]) => d.aliases.map(alias=>[alias,type])).sort((a,b)=>b[0].length-a[0].length);
 const domain = text => aliases.find(([alias])=>alias===text)?.[1];
 const command = (name,args={}) => ({name,arguments:name === 'studio.search' ? {...args, query:args.query.replace(/\bunderglazes\b/g,'underglaze')} : args});
@@ -28,10 +55,10 @@ function resolve(text, fail) {
     fail(400,'ACTION_NOT_AVAILABLE','Studio changes are not available through this assistant yet. No changes were made. Use the existing forms.');
   const nav = n.match(/^(?:open|show(?: me)?|go to|take me to)(?: my| the)? (.+)$/);
   if (nav) {
-    const type=domain(nav[1]);
+    const type=navigationAliases.find(([alias])=>alias===nav[1])?.[1];
     if (type) return command('studio.navigate',{destination:type});
-    if (['photo lookup','photo search'].includes(nav[1])) return command('studio.navigate',{destination:'photo-lookup'});
-    if (['search','studio search'].includes(nav[1])) return command('studio.navigate',{destination:'search'});
+    if (['kiln share','kilnshare','kiln sharing'].includes(nav[1]))
+      fail(400,'DESTINATION_UNAVAILABLE','Kiln Share is not available in this website build. No page was opened.');
   }
   // Domain-first searches, including the real-device compound request.
   const filtered=n.match(/^(?:find(?: in)?|search(?: in)?|show(?: me)?|open)(?: my| the)? (.+?) (?:for|matching|and show(?: me)?) (.+)$/);
@@ -48,4 +75,4 @@ function resolve(text, fail) {
   }
   fail(400,'UNSUPPORTED_INTENT','That command is not supported yet. Try opening a studio feature or searching saved records. No changes were made.');
 }
-module.exports={DOMAINS,validQuery,resolve};
+module.exports={DOMAINS,DESTINATIONS,validQuery,resolve};

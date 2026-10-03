@@ -7,7 +7,7 @@ for (const [args, extraEnv] of [
   [['ql/verify.cjs'], {}],
   [['--test','tests/ql-assistant-voice-web.cjs','tests/ql-assistant-voice-http.cjs'], {}],
   [['--test','tests/ql-assistant-web.cjs','tests/ql-assistant-web-http.cjs'], {}],
-  [['--test','tests/ql-assistant-core.cjs','tests/ql-assistant-http.cjs'], {}],
+  [['--test','tests/ql-assistant-core.cjs','tests/ql-assistant-http.cjs','tests/ql-assistant-expansion.cjs'], {}],
   [['--test','tests/ql-photo-results.cjs','tests/ql-photo-results-dom.cjs','tests/ql-photo-client-dom.cjs','tests/ql-photo-client-viewer.cjs','tests/ql-photo-client-upload.cjs'], {}],
   [['--test','tests/ql-photo-eval.cjs'], {}],
   [['--test','tests/ql-photo-safety.cjs'], {}],

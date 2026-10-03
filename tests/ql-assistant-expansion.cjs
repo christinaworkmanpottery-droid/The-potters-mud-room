@@ -2,7 +2,7 @@
 const test=require('node:test'), assert=require('node:assert/strict');
 const fs=require('node:fs'), os=require('node:os'), path=require('node:path');
 const {createAssistantCore,validateIntent,deterministicProvider}=require('../ql/assistant/core.cjs');
-const {DOMAINS}=require('../ql/assistant/intents.cjs');
+const {DOMAINS,DESTINATIONS}=require('../ql/assistant/intents.cjs');
 let db,dir,core;
 const ask=(text,id='a')=>core.turn({authorize:()=>id,request:{version:1,requestId:'expanded',input:{text}}});
 const fixtures=[['piece','pieces','title',{}],['clay','clay_bodies','name',{}],['glaze','glazes','name',{}],
@@ -76,4 +76,41 @@ test('account deletion while provider resolves blocks navigation',async()=>{
 test('no write side effects from commands',async()=>{
  const before=db.prepare('SELECT * FROM pieces ORDER BY id').all();await ask('Open pieces');await ask('Find celadon pieces');
  await assert.rejects(ask('Delete all my pieces'));assert.deepEqual(db.prepare('SELECT * FROM pieces ORDER BY id').all(),before);
+});
+
+for (const [destination, d] of Object.entries(DESTINATIONS)) {
+ test('complete navigation aliases '+destination, async()=>{
+  for (const alias of d.aliases) for (const verb of ['Show me','Open','Take me to','Go to','Please show me the']) {
+   const result=await ask(verb+' '+alias);
+   assert.deepEqual(result.intent,{name:'studio.navigate',arguments:{destination}});
+   assert.deepEqual(result.response.navigation,{kind:'page',page:d.page});
+  }
+ });
+ if (!Object.hasOwn(DOMAINS,destination)) test('navigation-only destination cannot become search '+destination,()=>{
+  assert.throws(()=>validateIntent({name:'studio.search',arguments:{type:destination,query:'private'}}));
+ });
+}
+for(const verb of ['Show me','Open','Take me to','Go to']) test('honest missing Kiln Share destination '+verb,async()=>{
+ await assert.rejects(ask(verb+' Kiln Share'),e=>e.code==='DESTINATION_UNAVAILABLE');
+});
+test('every normal website menu destination has an assistant mapping',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'../public/index.html'),'utf8');
+ const pages=new Set(Object.values(DESTINATIONS).map(d=>d.page));
+ for(const [,page] of html.matchAll(/class="nav-link" data-page="([^"]+)"/g)) {
+  if(page!=='admin') assert.ok(pages.has(page),page+' missing');
+ }
+});
+test('new navigation destinations remain authenticated and provider-validated',async()=>{
+ for(const destination of ['community','shop','ask-potter','photo-lookup']) {
+  await assert.rejects(core.turn({authorize:()=> 'missing',request:{version:1,requestId:'denied',input:{command:{name:'studio.navigate',arguments:{destination}}}}}),e=>e.status===401);
+  assert.throws(()=>validateIntent({name:'studio.navigate',arguments:{destination,userId:'b'}}));
+ }
+});
+
+test('real-iPhone failed destinations resolve to their existing website pages',async()=>{
+ for(const [name,page] of [['Casualties','casualties'],['Community','community'],['Shop','shop'],['Ask a Potter','aiChat'],['Glaze Library','community'],['Photo Lookup','visualSearch']]) {
+  for(const verb of ['Show me','Open','Take me to','Go to']) {
+   assert.deepEqual((await ask(verb+' '+name)).response.navigation,{kind:'page',page});
+  }
+ }
 });

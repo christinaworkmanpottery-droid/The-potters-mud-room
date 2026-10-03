@@ -5,7 +5,7 @@
   const identity = () => JSON.stringify([token, currentUser?.id, localStorage.getItem('mudlog_token')]);
   let session = identity(), invalidSession = null, generation = 0, serial = 0;
   let controller, pendingText = null, enabled = false, entered = false;
-  let page, entry, input, form, send, retry, output;
+  let page, entry, input, form, send, retry, output, fallback;
   let voiceEnabled = false, recognition = null, voiceTimer, stopTimer;
   let talk, stop, cancel, voiceStatus;
   const speechConstructor = () => window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -113,7 +113,7 @@
   function invalidate() {
     cancelVoice();
     generation++; serial++; controller?.abort(); controller = null; pendingText = null;
-    if (input) { input.value = ''; output.textContent = ''; retry.hidden = true; form.setAttribute('aria-busy', 'false'); send.disabled = false; }
+    if (input) { input.value = ''; output.textContent = ''; retry.hidden = true; fallback.hidden = true; form.setAttribute('aria-busy', 'false'); send.disabled = false; }
   }
   function syncSession() {
     const next = identity();
@@ -149,7 +149,7 @@
         ownSerial === serial && ownSession === session && !abort.signal.aborted;
     };
     pendingText = text; output.textContent = 'Looking up your studio request…';
-    retry.hidden = true; form.setAttribute('aria-busy', 'true');
+    retry.hidden = true; fallback.hidden = true; form.setAttribute('aria-busy', 'true');
     try {
       const response = await fetch(API + '/api/ql/assistant/turn', {
         method: 'POST', cache: 'no-store', signal: abort.signal,
@@ -162,6 +162,8 @@
       if (!active()) return;
       if (response.status === 400 && data.code === 'UNSUPPORTED_INTENT') {
         output.textContent = 'That question isn’t supported in this test version yet.';
+      } else if (response.status === 400 && data.code === 'DESTINATION_UNAVAILABLE') {
+        output.textContent = 'Kiln Share is not available in this website build. No page was opened.';
       } else if (response.status === 400 && data.code === 'ACTION_NOT_AVAILABLE') {
         output.textContent = 'Studio changes are not available through this assistant yet. No changes were made. Use the existing forms.';
       } else {
@@ -169,11 +171,13 @@
             data.accountId !== account || typeof data.response?.text !== 'string') throw Error('Unavailable');
         // The core owns all facts and wording, including empty/undated/tied records.
         output.textContent = data.response.text;
+        fallback.hidden = !['studio.firing.latest','studio.firing.openLatest'].includes(data.intent?.name);
         if (data.response.navigation) followNavigation(data.response.navigation);
       }
     } catch (_) {
       if (active()) {
-        output.textContent = 'The assistant is unavailable. Try again or open Firings.';
+        fallback.hidden = true;
+        output.textContent = 'The assistant is unavailable. Try again or use the menu to open a feature.';
         retry.hidden = false;
       }
     } finally {
@@ -183,7 +187,10 @@
   function followNavigation(target) {
     // Server output is still untrusted: never execute URLs, code, or arbitrary routes.
     const pages = ['pieces','clayBodies','glazes','chemicals','testTiles','firings',
-      'pricingCalculator','sales','projects','contacts','events','studioSearch','visualSearch'];
+      'pricingCalculator','sales','projects','contacts','events','studioSearch','visualSearch',
+      'dashboard','casualties','community','shop','aiChat','myStore','shoppingList','goals',
+      'studioNotes','communityMembers','findPotter','forum','reviews','blog','help','upgrade',
+      'profile','notifications','messages'];
     const types = ['piece','clay','glaze','raw-material','test-tile','firing','pricing','sale','project','contact','event','all'];
     const keys = Object.keys(target).sort().join(',');
     if (target.kind === 'page' && keys === 'kind,page' && pages.includes(target.page)) {
@@ -213,7 +220,7 @@
     retry = node('button', 'Retry'); retry.id = 'qlAssistantRetry'; retry.type = 'button';
     retry.className = 'btn btn-secondary'; retry.hidden = true; retry.onclick = () => void submit();
     output = node('p'); output.id = 'qlAssistantResponse'; output.setAttribute('role', 'status'); output.setAttribute('aria-live', 'polite');
-    const fallback = node('button', 'Open Firings'); fallback.type = 'button'; fallback.className = 'btn btn-secondary';
+    fallback = node('button', 'Open Firings'); fallback.id = 'qlAssistantFiringFallback'; fallback.hidden = true; fallback.type = 'button'; fallback.className = 'btn btn-secondary';
     fallback.onclick = () => navigate('firings');
     form.append(label, input, send, retry); form.onsubmit = e => { e.preventDefault(); void submit(); };
     page.append(heading, help, form, output, fallback);

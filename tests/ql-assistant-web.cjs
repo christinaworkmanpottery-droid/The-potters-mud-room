@@ -30,7 +30,7 @@ async function fixture(t, config = {enabled:true}) {
     el('qlAssistantInput').value = text;
     el('qlAssistantForm').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
   };
-  const reply = (i=0,text='Your latest recorded firing date is 2026-10-01.',extra={}) => pending[i].resolve({ok:true,status:200,json:async()=>({version:1,requestId:pending[i].body.requestId,accountId:'a',response:{text},...extra})});
+  const reply = (i=0,text='Your latest recorded firing date is 2026-10-01.',extra={}) => pending[i].resolve({ok:true,status:200,json:async()=>({version:1,requestId:pending[i].body.requestId,accountId:'a',intent:{name:'studio.firing.latest',arguments:{}},response:{text},...extra})});
   return {w,el,send,reply,pending,calls};
 }
 test('flag OFF has no entry, page, or turn request even with direct navigation',async t=>{
@@ -76,7 +76,7 @@ test('session changes while JSON parses cannot render late answer',async t=>{con
 test('late 401 from A cannot invalidate B',async t=>{const f=await fixture(t);f.send();f.w.eval("setAuthUser({id:'b'});setAuthToken('token-b');localStorage.setItem('mudlog_token','token-b');");f.w.navigate('qlAssistant');f.pending[0].resolve({status:401});await tick();assert.equal(f.w.QLAssistant.available(),true);});
 
 // Phase 4G: exercise real page router, not just response strings.
-for (const page of ['pieces','clayBodies','glazes','chemicals','testTiles','firings','pricingCalculator','sales','projects','contacts','events','studioSearch','visualSearch']) {
+for (const page of [...new Set(Object.values(require('../ql/assistant/intents.cjs').DESTINATIONS).map(d=>d.page))]) {
  test('assistant actually navigates to '+page,async t=>{
   const f=await fixture(t);f.send('Open a feature');f.reply(0,'Opening.',{response:{text:'Opening.',navigation:{kind:'page',page}}});await tick();
   assert.equal(f.w.eval('currentPage'),page);assert.equal(f.el('pageQLAssistant').classList.contains('active'),false);
@@ -107,4 +107,23 @@ test('filtered search hands off query and type to Studio Search',async t=>{
 test('write commands explain that no changes were made',async t=>{
  const f=await fixture(t);f.send('Delete my pieces');f.pending[0].resolve({ok:false,status:400,json:async()=>({code:'ACTION_NOT_AVAILABLE'})});await tick();
  assert.match(f.el('qlAssistantResponse').textContent,/No changes were made/);assert.equal(f.w.eval('currentPage'),'qlAssistant');
+});
+
+test('firing shortcut clears for unsupported, failed, and unavailable unrelated requests',async t=>{
+ const f=await fixture(t);const shortcut=f.el('qlAssistantFiringFallback');
+ assert.equal(shortcut.hidden,true);
+ f.send();f.reply();await tick();assert.equal(shortcut.hidden,false);
+ f.send('Show me unicorns');assert.equal(shortcut.hidden,true);
+ f.pending[1].resolve({ok:false,status:400,json:async()=>({code:'UNSUPPORTED_INTENT'})});await tick();
+ assert.equal(shortcut.hidden,true);assert.doesNotMatch(f.el('qlAssistantResponse').textContent,/Firings/);
+ f.send('Open photo lookup');f.pending[2].reject(Error('offline'));await tick();
+ assert.equal(shortcut.hidden,true);assert.doesNotMatch(f.el('qlAssistantResponse').textContent,/Firings/);
+ f.send('Show me Kiln Share');f.pending[3].resolve({ok:false,status:400,json:async()=>({code:'DESTINATION_UNAVAILABLE'})});await tick();
+ assert.match(f.el('qlAssistantResponse').textContent,/Kiln Share is not available in this website build/);
+ assert.equal(shortcut.hidden,true);assert.equal(f.w.eval('currentPage'),'qlAssistant');
+});
+test('firing shortcut clears on logout and navigation',async t=>{
+ const f=await fixture(t);f.send();f.reply();await tick();assert.equal(f.el('qlAssistantFiringFallback').hidden,false);
+ f.w.navigate('pieces');assert.equal(f.el('qlAssistantFiringFallback').hidden,true);
+ f.w.navigate('qlAssistant');f.send();f.reply(1);await tick();f.w.logout();assert.equal(f.el('qlAssistantFiringFallback').hidden,true);
 });
