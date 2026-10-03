@@ -160,7 +160,7 @@ test('read clarification cannot survive account changes, record deletion or topi
 test('misheard piece names ask before opening and retain canonical followups',async()=>{
  add('pieces',{id:'repair-vase',user_id:'a',title:'Blue vase'});
  try {
-  for(const word of ['faze','phase','base']) {
+  for(const word of ['faze','phase','base','face']) {
    const r=await ask('Show me blue '+word);assert.match(r.response.text,/Did you mean Blue vase/);assert.equal(r.response.navigation,undefined);
    const yes=await ask('Yes',r.context);assert.equal(yes.response.navigation.id,'repair-vase');
    assert.equal((await ask('What glaze is on it?',yes.context)).result.status,'empty');
@@ -183,4 +183,16 @@ test('literal matches win; ambiguous speech alternatives require selection',asyn
   assert.ok(['vase1','vase2'].includes((await ask('The first one',r.context)).response.navigation.id));
   assert.throws(()=>validateIntent({name:'studio.piece.clarifyOpen',arguments:{query:'blue faze',pieceId:'foreign'}}));
  }finally{db.prepare("DELETE FROM pieces WHERE id IN ('literal','vase1','vase2')").run();}
+});
+
+test('joined speech and unknown piece navigation recover without guessing',async()=>{
+ add('pieces',{id:'joined-vase',user_id:'a',title:'Blue vase'});
+ try {
+  const r=await ask('Show me Blueface');assert.match(r.response.text,/Did you mean Blue vase/);assert.equal(r.response.navigation,undefined);
+  assert.equal((await ask('Yes',r.context)).response.navigation.id,'joined-vase');
+  const unknown=await ask('Show me blurf',r.context);assert.match(unknown.response.text,/Please repeat/);assert.equal(unknown.response.navigation,undefined);
+  assert.equal((await ask('Yes',unknown.context)).response.navigation,undefined);
+  const nav=await ask('Open my glazes',r.context);assert.equal(nav.response.navigation.page,'glazes');
+  await assert.rejects(ask('Delete blue vase',r.context),{code:'ACTION_NOT_AVAILABLE'});
+ }finally{db.prepare("DELETE FROM pieces WHERE id='joined-vase'").run();}
 });

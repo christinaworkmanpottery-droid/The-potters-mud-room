@@ -13,7 +13,7 @@ function exact(value, keys) {
 function validateIntent(value) {
   if (!exact(value, ['name', 'arguments'])) fail(400, 'UNSUPPORTED_INTENT', 'Unsupported assistant intent.');
   const args = value.arguments;
-  const valid = (['studio.piece.glazes','studio.piece.firings','studio.piece.open','studio.piece.clarifyGlazes'].includes(value.name) && exact(args, [])) ||
+  const valid = (['studio.piece.glazes','studio.piece.firings','studio.piece.open','studio.piece.clarifyGlazes','studio.piece.repeatName'].includes(value.name) && exact(args, [])) ||
     (value.name === 'studio.piece.choose' && exact(args,['index']) && Number.isInteger(args.index) && args.index >= 1 && args.index <= 5) ||
     (value.name === 'studio.piece.confirmRead' && exact(args,['confirmed']) && typeof args.confirmed === 'boolean') ||
     (['studio.piece.namedGlazes','studio.piece.clarifyOpen'].includes(value.name) && exact(args,['query']) && validQuery(args.query)) ||
@@ -103,12 +103,19 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
       const userId = authorize(); requireAccount(db, userId);
       const {requestId, input} = validateRequest(request);
       if (signal?.aborted) fail(409, 'CANCELLED', 'Assistant request cancelled.');
-      const intent = validateIntent(input.command || await intentProvider.resolveIntent({text: input.text}, {signal}));
+      const context = request.context ? contexts.read(request.context.token,userId) : null;
+      let proposed;
+      try { proposed = input.command || await intentProvider.resolveIntent({text: input.text}, {signal}); }
+      catch (error) {
+        if (error.code !== 'UNSUPPORTED_INTENT' || context?.scope !== 'piece' ||
+            !/^(?:please )?(?:open|show(?: me)?) /i.test(input.text || '')) throw error;
+        proposed = {name:'studio.piece.repeatName',arguments:{}};
+      }
+      const intent = validateIntent(proposed);
       if (signal?.aborted) fail(409, 'CANCELLED', 'Assistant request cancelled.');
       if (authorize() !== userId) fail(401, 'SESSION_CHANGED', 'Account session changed.');
       requireAccount(db, userId);
       let result, response, nextState = {};
-      const context = request.context ? contexts.read(request.context.token,userId) : null;
       if (intent.name.startsWith('studio.piece.')) {
         ({result,response,state:nextState} = conversation.execute(intent,userId,context));
       } else if (intent.name === INTENT || intent.name === 'studio.firing.openLatest') {

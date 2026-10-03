@@ -40,7 +40,7 @@ function followup(text) {
   if (ordinal) return intent('studio.piece.choose',{index:({'first':1,'second':2,'third':3,'fourth':4,'fifth':5,'one':1,'two':2,'three':3,'four':4,'five':5}[ordinal[1]] || Number(ordinal[1]))});
   // Bounded named Piece phrases; ordinary feature navigation keeps its existing
   // priority. A title/form cue is a text search, never photo interpretation.
-  const misheard = n.match(/^(?:open|show(?: me)?)(?: my| the)? (.+? (?:faze|phase|base))$/);
+  const misheard = n.match(/^(?:open|show(?: me)?)(?: my| the)? (.+?(?:faze|phase|base|face))$/);
   if (misheard) return intent('studio.piece.clarifyOpen',{query:misheard[1]});
   const named = n.match(/^(?:open|show(?: me)?)(?: my| the)? (.+? (?:bowl|cup|mug|plate|vase|planter|pitcher|jar|sculpture))$/);
   if (named) return intent('studio.search',{type:'piece',query:named[1]});
@@ -71,12 +71,13 @@ function createConversationTools(db, {search, validDate}) {
     return {...answer(text,state,{kind:'search',type:'piece',query}),result:{tool:'studio.piece.matches',status:ids.length?'choices':'empty',...found}};
   }
   function execute(intent, userId, state) {
+    if (intent.name === 'studio.piece.repeatName') return answer('I did not understand that Piece name. Please repeat its saved name, or say “Find blue pieces” to list matches.',{scope:'piece'});
     if (intent.name === 'studio.piece.clarifyOpen') {
       const query = intent.arguments.query;
       // Respect literal saved matches first; speech alternatives are suggestions only.
       const literal = matches(userId,query);
       if (literal.result.status !== 'empty') return literal;
-      const suggestion = matches(userId,query.replace(/\b(?:faze|phase|base)$/, 'vase'));
+      const suggestion = matches(userId,query.replace(/\s*(?:faze|phase|base|face)$/, ' vase'));
       if (suggestion.state.pieceId) {
         const piece = selected({pieceId:suggestion.state.pieceId,userId});
         return answer('I may have misheard. Did you mean '+piece.title+'? Say yes or no.',{scope:'piece',confirmOpen:piece.id});
