@@ -1,7 +1,7 @@
 /* Bounded QL proof. Speech is transient input to the same typed turn path. */
 (() => {
   'use strict';
-  const displayName = 'QL assistant — testing 4J.2';
+  const displayName = 'QL assistant — testing 4K';
   const identity = () => JSON.stringify([token, currentUser?.id, localStorage.getItem('mudlog_token')]);
   let conversationToken = null, recordNavigation = false, noteDictation = false;
   let session = identity(), invalidSession = null, generation = 0, serial = 0;
@@ -11,6 +11,7 @@
   let talk, stop, cancel, voiceStatus;
   let handsFreeEnabled = false, handsFree = false, sessionTimer, restartTimer, speechTimer, requestTimer;
   let dock, dockStatus, dockCommand, dockReply, sessionStart, sessionStop, spokenReplies, utterance, notePreview, notePreviewText;
+  let speechReview = null;
   let emptyAttempts = 0, voiceEpoch = 0, internalNavigation = false;
   const inVoiceContext = () => entered && (currentPage === 'qlAssistant' || handsFree);
   function sessionState(state, message) {
@@ -21,6 +22,7 @@
     sessionStop.hidden = !handsFree;
   }
   function endSession(message = 'Stopped — tap Start voice session to resume.', state = 'stopped') {
+    speechReview = null;
     handsFree = false; voiceEpoch++; conversationToken = null; noteDictation = false; recordNavigation = false;
     if(notePreview){notePreview.hidden=true;notePreviewText.textContent='';}
     clearTimeout(restartTimer); clearTimeout(sessionTimer); clearTimeout(speechTimer); clearTimeout(requestTimer);
@@ -89,6 +91,27 @@
     }
     voiceState(message);
   }
+  // Review is local, transient, and never bypasses server-side note confirmation.
+  function reviewSpeech(text, reason) {
+    speechReview = text;
+    if (dockCommand) dockCommand.textContent = 'Needs review: ' + text;
+    voiceReply(reason + ' I heard: “' + text + '”. Say “use those words”, or repeat the full corrected sentence. Say “discard transcript” to discard it. Nothing has been sent.');
+  }
+  function acceptSpeech(text, uncertain) {
+    if (/^(stop listening|pause voice|end voice session|stop voice session)[.!?]?$/i.test(text)) { pauseSession(); return; }
+    if (uncertain) { reviewSpeech(text, 'Speech may be incomplete or misheard.'); return; }
+    if (speechReview) {
+      if (/^use those words[.!?]?$/i.test(text)) text = speechReview;
+      else if (/^(discard transcript|no|cancel)[.!?]?$/i.test(text)) {
+        speechReview = null; voiceReply('Transcript discarded. Please say the full request again.'); return;
+      } else if (/^(yes|save(?: note)?|confirm(?: note)?)[.!?]?$/i.test(text)) {
+        reviewSpeech(speechReview, 'Please check the transcript first.'); return;
+      }
+      speechReview = null;
+    }
+    input.value = text;
+    void submit(true);
+  }
   function startVoice() {
     syncSession();
     if (!voiceEnabled || !available() || !inVoiceContext() || document.hidden || recognition) return;
@@ -104,13 +127,16 @@
     };
     try {
       const engine = new (speechConstructor())();
-      turn = {engine, stopping: false, finalText: '', draft: '', heardSound: false}; recognition = turn;
+      turn = {engine, stopping: false, finalText: '', draft: '', heardSound: false, uncertain: false, timedOut: false}; recognition = turn;
       engine.continuous = false; engine.interimResults = true; engine.maxAlternatives = 1; engine.lang = 'en-US';
       const finish = (message, ended = false, allowFinal = false) => {
         if (!active()) return;
         const finalText = turn.finalText, draft = turn.draft;
         cancelVoice('', !ended);
-        if (allowFinal && finalText) {
+        if (handsFree && allowFinal && (finalText || draft)) {
+          emptyAttempts = 0;
+          acceptSpeech(finalText || draft, !finalText || turn.uncertain || turn.timedOut);
+        } else if (allowFinal && finalText) {
           if (handsFree && /^(stop listening|pause voice|end voice session|stop voice session)[.!?]?$/i.test(finalText)) {
             pauseSession(); return;
           }
@@ -137,18 +163,23 @@
         if (!active()) return;
         const results = Array.from(event.results || []);
         const text = results.map(r => typeof r?.[0]?.transcript === 'string' ? r[0].transcript.trim() : '').filter(Boolean).join(' ');
-        if (!text || text.length > 200) {
+        if (!text) { turn.draft = turn.finalText = ''; return; }
+        if (text.length > 200) {
+          turn.draft = turn.finalText = '';
           finish('Please say a command of 200 characters or fewer, or type your question.'); return;
         }
         // Interim words are a draft only: they must never trigger navigation/actions.
         turn.draft = text;
+        if (dockCommand) dockCommand.textContent = 'Hearing: ' + text;
+        // Some engines omit confidence or return zero as an unknown value.
+        turn.uncertain = results.some(r => Number.isFinite(r?.[0]?.confidence) && r[0].confidence > 0 && r[0].confidence < 0.6);
         if(noteDictation && notePreview && !/^(?:save(?: note)?|confirm(?: note)?|yes|no|cancel|stop listening)[.!?]?$/i.test(text)){notePreview.hidden=false;notePreviewText.textContent=text;}
         if (results.length && results.every(r => r.isFinal === true)) {
           turn.finalText = text;
-          // Note dictation may emit several finalized chunks. Let the browser end
-          // naturally so we do not cut it off at the first finalized phrase.
-          if (noteDictation && !/^(stop listening|pause voice|end voice session|stop voice session)[.!?]?$/i.test(text)) voiceState('Hearing: ' + text);
-          else stopVoice();
+          // A final segment is not the end of the utterance. Wait for onend
+          // for commands too, including a one-turn request to create a note.
+          voiceState('Hearing: ' + text);
+          if (!handsFree || /^(stop listening|pause voice|end voice session|stop voice session)[.!?]?$/i.test(text)) stopVoice();
         } else { turn.finalText = ''; voiceState('Hearing: ' + text); }
       };
       engine.onerror = event => {
@@ -183,7 +214,7 @@
         : 'No speech text was returned by the browser. Wait for “Microphone ready” before speaking, or type your question.', true, true);
       voiceState('Starting microphone… Wait for “Microphone ready” before speaking.');
       // Watchdog bounds every attempt, even when Safari emits no terminal event.
-      voiceTimer = setTimeout(() => { if (active()) stopVoice(); }, handsFree ? 30000 : 20000);
+      voiceTimer = setTimeout(() => { if (active()) { turn.timedOut = true; stopVoice(); } }, handsFree ? 30000 : 20000);
       engine.start();
     } catch (_) {
       if (handsFree) { pauseSession('Speech could not start. Check permission and tap Start voice session to retry.', 'unavailable'); return; }
@@ -225,7 +256,7 @@
     syncSession();
     if (internalNavigation || recordNavigation && options.searchDetail === true && location.hash === '#studioSearch/'+recordNavigation.type+'/'+encodeURIComponent(recordNavigation.id)) return;
     recordNavigation = false;
-    if (handsFree && !pendingText) { conversationToken = null; noteDictation = false; if(notePreview){notePreview.hidden=true;notePreviewText.textContent='';} return; }
+    if (handsFree && !pendingText) { speechReview = null; conversationToken = null; noteDictation = false; if(notePreview){notePreview.hidden=true;notePreviewText.textContent='';} return; }
     if (destination !== 'qlAssistant') { entered = false; invalidate(); }
   }
   function enter() {
@@ -363,7 +394,7 @@
     }
     if (handsFreeEnabled) {
       dock = node('aside'); dock.id = 'qlAssistantSession'; dock.setAttribute('aria-label', 'Voice session controls');
-      const note = node('p', 'Conversation test 4J.2. Wait for Microphone ready. Say “stop listening” to end. Keep Safari visible.');
+      const note = node('p', 'Conversation test 4K. Wait for Microphone ready. Say “stop listening” to end. Keep Safari visible.');
       sessionStart = node('button', 'Start voice session'); sessionStart.id = 'qlAssistantSessionStart';
       sessionStop = node('button', 'End session'); sessionStop.id = 'qlAssistantSessionStop';
       for (const b of [sessionStart, sessionStop]) { b.type = 'button'; b.className = 'btn btn-secondary'; }
@@ -374,13 +405,13 @@
       spokenLabel.prepend(spokenReplies);
       spokenReplies.onchange = () => { if (handsFree) pauseSession('Reply preference changed. Start the session again.'); };
       dockStatus = node('p'); dockStatus.id = 'qlAssistantSessionStatus'; dockStatus.setAttribute('role', 'status');
-      dockCommand = node('p'); dockCommand.id = 'qlAssistantSessionCommand';
+      dockCommand = node('p'); dockCommand.id = 'qlAssistantSessionCommand'; dockCommand.style.whiteSpace = 'pre-wrap'; dockCommand.setAttribute('aria-label', 'Live speech transcript');
       dockReply = node('p'); dockReply.id = 'qlAssistantSessionReply'; dockReply.setAttribute('role', 'status'); dockReply.setAttribute('aria-live', 'polite');
       notePreview=node('section');notePreview.id='qlAssistantNotePreview';notePreview.hidden=true;
       const previewLabel=node('strong','Live note draft — not saved');
       notePreviewText=node('p');notePreviewText.id='qlAssistantNotePreviewText';notePreviewText.style.whiteSpace='pre-wrap';
       notePreview.append(previewLabel,notePreviewText);
-      dock.append(notePreview, note, dockReply, dockCommand, dockStatus, sessionStart, sessionStop, spokenLabel); document.body.append(dock);
+      dock.append(dockCommand, notePreview, dockReply, dockStatus, sessionStart, sessionStop, spokenLabel, note); document.body.append(dock);
       const css = node('style'); css.textContent = '#qlAssistantSession{position:fixed;left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom));z-index:10001;margin:auto;max-width:620px;padding:12px;background:#fff;color:#252525;border:2px solid #654536;border-radius:12px;box-shadow:0 4px 20px #0003;max-height:35vh;overflow:auto;font-size:15px}#qlAssistantSession p{margin:4px 0 8px}#qlAssistantSession button{min-height:44px;margin:0 8px 4px 0}#qlAssistantSession[data-state="listening"]{border-color:#24734a}';
       document.head.append(css);
       sessionState(speechSupported() ? 'stopped' : 'unavailable', speechSupported() ? 'Stopped — ready when you start.' : 'Voice unavailable. Typing and the menu remain available.');

@@ -17,6 +17,8 @@ function noteStart(text) {
 const isNoteText=text=>typeof text==='string' && !/^(?:please )?(?:open|show|go|take|find|search|add|create|make|edit|update|change|replace|delete|remove|save|send|record|log|publish|what|which|when|yes|no|cancel|never mind)\b/i.test(text.trim());
 const confirmation=text=>typeof text==='string' && /^(?:yes|yes please|save (?:the )?note|confirm (?:the )?note)[.!]?$/i.test(text.trim());
 const cancellation=text=>typeof text==='string' && /^(?:no|no thanks|cancel|cancel (?:the )?note|never mind)[.!]?$/i.test(text.trim());
+// Deliberately bounded fragment guard; exact saved text is never rewritten.
+const incompleteNote = text => /(?:\b(?:and|or|because|with|for|to|the|my|buy|need)|\bi[’']ve been|\bi have been|\bi[’']m going to)[.!?]*$/i.test((text || '').trim());
 function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
   const drafts=new Map();
   function clear(userId){drafts.delete(userId);}
@@ -42,7 +44,7 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
       prune();const draft=drafts.get(userId);
       if(!draft || draft.id!==state?.noteDraftId)return reply('There is no current Studio Note draft to confirm. Please dictate the note again.','clarification');
       if(draft.collecting && save)return reply('Please tell me what the note should say before saving. Nothing has been saved.','collecting',state);
-      if(save && /^(?:i[’']ve been|i have been|i need to|i want to|i[’']m going to)[.!]?$/i.test(draft.body || ''))return reply('That sounds incomplete: “'+draft.body+'”. Please say the full note again. Nothing has been saved.','incomplete',state);
+      if(save && incompleteNote(draft.body))return reply('That sounds incomplete: “'+draft.body+'”. Please say the full note again. Nothing has been saved.','incomplete',state);
       // Consume before the synchronous transaction: retries/concurrent confirmations
       // cannot duplicate a note. A failed save requires an explicit new draft.
       clear(userId);

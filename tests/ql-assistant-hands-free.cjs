@@ -200,7 +200,8 @@ test('note dictation never submits an earlier final chunk when trailing words re
  const f=await fixture(t);start(f);f.engines[0].result('Create new note');f.reply(0,'Text?',{result:{tool:'studio.note',status:'collecting'},context:{token:'a'.repeat(48)}});await tick();restart(f);
  const e=f.engines.at(-1);e.onresult({results:[{isFinal:true,0:{transcript:"I've been"}}]});
  e.onresult({results:[{isFinal:true,0:{transcript:"I've been"}},{isFinal:false,0:{transcript:'needing sapphire glaze'}}]});e.onend();assert.equal(f.pending.length,1);
- assert.match(f.el('qlAssistantSessionStatus').textContent,/finalized|repeat/i);
+ assert.match(f.el('qlAssistantSessionReply').textContent,/incomplete|misheard/i);
+ assert.match(f.el('qlAssistantSessionCommand').textContent,/Needs review/);
 });
 test('live note draft visibly updates interim words before any request or save and clears on stop',async t=>{
  const f=await fixture(t);start(f);f.engines[0].result('Create new note');
@@ -209,4 +210,39 @@ test('live note draft visibly updates interim words before any request or save a
  assert.equal(f.el('qlAssistantNotePreview').hidden,false);assert.equal(f.el('qlAssistantNotePreviewText').textContent,'I need sapphire');assert.equal(f.pending.length,1);
  e.onresult({results:[{isFinal:false,0:{transcript:'I need to buy sapphire glaze.'}}]});assert.equal(f.el('qlAssistantNotePreviewText').textContent,'I need to buy sapphire glaze.');
  f.el('qlAssistantSessionStop').click();assert.equal(f.el('qlAssistantNotePreview').hidden,true);assert.equal(f.el('qlAssistantNotePreviewText').textContent,'');assert.equal(f.pending.length,1);
+});
+
+// Phase 4K: browser event sequences, not a claim about real microphone accuracy.
+test('one-turn note and commands retain all chunks and show live text', async t=>{
+ const f=await fixture(t);start(f);const e=f.engines[0];
+ const r=(text,isFinal,confidence=.9)=>({isFinal,0:{transcript:text,confidence}});
+ e.onresult({results:[r('Create a note',true)]});assert.equal(e.stops,0);assert.equal(f.pending.length,0);
+ e.onresult({results:[r('Create a note',true),r('I need sapphire',false)]});
+ assert.equal(f.el('qlAssistantSessionCommand').textContent,'Hearing: Create a note I need sapphire');
+ e.onresult({results:[r('Create a note',true),r('I need sapphire glaze',true)]});e.onend();
+ assert.equal(f.pending[0].body.input.text,'Create a note I need sapphire glaze');
+ assert.equal(f.el('qlAssistantSessionCommand').textContent,'Heard: Create a note I need sapphire glaze');
+});
+for(const mode of ['interim','confidence','watchdog'])test('uncertain speech requires explicit transcript review '+mode, async t=>{
+ const f=await fixture(t);start(f);const e=f.engines[0];
+ e.onresult({results:[{isFinal:mode!=='interim',0:{transcript:'Open blue vase',confidence:mode==='confidence'?.3:.9}}]});
+ if(mode==='watchdog')f.timers.get(30000)();e.onend();
+ assert.equal(f.pending.length,0);assert.match(f.el('qlAssistantSessionReply').textContent,/use those words/);
+ restart(f);f.engines.at(-1).result('Yes');assert.equal(f.pending.length,0);
+ restart(f);f.engines.at(-1).result('Use those words');assert.equal(f.pending.length,1);
+ assert.equal(f.pending[0].body.input.text,'Open blue vase');f.reply();await tick();restart(f);assert.equal(state(f),'starting');
+});
+test('review correction and discard never execute the old transcript',async t=>{
+ const f=await fixture(t);start(f);f.engines[0].result('Delete blue vase',false);f.engines[0].onend();restart(f);
+ f.engines.at(-1).result('Open blue bowl');assert.equal(f.pending[0].body.input.text,'Open blue bowl');f.reply();await tick();restart(f);
+ f.engines.at(-1).result('Save note',false);f.engines.at(-1).onend();restart(f);f.engines.at(-1).result('Discard transcript');assert.equal(f.pending.length,1);
+});
+test('overflow never submits the previous final prefix',async t=>{
+ const f=await fixture(t);start(f);const e=f.engines[0];
+ e.onresult({results:[{isFinal:true,0:{transcript:'Create a note'}}]});
+ e.onresult({results:[{isFinal:true,0:{transcript:'x'.repeat(201)}}]});e.onend?.();assert.equal(f.pending.length,0);
+});
+test('ending review clears transcript and queued confirmation',async t=>{
+ const f=await fixture(t);start(f);f.engines[0].result('Open glazes',false);f.engines[0].onend();f.el('qlAssistantSessionStop').click();start(f);
+ f.engines.at(-1).result('Use those words');assert.equal(f.pending[0].body.input.text,'Use those words');
 });

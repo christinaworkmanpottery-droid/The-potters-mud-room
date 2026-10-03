@@ -290,3 +290,13 @@ test('incomplete note refuses saving; next full sentence replaces draft before e
  assert.equal(db.prepare('SELECT body FROM studio_notes WHERE id=?').get(saved.result.noteId).body,'I need to buy sapphire glaze.');
  const pending=await ask('Create new note');const replacement=await ask('Replace note with Buy sapphire glaze.',pending.context);assert.equal(replacement.result.status,'draft');await ask('Cancel',replacement.context);
 });
+
+for (const fragment of ['I need to buy', 'Buy sapphire glaze and', 'Try this glaze with', 'I need glaze for']) test('4K incomplete note refuses write: '+fragment, async()=>{
+ const before=db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n;
+ const draft=await ask('Create a note '+fragment);
+ const blocked=await ask('Save note',draft.context);
+ assert.equal(blocked.result.status,'incomplete');assert.equal(db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n,before);
+ const corrected=await ask('Replace note with I need to buy sapphire glaze.',blocked.context);
+ const saved=await ask('Save note',corrected.context);assert.equal(saved.result.status,'saved');
+ assert.equal(db.prepare('SELECT body FROM studio_notes WHERE id=?').get(saved.result.noteId).body,'I need to buy sapphire glaze.');
+});
