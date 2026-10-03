@@ -238,14 +238,15 @@ test('Studio Note pending drafts expire and are bounded',()=>{
  const a=drafts.draft('a','A');drafts.draft('b','B');assert.equal(drafts.confirm('a',a.state,true).result.status,'clarification');
  const b=drafts.draft('b','B');now=11;assert.equal(drafts.confirm('b',b.state,true).result.status,'clarification');
 });
-test('note confirmation rechecks auth, aborts and error invalidation before any write',async()=>{
+test('note confirmation rechecks auth and aborts; unsupported commands retain an unsaved draft',async()=>{
  const before=db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n;
  let draft=await ask('Add a studio note that Never save after auth change');let authCalls=0;
  await assert.rejects(core.turn({authorize:()=>++authCalls===1?'a':'b',request:{version:1,requestId:'auth-change',input:{text:'Save note'},context:draft.context}}),{code:'SESSION_CHANGED'});
  const abort=new AbortController();abort.abort();
  await assert.rejects(core.turn({authorize:()=> 'a',signal:abort.signal,request:{version:1,requestId:'abort-note',input:{text:'Save note'},context:draft.context}}),{code:'CANCELLED'});
- await assert.rejects(ask('Delete it',draft.context),{code:'ACTION_NOT_AVAILABLE'});
- assert.notEqual((await ask('Save note',draft.context)).result.status,'saved');
+ const retained=await ask('Delete it',draft.context);assert.equal(retained.result.draftText,'Never save after auth change');
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n,before);
+ await ask('Cancel',retained.context);
  draft=await ask('Add a studio note that Restart discards this');
  assert.notEqual((await ask('Save note',draft.context,'a',createAssistantCore(db))).result.status,'saved');
  await ask('Cancel',draft.context);
@@ -272,7 +273,7 @@ test('note dialogue rejects foreign/expired context, preserves commands and dire
  await assert.rejects(ask('Try three coats.',start.context,'b'),{code:'UNSUPPORTED_INTENT'});
  const nav=await ask('Open my pieces',start.context);assert.equal(nav.response.navigation.page,'pieces');
  await assert.rejects(ask('Try three coats.',start.context),{code:'UNSUPPORTED_INTENT'});
- const fresh=await ask('Create new note');await assert.rejects(ask('Delete all my pieces',fresh.context),{code:'ACTION_NOT_AVAILABLE'});
+ const fresh=await ask('Create new note');assert.equal((await ask('Delete all my pieces',fresh.context)).result.status,'collecting');
  for(const text of ['Create a new note saying Exact Words','Add a note that Exact Words']){
   const r=await ask(text);assert.equal(r.result.status,'draft');assert.match(r.response.text,/Exact Words/);await ask('Cancel',r.context);
  }

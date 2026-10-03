@@ -63,6 +63,13 @@ test('full website + actual HTTP + SQLite: hands-free Piece conversation and man
   assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a' AND body='I need to buy B-Mix clay'").get().n,1);
   assert.match(await say('Save'),/no current Studio Note draft/i);
   await say('Open glazes');assert.equal(w.eval('currentPage'),'glazes');
+  await say('Could you bring up clay or glazes?');assert.match(el('qlAssistantSessionReply').textContent,/Which would you like/);
+  await say('Glazes please');assert.equal(w.eval('currentPage'),'glazes');
+  await say('Would you pull up the blue bowl?');await until(()=>w.eval('currentPage')==='pieceDetail');
+  assert.match(await say('Tell me about the glaze on it'),/Ocean/);
+  assert.match(await say('And its firing?'),/2026-10-01/);
+  await say('Search glazes for');assert.match(el('qlAssistantSessionReply').textContent,/What should I look for/);
+  await say('ocean');assert.equal(w.eval('currentPage'),'studioSearch');
   const dictated='I need to make 25 soy sauce, dishes, and B mix clay';
   assert.match(await say('New note '+dictated+' save note'),/Draft studio note/);
   assert.equal(el('qlAssistantNotePreviewText').textContent,dictated);

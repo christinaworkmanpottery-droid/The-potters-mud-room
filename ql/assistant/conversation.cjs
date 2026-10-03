@@ -118,14 +118,14 @@ function createConversationTools(db, {search, validDate}) {
       const id = state?.candidates?.[intent.arguments.index-1];
       if (!id) return answer('There is no current choice with that number. Please search for a Piece again.',state || {});
       const chosen = choose(userId,id);
-      if (state.pendingRead === 'glazes' && chosen.state.pieceId) {
-        const read = execute({name:'studio.piece.glazes',arguments:{}},userId,chosen.state);
+      if (['glazes','firings'].includes(state.pendingRead) && chosen.state.pieceId) {
+        const read = execute({name:'studio.piece.'+state.pendingRead,arguments:{}},userId,chosen.state);
         read.response.navigation = chosen.response.navigation;
         return read;
       }
       return chosen;
     }
-    if (!state?.pieceId) return answer(missing,state || {});
+    if (!state?.pieceId) return answer(missing,{...(state || {}),...(['studio.piece.glazes','studio.piece.firings'].includes(intent.name)?{scope:'piece',pendingRead:intent.name.split('.').at(-1)}:{})});
     const piece = selected({pieceId:state.pieceId,userId});
     if (!piece) return answer('That Piece is no longer available. Please search again.',{scope:'piece'});
     if (intent.name === 'studio.piece.clarifyGlazes') return answer('I may have misheard. Do you mean: what glaze is saved on '+(piece.title || 'this Piece')+'? Say yes or no.',{scope:'piece',pieceId:piece.id,confirmGlazes:true});

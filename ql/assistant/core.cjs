@@ -1,6 +1,7 @@
 'use strict';
 const {DOMAINS, DESTINATIONS, validQuery, resolve} = require('./intents.cjs');
 const {createContextStore, followup, createConversationTools} = require('./conversation.cjs');
+const {envelope,interpret}=require('./language.cjs');
 const {dictationBody,noteStart,isNoteText,noteBody,confirmation,cancellation,unclearNoteCommand,createNoteDrafts}=require('./notes.cjs');
 const INTENT = 'studio.firing.latest';
 class AssistantError extends Error {
@@ -15,7 +16,7 @@ function validateIntent(value) {
   if (!exact(value, ['name', 'arguments'])) fail(400, 'UNSUPPORTED_INTENT', 'Unsupported assistant intent.');
   const args = value.arguments;
   const valid = (value.name === 'studio.note.begin' && exact(args,['topic']) && typeof args.topic==='string' && args.topic.length<=200 && !/[\x00-\x1f\x7f]/.test(args.topic)) || (value.name === 'studio.note.draft' && exact(args,['body']) && typeof args.body==='string' && args.body.trim().length>0 && args.body.length<=200 && !/[\x00-\x1f\x7f]/.test(args.body)) ||
-    (['studio.note.confirm','studio.note.cancel','studio.note.review'].includes(value.name) && exact(args,[])) || (['studio.piece.glazes','studio.piece.firings','studio.piece.open','studio.piece.clarifyGlazes','studio.piece.repeatName'].includes(value.name) && exact(args, [])) ||
+    (['studio.language.clarify','studio.note.confirm','studio.note.cancel','studio.note.review'].includes(value.name) && exact(args,[])) || (['studio.piece.glazes','studio.piece.firings','studio.piece.open','studio.piece.clarifyGlazes','studio.piece.repeatName'].includes(value.name) && exact(args, [])) ||
     (value.name === 'studio.piece.choose' && exact(args,['index']) && Number.isInteger(args.index) && args.index >= 1 && args.index <= 5) ||
     (value.name === 'studio.piece.confirmRead' && exact(args,['confirmed']) && typeof args.confirmed === 'boolean') ||
     (['studio.piece.namedGlazes','studio.piece.clarifyOpen'].includes(value.name) && exact(args,['query']) && validQuery(args.query)) ||
@@ -53,7 +54,16 @@ const deterministicProvider = Object.freeze({
     if(body) return {name:'studio.note.draft',arguments:{body}};
     if(confirmation(text)) return {name:'studio.note.confirm',arguments:{}};
     if(cancellation(text)) return {name:'studio.note.cancel',arguments:{}};
-    return followup(text) || resolve(text, fail);
+    try { return followup(text) || resolve(text, fail); }
+    catch(error) {
+      if(!['UNSUPPORTED_INTENT','ACTION_NOT_AVAILABLE'].includes(error.code))throw error;
+      const flexible=interpret(text);
+      if(flexible?.intent)return flexible.intent;
+      // Same command grammar after stripping only conversational scaffolding.
+      const clean=envelope(text);
+      if(clean && clean!==text.toLowerCase().trim())return followup(clean) || resolve(clean,fail);
+      throw error;
+    }
   }
 });
 function validDate(date) {
@@ -114,14 +124,25 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
       if (signal?.aborted) fail(409, 'CANCELLED', 'Assistant request cancelled.');
       const context = request.context ? contexts.read(request.context.token,userId) : null;
       const activeDraft=notes.wantsText(userId,context);
-      const capture=activeDraft && isNoteText(input.text);
+      let language = !input.command && intentProvider===deterministicProvider && !noteStart(input.text) && !noteBody(input.text) && !confirmation(input.text,activeDraft) && !cancellation(input.text) ? interpret(input.text,context) : null;
+      // A bare feature name can be literal note dictation. Only explicit read
+      // requests may leave a draft; shorthand navigation is for read context.
+      if(activeDraft && language?.intent?.name==='studio.navigate' && !/\b(?:open|show|bring|pull|go|take|look|see)\b/i.test(input.text))language=null;
+      const politeRequest=/^(?:(?:okay|ok|hey|um|uh)[, ]+)?(?:can|could|would|will) you\b/i.test(input.text || '');
+      const capture=activeDraft && !language && isNoteText(input.text) && (!politeRequest || isNoteText(envelope(input.text)));
       let clarifyNote=unclearNoteCommand(input.text);
       let proposed;
-      try { proposed = clarifyNote ? {name:'studio.note.review',arguments:{}} :
+      try { proposed = language?.clarification ? {name:'studio.language.clarify',arguments:{}} :
+        clarifyNote ? {name:'studio.note.review',arguments:{}} :
         activeDraft && confirmation(input.text,true) ? {name:'studio.note.confirm',arguments:{}} :
-        capture ? {name:'studio.note.draft',arguments:{body:dictationBody(input.text)}} : input.command || await intentProvider.resolveIntent({text: input.text}, {signal}); }
+        capture ? {name:'studio.note.draft',arguments:{body:dictationBody(input.text)}} :
+        language?.intent ? language.intent :
+        input.command || await intentProvider.resolveIntent({text: input.text}, {signal}); }
       catch (error) {
-        if(error.code==='UNSUPPORTED_INTENT' && activeDraft){
+        if(error.code==='UNSUPPORTED_INTENT' && context?.languagePending && intentProvider===deterministicProvider){
+          language={clarification:'I still have your earlier request. '+(context.languageQuestion || 'Which did you mean?'),pending:context.languagePending};
+          proposed={name:'studio.language.clarify',arguments:{}};
+        } else if(['UNSUPPORTED_INTENT','ACTION_NOT_AVAILABLE'].includes(error.code) && activeDraft){
           clarifyNote=true;
           proposed={name:'studio.note.review',arguments:{}};
         } else {
@@ -136,7 +157,13 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
       if (authorize() !== userId) fail(401, 'SESSION_CHANGED', 'Account session changed.');
       requireAccount(db, userId);
       let result, response, nextState = {};
-      if (intent.name === 'studio.note.review') {
+      if (intent.name === 'studio.language.clarify') {
+        if(!language?.clarification)fail(400,'INVALID_REQUEST','No language clarification is pending.');
+        result={tool:'studio.language',status:'clarification'};
+        response={text:language.clarification};
+        nextState={...(context || {}),languagePending:language.pending,languageQuestion:language.clarification};
+        if(activeDraft){const review=notes.review(userId,context);result=review.result;response.text+=' '+review.response.text;}
+      } else if (intent.name === 'studio.note.review') {
         if(!clarifyNote)fail(400,'INVALID_REQUEST','No note clarification is pending.');
         ({result,response,state:nextState}=notes.review(userId,context));
       } else if (intent.name === 'studio.note.begin') {
@@ -175,6 +202,10 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
           navigation:{kind:'page',page}};
       } else if (request.context && intent.name === 'studio.search' && intent.arguments.type === 'piece') {
         ({result,response,state:nextState} = conversation.matches(userId,intent.arguments.query));
+        if(['glazes','firings'].includes(context?.pendingRead)) {
+          if(nextState.pieceId)({result,response,state:nextState}=conversation.execute({name:'studio.piece.'+context.pendingRead,arguments:{}},userId,nextState));
+          else nextState.pendingRead=context.pendingRead;
+        }
       } else {
         searchService ||= require('../studio-search.cjs').createStudioSearchService(db);
         const {type,query}=intent.arguments;
@@ -183,7 +214,7 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
           result.results.length ? 'Opening your matching saved studio records.' : 'No matching saved records. Opening Studio Search.',
           navigation:{kind:'search',type,query}};
       }
-      if (!intent.name.startsWith('studio.note.')) notes.clear(userId);
+      if (!intent.name.startsWith('studio.note.') && intent.name!=='studio.language.clarify') notes.clear(userId);
       return {version: 1, requestId, accountId: userId, intent, result, response,
         ...(request.context ? {context:contexts.save(userId,nextState)} : {})};
     }
