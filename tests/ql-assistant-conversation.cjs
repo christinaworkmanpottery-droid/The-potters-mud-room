@@ -157,3 +157,30 @@ test('read clarification cannot survive account changes, record deletion or topi
  assert.equal((await ask('Yes',temp.context)).result.status,'clarification');
  for(const intent of [{name:'studio.piece.confirmRead',arguments:{confirmed:'true'}},{name:'studio.piece.confirmRead',arguments:{confirmed:true,pieceId:'b-blue'}},{name:'studio.piece.clarifyGlazes',arguments:{pieceId:'b-blue'}}])assert.throws(()=>validateIntent(intent));
 });
+test('misheard piece names ask before opening and retain canonical followups',async()=>{
+ add('pieces',{id:'repair-vase',user_id:'a',title:'Blue vase'});
+ try {
+  for(const word of ['faze','phase','base']) {
+   const r=await ask('Show me blue '+word);assert.match(r.response.text,/Did you mean Blue vase/);assert.equal(r.response.navigation,undefined);
+   const yes=await ask('Yes',r.context);assert.equal(yes.response.navigation.id,'repair-vase');
+   assert.equal((await ask('What glaze is on it?',yes.context)).result.status,'empty');
+   const no=await ask('No',r.context);assert.equal(no.response.navigation,undefined);assert.equal((await ask('Yes',no.context)).response.navigation,undefined);
+   assert.equal((await ask('Yes',r.context,'b')).response.navigation,undefined);
+   const moved=await ask('Open my glazes',r.context);assert.equal((await ask('Yes',moved.context)).response.navigation,undefined);
+  }
+  const pending=await ask('Show me blue faze');
+  db.prepare("DELETE FROM pieces WHERE id='repair-vase'").run();
+  assert.equal((await ask('Yes',pending.context)).response.navigation,undefined);
+  assert.match((await ask('Show me blue faze')).response.text,/could not match/);
+ }finally{db.prepare("DELETE FROM pieces WHERE id='repair-vase'").run();}
+});
+test('literal matches win; ambiguous speech alternatives require selection',async()=>{
+ for(const [id,title] of [['literal','Blue faze'],['vase1','Blue vase'],['vase2','Blue vase tall']])add('pieces',{id,user_id:'a',title});
+ try {
+  assert.equal((await ask('Show me blue faze')).response.navigation.id,'literal');
+  const r=await ask('Show me blue phase');assert.equal(r.result.status,'choices');assert.equal(r.response.navigation,undefined);
+  assert.equal((await ask('Yes',r.context)).response.navigation,undefined);
+  assert.ok(['vase1','vase2'].includes((await ask('The first one',r.context)).response.navigation.id));
+  assert.throws(()=>validateIntent({name:'studio.piece.clarifyOpen',arguments:{query:'blue faze',pieceId:'foreign'}}));
+ }finally{db.prepare("DELETE FROM pieces WHERE id IN ('literal','vase1','vase2')").run();}
+});

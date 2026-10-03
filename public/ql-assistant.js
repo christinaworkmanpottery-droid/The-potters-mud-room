@@ -1,7 +1,7 @@
 /* Bounded QL proof. Speech is transient input to the same typed turn path. */
 (() => {
   'use strict';
-  const displayName = 'QL assistant — testing 4I.2';
+  const displayName = 'QL assistant — testing 4I.3';
   const identity = () => JSON.stringify([token, currentUser?.id, localStorage.getItem('mudlog_token')]);
   let conversationToken = null, recordNavigation = false;
   let session = identity(), invalidSession = null, generation = 0, serial = 0;
@@ -351,7 +351,7 @@
     }
     if (handsFreeEnabled) {
       dock = node('aside'); dock.id = 'qlAssistantSession'; dock.setAttribute('aria-label', 'Voice session controls');
-      const note = node('p', 'Conversation test 4I.2. Wait for Microphone ready. Say “stop listening” to end. Keep Safari visible.');
+      const note = node('p', 'Conversation test 4I.3. Wait for Microphone ready. Say “stop listening” to end. Keep Safari visible.');
       sessionStart = node('button', 'Start voice session'); sessionStart.id = 'qlAssistantSessionStart';
       sessionStop = node('button', 'End session'); sessionStop.id = 'qlAssistantSessionStop';
       for (const b of [sessionStart, sessionStop]) { b.type = 'button'; b.className = 'btn btn-secondary'; }
