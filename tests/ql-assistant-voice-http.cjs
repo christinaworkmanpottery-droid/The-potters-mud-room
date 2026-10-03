@@ -69,6 +69,8 @@ for (const [core,web,voice,enabled,voiceEnabled] of [['0','0','1',false,false],[
       const before=requests.length;
       w.document.getElementById('qlAssistantTalk').click();
       engine.onresult({resultIndex:0,results:[{isFinal:true,0:{transcript:text}}]});
+      assert.equal(form.getAttribute('aria-busy'),'false');
+      engine.onend(); // The browser must release recognition before submission/retry.
       for(let i=0;i<100&&form.getAttribute('aria-busy')==='true';i++)await pause(10);
       assert.deepEqual(requests.slice(before),['/api/ql/assistant/turn']);
      }

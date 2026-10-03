@@ -18,12 +18,12 @@
     stop.disabled = Boolean(recognition?.stopping);
     voiceStatus.textContent = message;
   }
-  function cancelVoice(message = '') {
+  function cancelVoice(message = '', abort = true) {
     const old = recognition; recognition = null;
     clearTimeout(voiceTimer); clearTimeout(stopTimer);
     if (old) {
-      old.engine.onstart = old.engine.onresult = old.engine.onerror = old.engine.onend = null;
-      try { old.engine.abort(); } catch (_) { /* Already ended. Never restart. */ }
+      old.engine.onstart = old.engine.onaudiostart = old.engine.onsoundstart = old.engine.onresult = old.engine.onerror = old.engine.onend = null;
+      if (abort) try { old.engine.abort(); } catch (_) { /* Already ended. Never restart. */ }
     }
     voiceState(message);
   }
@@ -40,30 +40,59 @@
       return recognition === turn && epoch === generation && ownSession === session &&
         available() && entered && currentPage === 'qlAssistant' && !document.hidden;
     };
-    const fail = message => { if (active()) cancelVoice(message); };
     try {
       const engine = new (speechConstructor())();
-      turn = {engine, stopping: false}; recognition = turn;
-      engine.continuous = false; engine.interimResults = false; engine.maxAlternatives = 1; engine.lang = 'en-US';
-      engine.onstart = () => { if (active()) voiceState(turn.stopping ? 'Finishing speech…' : 'Listening… Stop to finish, or Cancel.'); };
+      turn = {engine, stopping: false, finalText: '', draft: '', heardSound: false}; recognition = turn;
+      engine.continuous = false; engine.interimResults = true; engine.maxAlternatives = 1; engine.lang = 'en-US';
+      const finish = (message, ended = false, allowFinal = false) => {
+        if (!active()) return;
+        const finalText = turn.finalText, draft = turn.draft;
+        cancelVoice('', !ended);
+        if (allowFinal && finalText) {
+          input.value = finalText;
+          void submit();
+          voiceState('Speech received. You can edit the command and send again.');
+        } else if (draft) {
+          input.value = draft;
+          voiceState('Speech was received but not finalized. Check the words above, then tap Send.');
+        } else voiceState(message);
+      };
+      turn.finish = finish;
+      engine.onstart = () => { if (active()) voiceState(turn.stopping ? 'Finishing speech…' : 'Listening — speak now. Tap Stop when finished.'); };
+      engine.onaudiostart = () => { if (active() && !turn.stopping) voiceState('Microphone ready — speak now. Tap Stop when finished.'); };
+      engine.onsoundstart = () => { if (active()) { turn.heardSound = true; voiceState('Sound detected. Listening for your words…'); } };
       engine.onresult = event => {
         if (!active()) return;
-        const result = event.results?.[event.resultIndex ?? 0];
-        if (!result?.isFinal) return;
-        const text = typeof result[0]?.transcript === 'string' ? result[0].transcript.trim() : '';
-        cancelVoice(); // Detach before submitting: duplicate engine events cannot send twice.
-        if (!text || text.length > 200) { voiceState('Please say a question of 200 characters or fewer, or type it.'); return; }
-        input.value = text;
-        voiceState('Speech received. You can edit the question and send again.');
-        void submit();
+        const results = Array.from(event.results || []);
+        const text = results.map(r => typeof r?.[0]?.transcript === 'string' ? r[0].transcript.trim() : '').filter(Boolean).join(' ');
+        if (!text || text.length > 200) {
+          finish('Please say a command of 200 characters or fewer, or type your question.'); return;
+        }
+        // Interim words are a draft only: they must never trigger navigation/actions.
+        turn.draft = text;
+        if (results.length && results.every(r => r.isFinal === true)) {
+          turn.finalText = text;
+          stopVoice(); // Wait for the engine to disconnect before enabling another attempt.
+        } else voiceState('Hearing: ' + text);
       };
-      engine.onerror = event => fail(['not-allowed', 'service-not-allowed'].includes(event.error)
-        ? 'Microphone or speech permission was denied. You can type your question.'
-        : 'Speech is unavailable or could not be heard. You can try again or type your question.');
-      engine.onend = () => fail('No speech was received. You can try again or type your question.');
-      voiceState('Starting microphone… You can cancel.');
-      // Bound both permission/listening and stop completion; never auto-restart.
-      voiceTimer = setTimeout(() => fail('Listening timed out. You can try again or type your question.'), 20000);
+      engine.onerror = event => {
+        const messages = {
+          'not-allowed':'Microphone or speech permission was denied. You can type your question.',
+          'service-not-allowed':'Speech permission was denied. You can type your question.',
+          'audio-capture':'The browser could not access the microphone. You can type your question.',
+          'network':'The speech service connection failed. You can try again or type your question.',
+          'no-speech':'The speech service returned no words. Try again after “Microphone ready”, or type your question.',
+          'aborted':'Speech was interrupted. Tap to try again or type your question.',
+          'language-not-supported':'The speech service cannot use this language. You can type your question.'
+        };
+        finish(messages[event.error] || 'Speech is unavailable. You can try again or type your question.');
+      };
+      engine.onend = () => finish(turn.heardSound
+        ? 'Sound was detected, but the speech service returned no words. You can retry or type your question.'
+        : 'No speech text was returned by the browser. Wait for “Microphone ready” before speaking, or type your question.', true, true);
+      voiceState('Starting microphone… Wait for “Microphone ready” before speaking.');
+      // Foreground single attempt only; no automatic restart or background capture.
+      voiceTimer = setTimeout(() => { if (active()) stopVoice(); }, 20000);
       engine.start();
     } catch (_) {
       cancelVoice('Speech could not start. Check microphone permission, or type your question.');
@@ -74,9 +103,9 @@
     if (!turn || turn.stopping) return;
     turn.stopping = true; voiceState('Finishing speech…');
     stopTimer = setTimeout(() => {
-      if (recognition === turn) cancelVoice('Speech did not finish. You can try again or type your question.');
-    }, 3000);
-    try { turn.engine.stop(); } catch (_) { cancelVoice('Speech could not finish. You can type your question.'); }
+      if (recognition === turn) turn.finish('The speech service did not finish. You can try again or type your question.', false, true);
+    }, 5000);
+    try { turn.engine.stop(); } catch (_) { turn.finish('Speech could not finish. You can type your question.'); }
   }
   const node = (tag, text) => { const n = document.createElement(tag); if (text) n.textContent = text; return n; };
   const authenticated = () => Boolean(token && currentUser?.id && token === localStorage.getItem('mudlog_token') && invalidSession !== identity());
@@ -190,7 +219,7 @@
     page.append(heading, help, form, output, fallback);
     if (voiceEnabled) {
       const voice = node('div'); voice.id = 'qlAssistantVoice';
-      const notice = node('p', 'Tap-to-talk — testing. Your browser may send audio to its speech service. This app does not save audio or transcripts. One question per tap; typing stays available.');
+      const notice = node('p', 'Tap-to-talk — testing. Your browser may send audio to its speech service. This app does not save audio or transcripts. Wait for Microphone ready, speak, then tap Stop. If words need review, tap Send. Typing stays available.');
       talk = node('button', 'Tap to talk — test'); talk.id = 'qlAssistantTalk';
       stop = node('button', 'Stop listening'); stop.id = 'qlAssistantStop';
       cancel = node('button', 'Cancel listening'); cancel.id = 'qlAssistantCancelVoice';
@@ -216,7 +245,8 @@
   });
   for (const event of ['hashchange', 'popstate']) window.addEventListener(event, () => onNavigate(location.hash.slice(1).split('?')[0]));
   window.addEventListener('pagehide', () => { entered = false; invalidate(); });
-  window.addEventListener('blur', () => { if (voiceEnabled) invalidate(); });
+  // A visible page can lose focus to browser controls/permission UI. Only actual
+  // hiding, pagehide, navigation, or account changes cancel foreground speech.
   window.addEventListener('pageshow', () => { syncSession(); if (available() && currentPage === 'qlAssistant') entered = true; });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) invalidate();

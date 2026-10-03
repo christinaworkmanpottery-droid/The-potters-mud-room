@@ -16,7 +16,7 @@ async function fixture(t, config = {enabled:true,voiceEnabled:true}, support = '
     start() { this.starts++; if(support === 'start-error') throw Error('permission'); }
     stop() { this.stops++; if(support === 'stop-error') throw Error('stopped'); }
     abort() { this.aborts++; }
-    result(text, final=true) { this.onresult?.({resultIndex:0,results:[{isFinal:final,0:{transcript:text}}]}); }
+    result(text, final=true) { this.onresult?.({resultIndex:0,results:[{isFinal:final,0:{transcript:text}}]}); if(final) this.onend?.(); }
   }
   if(support !== 'none') w[support === 'prefixed' ? 'webkitSpeechRecognition' : 'SpeechRecognition'] = Speech;
   const style = w.document.createElement('style'); style.textContent = source('public/style.css'); w.document.head.append(style);
@@ -46,16 +46,16 @@ async function fixture(t, config = {enabled:true,voiceEnabled:true}, support = '
 }
 for(const config of [{enabled:false,voiceEnabled:true},{enabled:true},{enabled:true,voiceEnabled:false},{enabled:true,voiceEnabled:'true'}]) test('voice flag fails closed '+JSON.stringify(config),async t=>{const f=await fixture(t,config);assert.equal(f.el('qlAssistantTalk'),null);assert.equal(f.engines.length,0);});
 for(const support of ['none','insecure']) test('capability fallback '+support,async t=>{const f=await fixture(t,undefined,support);assert.equal(f.el('qlAssistantTalk').disabled,true);assert.equal(f.w.getComputedStyle(f.el('qlAssistantTalk')).display,'none');assert.match(f.el('qlAssistantVoiceStatus').textContent,/unavailable/);f.send();f.reply();await tick();assert.match(f.el('qlAssistantResponse').textContent,/2026/);});
-for(const support of ['standard','prefixed']) test('explicit start and stop with '+support,async t=>{const f=await fixture(t,undefined,support);assert.equal(f.engines.length,0);f.talk();const e=f.engines[0];assert.equal(e.starts,1);assert.equal(e.continuous,false);assert.equal(e.interimResults,false);assert.equal(e.maxAlternatives,1);e.onstart();assert.match(f.el('qlAssistantVoiceStatus').textContent,/Listening/);assert.equal(f.el('qlAssistantInput').disabled,false);f.el('qlAssistantStop').click();f.el('qlAssistantStop').click();assert.equal(e.stops,1);e.result('When was my last firing?');assert.deepEqual(f.pending[0].body.input,{text:'When was my last firing?'});f.reply();await tick();assert.match(f.el('qlAssistantResponse').textContent,/2026/);});
+for(const support of ['standard','prefixed']) test('explicit start and stop with '+support,async t=>{const f=await fixture(t,undefined,support);assert.equal(f.engines.length,0);f.talk();const e=f.engines[0];assert.equal(e.starts,1);assert.equal(e.continuous,false);assert.equal(e.interimResults,true);assert.equal(e.maxAlternatives,1);e.onstart();assert.match(f.el('qlAssistantVoiceStatus').textContent,/Listening/);assert.equal(f.el('qlAssistantInput').disabled,false);f.el('qlAssistantStop').click();f.el('qlAssistantStop').click();assert.equal(e.stops,1);e.result('When was my last firing?');assert.deepEqual(f.pending[0].body.input,{text:'When was my last firing?'});f.reply();await tick();assert.match(f.el('qlAssistantResponse').textContent,/2026/);});
 test('cancel stops and suppresses already queued final event',async t=>{const f=await fixture(t);f.talk();const e=f.engines[0],late=e.onresult;f.el('qlAssistantCancelVoice').click();assert.equal(e.aborts,1);late({results:[{isFinal:true,0:{transcript:'last firing'}}]});assert.equal(f.pending.length,0);assert.equal(f.el('qlAssistantInput').value,'');assert.match(f.el('qlAssistantVoiceStatus').textContent,/canceled/);});
-test('duplicate taps and final events send exactly once',async t=>{const f=await fixture(t);f.talk();f.talk();assert.equal(f.engines.length,1);const e=f.engines[0],event={results:[{isFinal:true,0:{transcript:'last firing'}}]},callback=e.onresult;callback(event);callback(event);f.el('qlAssistantForm').requestSubmit();assert.equal(f.pending.length,1);assert.equal(e.aborts,1);assert.equal(f.pending[0].options.headers.Authorization,'Bearer token-a');});
+test('duplicate taps and final events send exactly once',async t=>{const f=await fixture(t);f.talk();f.talk();assert.equal(f.engines.length,1);const e=f.engines[0],event={results:[{isFinal:true,0:{transcript:'last firing'}}]},callback=e.onresult;callback(event);callback(event);e.onend();f.el('qlAssistantForm').requestSubmit();assert.equal(f.pending.length,1);assert.equal(e.aborts,0);assert.equal(f.pending[0].options.headers.Authorization,'Bearer token-a');});
 test('interim speech never populates or submits',async t=>{const f=await fixture(t);f.talk();f.engines[0].result('partial secret',false);assert.equal(f.pending.length,0);assert.equal(f.el('qlAssistantInput').value,'');});
 test('unsupported speech uses same safe unsupported response',async t=>{const f=await fixture(t);f.talk();f.engines[0].result('Tell me a joke');assert.equal(f.pending[0].body.input.text,'Tell me a joke');f.pending[0].resolve({ok:false,status:400,json:async()=>({code:'UNSUPPORTED_INTENT'})});await tick();assert.match(f.el('qlAssistantResponse').textContent,/isn’t supported/);assert.equal(f.pending.length,1);});
 for(const error of ['not-allowed','service-not-allowed','audio-capture','network','no-speech','aborted','language-not-supported']) test('nonblocking speech error '+error,async t=>{const f=await fixture(t);f.talk();const e=f.engines[0];e.onerror({error});assert.equal(e.aborts,1);assert.match(f.el('qlAssistantVoiceStatus').textContent,/type your question/);assert.equal(f.el('qlAssistantTalk').disabled,false);f.send();f.reply();await tick();assert.match(f.el('qlAssistantResponse').textContent,/2026/);});
 for(const support of ['constructor-error','start-error','stop-error']) test('engine exception fallback '+support,async t=>{const f=await fixture(t,undefined,support);f.talk();if(support==='stop-error')f.el('qlAssistantStop').click();assert.match(f.el('qlAssistantVoiceStatus').textContent,/type your question/);f.send();assert.equal(f.pending.length,1);});
 for(const text of ['', 'a'.repeat(201)]) test('empty or oversized speech does not submit '+text.length,async t=>{const f=await fixture(t);f.talk();f.engines[0].result(text);assert.equal(f.pending.length,0);assert.equal(f.el('qlAssistantInput').value,'');assert.match(f.el('qlAssistantVoiceStatus').textContent,/200/);});
 test('engine ending without final result allows explicit retry only',async t=>{const f=await fixture(t);f.talk();f.engines[0].onend();assert.equal(f.engines.length,1);assert.match(f.el('qlAssistantVoiceStatus').textContent,/No speech/);f.talk();assert.equal(f.engines.length,2);});
-for(const ms of [20000,3000]) test('bounded timeout '+ms,async t=>{const f=await fixture(t);f.talk();if(ms===3000)f.el('qlAssistantStop').click();f.timers.get(ms)();assert.equal(f.engines[0].aborts,1);assert.equal(f.el('qlAssistantTalk').disabled,false);assert.equal(f.pending.length,0);});
+for(const ms of [20000,5000]) test('bounded timeout '+ms,async t=>{const f=await fixture(t);f.talk();if(ms===5000)f.el('qlAssistantStop').click();f.timers.get(ms)();if(ms===20000)f.timers.get(5000)();assert.equal(f.engines[0].aborts,1);assert.equal(f.el('qlAssistantTalk').disabled,false);assert.equal(f.pending.length,0);});
 const changes={
  navigation:f=>f.w.navigate('firings'),
  logout:f=>f.w.logout(),
@@ -66,7 +66,6 @@ const changes={
  storage:f=>{f.w.localStorage.setItem('mudlog_token','replacement');f.w.dispatchEvent(new f.w.StorageEvent('storage',{key:'mudlog_token'}));},
  hidden:f=>{Object.defineProperty(f.w.document,'hidden',{value:true});f.w.document.dispatchEvent(new f.w.Event('visibilitychange'));},
  pagehide:f=>f.w.dispatchEvent(new f.w.Event('pagehide')),
- blur:f=>f.w.dispatchEvent(new f.w.Event('blur')),
  hash:f=>{f.w.history.pushState({},'','#firings');f.w.dispatchEvent(new f.w.HashChangeEvent('hashchange'));},
  popstate:f=>{f.w.history.pushState({},'','#firings');f.w.dispatchEvent(new f.w.PopStateEvent('popstate'));}
 };
@@ -81,3 +80,46 @@ test('typed submit cancels active recognition and retains original typed path',a
 test('hidden foreground cannot start or submit',async t=>{const f=await fixture(t);Object.defineProperty(f.w.document,'hidden',{value:true});f.talk();f.send();assert.equal(f.engines.length,0);assert.equal(f.pending.length,0);});
 test('no audio/transcript storage, external request, legacy route or chat writes',async t=>{const f=await fixture(t);const storage=JSON.stringify(f.w.localStorage),start=f.calls.length;f.talk();f.engines[0].result('last firing');f.reply();await tick();assert.deepEqual(f.calls.slice(start).map(c=>c.url),['/api/ql/assistant/turn']);assert.equal(JSON.stringify(f.w.localStorage),storage);assert.equal(f.w.sessionStorage.length,0);assert.doesNotMatch(source('public/ql-assistant.js'),/MediaRecorder|getUserMedia|indexedDB|setItem|\/api\/ai\/chat|speechSynthesis|console\./);assert.match(f.el('qlAssistantVoice').textContent,/browser may send audio/);});
 test('voice stop/cancel truly hidden when idle',async t=>{const f=await fixture(t);assert.equal(f.w.getComputedStyle(f.el('qlAssistantStop')).display,'none');assert.equal(f.w.getComputedStyle(f.el('qlAssistantCancelVoice')).display,'none');});
+
+// Regression: distinguish visible focus changes, interim-only speech, and engine end.
+test('visible browser focus loss does not discard microphone session',async t=>{
+ const f=await fixture(t);f.talk();const e=f.engines[0];f.w.dispatchEvent(new f.w.Event('blur'));
+ assert.equal(e.aborts,0);e.result('Open test tiles');assert.equal(f.pending[0].body.input.text,'Open test tiles');
+});
+test('five consecutive speech attempts complete without aborting successful engines',async t=>{
+ const f=await fixture(t);
+ for(let i=0;i<5;i++){f.talk();const e=f.engines[i];e.onstart();e.onaudiostart();e.result('When was my last firing?');f.reply(i);await tick();assert.equal(e.aborts,0);assert.equal(f.el('qlAssistantTalk').disabled,false);}
+ assert.equal(f.pending.length,5);
+});
+test('interim-only disconnect preserves editable draft but never auto-submits',async t=>{
+ const f=await fixture(t);f.talk();const e=f.engines[0];e.result('open test tiles',false);e.onend();
+ assert.equal(e.aborts,0);assert.equal(f.el('qlAssistantInput').value,'open test tiles');assert.equal(f.pending.length,0);
+ assert.match(f.el('qlAssistantVoiceStatus').textContent,/tap Send/);f.el('qlAssistantForm').requestSubmit();assert.equal(f.pending.length,1);
+});
+test('final waits for disconnect; another tap cannot overlap engines',async t=>{
+ const f=await fixture(t);f.talk();const e=f.engines[0];e.onresult({results:[{isFinal:true,0:{transcript:'last firing'}}]});
+ f.talk();assert.equal(f.engines.length,1);assert.equal(f.pending.length,0);assert.equal(e.stops,1);assert.equal(e.aborts,0);
+ e.onend();assert.equal(f.pending.length,1);assert.equal(f.el('qlAssistantTalk').disabled,false);
+});
+test('stop timeout preserves interim draft and requires Send',async t=>{
+ const f=await fixture(t);f.talk();f.engines[0].result('open glazes',false);f.el('qlAssistantStop').click();f.timers.get(5000)();
+ assert.equal(f.pending.length,0);assert.equal(f.el('qlAssistantInput').value,'open glazes');assert.match(f.el('qlAssistantVoiceStatus').textContent,/tap Send/);
+});
+test('sound without recognized text reports recognizer outcome instead of claiming silence',async t=>{
+ const f=await fixture(t);f.talk();const e=f.engines[0];e.onsoundstart();e.onend();
+ assert.match(f.el('qlAssistantVoiceStatus').textContent,/Sound was detected/);assert.equal(f.pending.length,0);assert.equal(f.el('qlAssistantTalk').disabled,false);
+});
+test('late final after interim draft cancellation cannot navigate',async t=>{
+ const f=await fixture(t);f.talk();const e=f.engines[0],late=e.onresult;e.result('open glazes',false);f.el('qlAssistantCancelVoice').click();
+ late({results:[{isFinal:true,0:{transcript:'open glazes'}}]});assert.equal(f.pending.length,0);assert.equal(f.el('qlAssistantInput').value,'');
+});
+test('five explicit retries recover after no-speech errors',async t=>{
+ const f=await fixture(t);
+ for(let i=0;i<5;i++){f.talk();f.engines[i].onerror({error:'no-speech'});assert.equal(f.el('qlAssistantTalk').disabled,false);assert.equal(f.pending.length,0);}
+ f.talk();f.engines[5].result('last firing');assert.equal(f.pending.length,1);
+});
+test('pending finalized speech cannot submit after account replacement',async t=>{
+ const f=await fixture(t);f.talk();const e=f.engines[0],end=e.onend;
+ e.onresult({results:[{isFinal:true,0:{transcript:'open contacts'}}]});
+ f.w.eval("setAuthUser({id:'b'})");end();assert.equal(f.pending.length,0);assert.equal(f.el('qlAssistantInput').value,'');
+});
