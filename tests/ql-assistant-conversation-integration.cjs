@@ -1,0 +1,37 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const {JSDOM}=require('jsdom'),fixture=require('../ql/assistant-voice-validation/fixture.cjs');
+const root=path.resolve(__dirname,'..');
+const pause=ms=>new Promise(r=>setTimeout(r,ms));
+async function until(fn){for(let i=0;i<300;i++){if(fn())return;await pause(10);}throw Error('Timed out');}
+test('full website + actual HTTP + SQLite: hands-free Piece conversation and manual viewer',async()=>{
+ let dom;
+ try {
+  await fixture.start('1','1','1','1');const {base,token,db}=fixture.state;
+  db.prepare('INSERT INTO pieces (id,user_id,title) VALUES (?,?,?)').run('blue','a','Blue bowl');
+  db.prepare('INSERT INTO glazes (id,user_id,name) VALUES (?,?,?)').run('ocean','a','Ocean');
+  db.prepare('INSERT INTO piece_glazes (id,piece_id,glaze_id) VALUES (?,?,?)').run('layer','blue','ocean');
+  db.prepare("UPDATE firing_logs SET piece_id='blue' WHERE user_id='a'").run();
+  dom=new JSDOM(fs.readFileSync(path.join(root,'public/index.html'),'utf8'),{url:base+'/#qlAssistant',runScripts:'outside-only',pretendToBeVisual:true});
+  const w=dom.window,engines=[],requests=[];Object.defineProperty(w,'isSecureContext',{value:true});
+  w.localStorage.setItem('mudlog_token',token);w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};w.setInterval=()=>0;
+  w.fetch=(url,opts={})=>{const target=new URL(url,base);assert.equal(target.origin,base);requests.push({url:target.pathname,body:opts.body});return fetch(target.href,opts);};
+  w.webkitSpeechRecognition=class {constructor(){engines.push(this);}start(){this.onaudiostart?.();}stop(){queueMicrotask(()=>this.onend?.());}abort(){}result(text){this.onresult?.({results:[{isFinal:true,0:{transcript:text}}]});}};
+  for(const file of ['website-utils.js','app.js','studio-search.js','ql-assistant.js'])require('node:vm').runInContext(fs.readFileSync(path.join(root,'public',file),'utf8'),dom.getInternalVMContext());
+  await until(()=>w.QLAssistant?.available());w.navigate('qlAssistant');
+  const el=id=>w.document.getElementById(id);el('qlAssistantSessionStart').click();
+  async function say(text){const count=engines.length;engines.at(-1).result(text);await until(()=>engines.length>count);return el('qlAssistantResponse').textContent;}
+  await say('Open my pieces');assert.equal(w.eval('currentPage'),'pieces');
+  await say('Show me the blue one');await until(()=>w.eval('currentPage')==='pieceDetail');assert.match(el('pieceDetailContent').textContent,/Blue bowl/);
+  assert.match(await say('What glaze did I use on that?'),/Ocean/);
+  assert.match(await say('When did I fire it?'),/2026-10-01/);
+  await say('Go back to my glazes');assert.equal(w.eval('currentPage'),'glazes');
+  assert.match(await say('When did I fire it?'),/Which Piece/);
+  assert.match(await say('Add a studio note that I want to try this combination again'),/No changes were made/);
+  engines.at(-1).result('Stop listening');await until(()=>el('qlAssistantSession').dataset.state==='stopped');
+  assert.equal(requests.filter(r=>r.url==='/api/ql/assistant/turn').length,7);
+  assert.ok(requests.some(r=>r.url==='/api/pieces/blue'));assert.ok(requests.some(r=>r.url==='/api/ql/pieces/blue/history'));
+  assert.equal(requests.some(r=>r.url==='/api/ai/chat'),false);
+  w.navigate('qlAssistant');el('qlAssistantInput').value='When did I fire it?';el('qlAssistantForm').requestSubmit();await until(()=>el('qlAssistantForm').getAttribute('aria-busy')==='false');assert.match(el('qlAssistantResponse').textContent,/Which Piece/);
+ } finally {await pause(50);dom?.window.close();await fixture.stop();}
+});

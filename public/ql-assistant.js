@@ -3,6 +3,7 @@
   'use strict';
   const displayName = 'QL assistant — testing';
   const identity = () => JSON.stringify([token, currentUser?.id, localStorage.getItem('mudlog_token')]);
+  let conversationToken = null, recordNavigation = false;
   let session = identity(), invalidSession = null, generation = 0, serial = 0;
   let controller, pendingText = null, enabled = false, entered = false;
   let page, entry, input, form, send, retry, output, fallback;
@@ -20,7 +21,7 @@
     sessionStop.hidden = !handsFree;
   }
   function endSession(message = 'Stopped — tap Start voice session to resume.', state = 'stopped') {
-    handsFree = false; voiceEpoch++;
+    handsFree = false; voiceEpoch++; conversationToken = null; recordNavigation = false;
     clearTimeout(restartTimer); clearTimeout(sessionTimer); clearTimeout(speechTimer); clearTimeout(requestTimer);
     if (utterance) { utterance.onend = utterance.onerror = utterance.onstart = null; utterance = null; window.speechSynthesis?.cancel(); }
     cancelVoice();
@@ -213,9 +214,11 @@
   function sessionInvalid() {
     invalidate(); invalidSession = identity(); syncSession();
   }
-  function onNavigate(destination) {
+  function onNavigate(destination, options = {}) {
     syncSession();
-    if (handsFree && (internalNavigation || !pendingText)) return;
+    if (internalNavigation || recordNavigation && options.searchDetail === true && location.hash === '#studioSearch/'+recordNavigation.type+'/'+encodeURIComponent(recordNavigation.id)) return;
+    recordNavigation = false;
+    if (handsFree && !pendingText) { conversationToken = null; return; }
     if (destination !== 'qlAssistant') { entered = false; invalidate(); }
   }
   function enter() {
@@ -247,12 +250,13 @@
       const response = await fetch(API + '/api/ql/assistant/turn', {
         method: 'POST', cache: 'no-store', signal: abort.signal,
         headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + credential},
-        body: JSON.stringify({version: 1, requestId, input: {text}})
+        body: JSON.stringify({version: 1, requestId, input: {text}, context:{token:conversationToken}})
       });
       if (!active()) return;
       if (response.status === 401) { sessionInvalid(); return; }
       const data = await response.json();
       if (!active()) return;
+      if (response.status === 400) conversationToken = null;
       if (response.status === 400 && data.code === 'UNSUPPORTED_INTENT') {
         output.textContent = 'That question isn’t supported in this test version yet.';
       } else if (response.status === 400 && data.code === 'DESTINATION_UNAVAILABLE') {
@@ -262,22 +266,25 @@
       } else {
         if (!response.ok || data.version !== 1 || data.requestId !== requestId ||
             data.accountId !== account || typeof data.response?.text !== 'string') throw Error('Unavailable');
+        if (data.context !== undefined && (typeof data.context?.token !== 'string' || !/^[a-f0-9]{48}$/.test(data.context.token) || Object.keys(data.context).length !== 1)) throw Error('Invalid context');
+        conversationToken = data.context?.token || null;
         // The core owns all facts and wording, including empty/undated/tied records.
         output.textContent = data.response.text;
         fallback.hidden = !['studio.firing.latest','studio.firing.openLatest'].includes(data.intent?.name);
         if (data.response.navigation) {
-          internalNavigation = fromVoice && handsFree;
-          try { followNavigation(data.response.navigation); } finally { internalNavigation = false; }
+          internalNavigation = true;
+          try { followNavigation(data.response.navigation); if (!fromVoice) input.value = ''; } finally { internalNavigation = false; }
         }
       }
     } catch (_) {
       if (active()) {
+        conversationToken = null;
         fallback.hidden = true;
         output.textContent = 'The assistant is unavailable. Try again or use the menu to open a feature.';
         retry.hidden = false;
       }
     } finally {
-      if (active()) { clearTimeout(requestTimer); pendingText = null; controller = null; form.setAttribute('aria-busy', 'false'); if (fromVoice && handsFree) voiceReply(output.textContent); }
+      if (epoch === generation && ownSerial === serial && ownSession === session && !abort.signal.aborted && available()) { clearTimeout(requestTimer); pendingText = null; controller = null; form.setAttribute('aria-busy', 'false'); if (fromVoice && handsFree) voiceReply(output.textContent); }
     }
   }
   function followNavigation(target) {
@@ -290,16 +297,17 @@
     const types = ['piece','clay','glaze','raw-material','test-tile','firing','pricing','sale','project','contact','event','all'];
     const keys = Object.keys(target).sort().join(',');
     if (target.kind === 'page' && keys === 'kind,page' && pages.includes(target.page)) {
-      navigate(target.page); return;
+      recordNavigation = false; navigate(target.page); return;
     }
-    if (target.kind === 'record' && keys === 'id,kind,type' && target.type === 'firing' &&
+    if (target.kind === 'record' && keys === 'id,kind,type' && ['firing','piece'].includes(target.type) &&
         typeof target.id === 'string' && target.id.length > 0 && target.id.length <= 200 && window.StudioSearch) {
-      void window.StudioSearch.open('firing',target.id); return;
+      recordNavigation = {type:target.type,id:target.id};
+      void window.StudioSearch.open(target.type,target.id); return;
     }
     if (target.kind === 'search' && keys === 'kind,query,type' && types.includes(target.type) &&
         typeof target.query === 'string' && target.query.trim().length >= 2 && target.query.length <= 120 &&
         !/[\x00-\x1f\x7f]/.test(target.query) && window.StudioSearch?.runQuery) {
-      window.StudioSearch.runQuery(target.query,target.type); return;
+      recordNavigation = false; window.StudioSearch.runQuery(target.query,target.type); return;
     }
     throw Error('Invalid navigation');
   }

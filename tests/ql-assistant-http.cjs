@@ -61,3 +61,23 @@ test('actual server refuses missing and expired auth',async()=>{
 test('actual server rejects cross-account arguments',async()=>{
  assert.equal((await ask(token,{...proof,input:{command:{name:'studio.firing.latest',arguments:{id:'b-firing'}}}})).status,400);
 });
+
+test('HTTP conversation selects an owned Piece then rereads canonical relationships',async()=>{
+ add('pieces',{id:'a-blue',user_id:'a',title:'Blue bowl'});
+ add('pieces',{id:'b-blue',user_id:'b',title:'Blue secret'});
+ add('glazes',{id:'a-ocean',user_id:'a',name:'Ocean'});
+ add('piece_glazes',{id:'a-layer',piece_id:'a-blue',glaze_id:'a-ocean'});
+ db.prepare("UPDATE firing_logs SET piece_id='a-blue' WHERE id='a-firing'").run();
+ const turn=(text,context={token:null},auth=token)=>ask(auth,{version:1,requestId:'ctx-http',input:{text},context});
+ let r=await turn('Open my pieces');assert.equal(r.status,200);
+ r=await turn('Show me the blue one',r.data.context);assert.equal(r.data.response.navigation.id,'a-blue');
+ const context=r.data.context;
+ const canonical=await fetch(base+'/api/pieces/a-blue',{headers:{Authorization:'Bearer '+token}}).then(r=>r.json());assert.equal(canonical.id,r.data.response.navigation.id);
+ r=await turn('What glaze did I use on that?',context);assert.deepEqual(r.data.result.glazes,['Ocean']);
+ r=await turn('When did I fire it?',r.data.context);assert.deepEqual(r.data.result.dates,['2026-10-01']);
+ assert.equal((await turn('When did I fire it?',context,foreignToken)).data.result.status,'clarification');
+ assert.equal((await turn('When did I fire it?',context,null)).status,401);
+ assert.equal((await turn('Delete it',context)).status,400);
+ db.prepare("DELETE FROM piece_glazes WHERE id='a-layer'").run();
+ assert.equal((await turn('What glaze did I use on that?',context)).data.result.status,'empty');
+});

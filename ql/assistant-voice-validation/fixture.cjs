@@ -12,7 +12,7 @@ const root = path.resolve(__dirname,'../..');
 let dir,server,db,base,token,foreignToken,secret;
 const pause = ms => new Promise(resolve => setTimeout(resolve,ms));
 const add = (table,values) => db.prepare(`INSERT INTO ${table} (${Object.keys(values).join(',')}) VALUES (${Object.keys(values).map(()=>'?').join(',')})`).run(...Object.values(values));
-async function start(core, web, voice) {
+async function start(core, web, voice, handsFree = '0') {
   dir = fs.mkdtempSync(path.join(os.tmpdir(),'ql-search-'));
   secret = crypto.randomBytes(32).toString('hex');
   for (const file of ['server.js','database.js','iap.js','directory-search.js','calendar-export.js','deletion-lifecycle.cjs']) fs.copyFileSync(path.join(root,file),path.join(dir,file));
@@ -21,7 +21,7 @@ async function start(core, web, voice) {
   for (const folder of ['node_modules','public']) fs.symlinkSync(path.join(root,folder),path.join(dir,folder),'dir');
   fs.writeFileSync(path.join(dir,'port.cjs'),"const net=require('net'),listen=net.Server.prototype.listen;net.Server.prototype.listen=function(...a){this.once('listening',()=>require('fs').writeFileSync('port',String(this.address().port)));return listen.apply(this,a)};");
   let log='';
-  server=spawn(process.execPath,['--require','./port.cjs','server.js'],{cwd:dir,env:{PATH:process.env.PATH,NODE_ENV:'test',QL_ASSISTANT_CORE_ENABLED:core,QL_ASSISTANT_WEB_ENABLED:web,QL_ASSISTANT_VOICE_WEB_ENABLED:voice,NODE_OPTIONS:'--require '+path.join(root,'ql/rehearsal/suite-isolate.cjs'),PORT:'0',JWT_SECRET:secret,ADMIN_API_KEY:crypto.randomBytes(32).toString('hex')},stdio:['ignore','pipe','pipe']});
+  server=spawn(process.execPath,['--require','./port.cjs','server.js'],{cwd:dir,env:{PATH:process.env.PATH,NODE_ENV:'test',QL_ASSISTANT_CORE_ENABLED:core,QL_ASSISTANT_WEB_ENABLED:web,QL_ASSISTANT_VOICE_WEB_ENABLED:voice,QL_ASSISTANT_HANDS_FREE_WEB_ENABLED:handsFree,NODE_OPTIONS:'--require '+path.join(root,'ql/rehearsal/suite-isolate.cjs'),PORT:'0',JWT_SECRET:secret,ADMIN_API_KEY:crypto.randomBytes(32).toString('hex')},stdio:['ignore','pipe','pipe']});
   server.stdout.on('data',chunk=>log+=chunk);server.stderr.on('data',chunk=>log+=chunk);
   for(let i=0;i<600;i++) {
     if(server.exitCode!==null) throw Error(log);

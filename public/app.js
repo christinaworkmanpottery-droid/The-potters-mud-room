@@ -576,7 +576,7 @@ let currentPage = 'dashboard';
 let restoredUrl = '';
 function navigate(page, options = {}) {
   if (page === 'qlAssistant' && !window.QLAssistant?.available()) return;
-  window.QLAssistant?.onNavigate(page);
+  window.QLAssistant?.onNavigate(page, options);
   window.StudioSearch?.onNavigate(page, options);
   if (page !== 'glazes') { clearGlazeMedia('glazeList'); clearGlazeMedia('glazeViewBody'); }
   if (page !== 'clayBodies') { clearClayMedia('clayList'); clearClayMedia('clayViewBody'); }

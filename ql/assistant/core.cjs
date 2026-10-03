@@ -1,5 +1,6 @@
 'use strict';
 const {DOMAINS, DESTINATIONS, validQuery, resolve} = require('./intents.cjs');
+const {createContextStore, followup, createConversationTools} = require('./conversation.cjs');
 const INTENT = 'studio.firing.latest';
 class AssistantError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }
@@ -12,7 +13,10 @@ function exact(value, keys) {
 function validateIntent(value) {
   if (!exact(value, ['name', 'arguments'])) fail(400, 'UNSUPPORTED_INTENT', 'Unsupported assistant intent.');
   const args = value.arguments;
-  const valid = ([INTENT, 'studio.firing.openLatest'].includes(value.name) && exact(args, [])) ||
+  const valid = (['studio.piece.glazes','studio.piece.firings','studio.piece.open'].includes(value.name) && exact(args, [])) ||
+    (value.name === 'studio.piece.choose' && exact(args,['index']) && Number.isInteger(args.index) && args.index >= 1 && args.index <= 5) ||
+    (value.name === 'studio.piece.refine' && exact(args,['query']) && validQuery(args.query)) ||
+    ([INTENT, 'studio.firing.openLatest'].includes(value.name) && exact(args, [])) ||
     (value.name === 'studio.navigate' && exact(args, ['destination']) && typeof args.destination === 'string' &&
       Object.hasOwn(DESTINATIONS,args.destination)) ||
     (value.name === 'studio.search' && exact(args, ['type','query']) && typeof args.type === 'string' &&
@@ -21,9 +25,12 @@ function validateIntent(value) {
   return {name:value.name, arguments:{...args}};
 }
 function validateRequest(value) {
-  if (!exact(value, ['version', 'requestId', 'input']) || value.version !== 1 ||
+  if (!(exact(value, ['version', 'requestId', 'input']) || exact(value, ['version', 'requestId', 'input', 'context'])) || value.version !== 1 ||
       typeof value.requestId !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(value.requestId))
     fail(400, 'INVALID_REQUEST', 'Invalid assistant request.');
+  if (Object.hasOwn(value,'context') && (!exact(value.context,['token']) ||
+      !(value.context.token === null || typeof value.context.token === 'string' && /^[a-f0-9]{48}$/.test(value.context.token))))
+    fail(400, 'INVALID_REQUEST', 'Invalid conversation reference.');
   const input = value.input;
   if (exact(input, ['command'])) validateIntent(input.command);
   else if (!exact(input, ['text']) || typeof input.text !== 'string' || !input.text.trim() || input.text.length > 200)
@@ -36,7 +43,7 @@ function validateRequest(value) {
 const deterministicProvider = Object.freeze({
   id: 'deterministic-v1',
   resolveIntent({text}) {
-    return resolve(text, fail);
+    return followup(text) || resolve(text, fail);
   }
 });
 function validDate(date) {
@@ -85,6 +92,9 @@ function formatResult(result) {
 function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) {
   if (typeof intentProvider?.resolveIntent !== 'function') throw new TypeError('Intent provider required');
   let searchService;
+  const contexts = createContextStore();
+  const search = options => { searchService ||= require('../studio-search.cjs').createStudioSearchService(db); return searchService.search(options); };
+  const conversation = createConversationTools(db,{search,validDate});
   return Object.freeze({
     // authorize is a server-owned callback, never a JSON field. Rechecked after await.
     async turn({request, authorize, signal}) {
@@ -95,8 +105,11 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
       if (signal?.aborted) fail(409, 'CANCELLED', 'Assistant request cancelled.');
       if (authorize() !== userId) fail(401, 'SESSION_CHANGED', 'Account session changed.');
       requireAccount(db, userId);
-      let result, response;
-      if (intent.name === INTENT || intent.name === 'studio.firing.openLatest') {
+      let result, response, nextState = {};
+      const context = request.context ? contexts.read(request.context.token,userId) : null;
+      if (intent.name.startsWith('studio.piece.')) {
+        ({result,response,state:nextState} = conversation.execute(intent,userId,context));
+      } else if (intent.name === INTENT || intent.name === 'studio.firing.openLatest') {
         result = latestRecordedFiring(db, userId, {name:INTENT,arguments:{}});
         response = formatResult(result);
         if (intent.name === 'studio.firing.openLatest' && result.status === 'found') {
@@ -112,9 +125,12 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
         const destination=intent.arguments.destination;
         const {page,label}=DESTINATIONS[destination];
         result={tool:intent.name,destination};
+        nextState = destination === 'piece' ? {scope:'piece'} : {};
         // Feature loaders and canonical record APIs retain their normal entitlement gates.
         response={text:'Opening '+label+'.',
           navigation:{kind:'page',page}};
+      } else if (request.context && intent.name === 'studio.search' && intent.arguments.type === 'piece') {
+        ({result,response,state:nextState} = conversation.matches(userId,intent.arguments.query));
       } else {
         searchService ||= require('../studio-search.cjs').createStudioSearchService(db);
         const {type,query}=intent.arguments;
@@ -123,7 +139,8 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
           result.results.length ? 'Opening your matching saved studio records.' : 'No matching saved records. Opening Studio Search.',
           navigation:{kind:'search',type,query}};
       }
-      return {version: 1, requestId, accountId: userId, intent, result, response};
+      return {version: 1, requestId, accountId: userId, intent, result, response,
+        ...(request.context ? {context:contexts.save(userId,nextState)} : {})};
     }
   });
 }

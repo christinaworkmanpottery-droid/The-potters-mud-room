@@ -54,7 +54,7 @@ const check=(name,fn)=>{fn();report.checks.push(name);console.log('PASS '+name)}
     c(change+' cancels engine and late transcript',()=>{assert.equal(engine.aborts,1);assert.equal(input.value,'');assert.equal(output.textContent,'');assert.equal(turns().length,prior)});
    }
    c('no chat-history writes or persisted transcripts',()=>{assert.deepEqual(w.localStorage.getItem('aiChatHistory'),chatBefore);assert.equal(w.sessionStorage.length,0);assert.ok(Object.keys(w.localStorage).every(k=>['mudlog_token','mudlog_visitor_key'].includes(k)));assert.doesNotMatch(JSON.stringify(w.localStorage),/last firing|Tell me a joke|private stale/);assert.ok(!storage.includes('firing'))});
-   c('assistant requests use only existing turn endpoint',()=>{assert.equal(requests.some(r=>r.path==='/api/ai/chat'),false);for(const r of turns())assert.deepEqual(Object.keys(JSON.parse(r.body)).sort(),['input','requestId','version'])});
+   c('assistant requests use only existing turn endpoint',()=>{assert.equal(requests.some(r=>r.path==='/api/ai/chat'),false);for(const r of turns())assert.deepEqual(Object.keys(JSON.parse(r.body)).sort(),['context','input','requestId','version'])});
   } finally{await pause(250);dom.window.close()}
  }
  report.passed=report.checks.length;

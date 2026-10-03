@@ -1,0 +1,20 @@
+name: QL Phase 4I conversation verification
+on:
+  push:
+    branches: [ql/phase-4i-conversation-context]
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Assistant, voice, actual HTTP and canonical search regressions
+        run: node --require ./ql/rehearsal/suite-isolate.cjs --test tests/ql-assistant*.cjs tests/ql-studio-search.cjs tests/ql-studio-search-dom.cjs tests/ql-studio-search-http.cjs
+      - name: Strict foundation gate
+        run: QL_READINESS_STRICT=1 node --require ./ql/rehearsal/suite-isolate.cjs --test tests/ql-readiness-blockers.cjs tests/ql-safety-migrations.cjs

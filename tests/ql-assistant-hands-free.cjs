@@ -135,3 +135,32 @@ test('prefixed Safari recognition supports consecutive turns',async t=>{const f=
 
 test('typing cancels pending voice navigation and preserves manual words',async t=>{const f=await fixture(t);start(f);f.engines[0].result('Open glazes');f.el('qlAssistantInput').value='manual edit';f.el('qlAssistantInput').dispatchEvent(new f.w.Event('input'));f.reply(0,'Opening',{response:{text:'Opening',navigation:{kind:'page',page:'glazes'}}});await tick();assert.equal(f.w.eval('currentPage'),'qlAssistant');assert.equal(f.el('qlAssistantInput').value,'manual edit');assert.equal(f.pending[0].options.signal.aborted,true);});
 test('tap-to-talk cannot overlap active session and Cancel ends it',async t=>{const f=await fixture(t);start(f);assert.equal(f.el('qlAssistantTalk').disabled,true);f.el('qlAssistantCancelVoice').click();assert.equal(state(f),'stopped');assert.equal(f.engines[0].aborts,1);});
+
+// Phase 4I: opaque context must survive only the intended conversation.
+test('hands-free follow-ups carry context across owned asynchronous Piece navigation',async t=>{
+ const f=await fixture(t);const key='a'.repeat(48);let opened;
+ f.w.StudioSearch={onNavigate(){},async open(type,id){opened={type,id};f.w.history.pushState({},'','#studioSearch/'+type+'/'+id);f.w.navigate('searchRecord',{fromHistory:true,searchDetail:true});await tick();f.w.navigate('pieceDetail',{fromHistory:true,searchDetail:true});}};
+ start(f);f.engines[0].result('Open my pieces');assert.deepEqual(f.pending[0].body.context,{token:null});
+ f.reply(0,'Opening pieces',{context:{token:key},response:{text:'Opening pieces',navigation:{kind:'page',page:'pieces'}}});await tick();restart(f);
+ f.engines[1].result('Show me the blue one');assert.equal(f.pending[1].body.context.token,key);
+ f.reply(1,'Showing Blue bowl',{context:{token:'b'.repeat(48)},response:{text:'Showing Blue bowl',navigation:{kind:'record',type:'piece',id:'blue'}}});await tick();await tick();assert.deepEqual(opened,{type:'piece',id:'blue'});restart(f);
+ f.engines[2].result('What glaze did I use on that?');assert.equal(f.pending[2].body.context.token,'b'.repeat(48));
+ f.reply(2,'Saved glaze: Ocean',{context:{token:'c'.repeat(48)}});await tick();restart(f);
+ f.engines[3].result('When did I fire it?');assert.equal(f.pending[3].body.context.token,'c'.repeat(48));
+ f.reply(3,'Saved date: 2026-10-01',{context:{token:'d'.repeat(48)}});await tick();restart(f);assert.equal(f.engines.length,5);
+});
+for(const action of ['end','hidden','manual','foreign-record','unsupported'])test('context clears after '+action,async t=>{
+ const f=await fixture(t);start(f);f.engines[0].result('Find blue pieces');
+ f.reply(0,'Selected',{context:{token:'a'.repeat(48)}});await tick();
+ if(action==='end'){f.el('qlAssistantSessionStop').click();start(f);}
+ if(action==='hidden'){Object.defineProperty(f.w.document,'hidden',{value:true,configurable:true});f.w.document.dispatchEvent(new f.w.Event('visibilitychange'));Object.defineProperty(f.w.document,'hidden',{value:false});start(f);}
+ if(action==='manual'){f.w.navigate('glazes');restart(f);}
+ if(action==='foreign-record'){f.w.history.pushState({},'','#studioSearch/piece/another');f.w.navigate('searchRecord',{fromHistory:true,searchDetail:true});restart(f);}
+ if(action==='unsupported'){restart(f);f.engines.at(-1).result('Delete it');f.pending.at(-1).resolve({ok:false,status:400,json:async()=>({code:'ACTION_NOT_AVAILABLE'})});await tick();restart(f);}
+ f.engines.at(-1).result('When did I fire it?');assert.equal(f.pending.at(-1).body.context.token,null);
+});
+test('invalid or late response cannot replace conversation context',async t=>{
+ const f=await fixture(t);start(f);f.engines[0].result('Open pieces');
+ f.reply(0,'secret',{context:{token:'not-a-token'}});await tick();assert.doesNotMatch(f.el('qlAssistantResponse').textContent,/secret/);restart(f);
+ f.engines[1].result('Open pieces');f.el('qlAssistantSessionStop').click();f.reply(1,'late',{context:{token:'a'.repeat(48)}});await tick();start(f);f.engines[2].result('When did I fire it?');assert.equal(f.pending[2].body.context.token,null);
+});

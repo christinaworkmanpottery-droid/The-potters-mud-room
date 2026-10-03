@@ -53,7 +53,7 @@ function resolve(text, fail) {
   if (/^(?:open|show(?: me)?)(?: my| the)? (?:last|latest) firing$/.test(n)) return command('studio.firing.openLatest');
   if (/^(?:add|create|edit|update|change|delete|remove|save|send|buy|purchase|record|log|publish)\b/.test(n))
     fail(400,'ACTION_NOT_AVAILABLE','Studio changes are not available through this assistant yet. No changes were made. Use the existing forms.');
-  const nav = n.match(/^(?:open|show(?: me)?|go to|take me to)(?: my| the)? (.+)$/);
+  const nav = n.match(/^(?:open|show(?: me)?|go (?:back )?to|take me to)(?: my| the)? (.+)$/);
   if (nav) {
     const type=navigationAliases.find(([alias])=>alias===nav[1])?.[1];
     if (type) return command('studio.navigate',{destination:type});

@@ -39,8 +39,8 @@ test('flag OFF has no entry, page, or turn request even with direct navigation',
 test('missing/failed config fails closed',async t=>{const f=await fixture(t,new Error('offline'));assert.equal(f.el('qlAssistantEntry'),null);});
 test('non-boolean enabled fails closed',async t=>{const f=await fixture(t,{enabled:'true'});assert.equal(f.el('qlAssistantEntry'),null);});
 test('flag ON shows clearly marked separate entry and compact form',async t=>{const f=await fixture(t);assert.equal(f.el('qlAssistantEntry').hidden,false);assert.match(f.el('qlAssistantEntry').textContent,/QL.*testing/);assert.equal(f.el('qlAssistantInput').maxLength,200);});
-test('supported question sends exact 4B contract and renders only factual response',async t=>{
- const f=await fixture(t);f.send();assert.deepEqual(f.pending[0].body,{version:1,requestId:'web-1',input:{text:'When was my last firing?'}});
+test('supported question sends version 1 contract with bounded context reference and renders only factual response',async t=>{
+ const f=await fixture(t);f.send();assert.deepEqual(f.pending[0].body,{version:1,requestId:'web-1',input:{text:'When was my last firing?'},context:{token:null}});
  f.reply(0,undefined,{result:{secret:'hidden evidence'}});await tick();assert.equal(f.el('qlAssistantResponse').textContent,'Your latest recorded firing date is 2026-10-01.');assert.doesNotMatch(f.el('pageQLAssistant').textContent,/hidden evidence/);
 });
 for(const [name,text] of [['no-firing','No recorded firing was found.'],['undated','Your firing records have no valid saved firing date, so I cannot determine the latest.'],['tied records','Your latest recorded firing date is 2026-10-01. 2 firing records share that date.']]) test(name+' preserves core wording',async t=>{const f=await fixture(t);f.send();f.reply(0,text);await tick();assert.equal(f.el('qlAssistantResponse').textContent,text);});
@@ -126,4 +126,11 @@ test('firing shortcut clears on logout and navigation',async t=>{
  const f=await fixture(t);f.send();f.reply();await tick();assert.equal(f.el('qlAssistantFiringFallback').hidden,false);
  f.w.navigate('pieces');assert.equal(f.el('qlAssistantFiringFallback').hidden,true);
  f.w.navigate('qlAssistant');f.send();f.reply(1);await tick();f.w.logout();assert.equal(f.el('qlAssistantFiringFallback').hidden,true);
+});
+
+test('typed follow-ups use the same ephemeral context and clear on manual departure',async t=>{
+ const f=await fixture(t);f.send('Open pieces');f.reply(0,'Opening pieces',{context:{token:'a'.repeat(48)},response:{text:'Opening pieces',navigation:{kind:'page',page:'pieces'}}});await tick();
+ f.w.navigate('qlAssistant');f.send('Show me the blue one');assert.equal(f.pending[1].body.context.token,'a'.repeat(48));
+ f.reply(1,'Choose a piece',{context:{token:'b'.repeat(48)}});await tick();f.send('The first one');assert.equal(f.pending[2].body.context.token,'b'.repeat(48));
+ f.reply(2,'Selected',{context:{token:'c'.repeat(48)}});await tick();f.w.navigate('glazes');f.w.navigate('qlAssistant');f.send('When did I fire it?');assert.equal(f.pending[3].body.context.token,null);
 });
