@@ -32,11 +32,20 @@ test('full website + actual HTTP + SQLite: hands-free Piece conversation and man
   assert.match(await say('When did I fire it?'),/2026-10-01/);
   await say('Go back to my glazes');assert.equal(w.eval('currentPage'),'glazes');
   assert.match(await say('When did I fire it?'),/Which Piece/);
-  assert.match(await say('Add a studio note that I want to try this combination again'),/No changes were made/);
+  assert.match(await say('Add a studio note that I want to try this combination again'),/Nothing has been saved/);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,0);
+  assert.match(await say('Save note'),/Saved your Studio Note/);assert.equal(w.eval('currentPage'),'studioNotes');
+  await until(()=>el('studioNotesList').textContent.includes('I want to try this combination again'));
+  assert.match(await say('Yes'),/no pending question/i);
+  assert.match(await say('Add a studio note that discard this'),/Draft studio note/);
+  assert.match(await say('Cancel'),/Nothing was saved/);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,1);
+  await say('Add a studio note that Stop should discard this');
   engines.at(-1).result('Stop listening');await until(()=>el('qlAssistantSession').dataset.state==='stopped');
-  assert.equal(requests.filter(r=>r.url==='/api/ql/assistant/turn').length,9);
+  assert.equal(requests.filter(r=>r.url==='/api/ql/assistant/turn').length,14);
   assert.ok(requests.some(r=>r.url==='/api/pieces/blue'));assert.ok(requests.some(r=>r.url==='/api/ql/pieces/blue/history'));
   assert.equal(requests.some(r=>r.url==='/api/ai/chat'),false);
-  w.navigate('qlAssistant');el('qlAssistantInput').value='When did I fire it?';el('qlAssistantForm').requestSubmit();await until(()=>el('qlAssistantForm').getAttribute('aria-busy')==='false');assert.match(el('qlAssistantResponse').textContent,/Which Piece/);
+  w.navigate('qlAssistant');el('qlAssistantInput').value='Save note';el('qlAssistantForm').requestSubmit();await until(()=>el('qlAssistantForm').getAttribute('aria-busy')==='false');assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,1);
+  el('qlAssistantInput').value='When did I fire it?';el('qlAssistantForm').requestSubmit();await until(()=>el('qlAssistantForm').getAttribute('aria-busy')==='false');assert.match(el('qlAssistantResponse').textContent,/Which Piece/);
  } finally {await pause(50);dom?.window.close();await fixture.stop();}
 });

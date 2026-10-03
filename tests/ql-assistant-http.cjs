@@ -81,3 +81,16 @@ test('HTTP conversation selects an owned Piece then rereads canonical relationsh
  db.prepare("DELETE FROM piece_glazes WHERE id='a-layer'").run();
  assert.equal((await turn('What glaze did I use on that?',context)).data.result.status,'empty');
 });
+
+test('confirmed assistant note is the canonical manual API record; canceled drafts never appear',async()=>{
+ const turn=async(text,context={token:null},auth=token)=>(await ask(auth,{version:1,requestId:'notes-http',input:{text},context})).data;
+ const draft=await turn('Add a studio note that HTTP saved exact words');assert.equal(draft.result.status,'draft');
+ const saved=await turn('Yes',draft.context);assert.equal(saved.result.status,'saved');
+ const headers={Authorization:'Bearer '+token};
+ const row=await fetch(base+'/api/studio/notes/'+saved.result.noteId,{headers}).then(r=>r.json());assert.equal(row.body,'HTTP saved exact words');
+ assert.equal((await fetch(base+'/api/studio/notes/'+row.id,{headers:{Authorization:'Bearer '+foreignToken}})).status,404);
+ const updated=await fetch(base+'/api/studio/notes/'+row.id,{method:'PUT',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({title:'Manual title',body:'Manual edit'})}).then(r=>r.json());assert.equal(updated.body,'Manual edit');
+ const manual=await fetch(base+'/api/studio/notes',{method:'POST',headers:{...headers,'Content-Type':'application/json'},body:JSON.stringify({title:'Existing form',body:'Manual create'})}).then(r=>r.json());assert.equal(manual.title,'Existing form');assert.equal(manual.body,'Manual create');
+ const cancel=await turn('Add a studio note that Should not exist');await turn('Cancel',cancel.context);
+ const rows=await fetch(base+'/api/studio/notes',{headers}).then(r=>r.json());assert.equal(rows.some(r=>r.body==='Should not exist'),false);
+});

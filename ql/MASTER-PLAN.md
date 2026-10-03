@@ -70,3 +70,12 @@ Each chunk: build → test/verify → commit and push → concise checkpoint →
 - Earlier shopping-list/deletion and other device issues must be checked against current source and device evidence before marking complete.
 
 No new ideas added or features implemented in Phase 0.
+
+## October 2 Phase 4 execution checkpoint
+
+The September 30 table above is historical. Phase 4B–4H and the bounded Phase 4I
+conversation work were subsequently implemented on isolated branches. Christina
+accepted 4I.4 on real iPhone Safari (a12f6087f0c1a1f6be221deb567ae51c25c01f3d).
+Next authorized slice: **4J — confirmed Studio Note creation**, detailed in
+`assistant-notes/README.md`. Production release remains separately authorized;
+no reopening accepted phases and no claim that broader roadmap work is complete.

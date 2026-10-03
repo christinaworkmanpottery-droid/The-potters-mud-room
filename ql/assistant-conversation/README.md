@@ -111,3 +111,10 @@ arbitrary natural language, visual color understanding, general cross-domain
 conversation, persistent memory, writes, wake words, background or native voice.
 After Christina's focused acceptance, choose the next small roadmap slice from
 this checkpoint; do not reopen accepted 4B–4H or roll into a large write-agent build.
+
+## October 2 acceptance
+
+Christina confirmed “It works” on real iPhone Safari after 4I.4 at
+`a12f6087f0c1a1f6be221deb567ae51c25c01f3d`. The tested Phase 4I slice is accepted
+and closed. Historical repair notes retain their pre-acceptance status for context.
+Authorized next slice: 4J, see `../assistant-notes/README.md`.

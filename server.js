@@ -7404,9 +7404,7 @@ app.get('/api/studio/notes/:id', auth, (req, res) => {
 app.post('/api/studio/notes', auth, (req, res) => {
   const { title, body } = req.body;
   if (!body || !body.trim()) return res.status(400).json({ error: 'Body is required' });
-  const id = uuidv4();
-  db.prepare('INSERT INTO studio_notes (id, user_id, title, body) VALUES (?, ?, ?, ?)').run(id, req.userId, title || null, body);
-  const created = db.prepare('SELECT * FROM studio_notes WHERE id=?').get(id);
+  const created = require('./ql/studio-notes.cjs').createStudioNote(db,{userId:req.userId,title,body});
   res.json(created);
 });
 

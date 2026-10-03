@@ -1,6 +1,7 @@
 'use strict';
 const {DOMAINS, DESTINATIONS, validQuery, resolve} = require('./intents.cjs');
 const {createContextStore, followup, createConversationTools} = require('./conversation.cjs');
+const {noteBody,confirmation,cancellation,createNoteDrafts}=require('./notes.cjs');
 const INTENT = 'studio.firing.latest';
 class AssistantError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }
@@ -13,7 +14,8 @@ function exact(value, keys) {
 function validateIntent(value) {
   if (!exact(value, ['name', 'arguments'])) fail(400, 'UNSUPPORTED_INTENT', 'Unsupported assistant intent.');
   const args = value.arguments;
-  const valid = (['studio.piece.glazes','studio.piece.firings','studio.piece.open','studio.piece.clarifyGlazes','studio.piece.repeatName'].includes(value.name) && exact(args, [])) ||
+  const valid = (value.name === 'studio.note.draft' && exact(args,['body']) && typeof args.body==='string' && args.body.trim().length>0 && args.body.length<=200 && !/[\x00-\x1f\x7f]/.test(args.body)) ||
+    (['studio.note.confirm','studio.note.cancel'].includes(value.name) && exact(args,[])) || (['studio.piece.glazes','studio.piece.firings','studio.piece.open','studio.piece.clarifyGlazes','studio.piece.repeatName'].includes(value.name) && exact(args, [])) ||
     (value.name === 'studio.piece.choose' && exact(args,['index']) && Number.isInteger(args.index) && args.index >= 1 && args.index <= 5) ||
     (value.name === 'studio.piece.confirmRead' && exact(args,['confirmed']) && typeof args.confirmed === 'boolean') ||
     (['studio.piece.namedGlazes','studio.piece.clarifyOpen'].includes(value.name) && exact(args,['query']) && validQuery(args.query)) ||
@@ -45,6 +47,10 @@ function validateRequest(value) {
 const deterministicProvider = Object.freeze({
   id: 'deterministic-v1',
   resolveIntent({text}) {
+    const body=noteBody(text);
+    if(body) return {name:'studio.note.draft',arguments:{body}};
+    if(confirmation(text)) return {name:'studio.note.confirm',arguments:{}};
+    if(cancellation(text)) return {name:'studio.note.cancel',arguments:{}};
     return followup(text) || resolve(text, fail);
   }
 });
@@ -95,6 +101,7 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
   if (typeof intentProvider?.resolveIntent !== 'function') throw new TypeError('Intent provider required');
   let searchService;
   const contexts = createContextStore();
+  const notes = createNoteDrafts(db);
   const search = options => { searchService ||= require('../studio-search.cjs').createStudioSearchService(db); return searchService.search(options); };
   const conversation = createConversationTools(db,{search,validDate});
   return Object.freeze({
@@ -107,6 +114,7 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
       let proposed;
       try { proposed = input.command || await intentProvider.resolveIntent({text: input.text}, {signal}); }
       catch (error) {
+        notes.clear(userId);
         if (error.code !== 'UNSUPPORTED_INTENT' || context?.scope !== 'piece' ||
             !/^(?:please )?(?:open|show(?: me)?) /i.test(input.text || '')) throw error;
         proposed = {name:'studio.piece.repeatName',arguments:{}};
@@ -116,7 +124,15 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
       if (authorize() !== userId) fail(401, 'SESSION_CHANGED', 'Account session changed.');
       requireAccount(db, userId);
       let result, response, nextState = {};
-      if (intent.name.startsWith('studio.piece.')) {
+      if (intent.name === 'studio.note.draft') {
+        if (!request.context || noteBody(input.text)!==intent.arguments.body) fail(400,'INVALID_REQUEST','A note draft requires your exact dictated text and an active conversation.');
+        ({result,response,state:nextState}=notes.draft(userId,intent.arguments.body));
+      } else if (['studio.note.confirm','studio.note.cancel'].includes(intent.name)) {
+        const save=intent.name==='studio.note.confirm';
+        if (!(save?confirmation(input.text):cancellation(input.text))) fail(400,'INVALID_REQUEST','Please explicitly confirm or cancel the note.');
+        if(context?.noteDraftId || /^(?:save|confirm|cancel) (?:the )?note[.!]?$/i.test(input.text.trim())) ({result,response,state:nextState}=notes.confirm(userId,context,save));
+        else ({result,response,state:nextState}=conversation.execute({name:'studio.piece.confirmRead',arguments:{confirmed:save}},userId,context));
+      } else if (intent.name.startsWith('studio.piece.')) {
         ({result,response,state:nextState} = conversation.execute(intent,userId,context));
       } else if (intent.name === INTENT || intent.name === 'studio.firing.openLatest') {
         result = latestRecordedFiring(db, userId, {name:INTENT,arguments:{}});
@@ -148,6 +164,7 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
           result.results.length ? 'Opening your matching saved studio records.' : 'No matching saved records. Opening Studio Search.',
           navigation:{kind:'search',type,query}};
       }
+      if (!intent.name.startsWith('studio.note.')) notes.clear(userId);
       return {version: 1, requestId, accountId: userId, intent, result, response,
         ...(request.context ? {context:contexts.save(userId,nextState)} : {})};
     }

@@ -52,7 +52,7 @@ function resolve(text, fail) {
   if (['when was my last firing','when was my latest firing','latest recorded firing','last firing'].includes(n)) return command('studio.firing.latest');
   if (/^(?:open|show(?: me)?)(?: my| the)? (?:last|latest) firing$/.test(n)) return command('studio.firing.openLatest');
   if (/^(?:add|create|edit|update|change|delete|remove|save|send|buy|purchase|record|log|publish)\b/.test(n))
-    fail(400,'ACTION_NOT_AVAILABLE','Studio changes are not available through this assistant yet. No changes were made. Use the existing forms.');
+    fail(400,'ACTION_NOT_AVAILABLE','That studio change is not available through this assistant yet. No changes were made. Use the existing forms.');
   const nav = n.match(/^(?:open|show(?: me)?|go (?:back )?to|take me to)(?: my| the)? (.+)$/);
   if (nav) {
     const type=navigationAliases.find(([alias])=>alias===nav[1])?.[1];

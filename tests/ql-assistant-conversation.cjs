@@ -88,7 +88,7 @@ test('new intents cannot supply IDs, owner, arbitrary fields or writes',()=>{
 });
 test('writes remain unavailable and context is not a write authorization',async()=>{
  const before=db.prepare('SELECT * FROM pieces ORDER BY id').all();const r=await ask('Find blue pieces');
- for(const text of ['Add a studio note that I want to try this combination again','Delete it','Save that'])await assert.rejects(ask(text,r.context),e=>e.code==='ACTION_NOT_AVAILABLE');
+ for(const text of ['Edit a studio note','Delete it','Save that'])await assert.rejects(ask(text,r.context),e=>e.code==='ACTION_NOT_AVAILABLE');
  assert.deepEqual(db.prepare('SELECT * FROM pieces ORDER BY id').all(),before);
 });
 test('injected provider uses same bounded references with no history or data exposure',async()=>{
@@ -195,4 +195,63 @@ test('joined speech and unknown piece navigation recover without guessing',async
   const nav=await ask('Open my glazes',r.context);assert.equal(nav.response.navigation.page,'glazes');
   await assert.rejects(ask('Delete blue vase',r.context),{code:'ACTION_NOT_AVAILABLE'});
  }finally{db.prepare("DELETE FROM pieces WHERE id='joined-vase'").run();}
+});
+
+test('Studio Note draft preserves exact words; explicit confirmation saves once',async()=>{
+ const before=db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n;
+ const text='I want to try this combination again.';
+ const draft=await ask('Add a studio note that '+text);assert.equal(draft.result.status,'draft');assert.match(draft.response.text,/Nothing has been saved/);assert.equal(draft.response.navigation,undefined);
+ assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,before);
+ const results=await Promise.all([ask('Save note',draft.context),ask('Save note',draft.context)]);
+ assert.equal(results.filter(r=>r.result.status==='saved').length,1);
+ const saved=results.find(r=>r.result.status==='saved');assert.equal(saved.response.navigation.page,'studioNotes');
+ const row=db.prepare('SELECT * FROM studio_notes WHERE id=?').get(saved.result.noteId);assert.equal(row.body,text);assert.equal(row.user_id,'a');assert.equal(row.title,null);
+ assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,before+1);
+ assert.notEqual((await ask('Yes',saved.context)).result.status,'saved');
+});
+test('Studio Note cancellation, replacement, navigation and foreign contexts cannot save stale drafts',async()=>{
+ const count=()=>db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n;const before=count();
+ let draft=await ask('Create a studio note: Canceled test');
+ assert.equal((await ask('Cancel',draft.context)).result.status,'canceled');assert.notEqual((await ask('Save note',draft.context)).result.status,'saved');
+ draft=await ask('Add a studio note that old words');const replacement=await ask('Add a studio note that replacement words',draft.context);
+ assert.notEqual((await ask('Save note',draft.context)).result.status,'saved');assert.equal((await ask('No',replacement.context)).result.status,'canceled');
+ draft=await ask('Add a studio note that private words');const foreign=await ask('Save note',draft.context,'b');assert.doesNotMatch(JSON.stringify(foreign),/private words/);assert.notEqual(foreign.result.status,'saved');
+ await ask('Open my glazes',draft.context);assert.notEqual((await ask('Save note',draft.context)).result.status,'saved');assert.equal(count(),before);
+});
+test('Studio Note save failures never claim success and cannot replay',async()=>{
+ const draft=await ask('Add a studio note that Failure test');
+ db.exec("CREATE TRIGGER reject_note BEFORE INSERT ON studio_notes BEGIN SELECT RAISE(ABORT,'test failure'); END");
+ try{const r=await ask('Save note',draft.context);assert.equal(r.result.status,'failed');assert.equal(r.response.navigation,undefined);assert.match(r.response.text,/could not be saved/);}
+ finally{db.exec('DROP TRIGGER reject_note');}
+ assert.notEqual((await ask('Save note',draft.context)).result.status,'saved');
+});
+test('Studio Note provider cannot invent body or confirmation, and context is required',async()=>{
+ const forged=createAssistantCore(db,{intentProvider:{resolveIntent:()=>({name:'studio.note.draft',arguments:{body:'Invented body'}})}});
+ await assert.rejects(ask('Add a studio note that actual words',{token:null},'a',forged),{code:'INVALID_REQUEST'});
+ const confirming=createAssistantCore(db,{intentProvider:{resolveIntent:()=>({name:'studio.note.confirm',arguments:{}})}});
+ await assert.rejects(ask('What glaze is on it?',{token:null},'a',confirming),{code:'INVALID_REQUEST'});
+ await assert.rejects(core.turn({authorize:()=> 'a',request:{version:1,requestId:'noctx',input:{text:'Add a studio note that test'}}}),{code:'INVALID_REQUEST'});
+ assert.throws(()=>validateIntent({name:'studio.note.confirm',arguments:{body:'injected'}}));
+});
+test('Studio Note pending drafts expire and are bounded',()=>{
+ let now=0;const drafts=require('../ql/assistant/notes.cjs').createNoteDrafts(db,{now:()=>now,ttl:10,max:1});
+ const a=drafts.draft('a','A');drafts.draft('b','B');assert.equal(drafts.confirm('a',a.state,true).result.status,'clarification');
+ const b=drafts.draft('b','B');now=11;assert.equal(drafts.confirm('b',b.state,true).result.status,'clarification');
+});
+test('note confirmation rechecks auth, aborts and error invalidation before any write',async()=>{
+ const before=db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n;
+ let draft=await ask('Add a studio note that Never save after auth change');let authCalls=0;
+ await assert.rejects(core.turn({authorize:()=>++authCalls===1?'a':'b',request:{version:1,requestId:'auth-change',input:{text:'Save note'},context:draft.context}}),{code:'SESSION_CHANGED'});
+ const abort=new AbortController();abort.abort();
+ await assert.rejects(core.turn({authorize:()=> 'a',signal:abort.signal,request:{version:1,requestId:'abort-note',input:{text:'Save note'},context:draft.context}}),{code:'CANCELLED'});
+ await assert.rejects(ask('Delete it',draft.context),{code:'ACTION_NOT_AVAILABLE'});
+ assert.notEqual((await ask('Save note',draft.context)).result.status,'saved');
+ draft=await ask('Add a studio note that Restart discards this');
+ assert.notEqual((await ask('Save note',draft.context,'a',createAssistantCore(db))).result.status,'saved');
+ await ask('Cancel',draft.context);
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n,before);
+});
+test('save note cannot accidentally confirm a pending Piece clarification',async()=>{
+ const piece=await ask('Open blue bowl');const clarification=await ask('What way is on blue phase',piece.context);
+ const r=await ask('Save note',clarification.context);assert.equal(r.result.status,'clarification');assert.equal(r.response.navigation,undefined);assert.match(r.response.text,/no current Studio Note draft/);
 });

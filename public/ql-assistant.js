@@ -1,7 +1,7 @@
 /* Bounded QL proof. Speech is transient input to the same typed turn path. */
 (() => {
   'use strict';
-  const displayName = 'QL assistant — testing 4I.4';
+  const displayName = 'QL assistant — testing 4J';
   const identity = () => JSON.stringify([token, currentUser?.id, localStorage.getItem('mudlog_token')]);
   let conversationToken = null, recordNavigation = false;
   let session = identity(), invalidSession = null, generation = 0, serial = 0;
@@ -266,7 +266,7 @@
       } else if (response.status === 400 && data.code === 'DESTINATION_UNAVAILABLE') {
         output.textContent = 'Kiln Share is not available in this website build. No page was opened.';
       } else if (response.status === 400 && data.code === 'ACTION_NOT_AVAILABLE') {
-        output.textContent = 'Studio changes are not available through this assistant yet. No changes were made. Use the existing forms.';
+        output.textContent = 'That studio change is not available through this assistant yet. No changes were made. Use the existing forms.';
       } else {
         if (!response.ok || data.version !== 1 || data.requestId !== requestId ||
             data.accountId !== account || typeof data.response?.text !== 'string') throw Error('Unavailable');
@@ -351,7 +351,7 @@
     }
     if (handsFreeEnabled) {
       dock = node('aside'); dock.id = 'qlAssistantSession'; dock.setAttribute('aria-label', 'Voice session controls');
-      const note = node('p', 'Conversation test 4I.4. Wait for Microphone ready. Say “stop listening” to end. Keep Safari visible.');
+      const note = node('p', 'Conversation test 4J. Wait for Microphone ready. Say “stop listening” to end. Keep Safari visible.');
       sessionStart = node('button', 'Start voice session'); sessionStart.id = 'qlAssistantSessionStart';
       sessionStop = node('button', 'End session'); sessionStop.id = 'qlAssistantSessionStop';
       for (const b of [sessionStart, sessionStop]) { b.type = 'button'; b.className = 'btn btn-secondary'; }
