@@ -1,16 +1,16 @@
 /* Bounded QL proof. Speech is transient input to the same typed turn path. */
 (() => {
   'use strict';
-  const displayName = 'QL assistant — testing 4J.1';
+  const displayName = 'QL assistant — testing 4J.2';
   const identity = () => JSON.stringify([token, currentUser?.id, localStorage.getItem('mudlog_token')]);
-  let conversationToken = null, recordNavigation = false;
+  let conversationToken = null, recordNavigation = false, noteDictation = false;
   let session = identity(), invalidSession = null, generation = 0, serial = 0;
   let controller, pendingText = null, enabled = false, entered = false;
   let page, entry, input, form, send, retry, output, fallback;
   let voiceEnabled = false, recognition = null, voiceTimer, stopTimer;
   let talk, stop, cancel, voiceStatus;
   let handsFreeEnabled = false, handsFree = false, sessionTimer, restartTimer, speechTimer, requestTimer;
-  let dock, dockStatus, dockCommand, dockReply, sessionStart, sessionStop, spokenReplies, utterance;
+  let dock, dockStatus, dockCommand, dockReply, sessionStart, sessionStop, spokenReplies, utterance, notePreview, notePreviewText;
   let emptyAttempts = 0, voiceEpoch = 0, internalNavigation = false;
   const inVoiceContext = () => entered && (currentPage === 'qlAssistant' || handsFree);
   function sessionState(state, message) {
@@ -21,7 +21,8 @@
     sessionStop.hidden = !handsFree;
   }
   function endSession(message = 'Stopped — tap Start voice session to resume.', state = 'stopped') {
-    handsFree = false; voiceEpoch++; conversationToken = null; recordNavigation = false;
+    handsFree = false; voiceEpoch++; conversationToken = null; noteDictation = false; recordNavigation = false;
+    if(notePreview){notePreview.hidden=true;notePreviewText.textContent='';}
     clearTimeout(restartTimer); clearTimeout(sessionTimer); clearTimeout(speechTimer); clearTimeout(requestTimer);
     if (utterance) { utterance.onend = utterance.onerror = utterance.onstart = null; utterance = null; window.speechSynthesis?.cancel(); }
     cancelVoice();
@@ -141,10 +142,14 @@
         }
         // Interim words are a draft only: they must never trigger navigation/actions.
         turn.draft = text;
+        if(noteDictation && notePreview && !/^(?:save(?: note)?|confirm(?: note)?|yes|no|cancel|stop listening)[.!?]?$/i.test(text)){notePreview.hidden=false;notePreviewText.textContent=text;}
         if (results.length && results.every(r => r.isFinal === true)) {
           turn.finalText = text;
-          stopVoice(); // Wait for the engine to disconnect before enabling another attempt.
-        } else voiceState('Hearing: ' + text);
+          // Note dictation may emit several finalized chunks. Let the browser end
+          // naturally so we do not cut it off at the first finalized phrase.
+          if (noteDictation && !/^(stop listening|pause voice|end voice session|stop voice session)[.!?]?$/i.test(text)) voiceState('Hearing: ' + text);
+          else stopVoice();
+        } else { turn.finalText = ''; voiceState('Hearing: ' + text); }
       };
       engine.onerror = event => {
         if (!active()) return;
@@ -220,7 +225,7 @@
     syncSession();
     if (internalNavigation || recordNavigation && options.searchDetail === true && location.hash === '#studioSearch/'+recordNavigation.type+'/'+encodeURIComponent(recordNavigation.id)) return;
     recordNavigation = false;
-    if (handsFree && !pendingText) { conversationToken = null; return; }
+    if (handsFree && !pendingText) { conversationToken = null; noteDictation = false; if(notePreview){notePreview.hidden=true;notePreviewText.textContent='';} return; }
     if (destination !== 'qlAssistant') { entered = false; invalidate(); }
   }
   function enter() {
@@ -260,7 +265,7 @@
       if (response.status === 401) { sessionInvalid(); return; }
       const data = await response.json();
       if (!active()) return;
-      if (response.status === 400) conversationToken = null;
+      if (response.status === 400) { conversationToken = null; noteDictation = false; if(notePreview){notePreview.hidden=true;notePreviewText.textContent='';} }
       if (response.status === 400 && data.code === 'UNSUPPORTED_INTENT') {
         output.textContent = 'That question isn’t supported in this test version yet.';
       } else if (response.status === 400 && data.code === 'DESTINATION_UNAVAILABLE') {
@@ -272,6 +277,12 @@
             data.accountId !== account || typeof data.response?.text !== 'string') throw Error('Unavailable');
         if (data.context !== undefined && (typeof data.context?.token !== 'string' || !/^[a-f0-9]{48}$/.test(data.context.token) || Object.keys(data.context).length !== 1)) throw Error('Invalid context');
         conversationToken = data.context?.token || null;
+        noteDictation = data.result?.tool === 'studio.note' && ['collecting','draft','incomplete'].includes(data.result.status);
+        if(notePreview){
+          notePreview.hidden=!noteDictation;
+          if(!noteDictation || data.result.status==='collecting')notePreviewText.textContent='';
+          else if(typeof data.result.draftText==='string' && data.result.draftText.length<=200)notePreviewText.textContent=data.result.draftText;
+        }
         // The core owns all facts and wording, including empty/undated/tied records.
         output.textContent = data.response.text;
         fallback.hidden = !['studio.firing.latest','studio.firing.openLatest'].includes(data.intent?.name);
@@ -282,7 +293,8 @@
       }
     } catch (_) {
       if (active()) {
-        conversationToken = null;
+        conversationToken = null; noteDictation = false;
+        if(notePreview){notePreview.hidden=true;notePreviewText.textContent='';}
         fallback.hidden = true;
         output.textContent = 'The assistant is unavailable. Try again or use the menu to open a feature.';
         retry.hidden = false;
@@ -351,7 +363,7 @@
     }
     if (handsFreeEnabled) {
       dock = node('aside'); dock.id = 'qlAssistantSession'; dock.setAttribute('aria-label', 'Voice session controls');
-      const note = node('p', 'Conversation test 4J.1. Wait for Microphone ready. Say “stop listening” to end. Keep Safari visible.');
+      const note = node('p', 'Conversation test 4J.2. Wait for Microphone ready. Say “stop listening” to end. Keep Safari visible.');
       sessionStart = node('button', 'Start voice session'); sessionStart.id = 'qlAssistantSessionStart';
       sessionStop = node('button', 'End session'); sessionStop.id = 'qlAssistantSessionStop';
       for (const b of [sessionStart, sessionStop]) { b.type = 'button'; b.className = 'btn btn-secondary'; }
@@ -364,7 +376,11 @@
       dockStatus = node('p'); dockStatus.id = 'qlAssistantSessionStatus'; dockStatus.setAttribute('role', 'status');
       dockCommand = node('p'); dockCommand.id = 'qlAssistantSessionCommand';
       dockReply = node('p'); dockReply.id = 'qlAssistantSessionReply'; dockReply.setAttribute('role', 'status'); dockReply.setAttribute('aria-live', 'polite');
-      dock.append(note, dockReply, dockCommand, dockStatus, sessionStart, sessionStop, spokenLabel); document.body.append(dock);
+      notePreview=node('section');notePreview.id='qlAssistantNotePreview';notePreview.hidden=true;
+      const previewLabel=node('strong','Live note draft — not saved');
+      notePreviewText=node('p');notePreviewText.id='qlAssistantNotePreviewText';notePreviewText.style.whiteSpace='pre-wrap';
+      notePreview.append(previewLabel,notePreviewText);
+      dock.append(notePreview, note, dockReply, dockCommand, dockStatus, sessionStart, sessionStop, spokenLabel); document.body.append(dock);
       const css = node('style'); css.textContent = '#qlAssistantSession{position:fixed;left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom));z-index:10001;margin:auto;max-width:620px;padding:12px;background:#fff;color:#252525;border:2px solid #654536;border-radius:12px;box-shadow:0 4px 20px #0003;max-height:35vh;overflow:auto;font-size:15px}#qlAssistantSession p{margin:4px 0 8px}#qlAssistantSession button{min-height:44px;margin:0 8px 4px 0}#qlAssistantSession[data-state="listening"]{border-color:#24734a}';
       document.head.append(css);
       sessionState(speechSupported() ? 'stopped' : 'unavailable', speechSupported() ? 'Stopped — ready when you start.' : 'Voice unavailable. Typing and the menu remain available.');

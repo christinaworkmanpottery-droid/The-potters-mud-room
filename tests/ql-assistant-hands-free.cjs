@@ -186,3 +186,27 @@ test('visible voice response is safe text and cleared on hidden/pagehide',async 
  assert.equal(f.el('qlAssistantSessionReply').children.length,0);
  f.w.dispatchEvent(new f.w.Event('pagehide'));assert.equal(f.el('qlAssistantSessionReply').textContent,'');
 });
+test('note dictation waits for natural end and submits all final chunks exactly once',async t=>{
+ const f=await fixture(t);start(f);f.engines[0].result('Create new note');
+ f.reply(0,'What should it say?',{result:{tool:'studio.note',status:'collecting'},context:{token:'a'.repeat(48)}});await tick();restart(f);
+ const e=f.engines.at(-1);const result=(text,isFinal=true)=>({isFinal,0:{transcript:text}});
+ e.onresult({results:[result("I've been")]});assert.equal(e.stops,0);assert.equal(f.pending.length,1);
+ e.onresult({results:[result("I've been"),result('needing to buy',false)]});assert.equal(f.pending.length,1);
+ e.onresult({results:[result("I've been"),result('needing to buy sapphire glaze.')]});assert.equal(e.stops,0);assert.equal(f.pending.length,1);
+ e.onend();assert.equal(f.pending.length,2);assert.equal(f.pending[1].body.input.text,"I've been needing to buy sapphire glaze.");
+ e.onend?.();assert.equal(f.pending.length,2);
+});
+test('note dictation never submits an earlier final chunk when trailing words remain interim',async t=>{
+ const f=await fixture(t);start(f);f.engines[0].result('Create new note');f.reply(0,'Text?',{result:{tool:'studio.note',status:'collecting'},context:{token:'a'.repeat(48)}});await tick();restart(f);
+ const e=f.engines.at(-1);e.onresult({results:[{isFinal:true,0:{transcript:"I've been"}}]});
+ e.onresult({results:[{isFinal:true,0:{transcript:"I've been"}},{isFinal:false,0:{transcript:'needing sapphire glaze'}}]});e.onend();assert.equal(f.pending.length,1);
+ assert.match(f.el('qlAssistantSessionStatus').textContent,/finalized|repeat/i);
+});
+test('live note draft visibly updates interim words before any request or save and clears on stop',async t=>{
+ const f=await fixture(t);start(f);f.engines[0].result('Create new note');
+ f.reply(0,'Text?',{result:{tool:'studio.note',status:'collecting'},context:{token:'a'.repeat(48)}});await tick();restart(f);
+ const e=f.engines.at(-1);e.onresult({results:[{isFinal:false,0:{transcript:'I need sapphire'}}]});
+ assert.equal(f.el('qlAssistantNotePreview').hidden,false);assert.equal(f.el('qlAssistantNotePreviewText').textContent,'I need sapphire');assert.equal(f.pending.length,1);
+ e.onresult({results:[{isFinal:false,0:{transcript:'I need to buy sapphire glaze.'}}]});assert.equal(f.el('qlAssistantNotePreviewText').textContent,'I need to buy sapphire glaze.');
+ f.el('qlAssistantSessionStop').click();assert.equal(f.el('qlAssistantNotePreview').hidden,true);assert.equal(f.el('qlAssistantNotePreviewText').textContent,'');assert.equal(f.pending.length,1);
+});

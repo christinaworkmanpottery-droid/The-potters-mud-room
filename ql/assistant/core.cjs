@@ -131,6 +131,7 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
         if(!request.context || noteStart(input.text)?.topic!==intent.arguments.topic) fail(400,'INVALID_REQUEST','Please request a note using your own words.');
         ({result,response,state:nextState}=notes.begin(userId,intent.arguments.topic));
       } else if (intent.name === 'studio.note.draft') {
+        if(/^(?:replace (?:the )?note with|change (?:the )?note to) /i.test(input.text || '') && !notes.wantsText(userId,context)) fail(400,'ACTION_NOT_AVAILABLE','There is no pending note draft to replace. Saved notes can be edited in the existing form.');
         if (!request.context || (capture ? input.text.trim() : noteBody(input.text))!==intent.arguments.body) fail(400,'INVALID_REQUEST','A note draft requires your exact dictated text and an active conversation.');
         ({result,response,state:nextState}=notes.draft(userId,intent.arguments.body));
       } else if (['studio.note.confirm','studio.note.cancel'].includes(intent.name)) {

@@ -20,7 +20,7 @@ test('full website + actual HTTP + SQLite: hands-free Piece conversation and man
   for(const file of ['website-utils.js','app.js','studio-search.js','ql-assistant.js'])require('node:vm').runInContext(fs.readFileSync(path.join(root,'public',file),'utf8'),dom.getInternalVMContext());
   await until(()=>w.QLAssistant?.available());w.navigate('qlAssistant');
   const el=id=>w.document.getElementById(id);el('qlAssistantSessionStart').click();
-  async function say(text){const count=engines.length;engines.at(-1).result(text);await until(()=>engines.length>count);return el('qlAssistantResponse').textContent;}
+  async function say(text){const count=engines.length;const engine=engines.at(-1);engine.result(text);engine.onend?.();await until(()=>engines.length>count);return el('qlAssistantResponse').textContent;}
   await say('Open my pieces');assert.equal(w.eval('currentPage'),'pieces');
   await say('Show me the blue one');await until(()=>w.eval('currentPage')==='pieceDetail');assert.match(el('pieceDetailContent').textContent,/Blue bowl/);
   assert.match(await say('What glaze is on it?'),/Ocean/);
