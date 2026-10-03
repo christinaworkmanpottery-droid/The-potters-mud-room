@@ -246,3 +246,16 @@ test('ending review clears transcript and queued confirmation',async t=>{
  const f=await fixture(t);start(f);f.engines[0].result('Open glazes',false);f.engines[0].onend();f.el('qlAssistantSessionStop').click();start(f);
  f.engines.at(-1).result('Use those words');assert.equal(f.pending[0].body.input.text,'Use those words');
 });
+
+test('4K.1 material clarification keeps preview and hands-free context across correction and save',async t=>{
+ const f=await fixture(t);start(f);
+ f.engines[0].result('Create another note I need to buy BMX clay save');
+ f.reply(0,'Did you mean B-Mix clay?',{result:{tool:'studio.note',status:'material-review',draftText:'I need to buy BMX clay'},context:{token:'a'.repeat(48)}});await tick();restart(f);
+ assert.equal(f.el('qlAssistantNotePreview').hidden,false);assert.equal(f.el('qlAssistantNotePreviewText').textContent,'I need to buy BMX clay');
+ f.engines[1].result('Use B mix');assert.equal(f.pending[1].body.context.token,'a'.repeat(48));
+ f.reply(1,'Check the corrected note.',{result:{tool:'studio.note',status:'draft',draftText:'I need to buy B-Mix clay'},context:{token:'b'.repeat(48)}});await tick();restart(f);
+ assert.equal(f.el('qlAssistantNotePreviewText').textContent,'I need to buy B-Mix clay');
+ f.engines[2].result('Save');assert.equal(f.pending[2].body.context.token,'b'.repeat(48));
+ f.reply(2,'Saved your Studio Note.',{result:{tool:'studio.note',status:'saved'},context:{token:'c'.repeat(48)},response:{text:'Saved your Studio Note.',navigation:{kind:'page',page:'studioNotes'}}});await tick();restart(f);
+ assert.equal(f.el('qlAssistantNotePreview').hidden,true);assert.equal(f.engines.length,4);assert.equal(f.w.eval('currentPage'),'studioNotes');
+});

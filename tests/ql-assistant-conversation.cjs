@@ -300,3 +300,51 @@ for (const fragment of ['I need to buy', 'Buy sapphire glaze and', 'Try this gla
  const saved=await ask('Save note',corrected.context);assert.equal(saved.result.status,'saved');
  assert.equal(db.prepare('SELECT body FROM studio_notes WHERE id=?').get(saved.result.noteId).body,'I need to buy sapphire glaze.');
 });
+
+// Real iPhone report: the complete request was recognized, then rejected.
+test('4K.1 exact reported utterance clarifies clay, retains all words, then saves once',async()=>{
+ const before=db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n;
+ const r=await ask('Create another note I need to buy BMX clay save');
+ assert.equal(r.result.status,'material-review');assert.equal(r.result.draftText,'I need to buy BMX clay');
+ assert.match(r.response.text,/B-Mix clay/);assert.equal(r.response.navigation,undefined);
+ const blocked=await ask('Save',r.context);assert.equal(blocked.result.status,'material-review');
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n,before);
+ const corrected=await ask('Use B mix',blocked.context);
+ assert.equal(corrected.result.status,'draft');assert.equal(corrected.result.draftText,'I need to buy B-Mix clay');
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n,before);
+ assert.notEqual((await ask('Save note',r.context)).result.status,'saved');
+ const saved=await ask('Save',corrected.context);assert.equal(saved.result.status,'saved');
+ assert.equal(db.prepare('SELECT body FROM studio_notes WHERE id=?').get(saved.result.noteId).body,'I need to buy B-Mix clay');
+ assert.notEqual((await ask('Save',corrected.context)).result.status,'saved');
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n,before+1);
+});
+test('4K.1 note variants, split dictation and literal material names',async()=>{
+ for(const text of ['Create another note','Make another studio note','Please add another new note']) {
+  const begin=await ask(text);assert.equal(begin.result.status,'collecting');
+  const draft=await ask('I need to buy Bmix clay save',begin.context);
+  assert.equal(draft.result.draftText,'I need to buy Bmix clay');await ask('Cancel',draft.context);
+ }
+ for(const text of ['Create another note saying Buy sapphire glaze and save note','Add another studio note: Buy sapphire glaze save']) {
+  const draft=await ask(text);assert.equal(draft.result.status,'draft');assert.equal(draft.result.draftText,'Buy sapphire glaze');await ask('Cancel',draft.context);
+ }
+ const draft=await ask('Create another note I need money to save');assert.equal(draft.result.draftText,'I need money to save');await ask('Cancel',draft.context);
+});
+test('4K.1 material clarification can keep original, replace text, or cancel without writes',async()=>{
+ const before=db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n;
+ let r=await ask('Create another note Buy BMX clay for the bowls');
+ r=await ask('Keep original words',r.context);assert.equal(r.result.status,'draft');assert.equal(r.result.draftText,'Buy BMX clay for the bowls');
+ r=await ask('Save note',r.context);assert.equal(db.prepare('SELECT body FROM studio_notes WHERE id=?').get(r.result.noteId).body,'Buy BMX clay for the bowls');
+ r=await ask('Create another note Buy BMX clay for the bowls');
+ r=await ask('Replace note with I need B-Mix clay and sapphire glaze.',r.context);assert.equal(r.result.draftText,'I need B-Mix clay and sapphire glaze.');await ask('Cancel',r.context);
+ r=await ask('Create another note Buy BMX clay');r=await ask('Yes',r.context);assert.equal(r.result.status,'draft');assert.equal(r.result.draftText,'Buy B-Mix clay');await ask('Cancel',r.context);
+ r=await ask('Create another note Buy BMX clay');await ask('Cancel',r.context);assert.notEqual((await ask('Use B mix',r.context)).result.status,'saved');
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n,before+1);
+});
+test('4K.1 clay-name clarification is scoped to owner, current draft and explicit choices',async()=>{
+ const r=await ask('Create another note Buy BMX clay');
+ const foreign=await ask('Use B mix',r.context,'b');assert.equal(foreign.result.status,'clarification');assert.doesNotMatch(foreign.response.text,/Buy BMX/);
+ const own=await ask('Use B mix',r.context);assert.equal(own.result.draftText,'Buy B-Mix clay');
+ const repeated=await ask('Use B mix',own.context);assert.notEqual(repeated.result.status,'saved');await ask('Cancel',repeated.context);
+ const literal=await ask('Create another note Buy a BMX bike');assert.equal(literal.result.status,'draft');assert.equal(literal.result.draftText,'Buy a BMX bike');await ask('Cancel',literal.context);
+ const choice=await ask('Show me blue faze');const save=await ask('Save',choice.context);assert.equal(save.result.status,'clarification');assert.equal(save.response.navigation,undefined);
+});

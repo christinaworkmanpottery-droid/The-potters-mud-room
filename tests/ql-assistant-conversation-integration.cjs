@@ -50,5 +50,18 @@ test('full website + actual HTTP + SQLite: hands-free Piece conversation and man
   assert.equal(requests.some(r=>r.url==='/api/ai/chat'),false);
   w.navigate('qlAssistant');el('qlAssistantInput').value='Save note';el('qlAssistantForm').requestSubmit();await until(()=>el('qlAssistantForm').getAttribute('aria-busy')==='false');assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,1);
   el('qlAssistantInput').value='When did I fire it?';el('qlAssistantForm').requestSubmit();await until(()=>el('qlAssistantForm').getAttribute('aria-busy')==='false');assert.match(el('qlAssistantResponse').textContent,/Which Piece/);
+  el('qlAssistantSessionStart').click();
+  assert.match(await say('Create another note I need to buy BMX clay save'),/Did you mean “B-Mix clay”/);
+  assert.equal(el('qlAssistantNotePreviewText').textContent,'I need to buy BMX clay');
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,1);
+  assert.match(await say('Save'),/clarify the clay name first/);
+  assert.match(await say('Use B mix'),/Draft studio note/);
+  assert.equal(el('qlAssistantNotePreviewText').textContent,'I need to buy B-Mix clay');
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,1);
+  assert.match(await say('Save'),/Saved your Studio Note/);
+  await until(()=>el('studioNotesList').textContent.includes('I need to buy B-Mix clay'));
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a' AND body='I need to buy B-Mix clay'").get().n,1);
+  assert.match(await say('Save'),/no current Studio Note draft/i);
+  await say('Open glazes');assert.equal(w.eval('currentPage'),'glazes');
  } finally {await pause(50);dom?.window.close();await fixture.stop();}
 });

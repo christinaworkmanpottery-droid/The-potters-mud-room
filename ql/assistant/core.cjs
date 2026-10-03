@@ -1,7 +1,7 @@
 'use strict';
 const {DOMAINS, DESTINATIONS, validQuery, resolve} = require('./intents.cjs');
 const {createContextStore, followup, createConversationTools} = require('./conversation.cjs');
-const {noteStart,isNoteText,noteBody,confirmation,cancellation,createNoteDrafts}=require('./notes.cjs');
+const {dictationBody,noteStart,isNoteText,noteBody,confirmation,cancellation,createNoteDrafts}=require('./notes.cjs');
 const INTENT = 'studio.firing.latest';
 class AssistantError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }
@@ -115,7 +115,7 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
       const context = request.context ? contexts.read(request.context.token,userId) : null;
       const capture=notes.wantsText(userId,context) && isNoteText(input.text);
       let proposed;
-      try { proposed = capture ? {name:'studio.note.draft',arguments:{body:input.text.trim()}} : input.command || await intentProvider.resolveIntent({text: input.text}, {signal}); }
+      try { proposed = capture ? {name:'studio.note.draft',arguments:{body:dictationBody(input.text)}} : input.command || await intentProvider.resolveIntent({text: input.text}, {signal}); }
       catch (error) {
         notes.clear(userId);
         if (error.code !== 'UNSUPPORTED_INTENT' || context?.scope !== 'piece' ||
@@ -132,12 +132,12 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
         ({result,response,state:nextState}=notes.begin(userId,intent.arguments.topic));
       } else if (intent.name === 'studio.note.draft') {
         if(/^(?:replace (?:the )?note with|change (?:the )?note to) /i.test(input.text || '') && !notes.wantsText(userId,context)) fail(400,'ACTION_NOT_AVAILABLE','There is no pending note draft to replace. Saved notes can be edited in the existing form.');
-        if (!request.context || (capture ? input.text.trim() : noteBody(input.text))!==intent.arguments.body) fail(400,'INVALID_REQUEST','A note draft requires your exact dictated text and an active conversation.');
+        if (!request.context || (capture ? dictationBody(input.text) : noteBody(input.text))!==intent.arguments.body) fail(400,'INVALID_REQUEST','A note draft requires your exact dictated text and an active conversation.');
         ({result,response,state:nextState}=notes.draft(userId,intent.arguments.body));
       } else if (['studio.note.confirm','studio.note.cancel'].includes(intent.name)) {
         const save=intent.name==='studio.note.confirm';
         if (!(save?confirmation(input.text):cancellation(input.text))) fail(400,'INVALID_REQUEST','Please explicitly confirm or cancel the note.');
-        if(context?.noteDraftId || /^(?:save|confirm|cancel) (?:the )?note[.!]?$/i.test(input.text.trim())) ({result,response,state:nextState}=notes.confirm(userId,context,save));
+        if(context?.noteDraftId || /^(?:save(?: (?:the )?note)?|confirm (?:the )?note|cancel (?:the )?note|(?:yes[,]? )?use .+|keep .+)[.!]?$/i.test(input.text.trim())) ({result,response,state:nextState}=notes.confirm(userId,context,save,input.text));
         else ({result,response,state:nextState}=conversation.execute({name:'studio.piece.confirmRead',arguments:{confirmed:save}},userId,context));
       } else if (intent.name.startsWith('studio.piece.')) {
         ({result,response,state:nextState} = conversation.execute(intent,userId,context));

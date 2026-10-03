@@ -1,7 +1,7 @@
 /* Bounded QL proof. Speech is transient input to the same typed turn path. */
 (() => {
   'use strict';
-  const displayName = 'QL assistant — testing 4K';
+  const displayName = 'QL assistant — testing 4K.1';
   const identity = () => JSON.stringify([token, currentUser?.id, localStorage.getItem('mudlog_token')]);
   let conversationToken = null, recordNavigation = false, noteDictation = false;
   let session = identity(), invalidSession = null, generation = 0, serial = 0;
@@ -308,7 +308,7 @@
             data.accountId !== account || typeof data.response?.text !== 'string') throw Error('Unavailable');
         if (data.context !== undefined && (typeof data.context?.token !== 'string' || !/^[a-f0-9]{48}$/.test(data.context.token) || Object.keys(data.context).length !== 1)) throw Error('Invalid context');
         conversationToken = data.context?.token || null;
-        noteDictation = data.result?.tool === 'studio.note' && ['collecting','draft','incomplete'].includes(data.result.status);
+        noteDictation = data.result?.tool === 'studio.note' && ['collecting','draft','incomplete','material-review'].includes(data.result.status);
         if(notePreview){
           notePreview.hidden=!noteDictation;
           if(!noteDictation || data.result.status==='collecting')notePreviewText.textContent='';
