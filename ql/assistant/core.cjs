@@ -128,6 +128,8 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
       // A bare feature name can be literal note dictation. Only explicit read
       // requests may leave a draft; shorthand navigation is for read context.
       if(activeDraft && language?.intent?.name==='studio.navigate' && !/\b(?:open|show|bring|pull|go|take|look|see)\b/i.test(input.text))language=null;
+      if(activeDraft && context?.languagePending?.kind==='write-target' && confirmation(input.text,true))
+        language={clarification:'Please clarify the revised note text first. Nothing was saved.',pending:context.languagePending};
       const politeRequest=/^(?:(?:okay|ok|hey|um|uh)[, ]+)?(?:can|could|would|will) you\b/i.test(input.text || '');
       const capture=activeDraft && !language && isNoteText(input.text) && (!politeRequest || isNoteText(envelope(input.text)));
       let clarifyNote=unclearNoteCommand(input.text);
