@@ -47,7 +47,7 @@ for (const [core,web,enabled] of [['0','0',false],['1','0',false],['0','1',false
   try {
    await start(core,web);
    const r=await fetch(base+'/api/ql/assistant/config');
-   assert.deepEqual(await r.json(),{enabled,voiceEnabled:false});assert.match(r.headers.get('cache-control'),/no-store/);
+   assert.deepEqual(await r.json(),{enabled,voiceEnabled:false,handsFreeEnabled:false});assert.match(r.headers.get('cache-control'),/no-store/);
    if(enabled) {
     const {JSDOM}=require('jsdom');
     const dom=new JSDOM(fs.readFileSync(path.join(root,'public/index.html'),'utf8'),{url:base,runScripts:'outside-only',pretendToBeVisual:true});

@@ -12,7 +12,7 @@ const root = path.resolve(__dirname,'..');
 let dir,server,db,base,token,foreignToken,secret;
 const pause = ms => new Promise(resolve => setTimeout(resolve,ms));
 const add = (table,values) => db.prepare(`INSERT INTO ${table} (${Object.keys(values).join(',')}) VALUES (${Object.keys(values).map(()=>'?').join(',')})`).run(...Object.values(values));
-async function start(core, web, voice) {
+async function start(core, web, voice, handsFree = '0') {
   dir = fs.mkdtempSync(path.join(os.tmpdir(),'ql-search-'));
   secret = crypto.randomBytes(32).toString('hex');
   for (const file of ['server.js','database.js','iap.js','directory-search.js','calendar-export.js','deletion-lifecycle.cjs']) fs.copyFileSync(path.join(root,file),path.join(dir,file));
@@ -21,7 +21,7 @@ async function start(core, web, voice) {
   for (const folder of ['node_modules','public']) fs.symlinkSync(path.join(root,folder),path.join(dir,folder),'dir');
   fs.writeFileSync(path.join(dir,'port.cjs'),"const net=require('net'),listen=net.Server.prototype.listen;net.Server.prototype.listen=function(...a){this.once('listening',()=>require('fs').writeFileSync('port',String(this.address().port)));return listen.apply(this,a)};");
   let log='';
-  server=spawn(process.execPath,['--require','./port.cjs','server.js'],{cwd:dir,env:{PATH:process.env.PATH,NODE_ENV:'test',QL_ASSISTANT_CORE_ENABLED:core,QL_ASSISTANT_WEB_ENABLED:web,QL_ASSISTANT_VOICE_WEB_ENABLED:voice,PORT:'0',JWT_SECRET:secret,ADMIN_API_KEY:crypto.randomBytes(32).toString('hex')},stdio:['ignore','pipe','pipe']});
+  server=spawn(process.execPath,['--require','./port.cjs','server.js'],{cwd:dir,env:{PATH:process.env.PATH,NODE_ENV:'test',QL_ASSISTANT_CORE_ENABLED:core,QL_ASSISTANT_WEB_ENABLED:web,QL_ASSISTANT_VOICE_WEB_ENABLED:voice,QL_ASSISTANT_HANDS_FREE_WEB_ENABLED:handsFree,PORT:'0',JWT_SECRET:secret,ADMIN_API_KEY:crypto.randomBytes(32).toString('hex')},stdio:['ignore','pipe','pipe']});
   server.stdout.on('data',chunk=>log+=chunk);server.stderr.on('data',chunk=>log+=chunk);
   for(let i=0;i<600;i++) {
     if(server.exitCode!==null) throw Error(log);
@@ -42,12 +42,12 @@ async function stop(){
   if(server && server.exitCode===null) { const done=new Promise(resolve=>server.once('exit',resolve));server.kill();await done; }
   if(dir) fs.rmSync(dir,{recursive:true,force:true});
 }
-for (const [core,web,voice,enabled,voiceEnabled] of [['0','0','1',false,false],['1','0','1',false,false],['0','1','1',false,false],['1','1','0',true,false],['1','1','true',true,false],['1','1','1',true,true]]) {
- test(`server flag combination core=${core} web=${web} voice=${voice}`,async()=>{
+for (const [core,web,voice,enabled,voiceEnabled,handsFree = '0'] of [['0','0','1',false,false],['1','0','1',false,false],['0','1','1',false,false],['1','1','0',true,false],['1','1','true',true,false],['1','1','1',true,true],['1','1','1',true,true,'1'],['1','1','0',true,false,'1'],['1','1','1',true,true,'true']]) {
+ test(`server flag combination core=${core} web=${web} voice=${voice} handsFree=${handsFree}`,async()=>{
   try {
-   await start(core,web,voice);
+   await start(core,web,voice,handsFree);
    const r=await fetch(base+'/api/ql/assistant/config');
-   assert.deepEqual(await r.json(),{enabled,voiceEnabled});assert.match(r.headers.get('cache-control'),/no-store/);
+   assert.deepEqual(await r.json(),{enabled,voiceEnabled,handsFreeEnabled:enabled && voiceEnabled && handsFree === '1'});assert.match(r.headers.get('cache-control'),/no-store/);
    if(enabled) {
     const {JSDOM}=require('jsdom');
     const dom=new JSDOM(fs.readFileSync(path.join(root,'public/index.html'),'utf8'),{url:base,runScripts:'outside-only',pretendToBeVisual:true});
@@ -76,6 +76,18 @@ for (const [core,web,voice,enabled,voiceEnabled] of [['0','0','1',false,false],[
      }
      assert.equal(Boolean(w.document.getElementById('qlAssistantTalk')),voiceEnabled);
      if(voiceEnabled) await say('When was my last firing?'); else await send('When was my last firing?');assert.equal(output.textContent,'Your latest recorded firing date is 2026-10-01.');
+     if (handsFree === '1' && voiceEnabled) {
+      w.document.getElementById('qlAssistantSessionStart').click();
+      for (const text of ['Open glazes', 'Open test tiles', 'When was my last firing?']) {
+       const current=engine;
+       current.onresult({results:[{isFinal:true,0:{transcript:text}}]});current.onend();
+       for(let i=0;i<200 && engine===current;i++)await pause(10);
+       assert.notEqual(engine,current,'automatic restart after real HTTP response');
+      }
+      assert.equal(output.textContent,'Your latest recorded firing date is 2026-10-01.');
+      assert.equal(w.currentPage,'testTiles');
+      w.document.getElementById('qlAssistantSessionStop').click();w.navigate('qlAssistant');
+     }
      db.prepare("DELETE FROM firing_logs WHERE user_id='a'").run();
      await send('last firing');assert.equal(output.textContent,'No recorded firing was found.');
      if(voiceEnabled) await say('What glaze did I use?'); else await send('What glaze did I use?');assert.match(output.textContent,/isn’t supported/);

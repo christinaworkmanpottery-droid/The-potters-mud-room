@@ -3144,6 +3144,7 @@ function serializeFiring(log) {
 app.get('/api/ql/assistant/config', (req, res) => {
   res.set('Cache-Control', 'private, no-store').json({
     enabled: process.env.QL_ASSISTANT_CORE_ENABLED === '1' && process.env.QL_ASSISTANT_WEB_ENABLED === '1',
+    handsFreeEnabled: process.env.QL_ASSISTANT_CORE_ENABLED === '1' && process.env.QL_ASSISTANT_WEB_ENABLED === '1' && process.env.QL_ASSISTANT_VOICE_WEB_ENABLED === '1' && process.env.QL_ASSISTANT_HANDS_FREE_WEB_ENABLED === '1',
     voiceEnabled: process.env.QL_ASSISTANT_CORE_ENABLED === '1' && process.env.QL_ASSISTANT_WEB_ENABLED === '1' && process.env.QL_ASSISTANT_VOICE_WEB_ENABLED === '1'
   });
 });

@@ -8,15 +8,74 @@
   let page, entry, input, form, send, retry, output, fallback;
   let voiceEnabled = false, recognition = null, voiceTimer, stopTimer;
   let talk, stop, cancel, voiceStatus;
+  let handsFreeEnabled = false, handsFree = false, sessionTimer, restartTimer, speechTimer, requestTimer;
+  let dock, dockStatus, sessionStart, sessionStop, spokenReplies, utterance;
+  let emptyAttempts = 0, voiceEpoch = 0, internalNavigation = false;
+  const inVoiceContext = () => entered && (currentPage === 'qlAssistant' || handsFree);
+  function sessionState(state, message) {
+    if (!dock) return;
+    dock.dataset.state = state;
+    dockStatus.textContent = message;
+    sessionStart.disabled = handsFree || !available() || !speechSupported();
+    sessionStop.hidden = !handsFree;
+  }
+  function endSession(message = 'Stopped — tap Start voice session to resume.', state = 'stopped') {
+    handsFree = false; voiceEpoch++;
+    clearTimeout(restartTimer); clearTimeout(sessionTimer); clearTimeout(speechTimer); clearTimeout(requestTimer);
+    if (utterance) { utterance.onend = utterance.onerror = utterance.onstart = null; utterance = null; window.speechSynthesis?.cancel(); }
+    cancelVoice();
+    sessionState(state, message);
+  }
+  function pauseSession(message = 'Stopped — tap Start voice session to resume.', state = 'stopped') {
+    invalidate();
+    sessionState(state, message);
+  }
+  function listenAgain(message = 'Preparing microphone for your next command…') {
+    if (!handsFree) return;
+    const own = voiceEpoch;
+    sessionState('starting', message);
+    clearTimeout(restartTimer);
+    restartTimer = setTimeout(() => {
+      syncSession();
+      if (handsFree && own === voiceEpoch && available() && !document.hidden) startVoice();
+    }, 650);
+  }
+  function voiceReply(text) {
+    if (!handsFree) return;
+    sessionState('responding', text);
+    if (!spokenReplies.checked) { listenAgain(text + ' Ready for another command…'); return; }
+    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
+      pauseSession('Spoken replies are unavailable. Turn off spoken replies and restart for text responses.', 'unavailable'); return;
+    }
+    const own = voiceEpoch;
+    const speech = new window.SpeechSynthesisUtterance(text.slice(0, 600)); utterance = speech;
+    speech.lang = 'en-US';
+    const active = () => handsFree && own === voiceEpoch && utterance === speech;
+    speech.onstart = () => { if (active()) sessionState('speaking', 'Speaking — microphone is off. ' + text); };
+    speech.onend = () => { if (active()) { clearTimeout(speechTimer); utterance = null; listenAgain(); } };
+    speech.onerror = () => { if (active()) pauseSession('Audio could not play. Turn off spoken replies and restart the session.', 'unavailable'); };
+    speechTimer = setTimeout(() => { if (active()) pauseSession('Audio did not finish. Turn off spoken replies and restart the session.', 'unavailable'); }, 30000);
+    try { window.speechSynthesis.speak(speech); } catch (_) { speech.onerror(); }
+  }
+  function beginSession() {
+    syncSession();
+    if (!handsFreeEnabled || !available() || document.hidden || handsFree) return;
+    if (!speechSupported()) { sessionState('unavailable', 'Voice unavailable. Typing and the menu remain available.'); return; }
+    invalidate(); handsFree = true; entered = true; emptyAttempts = 0;
+    // An explicit new activation only; never resume after hiding or permission denial.
+    sessionTimer = setTimeout(() => pauseSession('Stopped after 15 minutes. Tap Start voice session to continue.'), 15 * 60 * 1000);
+    startVoice();
+  }
   const speechConstructor = () => window.SpeechRecognition || window.webkitSpeechRecognition;
   const speechSupported = () => window.isSecureContext === true && typeof speechConstructor() === 'function';
   function voiceState(message = '') {
     if (!talk) return;
     talk.hidden = !speechSupported();
-    talk.disabled = !available() || !speechSupported() || Boolean(recognition);
+    talk.disabled = handsFree || !available() || !speechSupported() || Boolean(recognition);
     stop.hidden = cancel.hidden = !recognition;
     stop.disabled = Boolean(recognition?.stopping);
     voiceStatus.textContent = message;
+    if (handsFree && message) sessionState(recognition?.stopping ? 'processing' : /^Starting/.test(message) ? 'starting' : 'listening', message);
   }
   function cancelVoice(message = '', abort = true) {
     const old = recognition; recognition = null;
@@ -29,16 +88,16 @@
   }
   function startVoice() {
     syncSession();
-    if (!voiceEnabled || !available() || !entered || currentPage !== 'qlAssistant' || document.hidden || recognition) return;
+    if (!voiceEnabled || !available() || !inVoiceContext() || document.hidden || recognition) return;
     if (!speechSupported()) { voiceState('Speech is unavailable in this browser. You can type your question.'); return; }
     // A new voice attempt supersedes any pending typed/voice answer.
-    invalidate();
+    if (!handsFree) invalidate();
     const epoch = generation, ownSession = session;
     let turn;
     const active = () => {
       syncSession();
       return recognition === turn && epoch === generation && ownSession === session &&
-        available() && entered && currentPage === 'qlAssistant' && !document.hidden;
+        available() && inVoiceContext() && !document.hidden;
     };
     try {
       const engine = new (speechConstructor())();
@@ -49,9 +108,19 @@
         const finalText = turn.finalText, draft = turn.draft;
         cancelVoice('', !ended);
         if (allowFinal && finalText) {
+          if (handsFree && /^(stop listening|pause voice|end voice session|stop voice session)[.!?]?$/i.test(finalText)) {
+            pauseSession(); return;
+          }
+          emptyAttempts = 0;
           input.value = finalText;
-          void submit();
-          voiceState('Speech received. You can edit the command and send again.');
+          void submit(handsFree);
+          if (!handsFree) voiceState('Speech received. You can edit the command and send again.');
+        } else if (handsFree) {
+          // Partial words remain untrusted. A repeat is safer than executing them.
+          if (draft) input.value = draft;
+          if (++emptyAttempts >= 3) {
+            pauseSession('Stopped: the browser could not finalize speech after three attempts. Check Siri/Dictation and microphone permission, or type your command.');
+          } else listenAgain((draft ? 'Words were not finalized. Please repeat after Microphone ready. ' : message + ' ') + 'Retry ' + emptyAttempts + ' of 2…');
         } else if (draft) {
           input.value = draft;
           voiceState('Speech was received but not finalized. Check the words above, then tap Send.');
@@ -76,6 +145,21 @@
         } else voiceState('Hearing: ' + text);
       };
       engine.onerror = event => {
+        if (!active()) return;
+        if (handsFree) {
+          if (event.error === 'no-speech') {
+            // Wait for onend before recycling the recognizer. If it never arrives,
+            // stop rather than overlap two microphone owners.
+            turn.finalText = '';
+            clearTimeout(voiceTimer);
+            voiceTimer = setTimeout(() => { if (active()) pauseSession('Speech service did not disconnect. Tap Start voice session to retry.', 'unavailable'); }, 5000);
+            voiceState('The speech service returned no words. Waiting to retry…');
+            return;
+          }
+          const denied = ['not-allowed', 'service-not-allowed'].includes(event.error);
+          pauseSession(denied ? 'Permission denied — allow microphone and speech access, then start again. Typing remains available.' : 'Speech unavailable (' + event.error + '). Start again or type your command.', denied ? 'permission-denied' : 'unavailable');
+          return;
+        }
         const messages = {
           'not-allowed':'Microphone or speech permission was denied. You can type your question.',
           'service-not-allowed':'Speech permission was denied. You can type your question.',
@@ -91,10 +175,11 @@
         ? 'Sound was detected, but the speech service returned no words. You can retry or type your question.'
         : 'No speech text was returned by the browser. Wait for “Microphone ready” before speaking, or type your question.', true, true);
       voiceState('Starting microphone… Wait for “Microphone ready” before speaking.');
-      // Foreground single attempt only; no automatic restart or background capture.
-      voiceTimer = setTimeout(() => { if (active()) stopVoice(); }, 20000);
+      // Watchdog bounds every attempt, even when Safari emits no terminal event.
+      voiceTimer = setTimeout(() => { if (active()) stopVoice(); }, handsFree ? 30000 : 20000);
       engine.start();
     } catch (_) {
+      if (handsFree) { pauseSession('Speech could not start. Check permission and tap Start voice session to retry.', 'unavailable'); return; }
       cancelVoice('Speech could not start. Check microphone permission, or type your question.');
     }
   }
@@ -103,6 +188,7 @@
     if (!turn || turn.stopping) return;
     turn.stopping = true; voiceState('Finishing speech…');
     stopTimer = setTimeout(() => {
+      if (recognition === turn && handsFree) { pauseSession('Speech did not disconnect. Tap Start voice session to retry.', 'unavailable'); return; }
       if (recognition === turn) turn.finish('The speech service did not finish. You can try again or type your question.', false, true);
     }, 5000);
     try { turn.engine.stop(); } catch (_) { turn.finish('Speech could not finish. You can type your question.'); }
@@ -111,7 +197,7 @@
   const authenticated = () => Boolean(token && currentUser?.id && token === localStorage.getItem('mudlog_token') && invalidSession !== identity());
   const available = () => enabled && authenticated();
   function invalidate() {
-    cancelVoice();
+    endSession();
     generation++; serial++; controller?.abort(); controller = null; pendingText = null;
     if (input) { input.value = ''; output.textContent = ''; retry.hidden = true; fallback.hidden = true; form.setAttribute('aria-busy', 'false'); send.disabled = false; }
   }
@@ -119,24 +205,27 @@
     const next = identity();
     if (next !== session) { invalidate(); session = next; }
     if (entry) entry.hidden = !available();
+    if (dock) { dock.hidden = !available(); sessionStart.disabled = handsFree || !available() || !speechSupported(); }
     if (form) { input.disabled = !available(); send.disabled = !available(); }
     if (!available()) { entered = false; if (page) page.classList.remove('active'); }
-    if (talk) talk.disabled = !available() || !speechSupported() || Boolean(recognition);
+    if (talk) talk.disabled = handsFree || !available() || !speechSupported() || Boolean(recognition);
   }
   function sessionInvalid() {
     invalidate(); invalidSession = identity(); syncSession();
   }
   function onNavigate(destination) {
     syncSession();
+    if (handsFree && (internalNavigation || !pendingText)) return;
     if (destination !== 'qlAssistant') { entered = false; invalidate(); }
   }
   function enter() {
     syncSession(); if (!available()) return;
-    entered = true; input.focus();
+    entered = true; if (!handsFree) input.focus();
   }
-  async function submit() {
+  async function submit(fromVoice = false) {
     syncSession();
-    if (!available() || !entered || currentPage !== 'qlAssistant' || document.hidden) return;
+    if (!available() || !inVoiceContext() || document.hidden) return;
+    if (!fromVoice && handsFree) endSession();
     cancelVoice();
     const text = input.value.trim();
     if (!text || text.length > 200 || pendingText === text) return;
@@ -145,9 +234,13 @@
     const account = currentUser.id, credential = token, ownSession = session;
     const active = () => {
       syncSession();
-      return available() && entered && currentPage === 'qlAssistant' && epoch === generation &&
+      return available() && inVoiceContext() && epoch === generation &&
         ownSerial === serial && ownSession === session && !abort.signal.aborted;
     };
+    if (fromVoice) {
+      sessionState('processing', 'Processing: ' + text);
+      requestTimer = setTimeout(() => { if (active()) pauseSession('The assistant did not respond. Start again or use the menu.', 'unavailable'); }, 30000);
+    }
     pendingText = text; output.textContent = 'Looking up your studio request…';
     retry.hidden = true; fallback.hidden = true; form.setAttribute('aria-busy', 'true');
     try {
@@ -172,7 +265,10 @@
         // The core owns all facts and wording, including empty/undated/tied records.
         output.textContent = data.response.text;
         fallback.hidden = !['studio.firing.latest','studio.firing.openLatest'].includes(data.intent?.name);
-        if (data.response.navigation) followNavigation(data.response.navigation);
+        if (data.response.navigation) {
+          internalNavigation = fromVoice && handsFree;
+          try { followNavigation(data.response.navigation); } finally { internalNavigation = false; }
+        }
       }
     } catch (_) {
       if (active()) {
@@ -181,7 +277,7 @@
         retry.hidden = false;
       }
     } finally {
-      if (active()) { pendingText = null; controller = null; form.setAttribute('aria-busy', 'false'); }
+      if (active()) { clearTimeout(requestTimer); pendingText = null; controller = null; form.setAttribute('aria-busy', 'false'); if (fromVoice && handsFree) voiceReply(output.textContent); }
     }
   }
   function followNavigation(target) {
@@ -232,11 +328,32 @@
       cancel = node('button', 'Cancel listening'); cancel.id = 'qlAssistantCancelVoice';
       for (const button of [talk, stop, cancel]) { button.type = 'button'; button.className = 'btn btn-secondary'; }
       talk.onclick = startVoice; stop.onclick = stopVoice;
-      cancel.onclick = () => cancelVoice('Listening canceled. You can type your question.');
+      cancel.onclick = () => handsFree ? pauseSession('Listening canceled. You can type your question.') : cancelVoice('Listening canceled. You can type your question.');
       voiceStatus = node('p'); voiceStatus.id = 'qlAssistantVoiceStatus'; voiceStatus.setAttribute('role', 'status');
       voice.append(notice, talk, stop, cancel, voiceStatus); form.after(voice);
       voiceState(speechSupported() ? 'Ready when you tap.' : 'Speech is unavailable in this browser. You can type your question.');
-      input.addEventListener('input', () => cancelVoice());
+      input.addEventListener('input', () => {
+        if (handsFree) { const draft = input.value; invalidate(); input.value = draft; }
+        else cancelVoice();
+      });
+    }
+    if (handsFreeEnabled) {
+      dock = node('aside'); dock.id = 'qlAssistantSession'; dock.setAttribute('aria-label', 'Voice session controls');
+      const note = node('p', 'Foreground voice — testing. Start once, wait for Microphone ready, then speak one command at a time. Say “stop listening” or use End session. Keep Safari visible and your screen unlocked.');
+      sessionStart = node('button', 'Start voice session'); sessionStart.id = 'qlAssistantSessionStart';
+      sessionStop = node('button', 'End session'); sessionStop.id = 'qlAssistantSessionStop';
+      for (const b of [sessionStart, sessionStop]) { b.type = 'button'; b.className = 'btn btn-secondary'; }
+      sessionStart.onclick = beginSession; sessionStop.onclick = () => pauseSession();
+      const spokenLabel = node('label', ' Spoken replies (experimental) ');
+      spokenReplies = node('input'); spokenReplies.type = 'checkbox'; spokenReplies.id = 'qlAssistantSpokenReplies';
+      // Audio/recognition handoff is unreliable on some Safari versions. Opt in explicitly.
+      spokenLabel.prepend(spokenReplies);
+      spokenReplies.onchange = () => { if (handsFree) pauseSession('Reply preference changed. Start the session again.'); };
+      dockStatus = node('p'); dockStatus.id = 'qlAssistantSessionStatus'; dockStatus.setAttribute('role', 'status');
+      dock.append(note, sessionStart, sessionStop, spokenLabel, dockStatus); document.body.append(dock);
+      const css = node('style'); css.textContent = '#qlAssistantSession{position:fixed;left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom));z-index:10001;margin:auto;max-width:620px;padding:12px;background:#fff;color:#252525;border:2px solid #654536;border-radius:12px;box-shadow:0 4px 20px #0003;max-height:35vh;overflow:auto;font-size:15px}#qlAssistantSession p{margin:4px 0 8px}#qlAssistantSession button{min-height:44px;margin:0 8px 4px 0}#qlAssistantSession[data-state="listening"]{border-color:#24734a}';
+      document.head.append(css);
+      sessionState(speechSupported() ? 'stopped' : 'unavailable', speechSupported() ? 'Stopped — ready when you start.' : 'Voice unavailable. Typing and the menu remain available.');
     }
     document.getElementById('pageStudioSearch').after(page);
     entry = node('button', displayName); entry.id = 'qlAssistantEntry'; entry.className = 'nav-link';
@@ -262,6 +379,6 @@
   // Failed/missing configuration is OFF. No HTML entry exists until explicit opt-in.
   fetch(API + '/api/ql/assistant/config', {cache: 'no-store'})
     .then(r => r.ok ? r.json() : null)
-    .then(config => { if (config?.enabled === true) { enabled = true; voiceEnabled = config.voiceEnabled === true; mount(); } })
+    .then(config => { if (config?.enabled === true) { enabled = true; voiceEnabled = config.voiceEnabled === true; handsFreeEnabled = voiceEnabled && config.handsFreeEnabled === true; mount(); } })
     .catch(() => {});
 })();

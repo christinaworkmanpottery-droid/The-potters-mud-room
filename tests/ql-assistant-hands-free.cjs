@@ -1,0 +1,137 @@
+'use strict';
+const test = require('node:test'), assert = require('node:assert/strict');
+const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto');
+const {JSDOM} = require('jsdom');
+const root = path.resolve(__dirname, '..');
+const source = file => fs.readFileSync(path.join(root,file),'utf8');
+const tick = () => new Promise(r => setTimeout(r,20));
+async function fixture(t, config = {enabled:true,voiceEnabled:true,handsFreeEnabled:true}, support = 'standard') {
+  const dom = new JSDOM(source('public/index.html'), {url:'http://localhost/',runScripts:'outside-only',pretendToBeVisual:true});
+  const w = dom.window, calls = [], pending = [], engines = [], timers = new Map();
+  const nativeSetTimeout = w.setTimeout.bind(w);
+  w.setTimeout = (fn, ms) => { const id = nativeSetTimeout(fn, ms); timers.set(ms, fn); return id; };
+  Object.defineProperty(w, 'isSecureContext', {value:support !== 'insecure'});
+  class Speech {
+    constructor() { if(support === 'constructor-error') throw Error('unavailable'); this.starts=0;this.stops=0;this.aborts=0;engines.push(this); }
+    start() { this.starts++; if(support === 'start-error') throw Error('permission'); }
+    stop() { this.stops++; if(support === 'stop-error') throw Error('stopped'); }
+    abort() { this.aborts++; }
+    result(text, final=true) { this.onresult?.({resultIndex:0,results:[{isFinal:final,0:{transcript:text}}]}); if(final) this.onend?.(); }
+  }
+  if(support !== 'none') w[support === 'prefixed' ? 'webkitSpeechRecognition' : 'SpeechRecognition'] = Speech;
+  const style = w.document.createElement('style'); style.textContent = source('public/style.css'); w.document.head.append(style);
+  t.after(async () => { await tick(); w.close(); });
+  w.localStorage.setItem('mudlog_token','token-a');
+  w.scrollTo = () => {}; w.HTMLElement.prototype.scrollIntoView = () => {}; w.setInterval = () => 0;
+  w.fetch = async (url, options = {}) => {
+    calls.push({url,options});
+    if (url === '/api/ql/assistant/config') { if (config instanceof Error) throw config; return {ok:true,json:async()=>config}; }
+    if (url === '/api/ql/assistant/turn') return new Promise((resolve,reject) => pending.push({resolve,reject,options,body:JSON.parse(options.body)}));
+    let data = [];
+    if (url === '/api/auth/me') data = {user:{id:'a',email:'a@example.invalid',tier:'free'}};
+    if (url === '/api/dashboard') data = {totalPieces:0,totalClays:0,totalGlazes:0,sales:{total:0},recentPieces:[],statusCounts:[]};
+    return {ok:true,status:200,json:async()=>data};
+  };
+  const run = code => require('node:vm').runInContext(code, dom.getInternalVMContext());
+  run(source('public/website-utils.js')); run(source('public/app.js'));
+  await tick(); run(source('public/ql-assistant.js')); await tick();
+  const el = id => w.document.getElementById(id);
+  if (el('qlAssistantEntry')) w.navigate('qlAssistant');
+  const send = (text = 'When was my last firing?') => {
+    el('qlAssistantInput').value = text;
+    el('qlAssistantForm').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
+  };
+  const reply = (i=0,text='Your latest recorded firing date is 2026-10-01.',extra={}) => pending[i].resolve({ok:true,status:200,json:async()=>({version:1,requestId:pending[i].body.requestId,accountId:'a',response:{text},...extra})});
+  return {w,el,send,reply,pending,calls,engines,timers,talk:()=>el('qlAssistantTalk')?.click()};
+}
+
+const start = f => f.el('qlAssistantSessionStart').click();
+const state = f => f.el('qlAssistantSession').dataset.state;
+const restart = f => f.timers.get(650)();
+test('no automatic activation and explicit flag only',async t=>{
+ for(const cfg of [{enabled:true,voiceEnabled:true},{enabled:true,voiceEnabled:false,handsFreeEnabled:true},{enabled:true,voiceEnabled:true,handsFreeEnabled:'true'}]) {
+  const f=await fixture(t,cfg);assert.equal(f.el('qlAssistantSession'),null);assert.equal(f.engines.length,0);
+ }
+ const f=await fixture(t);assert.equal(f.engines.length,0);assert.equal(state(f),'stopped');
+});
+test('five navigation commands need only one activation',async t=>{
+ const f=await fixture(t);start(f);start(f);
+ for(const [i,page] of ['pieces','glazes','clayBodies','testTiles','firings'].entries()) {
+  assert.equal(f.engines.length,i+1);const e=f.engines[i];e.onstart();e.onaudiostart();assert.equal(state(f),'listening');
+  e.result('Open '+page);assert.equal(state(f),'processing');
+  f.reply(i,'Opening '+page,{response:{text:'Opening '+page,navigation:{kind:'page',page}}});await tick();
+  assert.equal(f.w.eval('currentPage'),page);assert.equal(f.engines.length,i+1);restart(f);
+ }
+ assert.equal(f.pending.length,5);assert.equal(f.engines.length,6);
+});
+test('all 4G page destinations retain active session',async t=>{
+ const f=await fixture(t);start(f);
+ const pages=['casualties','community','shop','aiChat','visualSearch','shoppingList','studioNotes','profile','messages'];
+ for(const [i,page] of pages.entries()) {f.engines[i].result('Open '+page);f.reply(i,'Open',{response:{text:'Opening',navigation:{kind:'page',page}}});await tick();assert.equal(f.w.eval('currentPage'),page);restart(f);}
+});
+test('firing record and search reuse existing StudioSearch entry points',async t=>{
+ const f=await fixture(t);let record,query;
+ f.w.StudioSearch={onNavigate(){},open(type,id){record={type,id};f.w.navigate('searchRecord');return Promise.resolve().then(()=>f.w.navigate('studioSearch'));},runQuery(q,type){query={q,type};f.w.navigate('studioSearch');}};
+ start(f);f.engines[0].result('Open my last firing');f.reply(0,'Opening',{response:{text:'Opening',navigation:{kind:'record',type:'firing',id:'existing'}}});await tick();assert.deepEqual(record,{type:'firing',id:'existing'});restart(f);
+ f.engines[1].result('Find blue glazes');f.reply(1,'Searching',{response:{text:'Searching',navigation:{kind:'search',type:'glaze',query:'blue'}}});await tick();assert.deepEqual(query,{q:'blue',type:'glaze'});restart(f);assert.equal(f.engines.length,3);
+});
+for(const code of ['UNSUPPORTED_INTENT','DESTINATION_UNAVAILABLE','ACTION_NOT_AVAILABLE']) test('safe non-navigation '+code,async t=>{
+ const f=await fixture(t);start(f);f.engines[0].result('not supported');f.pending[0].resolve({ok:false,status:400,json:async()=>({code})});await tick();
+ assert.equal(f.w.eval('currentPage'),'qlAssistant');assert.equal(f.el('qlAssistantFiringFallback').hidden,true);restart(f);assert.equal(f.engines.length,2);
+});
+test('no-speech retries only after disconnect, bounded at three attempts',async t=>{
+ const f=await fixture(t);start(f);
+ for(let i=0;i<3;i++){const e=f.engines[i];e.onerror({error:'no-speech'});assert.equal(f.engines.length,i+1);e.onend();if(i<2)restart(f);}
+ assert.equal(state(f),'stopped');assert.equal(f.pending.length,0);assert.equal(f.engines.length,3);
+});
+test('interim-only words never execute and retry after disconnect',async t=>{
+ const f=await fixture(t);start(f);f.engines[0].result('open glazes',false);f.engines[0].onend();assert.equal(f.pending.length,0);restart(f);f.engines[1].result('Open glazes');assert.equal(f.pending.length,1);
+});
+for(const error of ['not-allowed','service-not-allowed','audio-capture','network','aborted']) test('terminal error stops session '+error,async t=>{
+ const f=await fixture(t);start(f);f.engines[0].onerror({error});assert.equal(state(f),error.includes('allowed')?'permission-denied':'unavailable');assert.equal(f.engines.length,1);assert.equal(f.el('qlAssistantSessionStop').hidden,true);
+});
+test('engine watchdog cannot overlap a stuck recognizer',async t=>{
+ const f=await fixture(t);start(f);f.timers.get(30000)();f.timers.get(5000)();assert.equal(state(f),'unavailable');assert.equal(f.engines[0].aborts,1);assert.equal(f.engines.length,1);
+});
+test('no-speech missing onend stops without restarting',async t=>{
+ const f=await fixture(t);start(f);f.engines[0].onerror({error:'no-speech'});f.timers.get(5000)();assert.equal(state(f),'unavailable');assert.equal(f.engines.length,1);
+});
+for(const action of ['button','voice','hidden','logout','storage','pagehide','typed','timeout']) test('session cancellation and queued callbacks '+action,async t=>{
+ const f=await fixture(t);start(f);const e=f.engines[0],late=e.onresult;
+ if(action==='button')f.el('qlAssistantSessionStop').click();
+ if(action==='voice')e.result('Stop listening');
+ if(action==='hidden'){Object.defineProperty(f.w.document,'hidden',{value:true});f.w.document.dispatchEvent(new f.w.Event('visibilitychange'));}
+ if(action==='logout')f.w.logout();
+ if(action==='storage'){f.w.localStorage.setItem('mudlog_token','other');f.w.dispatchEvent(new f.w.StorageEvent('storage',{key:'mudlog_token'}));}
+ if(action==='pagehide')f.w.dispatchEvent(new f.w.Event('pagehide'));
+ if(action==='typed'){f.el('qlAssistantInput').value='manual';f.el('qlAssistantInput').dispatchEvent(new f.w.Event('input'));}
+ if(action==='timeout')f.timers.get(900000)();
+ late({results:[{isFinal:true,0:{transcript:'Open glazes'}}]});assert.equal(f.pending.length,0);assert.equal(f.engines.length,1);assert.equal(state(f),'stopped');
+});
+test('End session suppresses late HTTP navigation',async t=>{
+ const f=await fixture(t);start(f);f.engines[0].result('Open glazes');f.el('qlAssistantSessionStop').click();assert.equal(f.pending[0].options.signal.aborted,true);
+ f.reply(0,'Opening',{response:{text:'Opening',navigation:{kind:'page',page:'glazes'}}});await tick();assert.equal(f.w.eval('currentPage'),'qlAssistant');assert.equal(state(f),'stopped');
+});
+test('manual navigation during pending voice cancels stale action',async t=>{
+ const f=await fixture(t);start(f);f.engines[0].result('Open glazes');f.w.navigate('pieces');f.reply(0,'Opening',{response:{text:'Opening',navigation:{kind:'page',page:'glazes'}}});await tick();assert.equal(f.w.eval('currentPage'),'pieces');assert.equal(state(f),'stopped');
+});
+test('speech output waits for recognizer release and completion before listening',async t=>{
+ const f=await fixture(t);let spoken,canceled=0;f.w.SpeechSynthesisUtterance=class {constructor(text){this.text=text;}};f.w.speechSynthesis={speak(s){spoken=s;},cancel(){canceled++;}};
+ f.el('qlAssistantSpokenReplies').checked=true;start(f);f.engines[0].result('last firing');f.reply();await tick();assert.ok(spoken);assert.equal(f.engines.length,1);spoken.onstart();assert.equal(state(f),'speaking');spoken.onend();restart(f);assert.equal(f.engines.length,2);
+ f.engines[1].result('last firing');f.reply(1);await tick();const late=spoken.onend;f.el('qlAssistantSessionStop').click();late();assert.equal(canceled,1);assert.equal(f.engines.length,2);
+});
+for(const mode of ['missing','error','watchdog']) test('audio fallback '+mode,async t=>{
+ const f=await fixture(t);let spoken;if(mode!=='missing'){f.w.SpeechSynthesisUtterance=class {};f.w.speechSynthesis={speak(s){spoken=s;},cancel(){}};}
+ f.el('qlAssistantSpokenReplies').checked=true;start(f);f.engines[0].result('last firing');f.reply();await tick();if(mode==='error')spoken.onerror();if(mode==='watchdog')f.timers.get(30000)();assert.equal(state(f),'unavailable');assert.equal(f.engines.length,1);
+});
+test('duplicate final callback sends exactly once',async t=>{
+ const f=await fixture(t);start(f);const e=f.engines[0],cb=e.onresult,event={results:[{isFinal:true,0:{transcript:'last firing'}}]};cb(event);cb(event);e.onend();cb(event);assert.equal(f.pending.length,1);
+});
+test('invalid response cannot navigate',async t=>{const f=await fixture(t);start(f);f.engines[0].result('Open glazes');f.reply(0,'bad',{accountId:'b',response:{text:'bad',navigation:{kind:'page',page:'glazes'}}});await tick();assert.equal(f.w.eval('currentPage'),'qlAssistant');assert.equal(f.el('qlAssistantFiringFallback').hidden,true);});
+
+test('stalled assistant request stops and suppresses late navigation',async t=>{const f=await fixture(t);start(f);f.engines[0].result('Open glazes');f.timers.get(30000)();assert.equal(state(f),'unavailable');assert.equal(f.pending[0].options.signal.aborted,true);f.reply(0,'Opening',{response:{text:'Opening',navigation:{kind:'page',page:'glazes'}}});await tick();assert.equal(f.w.eval('currentPage'),'qlAssistant');});
+test('queued automatic restart is inert after End session',async t=>{const f=await fixture(t);start(f);f.engines[0].onend();const queued=f.timers.get(650);f.el('qlAssistantSessionStop').click();queued();assert.equal(f.engines.length,1);assert.equal(state(f),'stopped');});
+test('prefixed Safari recognition supports consecutive turns',async t=>{const f=await fixture(t,undefined,'prefixed');start(f);f.engines[0].result('last firing');f.reply();await tick();restart(f);assert.equal(f.engines.length,2);});
+
+test('typing cancels pending voice navigation and preserves manual words',async t=>{const f=await fixture(t);start(f);f.engines[0].result('Open glazes');f.el('qlAssistantInput').value='manual edit';f.el('qlAssistantInput').dispatchEvent(new f.w.Event('input'));f.reply(0,'Opening',{response:{text:'Opening',navigation:{kind:'page',page:'glazes'}}});await tick();assert.equal(f.w.eval('currentPage'),'qlAssistant');assert.equal(f.el('qlAssistantInput').value,'manual edit');assert.equal(f.pending[0].options.signal.aborted,true);});
+test('tap-to-talk cannot overlap active session and Cancel ends it',async t=>{const f=await fixture(t);start(f);assert.equal(f.el('qlAssistantTalk').disabled,true);f.el('qlAssistantCancelVoice').click();assert.equal(state(f),'stopped');assert.equal(f.engines[0].aborts,1);});
