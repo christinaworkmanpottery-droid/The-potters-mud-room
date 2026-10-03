@@ -43,7 +43,7 @@ const base='https://potters-ql-phase4f-safari.onrender.com';
  assert.equal(proposed.result.status,'clarification');assert.equal(proposed.response.navigation,undefined);assert.match(proposed.response.text,/Say yes or no/);
  assert.equal((await turn('Yes')).result.status,'empty');
  assert.deepEqual((await turn('What glaze is on blue bowl?')).result.glazes,[glazeName]);
- assert.equal((await turn('What glaze is on blue phase?')).result.status,'clarification');
+ assert.equal((await turn('What glaze is on purple vase?')).result.status,'clarification');
  assert.match((await turn('No')).response.text,/Canceled/);
  assert.deepEqual((await turn('What glaze is on it?')).result.glazes,[glazeName]);
  const config=await api('/api/ql/assistant/config');assert.deepEqual(config,{enabled:true,voiceEnabled:true,handsFreeEnabled:true});
