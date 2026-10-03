@@ -49,8 +49,9 @@ test('full website + actual HTTP + SQLite: hands-free Piece conversation and man
   assert.match(await say('Try three coats next time.'),/Draft studio note/);
   assert.match(await say('Cancel'),/Nothing was saved/);
   await say('Add a studio note that Stop should discard this');
+  const requestsBeforeStop=requests.filter(r=>r.url==='/api/ql/assistant/turn').length;
   engines.at(-1).result('Stop listening');await until(()=>el('qlAssistantSession').dataset.state==='stopped');
-  assert.equal(requests.filter(r=>r.url==='/api/ql/assistant/turn').length,17);
+  assert.equal(requests.filter(r=>r.url==='/api/ql/assistant/turn').length,requestsBeforeStop);
   assert.ok(requests.some(r=>r.url==='/api/pieces/blue'));assert.ok(requests.some(r=>r.url==='/api/ql/pieces/blue/history'));
   assert.equal(requests.some(r=>r.url==='/api/ai/chat'),false);
   w.navigate('qlAssistant');el('qlAssistantInput').value='Save note';el('qlAssistantForm').requestSubmit();await until(()=>el('qlAssistantForm').getAttribute('aria-busy')==='false');assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,1);
