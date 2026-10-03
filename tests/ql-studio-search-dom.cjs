@@ -71,3 +71,17 @@ test('new account never reuses existing results or selected detail',async t=>{co
 test('entitlement revoked between preflight and canonical Tile fetch purges results',async t=>{const f=await fixture(t);f.payload(result([row('test-tile')]));await f.submit();let reads=0;f.handler(url=>url==='/api/test-tiles/x'&&++reads===2?response({},403):null);f.buttons()[0].click();await tick();await tick();assert.equal(f.buttons().length,0);assert.match(f.el('testTileViewBody').textContent,/locked/);assert.doesNotMatch(f.el('testTileViewBody').textContent,/Fresh canonical/);assert.doesNotMatch(f.el('studioSearchStatus').textContent,/1 results/);});
 test('pricing response without owner field relies on canonical owner-scoped route',async t=>{const f=await fixture(t);f.payload(result([row('pricing')]));await f.submit();delete f.record.user_id;f.buttons()[0].click();await tick();assert.match(f.el('studioSearchDetail').textContent,/Price Breakdown/);});
 test('modal close clears detail and returns to Search',async t=>{const f=await fixture(t);f.payload(result([row('clay')]));await f.submit();f.buttons()[0].click();await tick();f.w.closeModal('clayViewModal');assert.equal(f.el('clayViewBody').textContent,'');assert.ok(!f.el('clayViewModal').classList.contains('open'));assert.ok(f.el('pageStudioSearch').classList.contains('active'));});
+
+test('assistant query bridge opens Search, filters and renders saved results',async t=>{
+ const f=await fixture(t);f.payload(result([row('test-tile','Underglaze tile')]));
+ f.w.navigate('firings');f.w.StudioSearch.runQuery('underglaze','test-tile');await tick();
+ assert.ok(f.el('pageStudioSearch').classList.contains('active'));assert.equal(f.el('studioSearchInput').value,'underglaze');
+ assert.equal(f.el('studioSearchType').value,'test-tile');assert.match(f.el('studioSearchResults').textContent,/Underglaze tile/);
+ assert.ok(f.calls.some(c=>c.url.includes('q=underglaze')&&c.url.includes('types=test-tile')));
+});
+test('assistant record bridge opens actual latest firing viewer through canonical reads',async t=>{
+ const f=await fixture(t);f.w.navigate('firings');await f.w.StudioSearch.open('firing','x');await tick();
+ assert.ok(f.calls.some(c=>c.url==='/api/firing-logs/x'));
+ assert.match(f.el('firingViewBody').textContent,/Fresh canonical kiln/);
+ assert.match(f.w.location.hash,/studioSearch\/firing\/x/);
+});

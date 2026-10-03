@@ -1,4 +1,5 @@
 'use strict';
+const {DOMAINS, validQuery, resolve} = require('./intents.cjs');
 const INTENT = 'studio.firing.latest';
 class AssistantError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }
@@ -9,9 +10,15 @@ function exact(value, keys) {
     Object.keys(value).length === keys.length && keys.every(k => Object.hasOwn(value, k));
 }
 function validateIntent(value) {
-  if (!exact(value, ['name', 'arguments']) || value.name !== INTENT || !exact(value.arguments, []))
-    fail(400, 'UNSUPPORTED_INTENT', 'Unsupported assistant intent.');
-  return { name: INTENT, arguments: {} };
+  if (!exact(value, ['name', 'arguments'])) fail(400, 'UNSUPPORTED_INTENT', 'Unsupported assistant intent.');
+  const args = value.arguments;
+  const valid = ([INTENT, 'studio.firing.openLatest'].includes(value.name) && exact(args, [])) ||
+    (value.name === 'studio.navigate' && exact(args, ['destination']) && typeof args.destination === 'string' &&
+      (Object.hasOwn(DOMAINS,args.destination) || ['search','photo-lookup'].includes(args.destination))) ||
+    (value.name === 'studio.search' && exact(args, ['type','query']) && typeof args.type === 'string' &&
+      (Object.hasOwn(DOMAINS,args.type) || args.type === 'all') && validQuery(args.query));
+  if (!valid) fail(400, 'UNSUPPORTED_INTENT', 'Unsupported assistant intent.');
+  return {name:value.name, arguments:{...args}};
 }
 function validateRequest(value) {
   if (!exact(value, ['version', 'requestId', 'input']) || value.version !== 1 ||
@@ -29,10 +36,7 @@ function validateRequest(value) {
 const deterministicProvider = Object.freeze({
   id: 'deterministic-v1',
   resolveIntent({text}) {
-    const normalized = text.trim().toLowerCase().replace(/\?$/, '').replace(/\s+/g, ' ');
-    if (!['when was my last firing', 'when was my latest firing', 'latest recorded firing', 'last firing'].includes(normalized))
-      fail(400, 'UNSUPPORTED_INTENT', 'Unsupported question. Try “When was my last firing?”');
-    return {name: INTENT, arguments: {}};
+    return resolve(text, fail);
   }
 });
 function validDate(date) {
@@ -50,6 +54,7 @@ function requireAccount(db, userId) {
 function latestRecordedFiring(db, userId, intent) {
   requireAccount(db, userId);
   validateIntent(intent);
+  if (intent.name !== INTENT) fail(400, 'UNSUPPORTED_INTENT', 'Unsupported firing intent.');
   let date = null, tiedRecords = 0, unorderableRecords = 0, records = 0;
   for (const row of db.prepare('SELECT date FROM firing_logs WHERE user_id=? ORDER BY date DESC').iterate(userId)) {
     records++;
@@ -79,6 +84,7 @@ function formatResult(result) {
 }
 function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) {
   if (typeof intentProvider?.resolveIntent !== 'function') throw new TypeError('Intent provider required');
+  let searchService;
   return Object.freeze({
     // authorize is a server-owned callback, never a JSON field. Rechecked after await.
     async turn({request, authorize, signal}) {
@@ -88,8 +94,36 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
       const intent = validateIntent(input.command || await intentProvider.resolveIntent({text: input.text}, {signal}));
       if (signal?.aborted) fail(409, 'CANCELLED', 'Assistant request cancelled.');
       if (authorize() !== userId) fail(401, 'SESSION_CHANGED', 'Account session changed.');
-      const result = latestRecordedFiring(db, userId, intent);
-      return {version: 1, requestId, accountId: userId, intent, result, response: formatResult(result)};
+      requireAccount(db, userId);
+      let result, response;
+      if (intent.name === INTENT || intent.name === 'studio.firing.openLatest') {
+        result = latestRecordedFiring(db, userId, {name:INTENT,arguments:{}});
+        response = formatResult(result);
+        if (intent.name === 'studio.firing.openLatest' && result.status === 'found') {
+          if (result.tiedRecords === 1) {
+            const row=db.prepare('SELECT id FROM firing_logs WHERE user_id=? AND date=?').get(userId,result.date);
+            response.navigation={kind:'record',type:'firing',id:row.id};
+          } else {
+            response.text += ' Opening matching firings so you can choose.';
+            response.navigation={kind:'search',type:'firing',query:result.date};
+          }
+        }
+      } else if (intent.name === 'studio.navigate') {
+        const destination=intent.arguments.destination;
+        const page=DOMAINS[destination]?.page || (destination === 'search' ? 'studioSearch' : 'visualSearch');
+        result={tool:intent.name,destination};
+        // Feature loaders and canonical record APIs retain their normal entitlement gates.
+        response={text:'Opening '+(DOMAINS[destination]?.label || (destination === 'search' ? 'Studio Search' : 'Photo Lookup'))+'.',
+          navigation:{kind:'page',page}};
+      } else {
+        searchService ||= require('../studio-search.cjs').createStudioSearchService(db);
+        const {type,query}=intent.arguments;
+        result={tool:intent.name,...searchService.search({userId,q:query,...(type==='all'?{}:{types:type})})};
+        response={text:result.lockedTypes.includes(type) ? 'Test Tiles are unavailable on your current plan.' :
+          result.results.length ? 'Opening your matching saved studio records.' : 'No matching saved records. Opening Studio Search.',
+          navigation:{kind:'search',type,query}};
+      }
+      return {version: 1, requestId, accountId: userId, intent, result, response};
     }
   });
 }

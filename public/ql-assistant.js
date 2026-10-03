@@ -119,7 +119,7 @@
       return available() && entered && currentPage === 'qlAssistant' && epoch === generation &&
         ownSerial === serial && ownSession === session && !abort.signal.aborted;
     };
-    pendingText = text; output.textContent = 'Looking up your latest recorded firing…';
+    pendingText = text; output.textContent = 'Looking up your studio request…';
     retry.hidden = true; form.setAttribute('aria-busy', 'true');
     try {
       const response = await fetch(API + '/api/ql/assistant/turn', {
@@ -133,11 +133,14 @@
       if (!active()) return;
       if (response.status === 400 && data.code === 'UNSUPPORTED_INTENT') {
         output.textContent = 'That question isn’t supported in this test version yet.';
+      } else if (response.status === 400 && data.code === 'ACTION_NOT_AVAILABLE') {
+        output.textContent = 'Studio changes are not available through this assistant yet. No changes were made. Use the existing forms.';
       } else {
         if (!response.ok || data.version !== 1 || data.requestId !== requestId ||
             data.accountId !== account || typeof data.response?.text !== 'string') throw Error('Unavailable');
         // The core owns all facts and wording, including empty/undated/tied records.
         output.textContent = data.response.text;
+        if (data.response.navigation) followNavigation(data.response.navigation);
       }
     } catch (_) {
       if (active()) {
@@ -148,11 +151,31 @@
       if (active()) { pendingText = null; controller = null; form.setAttribute('aria-busy', 'false'); }
     }
   }
+  function followNavigation(target) {
+    // Server output is still untrusted: never execute URLs, code, or arbitrary routes.
+    const pages = ['pieces','clayBodies','glazes','chemicals','testTiles','firings',
+      'pricingCalculator','sales','projects','contacts','events','studioSearch','visualSearch'];
+    const types = ['piece','clay','glaze','raw-material','test-tile','firing','pricing','sale','project','contact','event','all'];
+    const keys = Object.keys(target).sort().join(',');
+    if (target.kind === 'page' && keys === 'kind,page' && pages.includes(target.page)) {
+      navigate(target.page); return;
+    }
+    if (target.kind === 'record' && keys === 'id,kind,type' && target.type === 'firing' &&
+        typeof target.id === 'string' && target.id.length > 0 && target.id.length <= 200 && window.StudioSearch) {
+      void window.StudioSearch.open('firing',target.id); return;
+    }
+    if (target.kind === 'search' && keys === 'kind,query,type' && types.includes(target.type) &&
+        typeof target.query === 'string' && target.query.trim().length >= 2 && target.query.length <= 120 &&
+        !/[\x00-\x1f\x7f]/.test(target.query) && window.StudioSearch?.runQuery) {
+      window.StudioSearch.runQuery(target.query,target.type); return;
+    }
+    throw Error('Invalid navigation');
+  }
   function mount() {
     page = node('section'); page.id = 'pageQLAssistant'; page.className = 'page';
     page.style.maxWidth = '640px'; page.setAttribute('aria-labelledby', 'qlAssistantHeading');
     const heading = node('h2', displayName); heading.id = 'qlAssistantHeading';
-    const help = node('p', 'This test answers one question: “When was my last firing?”');
+    const help = node('p', 'Open any studio feature, find saved records, or ask when you last fired. Try “Open my test tiles”, “Find blue glazes”, or “Open my last firing”. Changes still use the normal forms.');
     form = node('form'); form.id = 'qlAssistantForm'; form.setAttribute('aria-busy', 'false');
     const label = node('label', 'Your question'); label.htmlFor = 'qlAssistantInput';
     input = node('input'); input.id = 'qlAssistantInput'; input.type = 'text'; input.maxLength = 200;

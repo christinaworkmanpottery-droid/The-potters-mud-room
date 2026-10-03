@@ -74,3 +74,37 @@ test('hash navigation outside normal page router cancels',async t=>{const f=awai
 test('A to B to A cannot revive old request generation',async t=>{const f=await fixture(t);f.send();f.w.eval("setAuthUser({id:'b'});setAuthUser({id:'a'});");f.reply(0,'old A');await tick();assert.equal(f.el('qlAssistantResponse').textContent,'');});
 test('session changes while JSON parses cannot render late answer',async t=>{const f=await fixture(t);f.send();let finish;f.pending[0].resolve({ok:true,status:200,json:()=>new Promise(r=>finish=r)});await tick();f.w.eval("setAuthUser({id:'b'});");finish({version:1,requestId:f.pending[0].body.requestId,accountId:'a',response:{text:'private'}});await tick();assert.equal(f.el('qlAssistantResponse').textContent,'');});
 test('late 401 from A cannot invalidate B',async t=>{const f=await fixture(t);f.send();f.w.eval("setAuthUser({id:'b'});setAuthToken('token-b');localStorage.setItem('mudlog_token','token-b');");f.w.navigate('qlAssistant');f.pending[0].resolve({status:401});await tick();assert.equal(f.w.QLAssistant.available(),true);});
+
+// Phase 4G: exercise real page router, not just response strings.
+for (const page of ['pieces','clayBodies','glazes','chemicals','testTiles','firings','pricingCalculator','sales','projects','contacts','events','studioSearch','visualSearch']) {
+ test('assistant actually navigates to '+page,async t=>{
+  const f=await fixture(t);f.send('Open a feature');f.reply(0,'Opening.',{response:{text:'Opening.',navigation:{kind:'page',page}}});await tick();
+  assert.equal(f.w.eval('currentPage'),page);assert.equal(f.el('pageQLAssistant').classList.contains('active'),false);
+  assert.ok(f.w.document.querySelector('.page.active'));assert.equal(f.el('qlAssistantInput').value,'');
+ });
+}
+for (const target of [{kind:'page',page:'admin'},{kind:'page',page:'https://evil.invalid'},{kind:'page',page:'pieces',url:'evil'},
+ {kind:'record',type:'contact',id:'b'},{kind:'search',type:'users',query:'private'}]) {
+ test('untrusted navigation rejected '+JSON.stringify(target),async t=>{
+  const f=await fixture(t);f.send();f.reply(0,'Opening',{response:{text:'Opening',navigation:target}});await tick();
+  assert.equal(f.w.eval('currentPage'),'qlAssistant');assert.equal(f.el('qlAssistantRetry').hidden,false);
+ });
+}
+test('late navigation cannot redirect after account change',async t=>{
+ const f=await fixture(t);f.send('Open glazes');f.w.eval("setAuthUser({id:'b'});");
+ f.reply(0,'Opening',{response:{text:'Opening',navigation:{kind:'page',page:'glazes'}}});await tick();assert.equal(f.w.eval('currentPage'),'qlAssistant');
+});
+test('latest record hands off to existing authenticated record viewer',async t=>{
+ const f=await fixture(t);let opened;f.w.StudioSearch={open:(...args)=>{opened=args;}};
+ f.send('Open my last firing');f.reply(0,'Opening',{response:{text:'Opening',navigation:{kind:'record',type:'firing',id:'a-firing'}}});await tick();
+ assert.deepEqual(opened,['firing','a-firing']);
+});
+test('filtered search hands off query and type to Studio Search',async t=>{
+ const f=await fixture(t);let query;f.w.StudioSearch={runQuery:(...args)=>{query=args;}};
+ f.send('Find blue glazes');f.reply(0,'Found',{response:{text:'Found',navigation:{kind:'search',type:'glaze',query:'blue'}}});await tick();
+ assert.deepEqual(query,['blue','glaze']);
+});
+test('write commands explain that no changes were made',async t=>{
+ const f=await fixture(t);f.send('Delete my pieces');f.pending[0].resolve({ok:false,status:400,json:async()=>({code:'ACTION_NOT_AVAILABLE'})});await tick();
+ assert.match(f.el('qlAssistantResponse').textContent,/No changes were made/);assert.equal(f.w.eval('currentPage'),'qlAssistant');
+});

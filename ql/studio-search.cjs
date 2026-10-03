@@ -6,7 +6,7 @@ const SOURCES = Object.freeze([
   ['clay', 'clay_bodies', 'name', ['name','brand','color_wet','color_fired','cone_range','notes']],
   ['glaze', 'glazes', 'name', ['name','brand','sku','color_description','cone_range','notes']],
   ['raw-material', 'glaze_chemicals', 'name', ['name','source','notes']],
-  ['test-tile', 'test_tiles', 'name', ['name','glaze_name','clay_name','cone','color_result','tags','notes']],
+  ['test-tile', 'test_tiles', 'name', ['name','glaze_name','clay_name','cone','color_result','surface_result','tags','notes']],
   ['firing', 'firing_logs', 'kiln_name', ['kiln_name','firing_type','cone','date','results','notes']],
   ['pricing', 'pricing_calculations', 'name', ['name','description']],
   ['sale', 'sales', 'venue', ['venue','buyer_name','date','notes']],

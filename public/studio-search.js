@@ -221,7 +221,17 @@
   window.addEventListener('storage',e => { if (e.key === 'mudlog_token' || e.key == null) invalidate('Your session changed. Please sign in again.'); });
   window.addEventListener('pageshow',syncSession);
   document.addEventListener('visibilitychange',syncSession);
-  window.StudioSearch = {invalidate,lockTiles,syncSession,onNavigate,enter,back,restore,open,
+  window.StudioSearch = {
+    runQuery(text,type='all') {
+      syncSession();
+      if (!availableSession() || typeof text !== 'string' || text.length < 2 || text.length > 120 ||
+          (type !== 'all' && !Object.hasOwn(types,type))) return;
+      navigate('studioSearch');
+      el('studioSearchInput').value=text;
+      el('studioSearchType').value=type === 'all' ? '' : type;
+      void search();
+    },
+    invalidate,lockTiles,syncSession,onNavigate,enter,back,restore,open,
     closeViewer(id) { if (!closing && selected && modalFor[selected.type] === id) { back(); return true; } return false; }
   };
   render(); status('Search your saved studio records.');
