@@ -13,8 +13,10 @@ function exact(value, keys) {
 function validateIntent(value) {
   if (!exact(value, ['name', 'arguments'])) fail(400, 'UNSUPPORTED_INTENT', 'Unsupported assistant intent.');
   const args = value.arguments;
-  const valid = (['studio.piece.glazes','studio.piece.firings','studio.piece.open'].includes(value.name) && exact(args, [])) ||
+  const valid = (['studio.piece.glazes','studio.piece.firings','studio.piece.open','studio.piece.clarifyGlazes'].includes(value.name) && exact(args, [])) ||
     (value.name === 'studio.piece.choose' && exact(args,['index']) && Number.isInteger(args.index) && args.index >= 1 && args.index <= 5) ||
+    (value.name === 'studio.piece.confirmRead' && exact(args,['confirmed']) && typeof args.confirmed === 'boolean') ||
+    (value.name === 'studio.piece.namedGlazes' && exact(args,['query']) && validQuery(args.query)) ||
     (value.name === 'studio.piece.refine' && exact(args,['query']) && validQuery(args.query)) ||
     ([INTENT, 'studio.firing.openLatest'].includes(value.name) && exact(args, [])) ||
     (value.name === 'studio.navigate' && exact(args, ['destination']) && typeof args.destination === 'string' &&

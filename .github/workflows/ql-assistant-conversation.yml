@@ -1,7 +1,7 @@
 name: QL Phase 4I conversation verification
 on:
   push:
-    branches: [ql/phase-4i-conversation-context, ql/phase-4i-device-repair]
+    branches: [ql/phase-4i-conversation-context, ql/phase-4i-device-repair, ql/phase-4i-speech-clarification]
   workflow_dispatch:
 jobs:
   verify:

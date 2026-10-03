@@ -23,12 +23,19 @@ function followup(text) {
   if (/[\x00-\x1f\x7f]/.test(text)) return null;
   const n = normalized(text).replace(/\b(1st|2nd|3rd|4th|5th)\b/g, word => ({'1st':'first','2nd':'second','3rd':'third','4th':'fourth','5th':'fifth'}[word]));
   const intent = (name,args={}) => ({name,arguments:args});
+  if (['yes','yes please','that is right','that’s right','correct'].includes(n)) return intent('studio.piece.confirmRead',{confirmed:true});
+  if (['no','no thanks','cancel','never mind'].includes(n)) return intent('studio.piece.confirmRead',{confirmed:false});
   const reference = '(?:that|it|this)(?: piece| one)?';
   if (new RegExp('^(?:what|which) glazes? did i use on '+reference+'$').test(n) ||
       new RegExp('^(?:what|which) glazes? (?:is|are) (?:on|used on) '+reference+'$').test(n) ||
       new RegExp('^(?:what|which) glazes? (?:was|were) used on '+reference+'$').test(n)) return intent('studio.piece.glazes');
   if (new RegExp('^(?:when did i fire '+reference+'|when was '+reference+' fired)$').test(n)) return intent('studio.piece.firings');
   if (new RegExp('^(?:open|show(?: me)?) '+reference+'$').test(n)) return intent('studio.piece.open');
+  // These observed speech substitutions request clarification, never an answer
+  // or navigation. The authenticated selected Piece is named before confirmation.
+  if (/^(?:what|which) ways? (?:is|are) on .+$/.test(n)) return intent('studio.piece.clarifyGlazes');
+  const namedGlazes = n.match(/^(?:what|which) glazes? (?:(?:is|are|was|were) (?:on|used on)|did i use on) (?:the |my )?(.+)$/);
+  if (namedGlazes) return intent('studio.piece.namedGlazes',{query:namedGlazes[1]});
   const ordinal = n.match(/^(?:(?:open|show(?: me)?|choose|select) )?(?:the )?(?:number |option |piece )?(first|second|third|fourth|fifth|one|two|three|four|five|1|2|3|4|5)(?: one| 1| piece| result| item)?$/);
   if (ordinal) return intent('studio.piece.choose',{index:({'first':1,'second':2,'third':3,'fourth':4,'fifth':5,'one':1,'two':2,'three':3,'four':4,'five':5}[ordinal[1]] || Number(ordinal[1]))});
   // Bounded named Piece phrases; ordinary feature navigation keeps its existing
@@ -62,17 +69,43 @@ function createConversationTools(db, {search, validDate}) {
     return {...answer(text,state,{kind:'search',type:'piece',query}),result:{tool:'studio.piece.matches',status:ids.length?'choices':'empty',...found}};
   }
   function execute(intent, userId, state) {
+    if (intent.name === 'studio.piece.confirmRead') {
+      if (!state?.confirmGlazes || !state.pieceId) return answer('There is no pending question to confirm. Please ask your question again.',state || {});
+      const clean = {scope:'piece',pieceId:state.pieceId};
+      if (!intent.arguments.confirmed) return answer('Canceled that interpretation. Please repeat your question.',clean);
+      return execute({name:'studio.piece.glazes',arguments:{}},userId,clean);
+    }
+    if (intent.name === 'studio.piece.namedGlazes') {
+      const found = matches(userId,intent.arguments.query);
+      if (found.state.pieceId) {
+        const read = execute({name:'studio.piece.glazes',arguments:{}},userId,found.state);
+        read.response.navigation = found.response.navigation;
+        return read;
+      }
+      if (found.result.status === 'empty' && state?.pieceId) return execute({name:'studio.piece.clarifyGlazes',arguments:{}},userId,state);
+      if (found.state.candidates?.length) found.state.pendingRead = 'glazes';
+      return found;
+    }
     if (intent.name === 'studio.piece.refine') {
       if (state?.scope !== 'piece') return answer(missing);
       return matches(userId,intent.arguments.query);
     }
     if (intent.name === 'studio.piece.choose') {
       const id = state?.candidates?.[intent.arguments.index-1];
-      return id ? choose(userId,id) : answer('There is no current choice with that number. Please search for a Piece again.',state || {});
+      if (!id) return answer('There is no current choice with that number. Please search for a Piece again.',state || {});
+      const chosen = choose(userId,id);
+      if (state.pendingRead === 'glazes' && chosen.state.pieceId) {
+        const read = execute({name:'studio.piece.glazes',arguments:{}},userId,chosen.state);
+        read.response.navigation = chosen.response.navigation;
+        return read;
+      }
+      return chosen;
     }
     if (!state?.pieceId) return answer(missing,state || {});
     const piece = selected({pieceId:state.pieceId,userId});
     if (!piece) return answer('That Piece is no longer available. Please search again.',{scope:'piece'});
+    if (intent.name === 'studio.piece.clarifyGlazes') return answer('I may have misheard. Do you mean: what glaze is saved on '+(piece.title || 'this Piece')+'? Say yes or no.',{scope:'piece',pieceId:piece.id,confirmGlazes:true});
+    state = {scope:'piece',pieceId:piece.id};
     if (intent.name === 'studio.piece.open') return choose(userId,piece.id);
     // Reuse canonical owner-filtered relationship reads. Do not retrieve entitled
     // Test Tile content, media paths, or unrelated history in the response.

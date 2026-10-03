@@ -117,3 +117,43 @@ test('new name and ordinal wording preserves empty and owner boundaries',async()
  assert.deepEqual((await ask('What glaze is on it?',b.context,'b')).result.glazes,['Foreign private glaze']);
  await assert.rejects(ask('Open the blue bowl and delete it'),e=>e.status===400);
 });
+
+test('observed way/phase speech requires confirmation and preserves Piece context',async()=>{
+ const selected=await ask('Open blue bowl');
+ for(const words of ['What way is on blue phase','What ways is on blue phase']) {
+  const proposed=await ask(words,selected.context);
+  assert.equal(proposed.result.status,'clarification');assert.equal(proposed.response.navigation,undefined);
+  assert.match(proposed.response.text,/Do you mean: what glaze is saved on Blue bowl\? Say yes or no/);
+  assert.doesNotMatch(proposed.response.text,/Ocean/);
+  const yes=await ask('Yes',proposed.context);assert.deepEqual(yes.result.glazes,['Ocean']);
+  assert.equal((await ask('Yes',yes.context)).result.status,'clarification');
+  const no=await ask('No',proposed.context);assert.match(no.response.text,/Canceled/);
+  assert.equal((await ask('Yes',no.context)).result.status,'clarification');
+  assert.deepEqual((await ask('What glaze is on it?',no.context)).result.glazes,['Ocean']);
+ }
+});
+test('correctly heard named glaze queries read saved data or ask a choice',async()=>{
+ for(const words of ['What glaze is on the blue bowl?','What glaze did I use on blue bowl?']) {
+  const r=await ask(words);assert.deepEqual(r.result.glazes,['Ocean']);assert.equal(r.response.navigation.id,'a-blue');
+ }
+ add('pieces',{id:'a-blue2',user_id:'a',title:'Blue vase'});
+ try {
+  const choices=await ask('What glaze is on blue?');assert.equal(choices.result.status,'choices');
+  const second=await ask('The second one',choices.context);assert.equal(second.result.status,'empty');assert.equal(second.response.navigation.id,'a-blue2');
+ }finally{db.prepare("DELETE FROM pieces WHERE id='a-blue2'").run();}
+});
+test('unknown named target is not silently replaced by the current Piece',async()=>{
+ const chosen=await ask('Open blue bowl');
+ const r=await ask('What glaze is on blue phase?',chosen.context);assert.equal(r.result.status,'clarification');assert.equal(r.response.navigation,undefined);assert.doesNotMatch(r.response.text,/Ocean/);
+ const correct=await ask('What glaze is on white cup?',chosen.context);assert.equal(correct.result.status,'empty');assert.equal(correct.response.navigation.id,'a-white');
+ assert.equal((await ask('What way is on blue phase')).result.status,'clarification');
+});
+test('read clarification cannot survive account changes, record deletion or topic changes',async()=>{
+ let r=await ask('Open blue bowl');r=await ask('What way is on blue phase',r.context);
+ const foreign=await ask('Yes',r.context,'b');assert.equal(foreign.result.status,'clarification');assert.doesNotMatch(JSON.stringify(foreign),/Ocean|Blue bowl|a-blue/);
+ const nav=await ask('Open glazes',r.context);assert.equal((await ask('Yes',nav.context)).result.status,'clarification');
+ add('pieces',{id:'temporary-confirm',user_id:'a',title:'Temporary bowl'});
+ let temp=await ask('Open temporary bowl');temp=await ask('What way is on that',temp.context);db.prepare("DELETE FROM pieces WHERE id='temporary-confirm'").run();
+ assert.equal((await ask('Yes',temp.context)).result.status,'clarification');
+ for(const intent of [{name:'studio.piece.confirmRead',arguments:{confirmed:'true'}},{name:'studio.piece.confirmRead',arguments:{confirmed:true,pieceId:'b-blue'}},{name:'studio.piece.clarifyGlazes',arguments:{pieceId:'b-blue'}}])assert.throws(()=>validateIntent(intent));
+});
