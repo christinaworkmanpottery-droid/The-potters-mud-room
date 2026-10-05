@@ -54,7 +54,9 @@ for (const [core,web,voice,enabled,voiceEnabled,handsFree = '0'] of [['0','0','1
     try {
      const w=dom.window;w.localStorage.setItem('mudlog_token',token);
      w.eval(`var token=${JSON.stringify(token)},currentUser={id:'a'},API='',currentPage='qlAssistant';function navigate(p){QLAssistant.onNavigate(p);currentPage=p;if(p==='qlAssistant')QLAssistant.enter();}function closeNav(){}`);
-     const requests=[];
+     const requests=[],spoken=[];
+     w.SpeechSynthesisUtterance=class {constructor(text){this.text=text;}};
+     w.speechSynthesis={speak(s){spoken.push(s.text);queueMicrotask(()=>{s.onstart?.();s.onend?.();});},cancel(){}};
      w.fetch=(url,opts)=>{requests.push(url);return fetch(base+url,opts);};
      Object.defineProperty(w,'isSecureContext',{value:true});
      let engine;
@@ -82,7 +84,8 @@ for (const [core,web,voice,enabled,voiceEnabled,handsFree = '0'] of [['0','0','1
        const current=engine;
        current.onresult({results:[{isFinal:true,0:{transcript:text}}]});current.onend();
        for(let i=0;i<200 && engine===current;i++)await pause(10);
-       assert.notEqual(engine,current,'automatic restart after real HTTP response');
+       assert.notEqual(engine,current,'automatic restart after spoken real HTTP response');
+       assert.equal(spoken.at(-1),output.textContent);
       }
       assert.equal(output.textContent,'Your latest recorded firing date is 2026-10-01.');
       assert.equal(w.currentPage,'testTiles');
