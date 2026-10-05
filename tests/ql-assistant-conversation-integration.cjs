@@ -13,7 +13,9 @@ test('full website + actual HTTP + SQLite: hands-free Piece conversation and man
   db.prepare('INSERT INTO piece_glazes (id,piece_id,glaze_id) VALUES (?,?,?)').run('layer','blue','ocean');
   db.prepare("UPDATE firing_logs SET piece_id='blue' WHERE user_id='a'").run();
   dom=new JSDOM(fs.readFileSync(path.join(root,'public/index.html'),'utf8'),{url:base+'/#qlAssistant',runScripts:'outside-only',pretendToBeVisual:true});
-  const w=dom.window,engines=[],requests=[];Object.defineProperty(w,'isSecureContext',{value:true});
+  const w=dom.window,engines=[],requests=[],spoken=[];Object.defineProperty(w,'isSecureContext',{value:true});
+  w.SpeechSynthesisUtterance=class {constructor(text){this.text=text;}};
+  w.speechSynthesis={speak(s){spoken.push(s.text);queueMicrotask(()=>{s.onstart?.();s.onend?.();});},cancel(){}};
   w.localStorage.setItem('mudlog_token',token);w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};w.setInterval=()=>0;
   w.fetch=(url,opts={})=>{const target=new URL(url,base);assert.equal(target.origin,base);requests.push({url:target.pathname,body:opts.body});return fetch(target.href,opts);};
   w.webkitSpeechRecognition=class {constructor(){engines.push(this);}start(){this.onaudiostart?.();}stop(){queueMicrotask(()=>this.onend?.());}abort(){}result(text){this.onresult?.({results:[{isFinal:true,0:{transcript:text}}]});}};
@@ -102,5 +104,14 @@ test('full website + actual HTTP + SQLite: hands-free Piece conversation and man
   await until(()=>el('studioNotesList').textContent.includes(complete));
   assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a' AND body=?").get(complete).n,1);
   assert.match(await say('Save note'),/already saved/i);
+  assert.match(await say('Make 50 soy sauce dishes in the mix clay fire at cone 05'),/Did you mean “B-Mix clay”/);
+  assert.match(spoken.at(-1),/Did you mean “B-Mix clay”/);
+  assert.match(await say('Save'),/clarify the clay name first/);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE body LIKE '%the mix clay%'").get().n,0);
+  await say('Yes');assert.equal(el('qlAssistantNotePreviewText').textContent,'Make 50 soy sauce dishes in B-Mix clay fire at cone 05');
+  assert.match(spoken.at(-1),/B-Mix clay fire at cone 05/);
+  await say('Save');await say('Add sapphire float glaze to last note');await say('Save');
+  const savedBody='Make 50 soy sauce dishes in B-Mix clay fire at cone 05\nsapphire float glaze';
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a' AND body=?").get(savedBody).n,1);
  } finally {await pause(50);dom?.window.close();await fixture.stop();}
 });

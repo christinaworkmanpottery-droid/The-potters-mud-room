@@ -8,7 +8,7 @@ function dictationBody(text) {
 }
 const materialChoice = text => {
   const n = (text || '').trim().replace(/[.!?]$/, '');
-  if (/^(?:use|yes[,]? use) b[ -]?mix(?: clay)?$/i.test(n)) return 'suggested';
+  if (/^(?:(?:use|yes[,]?(?: use)?|i said|i meant|no[,]? i said) )?b[ -]?mix(?: clay)?$/i.test(n)) return 'suggested';
   if (/^(?:keep (?:the )?original words|use (?:the )?original words)$/i.test(n)) return 'original';
   return null;
 };
@@ -155,10 +155,12 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
       prune();clear(userId);
       while(drafts.size>=max)drafts.delete(drafts.keys().next().value);
       const id=randomBytes(24).toString('hex');
-      const suggestion=reviewMaterial && /\bbmx(?=\s+clay\b)/i.test(body) ? body.replace(/\bbmx(?=\s+clay\b)/gi,'B-Mix') : null;
+      const uncertainClay=/\b(?:bmx|the\s+mix|bee\s+mix)(?=\s+clay\b)/gi;
+      const heard=reviewMaterial ? body.match(uncertainClay)?.[0] : null;
+      const suggestion=heard ? body.replace(uncertainClay,'B-Mix') : null;
       drafts.set(userId,{id,body,suggestion,target,expires:now()+ttl});
       if(suggestion){
-        const result=reply('I heard “BMX clay”. Did you mean “B-Mix clay”? Your full note is: “'+body+'” Say “yes” or “use B mix” to correct the clay name, “keep original words”, or “replace note with” followed by the full corrected note. Nothing has been saved.','material-review',{noteDraftId:id});
+        const result=reply('I heard “'+heard+' clay”. Did you mean “B-Mix clay”? Your full note is: “'+body+'” Say “yes” or “use B mix” to correct the clay name, “keep original words”, or “replace note with” followed by the full corrected note. Nothing has been saved.','material-review',{noteDraftId:id});
         result.result.draftText=body;return result;
       }
       const result=reply((target?'Updated note preview: “':'Draft studio note: “')+body+'” Check all the words. Say “save note” to save, “replace note with” followed by the full corrected text, or “cancel”. Nothing has been saved yet.','draft',{noteDraftId:id});

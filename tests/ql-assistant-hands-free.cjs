@@ -5,7 +5,7 @@ const {JSDOM} = require('jsdom');
 const root = path.resolve(__dirname, '..');
 const source = file => fs.readFileSync(path.join(root,file),'utf8');
 const tick = () => new Promise(r => setTimeout(r,20));
-async function fixture(t, config = {enabled:true,voiceEnabled:true,handsFreeEnabled:true}, support = 'standard') {
+async function fixture(t, config = {enabled:true,voiceEnabled:true,handsFreeEnabled:true}, support = 'standard', spokenDefault = false) {
   const dom = new JSDOM(source('public/index.html'), {url:'http://localhost/',runScripts:'outside-only',pretendToBeVisual:true});
   const w = dom.window, calls = [], pending = [], engines = [], timers = new Map();
   const nativeSetTimeout = w.setTimeout.bind(w);
@@ -37,6 +37,7 @@ async function fixture(t, config = {enabled:true,voiceEnabled:true,handsFreeEnab
   await tick(); run(source('public/ql-assistant.js')); await tick();
   const el = id => w.document.getElementById(id);
   if (el('qlAssistantEntry')) w.navigate('qlAssistant');
+  if(!spokenDefault && el('qlAssistantSpokenReplies'))el('qlAssistantSpokenReplies').checked=false;
   const send = (text = 'When was my last firing?') => {
     el('qlAssistantInput').value = text;
     el('qlAssistantForm').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
@@ -275,4 +276,15 @@ test('queued speech endpoint cannot restart or submit after cancellation',async 
  e.onresult({results:[{isFinal:true,0:{transcript:'Make 40 soy sauce dishes'}}]});
  const endpoint=f.timers.get(1500);f.el('qlAssistantSessionStop').click();endpoint();
  assert.equal(e.stops,0);assert.equal(f.pending.length,0);assert.equal(f.engines.length,1);
+});
+
+test('spoken replies default on and read the complete clay clarification before listening resumes',async t=>{
+ const f=await fixture(t,undefined,'standard',true);assert.equal(f.el('qlAssistantSpokenReplies').checked,true);
+ let spoken;f.w.SpeechSynthesisUtterance=class {constructor(text){this.text=text;}};
+ f.w.speechSynthesis={speak(s){spoken=s;},cancel(){}};
+ start(f);f.engines[0].result('Make 50 soy sauce dishes in the mix clay fire at cone 05');
+ const text='Did you mean B-Mix clay? Your full note is: Make 50 soy sauce dishes in the mix clay fire at cone 05. Nothing has been saved.';
+ f.reply(0,text,{result:{tool:'studio.note',status:'material-review',draftText:'Make 50 soy sauce dishes in the mix clay fire at cone 05'}});await tick();
+ assert.equal(spoken.text,text);assert.equal(f.engines.length,1);spoken.onstart();assert.equal(state(f),'speaking');
+ spoken.onend();restart(f);assert.equal(f.engines.length,2);
 });

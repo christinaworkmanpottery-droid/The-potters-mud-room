@@ -151,3 +151,24 @@ for(const segments of [
  r=await f.ask('Save note',r.context);assert.equal(r.result.status,'saved');
  assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,segments.join(' '));
 });
+
+for(const clay of ['the mix','BMX','bee mix'])test('misheard B-Mix requires clarification before saving: '+clay,async t=>{
+ const f=fixture(t);const original='Make 50 soy sauce dishes in '+clay+' clay fire at cone 05';
+ let r=await f.ask(original);assert.equal(r.result.status,'material-review');assert.match(r.response.text,/Did you mean “B-Mix clay”/);
+ assert.equal(r.result.draftText,original);r=await f.ask('Save',r.context);assert.equal(f.count(),0);
+ r=await f.ask('Yes',r.context);const corrected='Make 50 soy sauce dishes in B-Mix clay fire at cone 05';
+ assert.equal(r.result.draftText,corrected);assert.equal(f.count(),0);r=await f.ask('Save',r.context);
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,corrected);
+ r=await f.ask('Add sapphire float glaze to last note',r.context);await f.ask('Save',r.context);
+ assert.equal(f.count(),1);assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,corrected+'\nsapphire float glaze');
+});
+test('literal the mix clay can be retained after clarification',async t=>{
+ const f=fixture(t);const body='Make 50 dishes in the mix clay fire at cone 05';let r=await f.ask(body);
+ r=await f.ask('Keep original words',r.context);await f.ask('Save',r.context);
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,body);
+});
+
+for(const answer of ['Bmix','B mix clay','Yes B-Mix','I said Bmix','I meant B-Mix clay'])test('natural answer resolves pending clay clarification: '+answer,async t=>{
+ const f=fixture(t);let r=await f.ask('Make 50 dishes in the mix clay fire at cone 05');r=await f.ask(answer,r.context);
+ assert.equal(r.result.draftText,'Make 50 dishes in B-Mix clay fire at cone 05');assert.equal(f.count(),0);
+});
