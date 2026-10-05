@@ -319,3 +319,20 @@ test('queued Safari final fallback is harmless after session shutdown',async t=>
  f.el('qlAssistantSessionStop').click();fallback();
  assert.equal(e.stops,0);assert.equal(f.pending.length,0);assert.equal(f.engines.length,1);
 });
+
+
+test('Safari spoken reply resumes microphone when synthesis onend is missing',async t=>{
+ const f=await fixture(t);let spoken,canceled=0;
+ f.w.SpeechSynthesisUtterance=class {constructor(text){this.text=text;}};
+ const synth={speaking:false,pending:false,speak(s){spoken=s;this.speaking=true;},cancel(){canceled++;this.speaking=false;this.pending=false;}};
+ f.w.speechSynthesis=synth;
+ f.el('qlAssistantSpokenReplies').checked=true;start(f);f.engines[0].result('New note');
+ f.reply(0,'What would you like the note to say?',{result:{tool:'studio.note',status:'collecting'},context:{token:'a'.repeat(48)}});await tick();
+ assert.ok(spoken);assert.equal(f.engines.length,1);
+ let probe=f.timers.get(250);probe();assert.equal(f.engines.length,1,'microphone stays off while synthesis reports speaking');
+ synth.speaking=false;probe=f.timers.get(250);probe();
+ assert.equal(canceled,1,'stale Safari synthesis session is explicitly released');
+ restart(f);assert.equal(f.engines.length,2,'hands-free recognition resumes without SpeechSynthesisUtterance.onend');
+ f.engines[1].result('I need to buy sapphire float glaze and make 30 soy sauce dishes in B-Mix clay');
+ assert.equal(f.pending.length,2,'second utterance is accepted after spoken prompt handoff');
+});
