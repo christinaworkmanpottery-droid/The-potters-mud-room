@@ -36,10 +36,12 @@ test('full website + actual HTTP + SQLite: hands-free Piece conversation and man
   assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,0);
   assert.match(await say('Save note'),/Saved your Studio Note/);assert.equal(w.eval('currentPage'),'studioNotes');
   await until(()=>el('studioNotesList').textContent.includes('Make 30 soy sauce dishes in dark horse clay'));
-  assert.match(await say('Add in Sapphire Float'),/Updated note preview/);
-  assert.doesNotMatch(db.prepare("SELECT body FROM studio_notes WHERE user_id='a'").get().body,/Sapphire/);
+  assert.match(await say('Save note'),/already saved/);
+  assert.match(await say('What did you say?'),/already saved/);
+  assert.match(await say('Add sapphire glaze'),/Updated note preview/);
+  assert.doesNotMatch(db.prepare("SELECT body FROM studio_notes WHERE user_id='a'").get().body,/sapphire glaze/);
   assert.match(await say('Save note'),/Updated your Studio Note/);
-  await until(()=>el('studioNotesList').textContent.includes('Sapphire Float'));
+  await until(()=>el('studioNotesList').textContent.includes('sapphire glaze'));
   assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,1);
   assert.match(await say('Yes'),/no pending question/i);
   assert.match(await say('Add a studio note that discard this'),/Draft studio note/);
@@ -67,7 +69,7 @@ test('full website + actual HTTP + SQLite: hands-free Piece conversation and man
   assert.match(await say('Save'),/Saved your Studio Note/);
   await until(()=>el('studioNotesList').textContent.includes('I need to buy B-Mix clay'));
   assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a' AND body='I need to buy B-Mix clay'").get().n,1);
-  assert.match(await say('Save'),/no current Studio Note draft/i);
+  assert.match(await say('Save'),/already saved/i);
   await say('Open glazes');assert.equal(w.eval('currentPage'),'glazes');
   await say('Could you bring up clay or glazes?');assert.match(el('qlAssistantSessionReply').textContent,/Which would you like/);
   await say('Glazes please');assert.equal(w.eval('currentPage'),'glazes');
@@ -85,7 +87,7 @@ test('full website + actual HTTP + SQLite: hands-free Piece conversation and man
   assert.match(await say('Okay, save it please.'),/Saved your Studio Note/);
   await until(()=>el('studioNotesList').textContent.includes(dictated));
   assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a' AND body=?").get(dictated).n,1);
-  assert.match(await say('Save note'),/no current Studio Note draft/i);
+  assert.match(await say('Save note'),/already saved/i);
   await say('Open glazes');assert.equal(w.eval('currentPage'),'glazes');
  } finally {await pause(50);dom?.window.close();await fixture.stop();}
 });

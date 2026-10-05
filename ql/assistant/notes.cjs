@@ -73,6 +73,13 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
   return {
     clear,
     canAmend(userId,state){prune();return !!(saved.get(userId)?.ref===state?.savedNoteRef && state?.savedNoteRef || state?.noteDraftId && drafts.get(userId)?.id===state.noteDraftId && drafts.get(userId)?.target);},
+    reviewSaved(userId,state){
+      prune();const target=saved.get(userId);
+      if(!target || target.ref!==state?.savedNoteRef)return reply('I no longer have a current saved note in this conversation. Nothing changed.','clarification');
+      const current=db.prepare('SELECT body FROM studio_notes WHERE id=? AND user_id=?').get(target.noteId,userId);
+      if(!current || current.body!==target.originalBody){clear(userId);return reply('That note changed or is no longer available. Please open it to review the latest text. Nothing changed.','clarification');}
+      return reply('Your note is already saved: “'+current.body+'” I still have it for follow-ups. Tell me what to add, for example “Also mention sapphire glaze”. Nothing changed.','clarification',state);
+    },
     amend(userId,state,addition){
       prune();
       const d=drafts.get(userId);
@@ -117,7 +124,10 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
     },
     confirm(userId,state,save,text=''){
       prune();const draft=drafts.get(userId);
-      if(!draft || draft.id!==state?.noteDraftId)return reply('There is no current Studio Note draft to confirm. Please dictate the note again.','clarification');
+      if(!draft || draft.id!==state?.noteDraftId){
+        if(this.canAmend(userId,state))return this.reviewSaved(userId,state);
+        return reply('There is no current Studio Note draft to confirm. Please dictate the note again.','clarification');
+      }
       if(save && draft.suggestion){
         const choice=materialChoice(text);
         if(choice || /^yes$/i.test(commandWords(text))) return this.draft(userId,choice==='original'?draft.body:draft.suggestion,{reviewMaterial:false,target:draft.target});

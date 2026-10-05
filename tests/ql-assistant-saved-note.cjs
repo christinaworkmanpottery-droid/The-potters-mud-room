@@ -52,7 +52,7 @@ test('navigation clears saved-note focus',async t=>{
 test('ambiguous content asks for words; explicit Piece destination never appends',async t=>{
  const f=fixture(t);const original=await saved(f);const r=await f.ask('Add that to my note',original.context);
  assert.equal(r.result.status,'clarification');assert.match(r.response.text,/What words/);
- await assert.rejects(f.ask('Add Sapphire Float to my piece',r.context));assert.doesNotMatch(f.db.prepare('SELECT body FROM studio_notes').get().body,/Sapphire/);
+ assert.equal((await f.ask('Add Sapphire Float to my piece',r.context)).result.status,'clarification');assert.doesNotMatch(f.db.prepare('SELECT body FROM studio_notes').get().body,/Sapphire/);
 });
 test('multiple additions and full correction keep same saved target',async t=>{
  const f=fixture(t);const original=await saved(f);let r=await f.ask('Add in Sapphire Float',original.context);
@@ -64,4 +64,11 @@ test('new note during amendment creates a separate note without altering origina
  const f=fixture(t);const original=await saved(f);let r=await f.ask('Add in Sapphire Float',original.context);
  r=await f.ask('New note Buy clay',r.context);r=await f.ask('Save note',r.context);
  assert.notEqual(r.result.noteId,original.result.noteId);assert.equal(f.count(),2);assert.doesNotMatch(f.db.prepare('SELECT body FROM studio_notes WHERE id=?').get(original.result.noteId).body,/Sapphire/);
+});
+
+for(const interruption of ['Save note','What did you say?','Change clay to Electric Brown','Add Sapphire Float to my piece'])test('saved-note follow-up survives nonexecuted turn: '+interruption,async t=>{
+ const f=fixture(t);const original=await saved(f);let r=await f.ask(interruption,original.context);
+ assert.equal(r.result.status,'clarification');assert.equal(f.count(),1);
+ r=await f.ask('Add sapphire glaze',r.context);assert.equal(r.result.status,'draft');assert.match(r.result.draftText,/sapphire glaze/);
+ r=await f.ask('Save it',r.context);assert.equal(r.result.noteId,original.result.noteId);assert.equal(f.count(),1);
 });

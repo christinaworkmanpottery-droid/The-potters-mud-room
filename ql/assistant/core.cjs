@@ -145,7 +145,7 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
         if(error.code==='UNSUPPORTED_INTENT' && context?.languagePending && intentProvider===deterministicProvider){
           language={clarification:'I still have your earlier request. '+(context.languageQuestion || 'Which did you mean?'),pending:context.languagePending};
           proposed={name:'studio.language.clarify',arguments:{}};
-        } else if(['UNSUPPORTED_INTENT','ACTION_NOT_AVAILABLE'].includes(error.code) && activeDraft){
+        } else if(['UNSUPPORTED_INTENT','ACTION_NOT_AVAILABLE'].includes(error.code) && (activeDraft || notes.canAmend(userId,context))){
           clarifyNote=true;
           proposed={name:'studio.note.review',arguments:{}};
         } else {
@@ -171,7 +171,7 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
         ({result,response,state:nextState}=notes.amend(userId,context,addition));
       } else if (intent.name === 'studio.note.review') {
         if(!clarifyNote)fail(400,'INVALID_REQUEST','No note clarification is pending.');
-        ({result,response,state:nextState}=notes.review(userId,context));
+        ({result,response,state:nextState}=!activeDraft && notes.canAmend(userId,context) ? notes.reviewSaved(userId,context) : notes.review(userId,context));
       } else if (intent.name === 'studio.note.begin') {
         if(!request.context || noteStart(input.text)?.topic!==intent.arguments.topic) fail(400,'INVALID_REQUEST','Please request a note using your own words.');
         ({result,response,state:nextState}=notes.begin(userId,intent.arguments.topic));

@@ -83,3 +83,15 @@ creation or save occurs until explicit confirmation. Same behavior during note
 collection. Existing saved-note follow-up repair preserved. Added negative cases
 for record mutations and actual HTTP/website flow for the reported wording.
 Production remains untouched. Real-iPhone retest required.
+
+
+## Phase 4L.3 — preserve saved-note focus after nonexecuted turns
+4L.2 real-device result partial: note creation saved, “Add sapphire glaze” failed.
+Exact preceding turns unknown. Reproduced context loss after duplicate Save note
+and after unsupported requests; preserve valid owner-bound saved note through
+these no-op/clarification turns. Explicit navigation still clears focus. No
+mutation is inferred from an unsupported request. Focused tests and integrated
+voice/HTTP scenario include save, duplicate save, unsupported question, append,
+confirm, and checking the same row. “con five” seen in screenshot remains a
+separate possible recognition issue; not silently corrected by this patch.
+Real-device acceptance pending; production untouched.
