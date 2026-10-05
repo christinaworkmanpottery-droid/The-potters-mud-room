@@ -25,6 +25,9 @@ function noteRequest(text) {
 function studioPlan(text) {
   if(typeof text!=='string' || /[\x00-\x1f\x7f]/.test(text))return false;
   let n=text.trim().toLowerCase();
+  // Classification only: preserve the original dictated body byte-for-byte.
+  n=n.replace(/\b(?:um|uh)\b[, ]*/g,'').replace(/,\s*/g,' ').replace(/\s+/g,' ');
+  n=n.replace(/^(?:in|using|with)\s+[^.!?]{1,60}?\bclay\s+(?=(?:i\s|make\s|throw\s|trim\s|decorate\s))/,'');
   for(let i=0;i<4;i++)n=n.replace(/^(?:(?:okay|ok|hey|um|uh|well)[, ]+|please\s+|(?:can|could|would) you\s+|i (?:need|want|have|would like) to\s+|i['’]d like to\s+)/,'');
   if(!/^(?:make|throw|trim|decorate)\s+/.test(n))return false;
   if(/\b(?:record|records|entry|entries|account|delete|remove|update|publish|send)\b/.test(n))return false;

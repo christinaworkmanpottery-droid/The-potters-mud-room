@@ -21,7 +21,7 @@ test('full website + actual HTTP + SQLite: hands-free Piece conversation and man
   w.webkitSpeechRecognition=class {constructor(){engines.push(this);}start(){this.onaudiostart?.();}stop(){queueMicrotask(()=>this.onend?.());}abort(){}result(text){this.onresult?.({results:[{isFinal:true,0:{transcript:text}}]});}};
   for(const file of ['website-utils.js','app.js','studio-search.js','ql-assistant.js'])require('node:vm').runInContext(fs.readFileSync(path.join(root,'public',file),'utf8'),dom.getInternalVMContext());
   await until(()=>w.QLAssistant?.available());w.navigate('qlAssistant');
-  const el=id=>w.document.getElementById(id);el('qlAssistantSessionStart').click();
+  const el=id=>w.document.getElementById(id);el('qlAssistantSpokenReplies').checked=true;el('qlAssistantSessionStart').click();
   async function say(text){const count=engines.length;const engine=engines.at(-1);engine.result(text);engine.onend?.();await until(()=>engines.length>count);return el('qlAssistantResponse').textContent;}
   await say('Open my pieces');assert.equal(w.eval('currentPage'),'pieces');
   await say('Show me the blue one');await until(()=>w.eval('currentPage')==='pieceDetail');assert.match(el('pieceDetailContent').textContent,/Blue bowl/);
@@ -65,7 +65,7 @@ test('full website + actual HTTP + SQLite: hands-free Piece conversation and man
   assert.equal(requests.some(r=>r.url==='/api/ai/chat'),false);
   w.navigate('qlAssistant');el('qlAssistantInput').value='Save note';el('qlAssistantForm').requestSubmit();await until(()=>el('qlAssistantForm').getAttribute('aria-busy')==='false');assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,1);
   el('qlAssistantInput').value='When did I fire it?';el('qlAssistantForm').requestSubmit();await until(()=>el('qlAssistantForm').getAttribute('aria-busy')==='false');assert.match(el('qlAssistantResponse').textContent,/Which Piece/);
-  el('qlAssistantSessionStart').click();
+  el('qlAssistantSpokenReplies').checked=true;el('qlAssistantSessionStart').click();
   assert.match(await say('Create another note I need to buy BMX clay save'),/Did you mean “B-Mix clay”/);
   assert.equal(el('qlAssistantNotePreviewText').textContent,'I need to buy BMX clay');
   assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,1);

@@ -204,12 +204,12 @@ test('note dictation never submits an earlier final chunk when trailing words re
  assert.match(f.el('qlAssistantSessionReply').textContent,/incomplete|misheard/i);
  assert.match(f.el('qlAssistantSessionCommand').textContent,/Needs review/);
 });
-test('interim words appear as hearing text without replacing the accumulated draft',async t=>{
+test('accepted live preview displays interim words before submitting a note',async t=>{
  const f=await fixture(t);start(f);f.engines[0].result('Create new note');
  f.reply(0,'Text?',{result:{tool:'studio.note',status:'collecting'},context:{token:'a'.repeat(48)}});await tick();restart(f);
  const e=f.engines.at(-1);e.onresult({results:[{isFinal:false,0:{transcript:'I need sapphire'}}]});
- assert.equal(f.el('qlAssistantNotePreview').hidden,false);assert.equal(f.el('qlAssistantNotePreviewText').textContent,'');assert.match(f.el('qlAssistantSessionCommand').textContent,/I need sapphire/);assert.equal(f.pending.length,1);
- e.onresult({results:[{isFinal:false,0:{transcript:'I need to buy sapphire glaze.'}}]});assert.equal(f.el('qlAssistantNotePreviewText').textContent,'');assert.match(f.el('qlAssistantSessionCommand').textContent,/I need to buy sapphire glaze/);
+ assert.equal(f.el('qlAssistantNotePreview').hidden,false);assert.equal(f.el('qlAssistantNotePreviewText').textContent,'I need sapphire');assert.match(f.el('qlAssistantSessionCommand').textContent,/I need sapphire/);assert.equal(f.pending.length,1);
+ e.onresult({results:[{isFinal:false,0:{transcript:'I need to buy sapphire glaze.'}}]});assert.equal(f.el('qlAssistantNotePreviewText').textContent,'I need to buy sapphire glaze.');assert.match(f.el('qlAssistantSessionCommand').textContent,/I need to buy sapphire glaze/);
  f.el('qlAssistantSessionStop').click();assert.equal(f.el('qlAssistantNotePreview').hidden,true);assert.equal(f.el('qlAssistantNotePreviewText').textContent,'');assert.equal(f.pending.length,1);
 });
 
@@ -261,25 +261,25 @@ test('4K.1 material clarification keeps preview and hands-free context across co
  assert.equal(f.el('qlAssistantNotePreview').hidden,true);assert.equal(f.engines.length,4);assert.equal(f.w.eval('currentPage'),'studioNotes');
 });
 
-test('continuous recognition accumulates final segments before submitting once',async t=>{
- const f=await fixture(t);start(f);const e=f.engines[0];assert.equal(e.continuous,true);
+test('accepted noncontinuous recognition accumulates browser segments until disconnect',async t=>{
+ const f=await fixture(t);start(f);const e=f.engines[0];assert.equal(e.continuous,false);
  const result=text=>({isFinal:true,0:{transcript:text,confidence:.9}});
  e.onresult({results:[result('Make 40 soy sauce dishes in terra-cotta clay')]});
  assert.equal(f.pending.length,0);assert.equal(e.stops,0);
  e.onresult({results:[result('Make 40 soy sauce dishes in terra-cotta clay'),result('fire at cone 04')]});
- assert.equal(f.pending.length,0);f.timers.get(1500)();assert.equal(e.stops,1);
+ assert.equal(f.pending.length,0);assert.equal(e.stops,0);
  e.onend();assert.equal(f.pending.length,1);
  assert.equal(f.pending[0].body.input.text,'Make 40 soy sauce dishes in terra-cotta clay fire at cone 04');
 });
 test('queued speech endpoint cannot restart or submit after cancellation',async t=>{
  const f=await fixture(t);start(f);const e=f.engines[0];
  e.onresult({results:[{isFinal:true,0:{transcript:'Make 40 soy sauce dishes'}}]});
- const endpoint=f.timers.get(1500);f.el('qlAssistantSessionStop').click();endpoint();
+ const endpoint=e.onend;f.el('qlAssistantSessionStop').click();endpoint();
  assert.equal(e.stops,0);assert.equal(f.pending.length,0);assert.equal(f.engines.length,1);
 });
 
-test('spoken replies default on and read the complete clay clarification before listening resumes',async t=>{
- const f=await fixture(t,undefined,'standard',true);assert.equal(f.el('qlAssistantSpokenReplies').checked,true);
+test('accepted opt-in spoken replies read the complete clay clarification before listening resumes',async t=>{
+ const f=await fixture(t,undefined,'standard',true);assert.equal(f.el('qlAssistantSpokenReplies').checked,false);f.el('qlAssistantSpokenReplies').checked=true;
  let spoken;f.w.SpeechSynthesisUtterance=class {constructor(text){this.text=text;}};
  f.w.speechSynthesis={speak(s){spoken=s;},cancel(){}};
  start(f);f.engines[0].result('Make 50 soy sauce dishes in the mix clay fire at cone 05');
@@ -287,4 +287,18 @@ test('spoken replies default on and read the complete clay clarification before 
  f.reply(0,text,{result:{tool:'studio.note',status:'material-review',draftText:'Make 50 soy sauce dishes in the mix clay fire at cone 05'}});await tick();
  assert.equal(spoken.text,text);assert.equal(f.engines.length,1);spoken.onstart();assert.equal(state(f),'speaking');
  spoken.onend();restart(f);assert.equal(f.engines.length,2);
+});
+
+test('recovery: default session resumes even when spoken audio is unavailable',async t=>{
+ const f=await fixture(t,undefined,'prefixed',true);start(f);
+ f.engines[0].result('New note I need to make 25 soy sauce dishes in B-Mix clay');
+ f.reply(0,'Draft studio note',{result:{tool:'studio.note',status:'draft',draftText:'I need to make 25 soy sauce dishes in B-Mix clay'}});await tick();
+ assert.notEqual(state(f),'unavailable');restart(f);assert.equal(f.engines.length,2);
+});
+test('recovery: accepted live note preview receives interim dictation before submission',async t=>{
+ const f=await fixture(t);start(f);f.engines[0].result('New note');
+ f.reply(0,'What should the note say?',{result:{tool:'studio.note',status:'collecting'},context:{token:'a'.repeat(48)}});await tick();restart(f);
+ f.engines[1].result('Make 40 soy sauce dishes in terra-cotta clay',false);
+ assert.equal(f.el('qlAssistantNotePreviewText').textContent,'Make 40 soy sauce dishes in terra-cotta clay');
+ assert.equal(f.pending.length,1,'interim capture is visible but never submitted');
 });

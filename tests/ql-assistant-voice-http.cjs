@@ -79,7 +79,7 @@ for (const [core,web,voice,enabled,voiceEnabled,handsFree = '0'] of [['0','0','1
      assert.equal(Boolean(w.document.getElementById('qlAssistantTalk')),voiceEnabled);
      if(voiceEnabled) await say('When was my last firing?'); else await send('When was my last firing?');assert.equal(output.textContent,'Your latest recorded firing date is 2026-10-01.');
      if (handsFree === '1' && voiceEnabled) {
-      w.document.getElementById('qlAssistantSessionStart').click();
+      w.document.getElementById('qlAssistantSpokenReplies').checked=true;w.document.getElementById('qlAssistantSessionStart').click();
       for (const text of ['Open glazes', 'Open test tiles', 'When was my last firing?']) {
        const current=engine;
        current.onresult({results:[{isFinal:true,0:{transcript:text}}]});current.onend();
