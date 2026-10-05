@@ -95,3 +95,14 @@ voice/HTTP scenario include save, duplicate save, unsupported question, append,
 confirm, and checking the same row. “con five” seen in screenshot remains a
 separate possible recognition issue; not silently corrected by this patch.
 Real-device acceptance pending; production untouched.
+
+
+## Phase 4L.4 — separate note destination from addition content
+4L.3 real-device test failed: update succeeded but saved “to last note” as text.
+Parse note references separately at either end of addition commands, including
+last/latest/current/most recent and “note I just saved”. Unknown note destinations
+ask for clarification without changes; quoted text stays literal. Do not silently
+change clay names or cone numbers. Two visible cards do not by themselves prove
+a duplicate-save defect. Added exact payload and same-row assertions plus the
+actual HTTP/website addition phrasing. Focused suite: 67 pass. Full CI and isolated
+staging deployment pending authorization; real-device acceptance remains open.

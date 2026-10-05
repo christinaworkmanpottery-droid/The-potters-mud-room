@@ -72,3 +72,17 @@ for(const interruption of ['Save note','What did you say?','Change clay to Elect
  r=await f.ask('Add sapphire glaze',r.context);assert.equal(r.result.status,'draft');assert.match(r.result.draftText,/sapphire glaze/);
  r=await f.ask('Save it',r.context);assert.equal(r.result.noteId,original.result.noteId);assert.equal(f.count(),1);
 });
+
+for(const words of ['Add sapphire float glaze to last note','Add sapphire float glaze to my last note','Add sapphire float glaze to the most recent studio note','Add sapphire float glaze to the note I just saved','Add to my last note sapphire float glaze','Please append to the latest note: sapphire float glaze'])test('note reference is instruction, not payload: '+words,async t=>{
+ const f=fixture(t);const original=await saved(f);const r=await f.ask(words,original.context);
+ assert.equal(r.result.draftText,'I need to make 25 soy sauce dishes in B mix clay\nsapphire float glaze');
+ const result=await f.ask('Save',r.context);assert.equal(result.result.noteId,original.result.noteId);assert.equal(f.count(),1);
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,r.result.draftText);
+});
+test('unknown note destination asks instead of appending routing words',async t=>{
+ const f=fixture(t);const original=await saved(f);const r=await f.ask('Add sapphire glaze to the first note',original.context);
+ assert.equal(r.result.status,'clarification');assert.match(r.response.text,/Which note/);assert.doesNotMatch(f.db.prepare('SELECT body FROM studio_notes').get().body,/sapphire/);
+});
+test('quoted routing words remain literal payload',async t=>{
+ const f=fixture(t);const original=await saved(f);const r=await f.ask('Add "refer to last note"',original.context);assert.match(r.result.draftText,/\nrefer to last note$/);
+});

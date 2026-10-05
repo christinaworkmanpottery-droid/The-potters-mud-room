@@ -59,10 +59,18 @@ function noteAddition(text) {
   const words=commandWords(text).replace(/^(?:and\s+)?(?:also\s+)?/i,'');
   const m=words.match(/^(?:add(?:\s+in)?|append|include|mention)\s+(.+)$/i);
   if(!m)return null;
-  let body=m[1].replace(/\s+(?:to|in)\s+(?:(?:the|my|this|that)\s+)?(?:studio\s+)?note[.!?]*$/i,'').replace(/\s+to\s+(?:that|it|this)[.!?]*$/i,'').trim();
+  const reference='(?:(?:the|my|this|that)\\s+)?(?:(?:last|latest|previous|current|most recent)\\s+)?(?:studio\\s+)?note(?:\\s+(?:I|we)\\s+(?:just\\s+)?saved)?';
+  const suffix=new RegExp('\\s+(?:to|in|into|on)\\s+'+reference+'[.!?]*$','i');
+  const prefix=new RegExp('^(?:to|in|into|on)\\s+'+reference+'[,:]?\\s+','i');
+  // Parse destination separately from literal content, including destination-first
+  // requests. A quoted payload is literal even if it mentions a note itself.
+  let body=m[1].trim();
+  if(!/^(?:"[\s\S]*"|“[\s\S]*”)$/.test(body))body=body.replace(suffix,'').replace(prefix,'').replace(/\s+to\s+(?:that|it|this)[.!?]*$/i,'').trim();
+  body=body.replace(/^(?:"([\s\S]*)"|“([\s\S]*)”)$/,(_,a,b)=>a ?? b);
+  if(/\b(?:to|in|on|into)\s+[^.!?]*\bnote\b/i.test(body) && !/^(?:"|“)/.test(m[1]))return {body:'',ambiguous:true,clarification:'Which note do you mean? I can add to the note just saved in this conversation; I will not choose a different note for you.'};
   if(/\b(?:to|on|into|in)\s+(?:(?:the|my|a|this|that)\s+)?(?:piece|glaze collection|glaze library|shopping list|inventory|bowl|vase)\b/i.test(body))return null;
   if(/^(?:a |another |new |studio )*note\b/i.test(body))return null;
-  return {body,ambiguous:/^(?:that|it|this)[.!?]*$/i.test(body)};
+  return {body,ambiguous:!body || /^(?:that|it|this)[.!?]*$/i.test(body)};
 }
 function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
   const drafts=new Map();
@@ -85,7 +93,7 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
       const d=drafts.get(userId);
       const target=d && d.id===state?.noteDraftId ? d.target : saved.get(userId)?.ref===state?.savedNoteRef ? saved.get(userId) : null;
       if(!target)return reply('Which note should I add that to? I do not have a current saved note in this conversation. Nothing changed.','clarification');
-      if(addition.ambiguous)return reply('What words should I add to your note? Please say the words you want included. Nothing changed.','clarification',state);
+      if(addition.ambiguous)return reply(addition.clarification || 'What words should I add to your note? Please say the words you want included. Nothing changed.','clarification',state);
       const current=db.prepare('SELECT body FROM studio_notes WHERE id=? AND user_id=?').get(target.noteId,userId);
       if(!current || current.body!==target.originalBody){clear(userId);return reply('That note changed or is no longer available. Please open it to review the latest text. Nothing changed.','clarification');}
       const body=(d && d.id===state?.noteDraftId ? d.body : current.body)+'\n'+addition.body;
