@@ -71,6 +71,29 @@ test('recovery: real note phrases through speech events, HTTP, displayed content
   await say('Add sapphire float glaze to last note');await say('Save note');
   assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,total);
   assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a' AND body=?").get('Make 25 soy sauce dishes in B-Mix clay\nsapphire float glaze').n,1);
+  // Same uninterrupted session: second utterance, normalization, persisted
+  // conversational correction, UI refresh, readback and another correction.
+  await say('New note');
+  const recognized='I need to buy sapphire float glaze, make 30 soy sauce dishes, and BM mix clay.';
+  await say(recognized);
+  const normalized=recognized.replace('BM mix','B-Mix');
+  assert.equal(el('qlAssistantNotePreviewText').textContent,normalized);
+  await say('Save note');total++;
+  await until(()=>el('studioNotesList').textContent.includes(normalized));
+  assert.match(await say('Change 30 to 40'),/Updated your Studio Note/);
+  let corrected=normalized.replace('30','40');
+  await until(()=>el('studioNotesList').textContent.includes(corrected));
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a' AND body=?").get(corrected).n,1);
+  assert.ok(spoken.at(-1).includes(corrected),'corrected note read back');
+  // Preserve an ambiguous dictated variant explicitly, then correct after save.
+  await say('New note');await say('Buy the mix clay');
+  await say('Keep original words');await say('Save note');total++;
+  assert.match(await say('I said B-Mix clay'),/Updated your Studio Note/);
+  await until(()=>el('studioNotesList').textContent.includes('Buy B-Mix clay'));
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a' AND body='Buy B-Mix clay'").get().n,1);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,total);
+  const reread=await fetch(base+'/api/studio/notes',{headers:{Authorization:'Bearer '+token}}).then(r=>r.json());
+  assert.ok(JSON.stringify(reread).includes('Buy B-Mix clay'));
   assert.match(await say('When was my last firing?'),/2026-10-01/);
   assert.ok(engines.length>30,'one activation supports all turns');
  } finally {await pause(50);dom?.window.close();await fixture.stop();}

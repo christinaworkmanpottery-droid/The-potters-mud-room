@@ -1,7 +1,7 @@
 name: QL Phase 4I conversation verification
 on:
   push:
-    branches: [ql/studio-note-recovery, ql/phase-4i-conversation-context, ql/phase-4i-device-repair, ql/phase-4i-speech-clarification, ql/phase-4i-piece-clarification, ql/phase-4i-joined-speech, ql/phase-4j-confirmed-studio-notes, ql/phase-4j-note-dialogue, ql/phase-4j-dictation-repair, ql/phase-4k-voice-reliability, ql/phase-4l-flexible-commands, ql/phase-4l-saved-note-followup]
+    branches: [ql/saved-note-correction, ql/studio-note-recovery, ql/phase-4i-conversation-context, ql/phase-4i-device-repair, ql/phase-4i-speech-clarification, ql/phase-4i-piece-clarification, ql/phase-4i-joined-speech, ql/phase-4j-confirmed-studio-notes, ql/phase-4j-note-dialogue, ql/phase-4j-dictation-repair, ql/phase-4k-voice-reliability, ql/phase-4l-flexible-commands, ql/phase-4l-saved-note-followup]
   workflow_dispatch:
 jobs:
   verify:

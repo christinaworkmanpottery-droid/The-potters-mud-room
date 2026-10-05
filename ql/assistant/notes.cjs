@@ -75,6 +75,39 @@ function noteAddition(text) {
   if(/^(?:a |another |new |studio )*note\b/i.test(body))return null;
   return {body,ambiguous:!body || /^(?:that|it|this)[.!?]*$/i.test(body)};
 }
+// Corrections are explicit instructions against the conversation's saved note.
+// An implicit replacement is supported only for the bounded B-Mix clay family.
+function noteCorrection(text) {
+  if(typeof text!=='string' || /[\x00-\x1f\x7f]/.test(text))return null;
+  const words=commandWords(text);
+  let m=words.match(/^(?:change|replace|correct)\s+(.+?)\s+(?:to|with)\s+(.+)$/i);
+  if(m)return {from:m[1].trim(),to:m[2].trim()};
+  m=words.match(/^(?:(?:no[, ]+)?i (?:said|meant)|correct (?:that|it|this) to)\s+(.+)$/i);
+  return m ? {from:null,to:m[1].trim()} : null;
+}
+const bMixTerm=/^b[ -]?mix(?: clay)?$/i;
+const bMixVariants=/\b(?:bm\s+mix|b[ -]?mix|bmx|the\s+mix|bee\s+mix)(?:\s+clay)?\b/gi;
+function correctedBody(body,correction) {
+  let {from,to}=correction;
+  const material=bMixTerm.test(to);
+  if(material)to=/ clay$/i.test(to)?'B-Mix clay':'B-Mix';
+  let matches;
+  if(!from || /^(?:that|it|this)$/i.test(from)) {
+    if(!material)return null;
+    matches=[...body.matchAll(bMixVariants)];
+  } else {
+    // Generic material categories do not identify a particular clay name.
+    if(/^(?:clay|glaze|note|the note)$/i.test(from))return null;
+    const escaped=from.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    matches=[...body.matchAll(new RegExp('(?<![\\w-])'+escaped+'(?![\\w-])','gi'))];
+  }
+  if(matches.length!==1)return null;
+  const match=matches[0];
+  // Replacing a material phrase never drops or doubles the clay suffix.
+  if(material && / clay$/i.test(match[0]) && !/ clay$/i.test(to))to+=' clay';
+  if(material && /^\s+clay\b/i.test(body.slice(match.index+match[0].length)))to=to.replace(/ clay$/i,'');
+  return body.slice(0,match.index)+to+body.slice(match.index+match[0].length);
+}
 function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
   const drafts=new Map();
   const saved=new Map();
@@ -90,6 +123,22 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
       const current=db.prepare('SELECT body FROM studio_notes WHERE id=? AND user_id=?').get(target.noteId,userId);
       if(!current || current.body!==target.originalBody){clear(userId);return reply('That note changed or is no longer available. Please open it to review the latest text. Nothing changed.','clarification');}
       return reply('Your note is already saved: “'+current.body+'” I still have it for follow-ups. Tell me what to add, for example “Also mention sapphire glaze”. Nothing changed.','clarification',state);
+    },
+    correct(userId,state,correction){
+      prune();const target=saved.get(userId);
+      if(!target || target.ref!==state?.savedNoteRef)return reply('Which saved note should I correct? Nothing changed.','clarification');
+      const current=db.prepare('SELECT body FROM studio_notes WHERE id=? AND user_id=?').get(target.noteId,userId);
+      if(!current || current.body!==target.originalBody){clear(userId);return reply('That note changed or is no longer available. Please open it to review the latest text. Nothing changed.','clarification');}
+      const body=correctedBody(current.body,correction);
+      if(body===null || body.length>10000)return reply('Which exact words should I replace? Say “change” followed by the old words, then “to” and the corrected words. Nothing changed.','clarification',state);
+      let note;
+      try{note=updateStudioNote(db,{userId,id:target.noteId,originalBody:target.originalBody,body});}
+      catch{clear(userId);return reply('The correction could not be saved, or the note changed. Please open it to review the latest text.','failed');}
+      target.originalBody=note.body;target.expires=now()+ttl;
+      const result=reply('Updated your Studio Note: “'+note.body+'”','saved',state);
+      result.result.noteId=note.id;
+      result.response.navigation={kind:'page',page:'studioNotes'};
+      return result;
     },
     amend(userId,state,addition){
       prune();
@@ -156,6 +205,9 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
     },
     draft(userId,body,{reviewMaterial=true,target=null}={}){
       prune();clear(userId);
+      // Only the obvious duplicated-M recognition variant is normalized here.
+      // Ambiguous variants below still require the user's choice.
+      if(reviewMaterial)body=body.replace(/\bbm\s+mix(?=\s+clay\b)/gi,'B-Mix');
       while(drafts.size>=max)drafts.delete(drafts.keys().next().value);
       const id=randomBytes(24).toString('hex');
       const uncertainClay=/\b(?:bmx|the\s+mix|bee\s+mix)(?=\s+clay\b)/gi;
@@ -202,4 +254,4 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
     }
   };
 }
-module.exports={noteAddition,dictationBody,materialChoice,noteStart,isNoteText,noteBody,confirmation,cancellation,unclearNoteCommand,createNoteDrafts};
+module.exports={noteCorrection,noteAddition,dictationBody,materialChoice,noteStart,isNoteText,noteBody,confirmation,cancellation,unclearNoteCommand,createNoteDrafts};

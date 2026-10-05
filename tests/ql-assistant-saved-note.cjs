@@ -86,3 +86,56 @@ test('unknown note destination asks instead of appending routing words',async t=
 test('quoted routing words remain literal payload',async t=>{
  const f=fixture(t);const original=await saved(f);const r=await f.ask('Add "refer to last note"',original.context);assert.match(r.result.draftText,/\nrefer to last note$/);
 });
+
+for(const command of ['I said B-Mix clay.','Change BM mix to B-Mix.','Correct that to B-Mix clay.','No, I meant Bmix clay'])test('post-save persisted correction: '+command,async t=>{
+ const f=fixture(t);
+ let r=await f.ask('New note I need to buy sapphire float glaze, make 30 soy sauce dishes, and BM mix');
+ r=await f.ask('Save note',r.context);const id=r.result.noteId;
+ f.db.prepare('UPDATE studio_notes SET title=? WHERE id=?').run('Studio tasks',id);
+ r=await f.ask(command,r.context);
+ assert.equal(r.result.status,'saved');assert.equal(r.result.noteId,id);assert.equal(f.count(),1);
+ const body='I need to buy sapphire float glaze, make 30 soy sauce dishes, and B-Mix'+(command.startsWith('Change')?'':' clay');
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes WHERE id=?').get(id).body,body);
+ assert.match(r.response.text,/Updated your Studio Note/);assert.ok(r.response.text.includes(body));
+ assert.equal(f.db.prepare('SELECT title FROM studio_notes WHERE id=?').get(id).title,'Studio tasks');
+ assert.equal(r.response.navigation.page,'studioNotes');
+ r=await f.ask('Add two coats',r.context);r=await f.ask('Save note',r.context);assert.equal(r.result.noteId,id);
+});
+for(const spelling of ['B-Mix clay','BM mix clay','bm mix clay'])test('new dictation preserves or normalizes '+spelling,async t=>{
+ const f=fixture(t);let r=await f.ask('New note');
+ r=await f.ask('Buy '+spelling,r.context);assert.equal(r.result.draftText,'Buy B-Mix clay');
+ r=await f.ask('Save note',r.context);assert.equal(r.result.status,'saved');assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,'Buy B-Mix clay');
+});
+test('ambiguous implicit correction preserves text until explicit unique replacement',async t=>{
+ const f=fixture(t);let r=await f.ask('New note Compare B mix clay and bee mix clay');
+ r=await f.ask('keep original words',r.context);r=await f.ask('Save note',r.context);
+ const id=r.result.noteId,before=f.db.prepare('SELECT body FROM studio_notes').get().body;
+ r=await f.ask('I said B-Mix clay',r.context);assert.equal(r.result.status,'clarification');assert.match(r.response.text,/Which exact words/);
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,before);
+ r=await f.ask('Change bee mix to B-Mix',r.context);assert.equal(r.result.noteId,id);
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,'Compare B mix clay and B-Mix clay');
+});
+test('post-save correction protects ownership and concurrent manual changes',async t=>{
+ const f=fixture(t);let r=await saved(f);const id=r.result.noteId;
+ const foreign=await f.ask('I said B-Mix clay',r.context,'b');
+ assert.equal(foreign.result.status,'clarification');assert.doesNotMatch(foreign.response.text,/25 soy sauce/);
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,'I need to make 25 soy sauce dishes in B mix clay');
+ f.db.prepare('UPDATE studio_notes SET body=? WHERE id=?').run('Manual edit',id);
+ r=await f.ask('I said B-Mix clay',r.context);assert.equal(r.result.status,'clarification');
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,'Manual edit');
+});
+
+test('exact legacy BM mix clay note corrects in place without duplicating clay',t=>{
+ const {createNoteDrafts}=require('../ql/assistant/notes.cjs');const f=fixture(t),notes=createNoteDrafts(f.db);
+ const body='I need to buy sapphire float glaze, make 30 soy sauce dishes, and BM mix clay.';
+ const draft=notes.draft('a',body,{reviewMaterial:false});const original=notes.confirm('a',draft.state,true,'Save note');
+ const result=notes.correct('a',original.state,{from:'BM mix',to:'B-Mix'});
+ assert.equal(result.result.noteId,original.result.noteId);assert.equal(f.count(),1);
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,body.replace('BM mix','B-Mix'));
+});
+for(const words of ['Change missing words to B-Mix','I said Electric Brown clay'])test('unresolved correction keeps saved note and asks: '+words,async t=>{
+ const f=fixture(t);let r=await saved(f);const before=f.db.prepare('SELECT body FROM studio_notes').get().body;
+ r=await f.ask(words,r.context);assert.equal(r.result.status,'clarification');assert.match(r.response.text,/Which exact words/);
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,before);
+ r=await f.ask('Change B mix to B-Mix',r.context);assert.equal(r.result.status,'saved');
+});
