@@ -101,3 +101,40 @@ test('studio plan correction preserves exact quantities and material names',asyn
  assert.equal(r.result.draftText,'Make 30 soy sauce dishes in Dark Horse clay');await f.ask('Save note',r.context);assert.equal(f.count(),1);
 });
 for(const text of ['Make 30 piece records','Make 30 dishes and delete my account','Make a payment','Create 30 bowls','Make 30 dishes into inventory entries'])test('record mutations are not inferred as notes: '+text,()=>assert.equal(noteBody(text),null));
+
+const intended='Make 30 soy sauce dishes in Electric Brown clay fire at cone 04';
+test('reported full sentence preserves Electric Brown and leading-zero cone exactly',async t=>{
+ const f=fixture(t);let r=await f.ask(intended);assert.equal(r.result.draftText,intended);
+ r=await f.ask('Save',r.context);assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,intended);
+});
+for(const fragment of ['104','cone 04','fire at cone 04','Electric Brown clay'])test('later speech never silently replaces the draft: '+fragment,async t=>{
+ const f=fixture(t);let r=await f.ask(intended);r=await f.ask(fragment,r.context);
+ assert.equal(r.result.draftText,intended);assert.match(r.response.text,/Should I add/);assert.equal(f.count(),0);
+ r=await f.ask('Save',r.context);assert.equal(r.result.draftText,intended);assert.equal(f.count(),0);
+ r=await f.ask('Keep the original',r.context);r=await f.ask('Save it',r.context);
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,intended);
+});
+test('split utterance can be explicitly joined without losing first segment',async t=>{
+ const f=fixture(t);let r=await f.ask('Make 30 soy sauce dishes in Electric Brown clay');
+ r=await f.ask('fire at cone 04',r.context);r=await f.ask('Add those words',r.context);
+ assert.equal(r.result.draftText,intended);r=await f.ask('Save',r.context);assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,intended);
+});
+test('explicit fragment replacement is previewed and requires separate save',async t=>{
+ const f=fixture(t);let r=await f.ask(intended);r=await f.ask('Make it tomorrow instead',r.context);
+ // Use plain dictation to isolate replacement choice from studio command parsing.
+ r=await f.ask('Tomorrow morning',r.context);r=await f.ask('Use those words instead',r.context);
+ assert.equal(r.result.draftText,'Tomorrow morning');assert.equal(f.count(),0);
+ r=await f.ask('Save',r.context);assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,'Tomorrow morning');
+});
+test('pending fragment cannot cross accounts or survive cancellation',async t=>{
+ const f=fixture(t);let r=await f.ask(intended);r=await f.ask('104',r.context);
+ await assert.rejects(f.ask('Add those words',r.context,'b'));assert.equal(f.count(),0);
+ const old=r.context;r=await f.ask('Cancel',r.context);assert.equal(r.result.status,'canceled');
+ assert.notEqual((await f.ask('Save note',old)).result.status,'saved');assert.equal(f.count(),0);
+});
+
+test('number-only initial dictation cannot silently become the whole note',async t=>{
+ const f=fixture(t);let r=await f.ask('New note');r=await f.ask('104',r.context);assert.equal(r.result.status,'collecting');
+ r=await f.ask('Save',r.context);assert.equal(f.count(),0);r=await f.ask(intended,r.context);await f.ask('Save',r.context);
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,intended);
+});

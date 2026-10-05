@@ -104,9 +104,39 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
     review(userId,state){
       prune();const d=drafts.get(userId);
       if(!d || d.id!==state?.noteDraftId)return reply('I heard a note-saving request, but I do not have a current note draft. Nothing was saved. Please say “new note” followed by the full note.','clarification');
+      if(d.fragment)return this.fragmentReview(userId,state);
       const result=reply('I did not understand that last command. '+(d.body?'Your draft is still: “'+d.body+'”. Say “save note” to save, “replace note with” and the corrected text, or “cancel”.':'Please tell me what the note should say, or say “cancel”.')+' Nothing has been saved.',d.suggestion?'material-review':d.collecting?'collecting':'draft',state);
       if(d.body)result.result.draftText=d.body;
       return result;
+    },
+    fragmentChoice(userId,state,text){
+      prune();const d=drafts.get(userId);
+      if(!d || d.id!==state?.noteDraftId || !d.fragment)return null;
+      const n=commandWords(text);
+      if(/^(?:add|append|include)(?: (?:it|that|those words))?(?: to (?:it|the note|my note|this note))?$/i.test(n))return 'append';
+      if(/^(?:replace (?:it|the note|my note|this note)(?: with (?:that|those words))?|use (?:that|those words) instead)$/i.test(n))return 'replace';
+      if(/^(?:keep (?:the )?original(?: note| words)?|discard (?:that fragment|those words)|ignore (?:that|those words))$/i.test(n))return 'discard';
+      return null;
+    },
+    fragmentReview(userId,state){
+      const d=drafts.get(userId);
+      const result=reply('Your draft is still: “'+d.body+'”. I also heard “'+d.fragment+'”. Should I add those words, replace the draft with them, or keep the original? Nothing has been saved.','draft',state);
+      result.result.draftText=d.body;return result;
+    },
+    resolveFragment(userId,state,choice){
+      prune();const d=drafts.get(userId);
+      if(!d || d.id!==state?.noteDraftId || !d.fragment)return reply('There is no current fragment to resolve. Nothing changed.','clarification');
+      const body=choice==='append'?d.body+' '+d.fragment:choice==='replace'?d.fragment:d.body;
+      return this.draft(userId,body,{target:d.target});
+    },
+    capture(userId,state,body){
+      prune();const d=drafts.get(userId);
+      if(d && d.id===state?.noteDraftId && d.collecting && /^[0-9\s.,:+/-]+$/.test(body))return reply('I only received “'+body+'”. Please repeat the full note so I do not save a stray number. Nothing was saved.','collecting',state);
+      if(d && d.id===state?.noteDraftId && d.body){
+        // Incoming speech is not an implicit instruction to erase existing text.
+        d.fragment=body;return this.fragmentReview(userId,state);
+      }
+      return this.revise(userId,state,body);
     },
     revise(userId,state,body){
       const d=drafts.get(userId);
@@ -136,6 +166,7 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
         if(this.canAmend(userId,state))return this.reviewSaved(userId,state);
         return reply('There is no current Studio Note draft to confirm. Please dictate the note again.','clarification');
       }
+      if(save && draft.fragment)return this.fragmentReview(userId,state);
       if(save && draft.suggestion){
         const choice=materialChoice(text);
         if(choice || /^yes$/i.test(commandWords(text))) return this.draft(userId,choice==='original'?draft.body:draft.suggestion,{reviewMaterial:false,target:draft.target});

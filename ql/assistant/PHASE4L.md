@@ -106,3 +106,17 @@ change clay names or cone numbers. Two visible cards do not by themselves prove
 a duplicate-save defect. Added exact payload and same-row assertions plus the
 actual HTTP/website addition phrasing. Focused suite: 67 pass. Full CI and isolated
 staging deployment pending authorization; real-device acceptance remains open.
+
+
+## Phase 4L.5 — protect drafts from speech-fragment replacement
+User intended “make 30 soy sauce, dishes in electric brown clay fire at cone 04”;
+4L.4 screenshot showed a saved body of only “104”. Reproduced a concrete defect:
+full draft → bare 104 → save silently replaced the entire body. Exact device
+speech-event sequence is unavailable; this is a demonstrated failure path, not
+proof of acoustic cause. Implicit continuation now preserves the draft, stages
+new words, asks append/replace/keep-original, and blocks save until resolved.
+Explicit replacement still previews before saving. Initial number-only collected
+dictation asks for full text. No guessing that 104 means cone 04. Tests include
+exact Electric Brown/cone 04 preservation, split text, overwrite protection,
+choice, cancel, ownership, and integrated voice-event/HTTP flow. Browser acoustic
+recognition remains unproven. Full CI and staging publication pending authorization.

@@ -32,10 +32,14 @@ test('full website + actual HTTP + SQLite: hands-free Piece conversation and man
   assert.match(await say('When did I fire it?'),/2026-10-01/);
   await say('Go back to my glazes');assert.equal(w.eval('currentPage'),'glazes');
   assert.match(await say('When did I fire it?'),/Which Piece/);
-  assert.match(await say('Make 30 soy sauce dishes in dark horse clay'),/Nothing has been saved/);
+  assert.match(await say('Make 30 soy sauce dishes in Electric Brown clay fire at cone 04'),/Nothing has been saved/);
   assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,0);
+  assert.match(await say('104'),/Should I add/);
+  assert.match(await say('Save'),/Should I add/);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,0);
+  assert.match(await say('Keep the original'),/Electric Brown clay fire at cone 04/);
   assert.match(await say('Save note'),/Saved your Studio Note/);assert.equal(w.eval('currentPage'),'studioNotes');
-  await until(()=>el('studioNotesList').textContent.includes('Make 30 soy sauce dishes in dark horse clay'));
+  await until(()=>el('studioNotesList').textContent.includes('Make 30 soy sauce dishes in Electric Brown clay fire at cone 04'));
   assert.match(await say('Save note'),/already saved/);
   assert.match(await say('What did you say?'),/already saved/);
   assert.match(await say('Add sapphire float glaze to last note'),/Updated note preview/);
