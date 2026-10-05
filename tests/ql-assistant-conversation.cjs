@@ -279,13 +279,16 @@ test('note dialogue rejects foreign/expired context, preserves commands and dire
  }
  let now=0;const drafts=require('../ql/assistant/notes.cjs').createNoteDrafts(db,{now:()=>now,ttl:10});const begin=drafts.begin('a','glazing');assert.equal(drafts.wantsText('a',begin.state),true);now=10;assert.equal(drafts.wantsText('a',begin.state),false);
 });
-test('incomplete note refuses saving; next full sentence replaces draft before explicit save',async()=>{
+test('incomplete note refuses saving; full correction requires explicit replacement choice',async()=>{
  const before=db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n;
  const start=await ask('Create new note about needing to buy sapphire glaze');
  const clipped=await ask("I've been",start.context);assert.equal(clipped.result.status,'draft');
  const blocked=await ask('Save note',clipped.context);assert.equal(blocked.result.status,'incomplete');assert.match(blocked.response.text,/Nothing has been saved/);
  assert.equal(db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n,before);
- const corrected=await ask('I need to buy sapphire glaze.',blocked.context);assert.equal(corrected.result.status,'draft');
+ const proposed=await ask('I need to buy sapphire glaze.',blocked.context);assert.equal(proposed.result.draftText,"I've been");
+ assert.notEqual((await ask('Save note',proposed.context)).result.status,'saved');
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n,before);
+ const corrected=await ask('Use those words instead',proposed.context);assert.equal(corrected.result.draftText,'I need to buy sapphire glaze.');
  assert.notEqual((await ask('Save note',clipped.context)).result.status,'saved');
  const saved=await ask('Save note',corrected.context);assert.equal(saved.result.status,'saved');
  assert.equal(db.prepare('SELECT body FROM studio_notes WHERE id=?').get(saved.result.noteId).body,'I need to buy sapphire glaze.');
