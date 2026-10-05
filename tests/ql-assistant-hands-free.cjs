@@ -302,3 +302,20 @@ test('recovery: accepted live note preview receives interim dictation before sub
  assert.equal(f.el('qlAssistantNotePreviewText').textContent,'Make 40 soy sauce dishes in terra-cotta clay');
  assert.equal(f.pending.length,1,'interim capture is visible but never submitted');
 });
+
+test('Safari final fallback requests stop but never submits or overlaps before onend',async t=>{
+ const f=await fixture(t);start(f);const e=f.engines[0];
+ e.onresult({results:[{isFinal:true,0:{transcript:'New note'}}]});
+ const fallback=f.timers.get(3000);assert.equal(typeof fallback,'function');fallback();fallback();
+ assert.equal(e.stops,1);assert.equal(f.pending.length,0);assert.equal(f.engines.length,1);
+ f.timers.get(5000)();assert.equal(state(f),'unavailable');
+ assert.equal(e.aborts,1);assert.equal(f.pending.length,0);assert.equal(f.engines.length,1);
+});
+
+test('queued Safari final fallback is harmless after session shutdown',async t=>{
+ const f=await fixture(t);start(f);const e=f.engines[0];
+ e.onresult({results:[{isFinal:true,0:{transcript:'New note'}}]});
+ const fallback=f.timers.get(3000);assert.equal(typeof fallback,'function');
+ f.el('qlAssistantSessionStop').click();fallback();
+ assert.equal(e.stops,0);assert.equal(f.pending.length,0);assert.equal(f.engines.length,1);
+});

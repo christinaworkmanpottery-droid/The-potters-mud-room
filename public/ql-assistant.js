@@ -84,7 +84,7 @@
   }
   function cancelVoice(message = '', abort = true) {
     const old = recognition; recognition = null;
-    clearTimeout(voiceTimer); clearTimeout(stopTimer);
+    clearTimeout(voiceTimer); clearTimeout(stopTimer); clearTimeout(old?.finalDisconnectTimer);
     if (old) {
       old.engine.onstart = old.engine.onaudiostart = old.engine.onsoundstart = old.engine.onresult = old.engine.onerror = old.engine.onend = null;
       if (abort) try { old.engine.abort(); } catch (_) { /* Already ended. Never restart. */ }
@@ -161,6 +161,7 @@
       engine.onsoundstart = () => { if (active()) { turn.heardSound = true; voiceState('Sound detected. Listening for your words…'); } };
       engine.onresult = event => {
         if (!active()) return;
+        clearTimeout(turn.finalDisconnectTimer);
         const results = Array.from(event.results || []);
         const text = results.map(r => typeof r?.[0]?.transcript === 'string' ? r[0].transcript.trim() : '').filter(Boolean).join(' ');
         if (!text) { turn.draft = turn.finalText = ''; return; }
@@ -180,10 +181,18 @@
           // for commands too, including a one-turn request to create a note.
           voiceState('Hearing: ' + text);
           if (!handsFree || /^(stop listening|pause voice|end voice session|stop voice session)[.!?]?$/i.test(text)) stopVoice();
+          // Safari can finalize speech without promptly emitting onend. Allow
+          // three quiet seconds for further segments, then request disconnect;
+          // only the normal onend path may accept/submit this turn. Every result
+          // cancels this fallback, and interim speech never arms it.
+          else if (!turn.stopping) turn.finalDisconnectTimer = setTimeout(() => {
+            if (active() && turn.finalText && !turn.stopping) stopVoice();
+          }, 3000);
         } else { turn.finalText = ''; voiceState('Hearing: ' + text); }
       };
       engine.onerror = event => {
         if (!active()) return;
+        clearTimeout(turn.finalDisconnectTimer);
         if (handsFree) {
           if (event.error === 'no-speech') {
             // Wait for onend before recycling the recognizer. If it never arrives,
@@ -224,6 +233,7 @@
   function stopVoice() {
     const turn = recognition;
     if (!turn || turn.stopping) return;
+    clearTimeout(turn.finalDisconnectTimer);
     turn.stopping = true; voiceState('Finishing speech…');
     stopTimer = setTimeout(() => {
       if (recognition === turn && handsFree) { pauseSession('Speech did not disconnect. Tap Start voice session to retry.', 'unavailable'); return; }
