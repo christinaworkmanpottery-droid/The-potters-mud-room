@@ -20,12 +20,22 @@ function noteRequest(text) {
   if(!match)return null;
   return text.trim().slice(match[0].length).replace(/^(?:\s+(?:that|saying|of)\b)?\s*[:,.!?]?\s*/, '').trim();
 }
+// Physical studio plans can be offered as note drafts, never executed as record
+// creation. Strip conversational scaffolding for classification only.
+function studioPlan(text) {
+  if(typeof text!=='string' || /[\x00-\x1f\x7f]/.test(text))return false;
+  let n=text.trim().toLowerCase();
+  for(let i=0;i<4;i++)n=n.replace(/^(?:(?:okay|ok|hey|um|uh|well)[, ]+|please\s+|(?:can|could|would) you\s+|i (?:need|want|have|would like) to\s+|i['’]d like to\s+)/,'');
+  if(!/^(?:make|throw|trim|decorate)\s+/.test(n))return false;
+  if(/\b(?:record|records|entry|entries|account|delete|remove|update|publish|send)\b/.test(n))return false;
+  return /^(?:make|throw|trim|decorate)\s+(?:\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten|twenty|thirty|some|more|another)\b.{0,100}\b(?:dish|dishes|bowl|bowls|cup|cups|mug|mugs|plate|plates|vase|vases|planter|planters|pitcher|pitchers|jar|jars|sculpture|sculptures)\b/.test(n);
+}
 function noteBody(text) {
   if(typeof text !== 'string' || /[\x00-\x1f\x7f]/.test(text)) return null;
   const correction=text.trim().match(/^(?:replace (?:the )?note with|change (?:the )?note to)\s+(.+)$/i);
   if(correction)return correction[1].trim();
   const body=noteRequest(text);
-  return body ? dictationBody(body) || null : null;
+  return body ? dictationBody(body) || null : studioPlan(text) ? dictationBody(text) : null;
 }
 function noteStart(text) {
   if(typeof text !== 'string' || /[\x00-\x1f\x7f]/.test(text)) return null;

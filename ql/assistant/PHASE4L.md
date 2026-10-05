@@ -71,3 +71,15 @@ Regression tests include actual HTTP/website hands-free save → append → save
 visible updated note. Real-iPhone acceptance still required for this repair.
 Test: create/save a note, say “Add in Sapphire Float”, review the combined text,
 say “Save note”, verify one updated note and resumed listening.
+
+
+## Phase 4L.2 — real-device natural studio-plan note repair
+4L.1 did not pass real-device acceptance: user reported four attempts and showed
+correctly recognized “Make 30 soy sauce dishes in dark horse clay” rejected as
+unsupported. This repairs intent handling, not acoustic recognition. Bounded
+physical pottery plans (make/throw/trim/decorate + quantity + pottery form) can
+become exact-text note previews without memorizing a new-note prefix. No record
+creation or save occurs until explicit confirmation. Same behavior during note
+collection. Existing saved-note follow-up repair preserved. Added negative cases
+for record mutations and actual HTTP/website flow for the reported wording.
+Production remains untouched. Real-iPhone retest required.

@@ -87,3 +87,17 @@ test('provider cannot invent clarification or confirmation authority',async t=>{
  }
  assert.equal(f.count(),0);
 });
+
+for(const words of ['Make 30 soy sauce dishes in dark horse clay','I need to make 30 soy sauce dishes in Dark Horse clay','Could you please make thirty soy sauce dishes using Dark Horse clay','Okay, make a small bowl with B-Mix clay','Throw two mugs tomorrow']){
+ for(const collecting of [false,true])test('physical studio plan is a confirmed note, collecting='+collecting+': '+words,async t=>{
+  const f=fixture(t);const context=collecting?(await f.ask('New note')).context:{token:null};
+  const r=await f.ask(words,context);assert.equal(r.result.status,'draft');assert.equal(r.result.draftText,words);assert.equal(f.count(),0);
+  const saved=await f.ask('Save it',r.context);assert.equal(saved.result.status,'saved');assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,words);
+ });
+}
+test('studio plan correction preserves exact quantities and material names',async t=>{
+ const f=fixture(t);let r=await f.ask('New note');r=await f.ask('Make 20 soy sauce dishes in B mix clay',r.context);
+ r=await f.ask('Make 30 soy sauce dishes in Dark Horse clay',r.context);
+ assert.equal(r.result.draftText,'Make 30 soy sauce dishes in Dark Horse clay');await f.ask('Save note',r.context);assert.equal(f.count(),1);
+});
+for(const text of ['Make 30 piece records','Make 30 dishes and delete my account','Make a payment','Create 30 bowls','Make 30 dishes into inventory entries'])test('record mutations are not inferred as notes: '+text,()=>assert.equal(noteBody(text),null));

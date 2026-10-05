@@ -32,10 +32,10 @@ test('full website + actual HTTP + SQLite: hands-free Piece conversation and man
   assert.match(await say('When did I fire it?'),/2026-10-01/);
   await say('Go back to my glazes');assert.equal(w.eval('currentPage'),'glazes');
   assert.match(await say('When did I fire it?'),/Which Piece/);
-  assert.match(await say('Add a studio note that I want to try this combination again'),/Nothing has been saved/);
+  assert.match(await say('Make 30 soy sauce dishes in dark horse clay'),/Nothing has been saved/);
   assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,0);
   assert.match(await say('Save note'),/Saved your Studio Note/);assert.equal(w.eval('currentPage'),'studioNotes');
-  await until(()=>el('studioNotesList').textContent.includes('I want to try this combination again'));
+  await until(()=>el('studioNotesList').textContent.includes('Make 30 soy sauce dishes in dark horse clay'));
   assert.match(await say('Add in Sapphire Float'),/Updated note preview/);
   assert.doesNotMatch(db.prepare("SELECT body FROM studio_notes WHERE user_id='a'").get().body,/Sapphire/);
   assert.match(await say('Save note'),/Updated your Studio Note/);
