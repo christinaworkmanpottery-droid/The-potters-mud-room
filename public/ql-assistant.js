@@ -9,7 +9,7 @@
   let page, entry, input, form, send, retry, output, fallback;
   let voiceEnabled = false, recognition = null, voiceTimer, stopTimer;
   let talk, stop, cancel, voiceStatus;
-  let handsFreeEnabled = false, handsFree = false, sessionTimer, restartTimer, speechTimer, requestTimer;
+  let handsFreeEnabled = false, handsFree = false, sessionTimer, restartTimer, speechTimer, speechProbeTimer, requestTimer;
   let dock, dockStatus, dockCommand, dockReply, sessionStart, sessionStop, spokenReplies, utterance, notePreview, notePreviewText;
   let speechReview = null;
   let emptyAttempts = 0, voiceEpoch = 0, internalNavigation = false;
@@ -25,7 +25,7 @@
     speechReview = null;
     handsFree = false; voiceEpoch++; conversationToken = null; noteDictation = false; recordNavigation = false;
     if(notePreview){notePreview.hidden=true;notePreviewText.textContent='';}
-    clearTimeout(restartTimer); clearTimeout(sessionTimer); clearTimeout(speechTimer); clearTimeout(requestTimer);
+    clearTimeout(restartTimer); clearTimeout(sessionTimer); clearTimeout(speechTimer); clearTimeout(speechProbeTimer); clearTimeout(requestTimer);
     if (utterance) { utterance.onend = utterance.onerror = utterance.onstart = null; utterance = null; window.speechSynthesis?.cancel(); }
     cancelVoice();
     sessionState(state, message);
@@ -52,15 +52,41 @@
     if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
       pauseSession('Spoken replies are unavailable. Turn off spoken replies and restart for text responses.', 'unavailable'); return;
     }
-    const own = voiceEpoch;
+    const own = voiceEpoch, synth = window.speechSynthesis;
     const speech = new window.SpeechSynthesisUtterance(text.slice(0, 600)); utterance = speech;
+    let finished = false, observedSpeaking = false, quietChecks = 0;
     speech.lang = 'en-US';
     const active = () => handsFree && own === voiceEpoch && utterance === speech;
-    speech.onstart = () => { if (active()) sessionState('speaking', 'Speaking — microphone is off.'); };
-    speech.onend = () => { if (active()) { clearTimeout(speechTimer); utterance = null; listenAgain(); } };
+    const completeSpeech = (forceRelease = false) => {
+      if (!active() || finished) return;
+      finished = true;
+      clearTimeout(speechTimer); clearTimeout(speechProbeTimer);
+      speech.onstart = speech.onend = speech.onerror = null;
+      utterance = null;
+      if (forceRelease) try { synth.cancel(); } catch (_) { /* Best-effort Safari audio-session release. */ }
+      listenAgain();
+    };
+    const probeSpeech = () => {
+      if (!active() || finished) return;
+      const speaking = synth.speaking === true, pending = synth.pending === true;
+      if (speaking) {
+        observedSpeaking = true; quietChecks = 0;
+        sessionState('speaking', 'Speaking — microphone is off.');
+      } else if (!pending) {
+        quietChecks++;
+        // iPhone Safari can finish TTS without dispatching SpeechSynthesisUtterance.onend.
+        // Once speech was observed and is now idle, or the utterance never starts at
+        // all for roughly 1.5 seconds, release synthesis and resume recognition.
+        if (observedSpeaking || quietChecks >= 6) { completeSpeech(true); return; }
+      }
+      speechProbeTimer = setTimeout(probeSpeech, 250);
+    };
+    speech.onstart = () => { if (active()) { observedSpeaking = true; quietChecks = 0; sessionState('speaking', 'Speaking — microphone is off.'); } };
+    speech.onend = () => completeSpeech(false);
     speech.onerror = () => { if (active()) pauseSession('Audio could not play. Turn off spoken replies and restart the session.', 'unavailable'); };
     speechTimer = setTimeout(() => { if (active()) pauseSession('Audio did not finish. Turn off spoken replies and restart the session.', 'unavailable'); }, 30000);
-    try { window.speechSynthesis.speak(speech); } catch (_) { speech.onerror(); }
+    speechProbeTimer = setTimeout(probeSpeech, 250);
+    try { synth.speak(speech); } catch (_) { speech.onerror(); }
   }
   function beginSession() {
     syncSession();
