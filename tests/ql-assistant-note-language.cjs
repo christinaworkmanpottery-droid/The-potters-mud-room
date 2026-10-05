@@ -107,22 +107,22 @@ test('reported full sentence preserves Electric Brown and leading-zero cone exac
  const f=fixture(t);let r=await f.ask(intended);assert.equal(r.result.draftText,intended);
  r=await f.ask('Save',r.context);assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,intended);
 });
-for(const fragment of ['104','cone 04','fire at cone 04','Electric Brown clay'])test('later speech never silently replaces the draft: '+fragment,async t=>{
+for(const fragment of ['104'])test('later speech never silently replaces the draft: '+fragment,async t=>{
  const f=fixture(t);let r=await f.ask(intended);r=await f.ask(fragment,r.context);
  assert.equal(r.result.draftText,intended);assert.match(r.response.text,/Should I add/);assert.equal(f.count(),0);
  r=await f.ask('Save',r.context);assert.equal(r.result.draftText,intended);assert.equal(f.count(),0);
  r=await f.ask('Keep the original',r.context);r=await f.ask('Save it',r.context);
  assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,intended);
 });
-test('split utterance can be explicitly joined without losing first segment',async t=>{
+test('split utterance accumulates and saves without an extra clarification',async t=>{
  const f=fixture(t);let r=await f.ask('Make 30 soy sauce dishes in Electric Brown clay');
- r=await f.ask('fire at cone 04',r.context);r=await f.ask('Add those words',r.context);
+ r=await f.ask('fire at cone 04',r.context);
  assert.equal(r.result.draftText,intended);r=await f.ask('Save',r.context);assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,intended);
 });
 test('explicit fragment replacement is previewed and requires separate save',async t=>{
  const f=fixture(t);let r=await f.ask(intended);r=await f.ask('Make it tomorrow instead',r.context);
  // Use plain dictation to isolate replacement choice from studio command parsing.
- r=await f.ask('Tomorrow morning',r.context);r=await f.ask('Use those words instead',r.context);
+ r=await f.ask('Replace note with Tomorrow morning',r.context);
  assert.equal(r.result.draftText,'Tomorrow morning');assert.equal(f.count(),0);
  r=await f.ask('Save',r.context);assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,'Tomorrow morning');
 });
@@ -137,4 +137,17 @@ test('number-only initial dictation cannot silently become the whole note',async
  const f=fixture(t);let r=await f.ask('New note');r=await f.ask('104',r.context);assert.equal(r.result.status,'collecting');
  r=await f.ask('Save',r.context);assert.equal(f.count(),0);r=await f.ask(intended,r.context);await f.ask('Save',r.context);
  assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,intended);
+});
+
+for(const segments of [
+ ['Make 40 soy sauce dishes in terra-cotta clay fire at cone 04'],
+ ['Make 40 soy sauce dishes in terra-cotta clay','fire at cone 04'],
+ ['Make 40 soy sauce dishes in terra-cotta clay','fire','at cone 04'],
+ ['Make 40 soy sauce dishes and terra-cotta clay','At con 04']
+])test('reported terra-cotta dictation saves every captured segment: '+segments.length+' '+segments.at(-1),async t=>{
+ const f=fixture(t);let r=await f.ask(segments[0]);
+ for(const segment of segments.slice(1))r=await f.ask(segment,r.context);
+ assert.equal(r.result.draftText,segments.join(' '));assert.equal(f.count(),0);
+ r=await f.ask('Save note',r.context);assert.equal(r.result.status,'saved');
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,segments.join(' '));
 });

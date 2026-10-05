@@ -203,12 +203,12 @@ test('note dictation never submits an earlier final chunk when trailing words re
  assert.match(f.el('qlAssistantSessionReply').textContent,/incomplete|misheard/i);
  assert.match(f.el('qlAssistantSessionCommand').textContent,/Needs review/);
 });
-test('live note draft visibly updates interim words before any request or save and clears on stop',async t=>{
+test('interim words appear as hearing text without replacing the accumulated draft',async t=>{
  const f=await fixture(t);start(f);f.engines[0].result('Create new note');
  f.reply(0,'Text?',{result:{tool:'studio.note',status:'collecting'},context:{token:'a'.repeat(48)}});await tick();restart(f);
  const e=f.engines.at(-1);e.onresult({results:[{isFinal:false,0:{transcript:'I need sapphire'}}]});
- assert.equal(f.el('qlAssistantNotePreview').hidden,false);assert.equal(f.el('qlAssistantNotePreviewText').textContent,'I need sapphire');assert.equal(f.pending.length,1);
- e.onresult({results:[{isFinal:false,0:{transcript:'I need to buy sapphire glaze.'}}]});assert.equal(f.el('qlAssistantNotePreviewText').textContent,'I need to buy sapphire glaze.');
+ assert.equal(f.el('qlAssistantNotePreview').hidden,false);assert.equal(f.el('qlAssistantNotePreviewText').textContent,'');assert.match(f.el('qlAssistantSessionCommand').textContent,/I need sapphire/);assert.equal(f.pending.length,1);
+ e.onresult({results:[{isFinal:false,0:{transcript:'I need to buy sapphire glaze.'}}]});assert.equal(f.el('qlAssistantNotePreviewText').textContent,'');assert.match(f.el('qlAssistantSessionCommand').textContent,/I need to buy sapphire glaze/);
  f.el('qlAssistantSessionStop').click();assert.equal(f.el('qlAssistantNotePreview').hidden,true);assert.equal(f.el('qlAssistantNotePreviewText').textContent,'');assert.equal(f.pending.length,1);
 });
 
@@ -258,4 +258,21 @@ test('4K.1 material clarification keeps preview and hands-free context across co
  f.engines[2].result('Save');assert.equal(f.pending[2].body.context.token,'b'.repeat(48));
  f.reply(2,'Saved your Studio Note.',{result:{tool:'studio.note',status:'saved'},context:{token:'c'.repeat(48)},response:{text:'Saved your Studio Note.',navigation:{kind:'page',page:'studioNotes'}}});await tick();restart(f);
  assert.equal(f.el('qlAssistantNotePreview').hidden,true);assert.equal(f.engines.length,4);assert.equal(f.w.eval('currentPage'),'studioNotes');
+});
+
+test('continuous recognition accumulates final segments before submitting once',async t=>{
+ const f=await fixture(t);start(f);const e=f.engines[0];assert.equal(e.continuous,true);
+ const result=text=>({isFinal:true,0:{transcript:text,confidence:.9}});
+ e.onresult({results:[result('Make 40 soy sauce dishes in terra-cotta clay')]});
+ assert.equal(f.pending.length,0);assert.equal(e.stops,0);
+ e.onresult({results:[result('Make 40 soy sauce dishes in terra-cotta clay'),result('fire at cone 04')]});
+ assert.equal(f.pending.length,0);f.timers.get(1500)();assert.equal(e.stops,1);
+ e.onend();assert.equal(f.pending.length,1);
+ assert.equal(f.pending[0].body.input.text,'Make 40 soy sauce dishes in terra-cotta clay fire at cone 04');
+});
+test('queued speech endpoint cannot restart or submit after cancellation',async t=>{
+ const f=await fixture(t);start(f);const e=f.engines[0];
+ e.onresult({results:[{isFinal:true,0:{transcript:'Make 40 soy sauce dishes'}}]});
+ const endpoint=f.timers.get(1500);f.el('qlAssistantSessionStop').click();endpoint();
+ assert.equal(e.stops,0);assert.equal(f.pending.length,0);assert.equal(f.engines.length,1);
 });

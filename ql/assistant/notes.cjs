@@ -133,8 +133,12 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
       prune();const d=drafts.get(userId);
       if(d && d.id===state?.noteDraftId && d.collecting && /^[0-9\s.,:+/-]+$/.test(body))return reply('I only received “'+body+'”. Please repeat the full note so I do not save a stray number. Nothing was saved.','collecting',state);
       if(d && d.id===state?.noteDraftId && d.body){
-        // Incoming speech is not an implicit instruction to erase existing text.
-        d.fragment=body;return this.fragmentReview(userId,state);
+        // Dictation can arrive in several recognition sessions. Continue the draft;
+        // only an explicit replacement command may discard existing words.
+        if(d.fragment || /^[0-9\s.,:+/-]+$/.test(body)){d.fragment=body;return this.fragmentReview(userId,state);}
+        const combined=d.body+' '+body;
+        if(combined.length>10000)return this.review(userId,state);
+        return this.draft(userId,combined,{target:d.target});
       }
       return this.revise(userId,state,body);
     },

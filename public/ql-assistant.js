@@ -1,13 +1,13 @@
 /* Bounded QL proof. Speech is transient input to the same typed turn path. */
 (() => {
   'use strict';
-  const displayName = 'QL assistant — testing 4L.5';
+  const displayName = 'QL assistant — testing 4L.6';
   const identity = () => JSON.stringify([token, currentUser?.id, localStorage.getItem('mudlog_token')]);
   let conversationToken = null, recordNavigation = false, noteDictation = false;
   let session = identity(), invalidSession = null, generation = 0, serial = 0;
   let controller, pendingText = null, enabled = false, entered = false;
   let page, entry, input, form, send, retry, output, fallback;
-  let voiceEnabled = false, recognition = null, voiceTimer, stopTimer;
+  let voiceEnabled = false, recognition = null, voiceTimer, stopTimer, speechEndTimer;
   let talk, stop, cancel, voiceStatus;
   let handsFreeEnabled = false, handsFree = false, sessionTimer, restartTimer, speechTimer, requestTimer;
   let dock, dockStatus, dockCommand, dockReply, sessionStart, sessionStop, spokenReplies, utterance, notePreview, notePreviewText;
@@ -84,7 +84,7 @@
   }
   function cancelVoice(message = '', abort = true) {
     const old = recognition; recognition = null;
-    clearTimeout(voiceTimer); clearTimeout(stopTimer);
+    clearTimeout(voiceTimer); clearTimeout(stopTimer); clearTimeout(speechEndTimer);
     if (old) {
       old.engine.onstart = old.engine.onaudiostart = old.engine.onsoundstart = old.engine.onresult = old.engine.onerror = old.engine.onend = null;
       if (abort) try { old.engine.abort(); } catch (_) { /* Already ended. Never restart. */ }
@@ -128,7 +128,7 @@
     try {
       const engine = new (speechConstructor())();
       turn = {engine, stopping: false, finalText: '', draft: '', heardSound: false, uncertain: false, timedOut: false}; recognition = turn;
-      engine.continuous = false; engine.interimResults = true; engine.maxAlternatives = 1; engine.lang = 'en-US';
+      engine.continuous = handsFree; engine.interimResults = true; engine.maxAlternatives = 1; engine.lang = 'en-US';
       const finish = (message, ended = false, allowFinal = false) => {
         if (!active()) return;
         const finalText = turn.finalText, draft = turn.draft;
@@ -161,6 +161,7 @@
       engine.onsoundstart = () => { if (active()) { turn.heardSound = true; voiceState('Sound detected. Listening for your words…'); } };
       engine.onresult = event => {
         if (!active()) return;
+        clearTimeout(speechEndTimer);
         const results = Array.from(event.results || []);
         const text = results.map(r => typeof r?.[0]?.transcript === 'string' ? r[0].transcript.trim() : '').filter(Boolean).join(' ');
         if (!text) { turn.draft = turn.finalText = ''; return; }
@@ -173,13 +174,13 @@
         if (dockCommand) dockCommand.textContent = 'Hearing: ' + text;
         // Some engines omit confidence or return zero as an unknown value.
         turn.uncertain = results.some(r => Number.isFinite(r?.[0]?.confidence) && r[0].confidence > 0 && r[0].confidence < 0.6);
-        if(noteDictation && notePreview && !/^(?:save(?: note)?|confirm(?: note)?|yes|no|cancel|stop listening)[.!?]?$/i.test(text)){notePreview.hidden=false;notePreviewText.textContent=text;}
         if (results.length && results.every(r => r.isFinal === true)) {
           turn.finalText = text;
           // A final segment is not the end of the utterance. Wait for onend
           // for commands too, including a one-turn request to create a note.
           voiceState('Hearing: ' + text);
           if (!handsFree || /^(stop listening|pause voice|end voice session|stop voice session)[.!?]?$/i.test(text)) stopVoice();
+          else speechEndTimer = setTimeout(() => { if (active() && !turn.stopping) stopVoice(); }, 1500);
         } else { turn.finalText = ''; voiceState('Hearing: ' + text); }
       };
       engine.onerror = event => {
@@ -312,7 +313,7 @@
         if(notePreview){
           notePreview.hidden=!noteDictation;
           if(!noteDictation || data.result.status==='collecting')notePreviewText.textContent='';
-          else if(typeof data.result.draftText==='string' && data.result.draftText.length<=200)notePreviewText.textContent=data.result.draftText;
+          else if(typeof data.result.draftText==='string' && data.result.draftText.length<=10000)notePreviewText.textContent=data.result.draftText;
         }
         // The core owns all facts and wording, including empty/undated/tied records.
         output.textContent = data.response.text;
@@ -362,7 +363,7 @@
     page = node('section'); page.id = 'pageQLAssistant'; page.className = 'page';
     page.style.maxWidth = '640px'; page.setAttribute('aria-labelledby', 'qlAssistantHeading');
     const heading = node('h2', displayName); heading.id = 'qlAssistantHeading';
-    const help = node('p', 'Open any studio feature, find saved records, or ask when you last fired. Try “Open my test tiles”, “Find blue glazes”, or “Open my last firing”. Changes still use the normal forms.');
+    const help = node('p', 'Open any studio feature, find saved records, or ask when you last fired. Try “Open my test tiles”, “Find blue glazes”, or “Open my last firing”. To dictate a Studio Note, say “new note”, dictate the text, then say “save note”. Say “replace note with” to correct it. Other changes use the normal forms.');
     form = node('form'); form.id = 'qlAssistantForm'; form.setAttribute('aria-busy', 'false');
     const label = node('label', 'Your question'); label.htmlFor = 'qlAssistantInput';
     input = node('input'); input.id = 'qlAssistantInput'; input.type = 'text'; input.maxLength = 200;
@@ -394,7 +395,7 @@
     }
     if (handsFreeEnabled) {
       dock = node('aside'); dock.id = 'qlAssistantSession'; dock.setAttribute('aria-label', 'Voice session controls');
-      const note = node('p', 'Conversation test 4L.5. Wait for Microphone ready. Say “stop listening” to end. Keep Safari visible.');
+      const note = node('p', 'Conversation test 4L.6. Wait for Microphone ready. Say “stop listening” to end. Keep Safari visible.');
       sessionStart = node('button', 'Start voice session'); sessionStart.id = 'qlAssistantSessionStart';
       sessionStop = node('button', 'End session'); sessionStop.id = 'qlAssistantSessionStop';
       for (const b of [sessionStart, sessionStop]) { b.type = 'button'; b.className = 'btn btn-secondary'; }

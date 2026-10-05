@@ -94,5 +94,13 @@ test('full website + actual HTTP + SQLite: hands-free Piece conversation and man
   assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a' AND body=?").get(dictated).n,1);
   assert.match(await say('Save note'),/already saved/i);
   await say('Open glazes');assert.equal(w.eval('currentPage'),'glazes');
+  await say('Make 40 soy sauce dishes in terra-cotta clay');
+  await say('fire at cone 04');
+  const complete='Make 40 soy sauce dishes in terra-cotta clay fire at cone 04';
+  assert.equal(el('qlAssistantNotePreviewText').textContent,complete);
+  assert.match(await say('Save note'),/Saved your Studio Note/);
+  await until(()=>el('studioNotesList').textContent.includes(complete));
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a' AND body=?").get(complete).n,1);
+  assert.match(await say('Save note'),/already saved/i);
  } finally {await pause(50);dom?.window.close();await fixture.stop();}
 });
