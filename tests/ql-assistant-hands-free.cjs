@@ -336,3 +336,14 @@ test('Safari spoken reply resumes microphone when synthesis onend is missing',as
  f.engines[1].result('I need to buy sapphire float glaze and make 30 soy sauce dishes in B-Mix clay');
  assert.equal(f.pending.length,2,'second utterance is accepted after spoken prompt handoff');
 });
+
+
+test('Safari tail-only final callback preserves the complete earlier transcript',async t=>{
+ const f=await fixture(t);start(f);const e=f.engines[0];
+ const result=text=>({isFinal:true,0:{transcript:text,confidence:.9}});
+ e.onresult({results:[result('Make 30 soy sauce dishes in B-Mix clay')]});
+ e.onresult({results:[result('fire at cone 04')]});
+ assert.equal(f.el('qlAssistantSessionCommand').textContent,'Hearing: Make 30 soy sauce dishes in B-Mix clay fire at cone 04');
+ e.onend();assert.equal(f.pending.length,1);
+ assert.equal(f.pending[0].body.input.text,'Make 30 soy sauce dishes in B-Mix clay fire at cone 04');
+});
