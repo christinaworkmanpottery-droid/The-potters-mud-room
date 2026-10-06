@@ -69,7 +69,8 @@ function noteReplacement(text) {
   if(!from || !to || from.length>200 || to.length>200)return null;
   return {from,to};
 }
-function noteAddition(text) {  if(typeof text!=='string' || /[\x00-\x1f\x7f]/.test(text))return null;
+function noteAddition(text) {
+  if(typeof text!=='string' || /[\x00-\x1f\x7f]/.test(text))return null;
   const words=commandWords(text).replace(/^(?:and\s+)?(?:also\s+)?/i,'');
   const m=words.match(/^(?:add(?:\s+in)?|append|include|mention)\s+(.+)$/i);
   if(!m)return null;
