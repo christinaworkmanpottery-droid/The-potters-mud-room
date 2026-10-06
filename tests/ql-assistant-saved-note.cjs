@@ -86,3 +86,22 @@ test('unknown note destination asks instead of appending routing words',async t=
 test('quoted routing words remain literal payload',async t=>{
  const f=fixture(t);const original=await saved(f);const r=await f.ask('Add "refer to last note"',original.context);assert.match(r.result.draftText,/\nrefer to last note$/);
 });
+
+
+test('saved note phrase correction previews then updates same note',async t=>{
+ const f=fixture(t);let r=await f.ask('New note Make 30 soy sauce dishes and terra-cotta clay fire cone six');
+ r=await f.ask('Save note',r.context);const id=r.result.noteId;
+ const preview=await f.ask('Change last note and terra-cotta clay to in terra-cotta clay',r.context);
+ assert.equal(preview.result.status,'draft');
+ assert.equal(preview.result.draftText,'Make 30 soy sauce dishes in terra-cotta clay fire cone six');
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes WHERE id=?').get(id).body,'Make 30 soy sauce dishes and terra-cotta clay fire cone six');
+ const result=await f.ask('Save it',preview.context);
+ assert.equal(result.result.noteId,id);
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes WHERE id=?').get(id).body,'Make 30 soy sauce dishes in terra-cotta clay fire cone six');
+});
+test('saved note correction fails closed when phrase is missing or repeated',async t=>{
+ const f=fixture(t);let r=await f.ask('New note red clay and red clay');r=await f.ask('Save note',r.context);
+ let x=await f.ask('Change red clay to B-Mix clay',r.context);assert.equal(x.result.status,'clarification');assert.match(x.response.text,/more than once/);
+ x=await f.ask('Change blue clay to B-Mix clay',x.context);assert.equal(x.result.status,'clarification');assert.match(x.response.text,/could not find/);
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,'red clay and red clay');
+});
