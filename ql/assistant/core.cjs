@@ -2,7 +2,7 @@
 const {DOMAINS, DESTINATIONS, validQuery, resolve} = require('./intents.cjs');
 const {createContextStore, followup, createConversationTools} = require('./conversation.cjs');
 const {envelope,interpret}=require('./language.cjs');
-const {noteAddition,dictationBody,noteStart,isNoteText,noteBody,confirmation,cancellation,unclearNoteCommand,createNoteDrafts}=require('./notes.cjs');
+const {noteAddition,noteReplacement,dictationBody,noteStart,isNoteText,noteBody,confirmation,cancellation,unclearNoteCommand,createNoteDrafts}=require('./notes.cjs');
 const INTENT = 'studio.firing.latest';
 class AssistantError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }
@@ -16,7 +16,7 @@ function validateIntent(value) {
   if (!exact(value, ['name', 'arguments'])) fail(400, 'UNSUPPORTED_INTENT', 'Unsupported assistant intent.');
   const args = value.arguments;
   const valid = (value.name==='studio.note.fragment' && exact(args,['choice']) && ['append','replace','discard'].includes(args.choice)) || (value.name === 'studio.note.begin' && exact(args,['topic']) && typeof args.topic==='string' && args.topic.length<=200 && !/[\x00-\x1f\x7f]/.test(args.topic)) || (value.name === 'studio.note.draft' && exact(args,['body']) && typeof args.body==='string' && args.body.trim().length>0 && args.body.length<=200 && !/[\x00-\x1f\x7f]/.test(args.body)) ||
-    (['studio.note.append','studio.language.clarify','studio.note.confirm','studio.note.cancel','studio.note.review'].includes(value.name) && exact(args,[])) || (['studio.piece.glazes','studio.piece.firings','studio.piece.open','studio.piece.clarifyGlazes','studio.piece.repeatName'].includes(value.name) && exact(args, [])) ||
+    (['studio.note.append','studio.note.replaceSaved','studio.language.clarify','studio.note.confirm','studio.note.cancel','studio.note.review'].includes(value.name) && exact(args,[])) || (['studio.piece.glazes','studio.piece.firings','studio.piece.open','studio.piece.clarifyGlazes','studio.piece.repeatName'].includes(value.name) && exact(args, [])) ||
     (value.name === 'studio.piece.choose' && exact(args,['index']) && Number.isInteger(args.index) && args.index >= 1 && args.index <= 5) ||
     (value.name === 'studio.piece.confirmRead' && exact(args,['confirmed']) && typeof args.confirmed === 'boolean') ||
     (['studio.piece.namedGlazes','studio.piece.clarifyOpen'].includes(value.name) && exact(args,['query']) && validQuery(args.query)) ||
@@ -125,8 +125,9 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
       const context = request.context ? contexts.read(request.context.token,userId) : null;
       const activeDraft=notes.wantsText(userId,context);
       const fragmentChoice=!input.command ? notes.fragmentChoice(userId,context,input.text) : null;
-      const addition=!fragmentChoice && !input.command && notes.canAmend(userId,context) ? noteAddition(input.text) : null;
-      let language = !fragmentChoice && !addition && !input.command && intentProvider===deterministicProvider && !noteStart(input.text) && !noteBody(input.text) && !confirmation(input.text,activeDraft) && !cancellation(input.text) ? interpret(input.text,context) : null;
+      const replacement=!fragmentChoice && !input.command && notes.canAmend(userId,context) ? noteReplacement(input.text) : null;
+      const addition=!fragmentChoice && !replacement && !input.command && notes.canAmend(userId,context) ? noteAddition(input.text) : null;
+      let language = !fragmentChoice && !replacement && !addition && !input.command && intentProvider===deterministicProvider && !noteStart(input.text) && !noteBody(input.text) && !confirmation(input.text,activeDraft) && !cancellation(input.text) ? interpret(input.text,context) : null;
       // A bare feature name can be literal note dictation. Only explicit read
       // requests may leave a draft; shorthand navigation is for read context.
       if(activeDraft && language?.intent?.name==='studio.navigate' && !/\b(?:open|show|bring|pull|go|take|look|see)\b/i.test(input.text))language=null;
@@ -136,7 +137,7 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
       const capture=activeDraft && !language && isNoteText(input.text) && (!politeRequest || isNoteText(envelope(input.text)));
       let clarifyNote=unclearNoteCommand(input.text);
       let proposed;
-      try { proposed = fragmentChoice ? {name:'studio.note.fragment',arguments:{choice:fragmentChoice}} : addition ? {name:'studio.note.append',arguments:{}} : language?.clarification ? {name:'studio.language.clarify',arguments:{}} :
+      try { proposed = fragmentChoice ? {name:'studio.note.fragment',arguments:{choice:fragmentChoice}} : replacement ? {name:'studio.note.replaceSaved',arguments:{}} : addition ? {name:'studio.note.append',arguments:{}} : language?.clarification ? {name:'studio.language.clarify',arguments:{}} :
         clarifyNote ? {name:'studio.note.review',arguments:{}} :
         activeDraft && confirmation(input.text,true) ? {name:'studio.note.confirm',arguments:{}} :
         capture ? {name:'studio.note.draft',arguments:{body:dictationBody(input.text)}} :
@@ -170,6 +171,9 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
       } else if (intent.name === 'studio.note.fragment') {
         if(!fragmentChoice || fragmentChoice!==intent.arguments.choice)fail(400,'INVALID_REQUEST','Please choose how to handle the pending words.');
         ({result,response,state:nextState}=notes.resolveFragment(userId,context,fragmentChoice));
+      } else if (intent.name === 'studio.note.replaceSaved') {
+        if(!replacement)fail(400,'INVALID_REQUEST','No saved-note replacement is pending.');
+        ({result,response,state:nextState}=notes.replaceSaved(userId,context,replacement));
       } else if (intent.name === 'studio.note.append') {
         if(!addition)fail(400,'INVALID_REQUEST','No note addition is pending.');
         ({result,response,state:nextState}=notes.amend(userId,context,addition));
