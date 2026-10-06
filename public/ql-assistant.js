@@ -153,7 +153,7 @@
     };
     try {
       const engine = new (speechConstructor())();
-      turn = {engine, stopping: false, finalText: '', draft: '', heardSound: false, uncertain: false, timedOut: false}; recognition = turn;
+      turn = {engine, stopping: false, finalText: '', draft: '', committedFinal: '', heardSound: false, uncertain: false, timedOut: false}; recognition = turn;
       engine.continuous = false; engine.interimResults = true; engine.maxAlternatives = 1; engine.lang = 'en-US';
       const finish = (message, ended = false, allowFinal = false) => {
         if (!active()) return;
@@ -189,20 +189,34 @@
         if (!active()) return;
         clearTimeout(turn.finalDisconnectTimer);
         const results = Array.from(event.results || []);
-        const text = results.map(r => typeof r?.[0]?.transcript === 'string' ? r[0].transcript.trim() : '').filter(Boolean).join(' ');
-        if (!text) { turn.draft = turn.finalText = ''; return; }
+        const eventText = results.map(r => typeof r?.[0]?.transcript === 'string' ? r[0].transcript.trim() : '').filter(Boolean).join(' ');
+        if (!eventText) return;
+        const allFinal = results.length && results.every(r => r.isFinal === true);
+        if (allFinal) {
+          const previous = turn.committedFinal;
+          if (!previous) turn.committedFinal = eventText;
+          else if (eventText === previous || eventText.startsWith(previous + ' ')) turn.committedFinal = eventText;
+          else if (previous === eventText || previous.startsWith(eventText + ' ') || previous.endsWith(' ' + eventText)) { /* stale/replayed final */ }
+          else turn.committedFinal = (previous + ' ' + eventText).trim();
+        }
+        const text = allFinal
+          ? turn.committedFinal
+          : (turn.committedFinal && !eventText.startsWith(turn.committedFinal)
+              ? (turn.committedFinal + ' ' + eventText).trim()
+              : eventText);
         if (text.length > 200) {
-          turn.draft = turn.finalText = '';
+          turn.draft = turn.finalText = turn.committedFinal = '';
           finish('Please say a command of 200 characters or fewer, or type your question.'); return;
         }
-        // Interim words are a draft only: they must never trigger navigation/actions.
+        // Safari can emit a later result event containing only the tail of the same
+        // utterance. Keep already-finalized words instead of replacing them.
         turn.draft = text;
         if (dockCommand) dockCommand.textContent = 'Hearing: ' + text;
         // Some engines omit confidence or return zero as an unknown value.
-        turn.uncertain = results.some(r => Number.isFinite(r?.[0]?.confidence) && r[0].confidence > 0 && r[0].confidence < 0.6);
+        turn.uncertain = turn.uncertain || results.some(r => Number.isFinite(r?.[0]?.confidence) && r[0].confidence > 0 && r[0].confidence < 0.6);
         if(noteDictation && notePreview && !/^(?:save(?: note)?|confirm(?: note)?|yes|no|cancel|stop listening)[.!?]?$/i.test(text)){notePreview.hidden=false;notePreviewText.textContent=text;}
-        if (results.length && results.every(r => r.isFinal === true)) {
-          turn.finalText = text;
+        if (allFinal) {
+          turn.finalText = turn.committedFinal;
           // A final segment is not the end of the utterance. Wait for onend
           // for commands too, including a one-turn request to create a note.
           voiceState('Hearing: ' + text);
