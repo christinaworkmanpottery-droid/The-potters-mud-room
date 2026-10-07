@@ -193,11 +193,21 @@
         if (!eventText) return;
         const allFinal = results.length && results.every(r => r.isFinal === true);
         if (allFinal) {
-          const previous = turn.committedFinal;
-          if (!previous) turn.committedFinal = eventText;
-          else if (eventText === previous || eventText.startsWith(previous + ' ')) turn.committedFinal = eventText;
-          else if (previous === eventText || previous.startsWith(eventText + ' ') || previous.endsWith(' ' + eventText)) { /* stale/replayed final */ }
-          else turn.committedFinal = (previous + ' ' + eventText).trim();
+          const previous = turn.committedFinal, priorDraft = turn.draft;
+          // iPhone Safari can show the complete utterance as interim text, then
+          // replace it with only the final tail. When that tail is an exact
+          // suffix of the same in-progress utterance, keep the longer transcript
+          // instead of discarding the already-heard beginning/middle.
+          const compact = s => (s || '').trim().replace(/\\s+/g, ' ');
+          const priorCompact = compact(priorDraft), eventCompact = compact(eventText), previousCompact = compact(previous);
+          const carriesPriorDraft = priorCompact.length > eventCompact.length &&
+            priorCompact.toLowerCase().endsWith(eventCompact.toLowerCase()) &&
+            (!previousCompact || priorCompact.toLowerCase().startsWith(previousCompact.toLowerCase()));
+          const finalizedText = carriesPriorDraft ? priorDraft : eventText;
+          if (!previous) turn.committedFinal = finalizedText;
+          else if (finalizedText === previous || finalizedText.startsWith(previous + ' ')) turn.committedFinal = finalizedText;
+          else if (previous === finalizedText || previous.startsWith(finalizedText + ' ') || previous.endsWith(' ' + finalizedText)) { /* stale/replayed final */ }
+          else turn.committedFinal = (previous + ' ' + finalizedText).trim();
         }
         const text = allFinal
           ? turn.committedFinal
