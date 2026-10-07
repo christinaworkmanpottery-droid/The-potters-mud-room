@@ -61,8 +61,9 @@ function noteReplacement(text) {
   if(typeof text!=='string' || /[\x00-\x1f\x7f]/.test(text))return null;
   const n=commandWords(text);
   const reference='(?:(?:the|my|this|that)\\s+)?(?:(?:last|latest|previous|current|most recent)\\s+)?(?:studio\\s+)?note';
-  let m=n.match(new RegExp('^(?:change|replace)\\s+'+reference+'\\s+(.+?)\\s+(?:to|with)\\s+(.+)
-  if(!m)return null;
+  let m=n.match(new RegExp('^(?:change|replace)\\s+'+reference+'\\s+(.+?)\\s+(?:to|with)\\s+(.+)$','i'));
+  if(!m)m=n.match(new RegExp('^(?:on|in)\\s+'+reference+'[,]?\\s+(?:change|replace)\\s+(.+?)\\s+(?:to|with)\\s+(.+)$','i'));
+  if(!m)m=n.match(/^(?:change|replace)\s+(.+?)\s+(?:to|with)\s+(.+)$/i);
   const from=m[1].trim().replace(/^(?:"([\s\S]*)"|“([\s\S]*)”)$/,(_,a,b)=>a ?? b);
   const to=m[2].trim().replace(/^(?:"([\s\S]*)"|“([\s\S]*)”)$/,(_,a,b)=>a ?? b);
   if(!from || !to || from.length>200 || to.length>200)return null;
