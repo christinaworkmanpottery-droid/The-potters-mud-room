@@ -111,8 +111,7 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
       if(!current || current.body!==target.originalBody){clear(userId);return reply('That note changed or is no longer available. Please open it to review the latest text. Nothing changed.','clarification');}
       const needle=replacement?.from || '', next=replacement?.to || '';
       if(!needle || !next)return reply('Please tell me exactly what words to change and what to replace them with. Nothing changed.','clarification',state);
-      const escaped=needle.replace(/[.*+?^${}()|[\]\\]/g,'\\const escaped=needle.replace(/[.*+?^$(){}|[\]\\]/g,'\\    amend(userId,state,addition){
-');');
+      const escaped=needle.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
       const matches=current.body.match(new RegExp(escaped,'gi')) || [];
       if(matches.length===0)return reply('I could not find “'+needle+'” in that saved note. Please say the exact words you want changed. Nothing changed.','clarification',state);
       if(matches.length>1)return reply('I found “'+needle+'” more than once. Please tell me which occurrence you mean. Nothing changed.','clarification',state);
