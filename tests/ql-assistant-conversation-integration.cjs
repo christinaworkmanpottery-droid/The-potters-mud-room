@@ -85,8 +85,8 @@ test('full website + actual HTTP + SQLite: hands-free Piece conversation and man
   assert.match(await say('And its firing?'),/2026-10-01/);
   await say('Search glazes for');assert.match(el('qlAssistantSessionReply').textContent,/What should I look for/);
   await say('ocean');assert.equal(w.eval('currentPage'),'studioSearch');
-  const dictated='I need to make 25 soy sauce, dishes, and B mix clay';
-  assert.match(await say('New note '+dictated+' save note'),/Draft studio note/);
+  const dictated='I need to make 25 soy sauce, dishes, and B-Mix clay';
+  assert.match(await say('New note '+dictated.replace('B-Mix','B mix')+' save note'),/Draft studio note/);
   assert.equal(el('qlAssistantNotePreviewText').textContent,dictated);
   assert.match(await say('Play save note'),/Your draft is still/);
   assert.equal(el('qlAssistantNotePreviewText').textContent,dictated);

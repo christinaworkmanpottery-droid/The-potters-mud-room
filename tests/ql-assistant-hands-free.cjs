@@ -371,10 +371,11 @@ test('Oct8 draft submission owns turn until spoken reply finishes; own voice and
  engine.result('I need to make 30 soy sauce dishes');assert.equal(f.pending.length,2,'no unmanaged five-second submission');
  oldRestart();assert.equal(f.engines.length,2,'pending HTTP cannot open microphone');
  f.reply(1,'Draft studio note: “I need to make 30 soy sauce dishes”.',{result:{tool:'studio.note',status:'draft',draftText:'I need to make 30 soy sauce dishes'},context:{token:'b'.repeat(48)}});await tick();
+ restart(f);const quiet=f.engines[2];f.timers.get(3000)();assert.equal(quiet.stops,1);quiet.onend();
  oldRestart();late({results:[{isFinal:true,0:{transcript:'Got it. I have the draft.'}}]});
- assert.equal(f.engines.length,2);assert.equal(f.pending.length,2,'late recognized speaker output is inert');
- spoken.onend();restart(f);assert.equal(f.engines.length,3);
- f.engines[2].result('Save draft');assert.equal(f.pending[2].body.input.text,'Save draft');
+ assert.equal(f.engines.length,3);assert.equal(f.pending.length,2,'late recognized speaker output is inert');
+ spoken.onend();restart(f);assert.equal(f.engines.length,4);
+ f.engines[3].result('Save draft');assert.equal(f.pending[2].body.input.text,'Save draft');
 });
 test('Oct8 cancel and edit interim commands never overwrite live draft preview',async t=>{
  const f=await fixture(t);start(f);f.engines[0].result('New note');f.reply(0,'Draft',{result:{tool:'studio.note',status:'draft',draftText:'Buy clay'},context:{token:'a'.repeat(48)}});await tick();restart(f);
@@ -384,4 +385,58 @@ test('Oct8 cancel and edit interim commands never overwrite live draft preview',
 test('Oct8 low-confidence and interim-only note text never bypass transcript review',async t=>{
  const f=await fixture(t);start(f);f.engines[0].result('New note');f.reply(0,'Text?',{result:{tool:'studio.note',status:'collecting'},context:{token:'a'.repeat(48)}});await tick();restart(f);
  f.engines[1].onresult({results:[{isFinal:true,0:{transcript:'BMX cone use',confidence:.2}}]});f.engines[1].onend();assert.equal(f.pending.length,1);assert.match(f.el('qlAssistantSessionReply').textContent,/misheard/);
+});
+
+// Issue #8: bounded speech normalization and turn handoff regressions.
+for (const [heard, expected] of [
+ ['New note Make bowls in b mix clay fire at cone six', 'New note Make bowls in B-Mix clay fire at cone 6'],
+ ['New note Bisque fire at cone zero four', 'New note Bisque fire at cone 04'],
+ ['New note Fire clay at cone oh four then glaze at cone six', 'New note Fire clay at cone 04 then glaze at cone 6'],
+ ['New note Call Glenn, buy oat milk, and walk the dogs', 'New note Call Glenn, buy oat milk, and walk the dogs'],
+ ['New note Order cone six from the ice cream menu', 'New note Order cone six from the ice cream menu'],
+ ['New note Use Electric Brown clay at 1945 degrees Fahrenheit', 'New note Use Electric Brown clay at 1945 degrees Fahrenheit'],
+ ['Change cone six to cone ten', 'Change cone six to cone ten'],
+ ['Remove soy subs dishes', 'Remove soy subs dishes']
+]) test('Issue8 preserves context and literal anchors: '+heard, async t=>{
+ const f=await fixture(t);start(f);f.engines[0].result(heard);assert.equal(f.pending[0].body.input.text,expected);
+});
+for (const choice of ['yes please','use corrected words','keep original words']) test('Issue8 asks before uncertain pottery substitution: '+choice,async t=>{
+ const f=await fixture(t);start(f);const heard='New note Make soy subs dishes with sapphire flow glaze';
+ f.engines[0].result(heard);assert.equal(f.pending.length,0);assert.match(f.el('qlAssistantSessionReply').textContent,/Did you mean.*soy sauce dishes.*Sapphire Float glaze/);
+ restart(f);f.engines.at(-1).result('Save draft');assert.equal(f.pending.length,0,'save cannot approve a transcription guess');
+ restart(f);f.engines.at(-1).result(choice);assert.equal(f.pending.length,1);
+ assert.equal(f.pending[0].body.input.text,choice==='keep original words'?heard:'New note Make soy sauce dishes with Sapphire Float glaze');
+});
+test('Issue8 clear final supersedes uncertain interim without losing words',async t=>{
+ const f=await fixture(t);start(f);const e=f.engines[0];
+ e.onresult({results:[{isFinal:false,0:{transcript:'New note buy sapphire',confidence:.2}}]});
+ e.onresult({results:[{isFinal:true,0:{transcript:'New note buy Sapphire Float glaze',confidence:.95}}]});e.onend();
+ assert.equal(f.pending[0].body.input.text,'New note buy Sapphire Float glaze');
+});
+test('Issue8 continuation after a breathing pause suppresses acknowledgement and preserves context',async t=>{
+ const f=await fixture(t);const speeches=[];
+ f.w.SpeechSynthesisUtterance=class{constructor(text){this.text=text;}};
+ f.w.speechSynthesis={speak(s){speeches.push(s);},cancel(){}};f.el('qlAssistantSpokenReplies').checked=true;
+ start(f);f.engines[0].result('New note Make 30 soy sauce dishes');
+ f.reply(0,'Draft studio note: “Make 30 soy sauce dishes”.',{result:{tool:'studio.note',status:'draft',draftText:'Make 30 soy sauce dishes'},context:{token:'a'.repeat(48)}});await tick();
+ assert.equal(speeches.filter(s=>s.text).length,0,'no interruption when Safari ends an utterance');
+ const deadline=f.timers.get(3000);restart(f);const continuation=f.engines[1];continuation.onsoundstart();deadline();
+ assert.equal(continuation.stops,0,'resumed speech cancels the acknowledgement');
+ continuation.result('in B-Mix clay fire at cone zero four');assert.equal(f.pending[1].body.context.token,'a'.repeat(48));
+ assert.equal(f.pending[1].body.input.text,'in B-Mix clay fire at cone 04');assert.equal(speeches.filter(s=>s.text).length,0);
+});
+test('Issue8 quiet draft waits for microphone disconnect and speaks only once',async t=>{
+ const f=await fixture(t);const speeches=[];f.w.SpeechSynthesisUtterance=class{constructor(text){this.text=text;}};
+ f.w.speechSynthesis={speak(s){speeches.push(s);},cancel(){}};f.el('qlAssistantSpokenReplies').checked=true;start(f);
+ f.engines[0].result('New note Buy clay');f.reply(0,'Draft studio note: “Buy clay”.',{result:{tool:'studio.note',status:'draft',draftText:'Buy clay'}});await tick();
+ restart(f);const e=f.engines[1],late=e.onresult;f.timers.get(3000)();assert.equal(e.stops,1);assert.equal(speeches.filter(s=>s.text).length,0);
+ e.onend();assert.equal(speeches.at(-1).text,'Got it. I have the draft.');
+ late({results:[{isFinal:true,0:{transcript:'Got it. I have the draft.'}}]});assert.equal(f.pending.length,1);
+ const spoken=speeches.at(-1),lateError=spoken.onerror;spoken.onend();lateError();restart(f);assert.equal(f.engines.length,3);
+});
+test('Issue8 cancellation makes queued quiet acknowledgement inert',async t=>{
+ const f=await fixture(t);const speeches=[];f.w.SpeechSynthesisUtterance=class{constructor(text){this.text=text;}};
+ f.w.speechSynthesis={speak(s){speeches.push(s);},cancel(){}};f.el('qlAssistantSpokenReplies').checked=true;start(f);
+ f.engines[0].result('New note Buy clay');f.reply(0,'Draft studio note: “Buy clay”.',{result:{tool:'studio.note',status:'draft',draftText:'Buy clay'}});await tick();const queued=f.timers.get(3000);
+ f.el('qlAssistantSessionStop').click();queued();assert.equal(speeches.filter(s=>s.text).length,0);assert.equal(f.engines.length,1);
 });

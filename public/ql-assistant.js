@@ -13,7 +13,7 @@
   let talk, stop, cancel, voiceStatus;
   let handsFreeEnabled = false, handsFree = false, sessionTimer, restartTimer, speechTimer, speechProbeTimer, requestTimer;
   let dock, dockStatus, dockCommand, dockReply, sessionStart, sessionStop, spokenReplies, utterance, notePreview, notePreviewText;
-  let speechReview = null, speechBurst = '', speechBurstTimer = null;
+  let speechReview = null, speechSuggestion = null, quietDraftReply = null, speechBurst = '', speechBurstTimer = null;
   let emptyAttempts = 0, voiceEpoch = 0, internalNavigation = false, autoStartTimer = null, foregroundVoiceActivated = false, speechAudioUnlocked = false;
   const inVoiceContext = () => entered && (currentPage === 'qlAssistant' || handsFree);
   function sessionState(state, message) {
@@ -24,7 +24,7 @@
     sessionStop.hidden = !handsFree;
   }
   function endSession(message = 'Stopped — tap Start voice session to resume.', state = 'stopped') {
-    speechReview = null;
+    speechReview = speechSuggestion = quietDraftReply = null;
     handsFree = false; voiceEpoch++; conversationToken = null; noteDictation = false; recordNavigation = false;
     if(notePreview){notePreview.hidden=true;notePreviewText.textContent='';}
     clearTimeout(restartTimer); clearTimeout(sessionTimer); clearTimeout(speechBurstTimer); speechBurst = ''; clearTimeout(speechTimer); clearTimeout(speechProbeTimer); clearTimeout(requestTimer); clearTimeout(autoStartTimer);
@@ -45,6 +45,20 @@
       syncSession();
       if (handsFree && own === voiceEpoch && available() && !document.hidden) startVoice();
     }, 650);
+  }
+  // A draft is already safe on the server. Reopen the mic before acknowledging
+  // it so a breathing pause can continue the same draft without a TTS interruption.
+  function acknowledgeDraftWhenQuiet(text) {
+    quietDraftReply = text;
+    listenAgain('Keep going, or say save draft when you are ready.');
+    clearTimeout(speechBurstTimer);
+    speechBurstTimer = setTimeout(() => {
+      if (!handsFree || quietDraftReply !== text) return;
+      if (recognition) {
+        recognition.quietReply = text;
+        stopVoice(); // onend must release the microphone before any speech.
+      } else { quietDraftReply = null; voiceReply(text); }
+    }, 3000);
   }
   function voiceReply(text) {
     if (!handsFree) return;
@@ -92,8 +106,8 @@
     };
     speech.onstart = () => { if (active()) { observedSpeaking = true; quietChecks = 0; sessionState('speaking', 'Speaking — microphone is off.'); } };
     speech.onend = () => completeSpeech(false);
-    speech.onerror = () => { if (active()) { utterance = null; listenAgain('Audio could not play. Clayton will keep listening and show replies on screen.'); } };
-    speechTimer = setTimeout(() => { if (active()) { try { synth.cancel(); } catch (_) {} utterance = null; listenAgain('Audio did not finish. Clayton will keep listening and show replies on screen.'); } }, 30000);
+    speech.onerror = () => completeSpeech(true);
+    speechTimer = setTimeout(() => completeSpeech(true), 30000);
     speechProbeTimer = setTimeout(probeSpeech, 250);
     try { synth.speak(speech); } catch (_) { speech.onerror(); }
   }
@@ -150,14 +164,17 @@
     voiceState(message);
   }
   // Review is local, transient, and never bypasses server-side note confirmation.
-  function reviewSpeech(text, reason) {
-    speechReview = text;
+  function reviewSpeech(text, reason, suggestion = null) {
+    speechReview = text; speechSuggestion = suggestion;
     if (dockCommand) dockCommand.textContent = 'Needs review: ' + text;
+    if (suggestion) { voiceReply(reason + ' Say “use corrected words”, “keep original words”, or repeat the sentence.'); return; }
     voiceReply(reason + ' I heard: “' + text + '”. Say “use those words”, or repeat the full corrected sentence. Say “discard transcript” to discard it. Nothing has been sent.');
   }
   function conciseSpeech(text) {
     const t=(text || '').trim();
     if(/Did you mean “B-Mix clay”/.test(t))return 'Did you mean “B-Mix clay”? Say yes, or keep original words.';
+    if(/^What would you like the note to say/i.test(t)) return 'What would you like the note to say?';
+    if(/^Speech may be incomplete or misheard/.test(t)) return 'Could you repeat that sentence? I’m not sure I heard it correctly.';
     if(/^Saved your Studio Note:/i.test(t)) return 'Done. I saved the note.';
     if(/^Updated your Studio Note:/i.test(t)) return 'Done. I updated the note.';
     if(/^Updated note preview:/i.test(t)) return 'Got it. I updated the draft.';
@@ -170,18 +187,41 @@
   function isNoteControl(text) {
     return /^(?:(?:hey|hi|okay|ok)[, ]+)?(?:clayton[, ]+)?(?:(?:can|could|would|will) you\s+)?(?:please\s+)?(?:save|safe draft|confirm|cancel|discard|edit|change|correct|replace|remove|delete|add|insert|i (?:said|meant)|no|yes|stop|shut up|on (?:the )?(?:live )?(?:note|draft)|in (?:the )?(?:note|draft))\b/i.test(text.trim());
   }
+  function normalizeSpeech(text) {
+    // Do not rewrite literal edit anchors or command text. Ordinary dictation
+    // stays byte-for-byte unless an explicit pottery phrase supplies context.
+    if (isNoteControl(text)) return {text};
+    // Keep the accepted server-side clay clarification in charge of its draft.
+    if (/\b(?:bmx|v[ -]?mix|b[ -]?mixed|bm\s+mix|the\s+mix|bee\s+mix)\s+clay\b/i.test(text)) return {text};
+    const numbers = {one:'1',two:'2',three:'3',four:'4',five:'5',six:'6',seven:'7',eight:'8',nine:'9',ten:'10'};
+    let normalized = text.replace(/\bb[ -]?mix(?=\s+clay\b)/gi, 'B-Mix');
+    if (/\b(?:clay|glaze|fire|firing|kiln|bisque|ceramic)\b/i.test(text) || /^cone\s+/i.test(text)) normalized = normalized
+      .replace(/\bcone\s+(zero|oh|o)\s+(one|two|three|four|five|six|seven|eight|nine)\b/gi, (_, zero, n) => 'cone 0' + numbers[n.toLowerCase()])
+      .replace(/\bcone\s+(one|two|three|four|five|six|seven|eight|nine|ten)\b/gi, (_, n) => 'cone ' + numbers[n.toLowerCase()]);
+    // These are plausible mishearings, not safe substitutions. The member must
+    // choose the proposal; saving cannot implicitly approve it.
+    const suggestion = normalized
+      .replace(/\bsoy (?:subs|saucer) dishes\b/gi, 'soy sauce dishes')
+      .replace(/\bsapphire (?:flow glaze|float blaze)\b/gi, 'Sapphire Float glaze');
+    return {text:normalized, suggestion:suggestion !== normalized ? suggestion : null};
+  }
   function acceptSpeech(text, uncertain) {
     if (/^(stop listening|pause voice|end voice session|stop voice session)[.!?]?$/i.test(text)) { pauseSession(); return; }
     if (uncertain) { reviewSpeech(text, 'Speech may be incomplete or misheard.'); return; }
     if (speechReview) {
-      if (/^use those words[.!?]?$/i.test(text)) text = speechReview;
+      if (speechSuggestion && /^(?:yes|yes please|use (?:the )?corrected words)[.!?]?$/i.test(text)) text = speechSuggestion;
+      else if (/^(?:use those words|keep (?:the )?original words)[.!?]?$/i.test(text)) text = speechReview;
       else if (/^(discard transcript|no|cancel)[.!?]?$/i.test(text)) {
-        speechReview = null; voiceReply('Transcript discarded. Please say the full request again.'); return;
-      } else if (/^(yes|save(?: note)?|confirm(?: note)?)[.!?]?$/i.test(text)) {
-        reviewSpeech(speechReview, 'Please check the transcript first.'); return;
+        speechReview = speechSuggestion = null; voiceReply('Transcript discarded. Please say the full request again.'); return;
+      } else if (/^(yes|save(?: (?:my |the )?(?:note|draft))?|confirm(?: (?:note|draft))?)[.!?]?$/i.test(text)) {
+        reviewSpeech(speechReview, 'Please check the transcript first.', speechSuggestion); return;
       }
-      speechReview = null;
+      speechReview = speechSuggestion = null;
+      input.value = text; void submit(true); return;
     }
+    const pottery = normalizeSpeech(text);
+    if (pottery.suggestion) { reviewSpeech(text, 'Did you mean “' + pottery.suggestion + '”?', pottery.suggestion); return; }
+    text = pottery.text;
     input.value = text;
     void submit(true);
   }
@@ -205,7 +245,14 @@
       const finish = (message, ended = false, allowFinal = false) => {
         if (!active()) return;
         const finalText = turn.finalText, draft = turn.draft;
+        const quietReply = turn.quietReply;
         cancelVoice('', !ended);
+        if (handsFree && quietReply && !finalText && !draft) {
+          quietDraftReply = null;
+          if (ended) voiceReply(quietReply);
+          else pauseSession('Microphone did not disconnect. Tap Start voice session to retry.', 'unavailable');
+          return;
+        }
         if (handsFree && allowFinal && (finalText || draft)) {
           emptyAttempts = 0;
           acceptSpeech((finalText || draft).trim(), !finalText || turn.uncertain || turn.timedOut);
@@ -231,13 +278,14 @@
       turn.finish = finish;
       engine.onstart = () => { if (active()) voiceState(turn.stopping ? 'Finishing speech…' : 'Listening — speak now. Tap Stop when finished.'); };
       engine.onaudiostart = () => { if (active() && !turn.stopping) voiceState('Microphone ready — speak now. Tap Stop when finished.'); };
-      engine.onsoundstart = () => { if (active()) { turn.heardSound = true; voiceState('Sound detected. Listening for your words…'); } };
+      engine.onsoundstart = () => { if (active()) { turn.heardSound = true; clearTimeout(speechBurstTimer); quietDraftReply = null; turn.quietReply = null; voiceState('Sound detected. Listening for your words…'); } };
       engine.onresult = event => {
         if (!active()) return;
         clearTimeout(turn.finalDisconnectTimer);
         const results = Array.from(event.results || []);
         const eventText = results.map(r => typeof r?.[0]?.transcript === 'string' ? r[0].transcript.trim() : '').filter(Boolean).join(' ');
         if (!eventText) return;
+        clearTimeout(speechBurstTimer); quietDraftReply = null; turn.quietReply = null;
         const allFinal = results.length && results.every(r => r.isFinal === true);
         if (allFinal) {
           const previous = turn.committedFinal, priorDraft = turn.draft;
@@ -270,7 +318,8 @@
         turn.draft = text;
         if (dockCommand) dockCommand.textContent = 'Hearing: ' + text;
         // Some engines omit confidence or return zero as an unknown value.
-        turn.uncertain = turn.uncertain || results.some(r => Number.isFinite(r?.[0]?.confidence) && r[0].confidence > 0 && r[0].confidence < 0.6);
+        turn.uncertain = (allFinal ? turn.finalUncertain === true : turn.uncertain) || results.some(r => Number.isFinite(r?.[0]?.confidence) && r[0].confidence > 0 && r[0].confidence < 0.6);
+        if (allFinal) turn.finalUncertain = turn.uncertain;
         if(noteDictation && notePreview && !isNoteControl(text)){notePreview.hidden=false;notePreviewText.textContent=text;}
         if (allFinal) {
           turn.finalText = turn.committedFinal;
@@ -392,6 +441,7 @@
       sessionState('processing', 'Processing your request…');
       requestTimer = setTimeout(() => { if (active()) pauseSession('The assistant did not respond. Start again or use the menu.', 'unavailable'); }, 30000);
     }
+    let quietAcknowledgement = false;
     pendingText = text; output.textContent = 'Looking up your studio request…';
     retry.hidden = true; fallback.hidden = true; form.setAttribute('aria-busy', 'true');
     try {
@@ -416,6 +466,7 @@
             data.accountId !== account || typeof data.response?.text !== 'string') throw Error('Unavailable');
         if (data.context !== undefined && (typeof data.context?.token !== 'string' || !/^[a-f0-9]{48}$/.test(data.context.token) || Object.keys(data.context).length !== 1)) throw Error('Invalid context');
         conversationToken = data.context?.token || null;
+        quietAcknowledgement = fromVoice && spokenReplies.checked && !isNoteControl(text) && data.result?.tool === 'studio.note' && data.result.status === 'draft';
         noteDictation = data.result?.tool === 'studio.note' && ['collecting','draft','incomplete','material-review'].includes(data.result.status);
         if(notePreview){
           notePreview.hidden=!noteDictation;
@@ -439,7 +490,7 @@
         retry.hidden = false;
       }
     } finally {
-      if (epoch === generation && ownSerial === serial && ownSession === session && !abort.signal.aborted && available()) { clearTimeout(requestTimer); pendingText = null; controller = null; form.setAttribute('aria-busy', 'false'); if (fromVoice && handsFree) voiceReply(output.textContent); }
+      if (epoch === generation && ownSerial === serial && ownSession === session && !abort.signal.aborted && available()) { clearTimeout(requestTimer); pendingText = null; controller = null; form.setAttribute('aria-busy', 'false'); if (fromVoice && handsFree) { if (quietAcknowledgement) acknowledgeDraftWhenQuiet(output.textContent); else voiceReply(output.textContent); } }
     }
   }
   function followNavigation(target) {
