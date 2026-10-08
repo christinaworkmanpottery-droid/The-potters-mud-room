@@ -37,7 +37,7 @@ async function fixture(t, config = {enabled:true,voiceEnabled:true,handsFreeEnab
   await tick(); run(source('public/ql-assistant.js')); await tick();
   const el = id => w.document.getElementById(id);
   if (el('qlAssistantEntry')) w.navigate('qlAssistant');
-  if(!spokenDefault && el('qlAssistantSpokenReplies'))el('qlAssistantSpokenReplies').checked=false;
+  if(el('qlAssistantSpokenReplies'))el('qlAssistantSpokenReplies').checked=!!spokenDefault;
   const send = (text = 'When was my last firing?') => {
     el('qlAssistantInput').value = text;
     el('qlAssistantForm').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
@@ -46,7 +46,7 @@ async function fixture(t, config = {enabled:true,voiceEnabled:true,handsFreeEnab
   return {w,el,send,reply,pending,calls,engines,timers,talk:()=>el('qlAssistantTalk')?.click()};
 }
 
-const start = f => f.el('qlAssistantSessionStart').click();
+const start = f => { const b=f.el('qlAssistantSessionStart'); if(b && !b.hidden)b.click(); };
 const state = f => f.el('qlAssistantSession').dataset.state;
 const restart = f => { const fn=f.timers.get(650); if(typeof fn==='function') fn(); };
 test('hands-free requires one foreground activation and explicit flag only',async t=>{
