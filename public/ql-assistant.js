@@ -13,7 +13,7 @@
   let talk, stop, cancel, voiceStatus;
   let handsFreeEnabled = false, handsFree = false, sessionTimer, restartTimer, speechTimer, speechProbeTimer, requestTimer;
   let dock, dockStatus, dockCommand, dockReply, sessionStart, sessionStop, spokenReplies, utterance, notePreview, notePreviewText;
-  let speechReview = null;
+  let speechReview = null, speechBurst = '', speechBurstTimer = null;
   let emptyAttempts = 0, voiceEpoch = 0, internalNavigation = false, autoStartTimer = null, foregroundVoiceActivated = false, speechAudioUnlocked = false;
   const inVoiceContext = () => entered && (currentPage === 'qlAssistant' || handsFree);
   function sessionState(state, message) {
@@ -27,7 +27,7 @@
     speechReview = null;
     handsFree = false; voiceEpoch++; conversationToken = null; noteDictation = false; recordNavigation = false;
     if(notePreview){notePreview.hidden=true;notePreviewText.textContent='';}
-    clearTimeout(restartTimer); clearTimeout(sessionTimer); clearTimeout(speechTimer); clearTimeout(speechProbeTimer); clearTimeout(requestTimer); clearTimeout(autoStartTimer);
+    clearTimeout(restartTimer); clearTimeout(sessionTimer); clearTimeout(speechBurstTimer); speechBurst = ''; clearTimeout(speechTimer); clearTimeout(speechProbeTimer); clearTimeout(requestTimer); clearTimeout(autoStartTimer);
     if (utterance) { utterance.onend = utterance.onerror = utterance.onstart = null; utterance = null; window.speechSynthesis?.cancel(); }
     cancelVoice();
     sessionState(state, message);
@@ -56,9 +56,13 @@
       listenAgain('Spoken audio is unavailable on this device. Clayton will keep listening and show replies on screen.'); return;
     }
     const own = voiceEpoch, synth = window.speechSynthesis;
-    const speech = new window.SpeechSynthesisUtterance(text.slice(0, 600)); utterance = speech;
+    const spokenText=conciseSpeech(text); const speech = new window.SpeechSynthesisUtterance(spokenText.slice(0, 300)); utterance = speech;
     let finished = false, observedSpeaking = false, quietChecks = 0;
     speech.lang = 'en-US';
+    const voices=synth.getVoices?.() || [];
+    const preferred=voices.find(v=>/Samantha|Ava|Siri|Evan|Zoe/i.test(v.name) && /^en(?:-|$)/i.test(v.lang)) || voices.find(v=>/^en-US$/i.test(v.lang) && v.localService) || voices.find(v=>/^en(?:-|$)/i.test(v.lang));
+    if(preferred) speech.voice=preferred;
+    speech.rate=0.96; speech.pitch=1.02;
     const active = () => handsFree && own === voiceEpoch && utterance === speech;
     const completeSpeech = (forceRelease = false) => {
       if (!active() || finished) return;
@@ -148,6 +152,16 @@
     speechReview = text;
     if (dockCommand) dockCommand.textContent = 'Needs review: ' + text;
     voiceReply(reason + ' I heard: “' + text + '”. Say “use those words”, or repeat the full corrected sentence. Say “discard transcript” to discard it. Nothing has been sent.');
+  }
+  function conciseSpeech(text) {
+    const t=(text || '').trim();
+    if(/^Saved your Studio Note:/i.test(t)) return 'Done. I saved the note.';
+    if(/^Updated your Studio Note:/i.test(t)) return 'Done. I updated the note.';
+    if(/^Updated note preview:/i.test(t)) return 'Got it. I updated the draft.';
+    if(/^Draft studio note:/i.test(t)) return 'Got it. I have the draft.';
+    if(/^Opening\b/i.test(t)) return t.split(/[.!?]/)[0]+'.';
+    if(/isn[’']t supported|not available through this assistant/i.test(t)) return 'I can’t do that yet.';
+    return t.length>180 ? t.split(/(?<=[.!?])\s+/)[0] : t;
   }
   function acceptSpeech(text, uncertain) {
     if (/^(stop listening|pause voice|end voice session|stop voice session)[.!?]?$/i.test(text)) { pauseSession(); return; }
