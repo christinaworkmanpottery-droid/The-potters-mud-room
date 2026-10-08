@@ -64,6 +64,7 @@ function noteReplacement(text) {
   let m=n.match(new RegExp('^(?:change|replace)\\s+'+reference+'\\s+(.+?)\\s+(?:to|with)\\s+(.+)$','i'));
   if(!m)m=n.match(new RegExp('^(?:on|in)\\s+'+reference+'[,]?\\s+(?:change|replace)\\s+(.+?)\\s+(?:to|with)\\s+(.+)$','i'));
   if(!m)m=n.match(/^(?:change|replace)\s+(.+?)\s+(?:to|with)\s+(.+)$/i);
+  if(!m)m=n.match(/^(?:change|replace)\s+(.+?)\s+to\s+(?:a|an|the)\s+(.+)$/i);
   const from=m[1].trim().replace(/^(?:"([\s\S]*)"|“([\s\S]*)”)$/,(_,a,b)=>a ?? b);
   const to=m[2].trim().replace(/^(?:"([\s\S]*)"|“([\s\S]*)”)$/,(_,a,b)=>a ?? b);
   if(!from || !to || from.length>200 || to.length>200)return null;
