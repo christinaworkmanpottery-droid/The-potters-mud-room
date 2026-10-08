@@ -20,6 +20,9 @@ function runMigration(filename) {
   
   try {
     const db = new Database(DB_PATH);
+    if (db.prepare("SELECT 1 FROM sqlite_master WHERE name GLOB 'ql_*' LIMIT 1").get()) {
+      db.close(); throw new Error('Legacy migrations are disabled with QL schema installed.');
+    }
     db.exec(sql);
     db.close();
     console.log('✓ Migration completed successfully');

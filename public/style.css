@@ -256,3 +256,42 @@ body.nav-open { overflow: hidden; }
 #clayList .card:hover, #glazeList .card:hover, #salesList .card:hover,
 #goalsList .card:hover, #projectsList .card:hover, #eventsList .card:hover,
 #contactsList .card:hover { border-color: var(--primary); }
+
+/* Read-only connected Piece history, using existing card/type/color tokens. */
+.piece-history { margin-top: 20px; overflow-wrap: anywhere; }
+.piece-history h2 { margin-bottom: 8px; }
+.piece-history-group { margin-top: 20px; min-width: 0; }
+.piece-history-group h3 { margin-bottom: 8px; }
+.piece-history-group ul, .piece-history-group ol { padding-left: 24px; }
+.piece-history-group li { padding: 8px 0; }
+.piece-history-date { color: var(--text-light); margin-top: 4px; }
+.piece-history-photo { display: block; max-width: 100%; width: 240px; max-height: 240px; object-fit: contain; margin-top: 8px; border-radius: var(--radius-sm); }
+
+/* Phase 2C: visible keyboard focus and touch-friendly History retry. */
+.piece-history .btn:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+.piece-history .btn { min-height: 44px; }
+
+/* Studio Search: readable text, native controls, and touch targets on mobile Safari. */
+.studio-search { max-width: 850px; margin-inline: auto; }
+.studio-search label { display: block; font-weight: 600; margin: 14px 0 6px; }
+.studio-search-input-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.studio-search-input-row input { flex: 1 1 260px; min-width: 0; font-size: 16px; }
+.studio-search select { max-width: 320px; font-size: 16px; }
+.studio-search button, .studio-search select { min-height: 44px; }
+.studio-search [hidden] { display: none !important; }
+.studio-search-results { list-style: none; padding: 0; display: grid; gap: 12px; }
+.studio-search-result { font: inherit; width: 100%; text-align: left; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-card, #fff); color: var(--text); padding: 18px; cursor: pointer; overflow-wrap: anywhere; }
+.studio-search-result strong, .studio-search-result span { display: block; }
+.studio-search-result strong { font-size: 1.1rem; margin: 5px 0 8px; }
+.studio-search-result .record-type { font-size: .85rem; font-weight: 600; }
+.studio-search :focus-visible { outline: 3px solid var(--primary, #6e4936); outline-offset: 3px; }
+#studioSearchDetail { overflow-wrap: anywhere; }
+#studioSearchDetail dt { font-weight: 600; margin-top: 14px; }
+#studioSearchDetail dd { margin: 4px 0 0; white-space: pre-wrap; }
+
+/* Isolated QL typed proof: preserve hidden semantics despite shared button styles. */
+#qlAssistantEntry[hidden], #pageQLAssistant [hidden] { display: none !important; }
+#pageQLAssistant form { display: flex; flex-wrap: wrap; gap: 10px; }
+#pageQLAssistant label, #pageQLAssistant input { width: 100%; }
+#pageQLAssistant button { min-height: 44px; }
+#qlAssistantResponse { white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -1,0 +1,161 @@
+# Extracted verbatim from the integrated full-suite.log
+TAP version 13
+# Subtest: cold request evaluates all 144 photos and all 48 eligible Pieces
+ok 1 - cold request evaluates all 144 photos and all 48 eligible Pieces
+  ---
+  duration_ms: 2527.827108
+  type: 'test'
+  ...
+# Subtest: warm request uses complete existing feature pairs without backfill
+ok 2 - warm request uses complete existing feature pairs without backfill
+  ---
+  duration_ms: 47.527573
+  type: 'test'
+  ...
+# Subtest: partial legacy feature pairs complete and do not omit tail Piece
+ok 3 - partial legacy feature pairs complete and do not omit tail Piece
+  ---
+  duration_ms: 64.363576
+  type: 'test'
+  ...
+# Subtest: hidden Pieces excluded consistently from cold and warm snapshots
+ok 4 - hidden Pieces excluded consistently from cold and warm snapshots
+  ---
+  duration_ms: 2449.149275
+  type: 'test'
+  ...
+# Subtest: missing candidate fails explicitly instead of returning a partial ranking
+ok 5 - missing candidate fails explicitly instead of returning a partial ranking
+  ---
+  duration_ms: 97.034069
+  type: 'test'
+  ...
+# Subtest: corrupt candidate fails explicitly instead of returning a partial ranking
+ok 6 - corrupt candidate fails explicitly instead of returning a partial ranking
+  ---
+  duration_ms: 64.450854
+  type: 'test'
+  ...
+# Subtest: oversized candidate fails explicitly instead of returning a partial ranking
+ok 7 - oversized candidate fails explicitly instead of returning a partial ranking
+  ---
+  duration_ms: 83.548594
+  type: 'test'
+  ...
+# Subtest: unsafe candidate fails explicitly instead of returning a partial ranking
+ok 8 - unsafe candidate fails explicitly instead of returning a partial ranking
+  ---
+  duration_ms: 75.224284
+  type: 'test'
+  ...
+# Subtest: multi-photo evidence remains MAX with an actual winning photo ID
+ok 9 - multi-photo evidence remains MAX with an actual winning photo ID
+  ---
+  duration_ms: 37.680183
+  type: 'test'
+  ...
+# Subtest: cold and warm rankings repeat exactly
+ok 10 - cold and warm rankings repeat exactly
+  ---
+  duration_ms: 1968.61508
+  type: 'test'
+  ...
+# Subtest: identical other-account images never enter candidate snapshot
+ok 11 - identical other-account images never enter candidate snapshot
+  ---
+  duration_ms: 2000.50018
+  type: 'test'
+  ...
+# Subtest: no persistent schema or index is added by search
+ok 12 - no persistent schema or index is added by search
+  ---
+  duration_ms: 31.451375
+  type: 'test'
+  ...
+# Subtest: optimized DCT retains exact legacy feature bytes for every corpus image
+ok 13 - optimized DCT retains exact legacy feature bytes for every corpus image
+  ---
+  duration_ms: 40652.958148
+  type: 'test'
+  ...
+# Subtest: color extraction and distance remain byte-identical to frozen algorithm
+ok 14 - color extraction and distance remain byte-identical to frozen algorithm
+  ---
+  duration_ms: 2.461539
+  type: 'test'
+  ...
+# Subtest: all 516-query accuracy gates pass including every protected blue case
+ok 15 - all 516-query accuracy gates pass including every protected blue case
+  ---
+  duration_ms: 96.345663
+  type: 'test'
+  ...
+# Subtest: full cold corpus has zero unevaluated positives and complete 144-photo snapshots
+ok 16 - full cold corpus has zero unevaluated positives and complete 144-photo snapshots
+  ---
+  duration_ms: 86.795607
+  type: 'test'
+  ...
+# Subtest: pale/plain improvement is at least ten absolute percentage points
+ok 17 - pale/plain improvement is at least ten absolute percentage points
+  ---
+  duration_ms: 0.40919
+  type: 'test'
+  ...
+# Subtest: crop/orientation accuracy does not regress
+ok 18 - crop/orientation accuracy does not regress
+  ---
+  duration_ms: 2.264131
+  type: 'test'
+  ...
+# Subtest: all four modes agree and every mode is account isolated
+ok 19 - all four modes agree and every mode is account isolated
+  ---
+  duration_ms: 157.41466
+  type: 'test'
+  ...
+# Subtest: paired sequential latency and accuracy gates pass without relaxation
+ok 20 - paired sequential latency and accuracy gates pass without relaxation
+  ---
+  duration_ms: 1.00599
+  type: 'test'
+  ...
+# Subtest: expired cold preparation budget fails closed and releases query
+ok 21 - expired cold preparation budget fails closed and releases query
+  ---
+  duration_ms: 4.818326
+  type: 'test'
+  ...
+# Subtest: expired warm scoring budget fails closed and releases query
+ok 22 - expired warm scoring budget fails closed and releases query
+  ---
+  duration_ms: 5.781384
+  type: 'test'
+  ...
+# Subtest: evidence identifies the current server bytes
+ok 23 - evidence identifies the current server bytes
+  ---
+  duration_ms: 4.793601
+  type: 'test'
+  ...
+# Subtest: quiet selector exactly preserves original cluster choices
+ok 24 - quiet selector exactly preserves original cluster choices
+  ---
+  duration_ms: 32.138961
+  type: 'test'
+  ...
+# Subtest: abort during cold preparation releases query memory slot and permits complete retry
+ok 25 - abort during cold preparation releases query memory slot and permits complete retry
+  ---
+  duration_ms: 2363.126477
+  type: 'test'
+  ...
+1..25
+# tests 25
+# suites 0
+# pass 25
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 53065.678992

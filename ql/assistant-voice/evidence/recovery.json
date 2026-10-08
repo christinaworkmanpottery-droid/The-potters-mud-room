@@ -1,0 +1,2787 @@
+{
+  "version": 1,
+  "fixtureVersion": 1,
+  "sourceCheckpoint": "2b30becbfb4986a975b93897ef0956d576812bf6",
+  "commit": "1546c4f8192bbdc698fcc8f5f2384e7a5f81e785",
+  "runtime": {
+    "node": "v22.23.3",
+    "sqlite": "3.49.2"
+  },
+  "checks": [
+    {
+      "name": "tracked release original manifest before any startup",
+      "result": "PASS",
+      "ms": 197
+    },
+    {
+      "name": "outbound isolation positive probes",
+      "result": "PASS",
+      "ms": 200
+    },
+    {
+      "name": "genuine empty first startup, schema, seeds, registration, login and reads",
+      "result": "PASS",
+      "ms": 777
+    },
+    {
+      "name": "complete Calendar/iCal regressions after fresh installation",
+      "result": "PASS",
+      "ms": 2903
+    },
+    {
+      "name": "fresh restart classified and second startup stable",
+      "result": "PASS",
+      "ms": 750
+    },
+    {
+      "name": "representative decodable synthetic fixture",
+      "result": "PASS",
+      "ms": 348
+    },
+    {
+      "name": "explicit current startup mutation classification",
+      "result": "PASS",
+      "ms": 7
+    },
+    {
+      "name": "clean relationship Contact audit",
+      "result": "PASS",
+      "ms": 10
+    },
+    {
+      "name": "cold paired backup checkpoint manifests exact offline restore",
+      "result": "PASS",
+      "ms": 1590
+    },
+    {
+      "name": "restored startup 0 stable before login",
+      "result": "PASS",
+      "ms": 7
+    },
+    {
+      "name": "auth restored-cycle-0 login account switching",
+      "result": "PASS",
+      "ms": 104
+    },
+    {
+      "name": "restored-cycle-0 media piece-a.jpg",
+      "result": "PASS",
+      "ms": 11
+    },
+    {
+      "name": "restored-cycle-0 media clay-a.jpg",
+      "result": "PASS",
+      "ms": 7
+    },
+    {
+      "name": "restored-cycle-0 media glaze-a.jpg",
+      "result": "PASS",
+      "ms": 12
+    },
+    {
+      "name": "restored-cycle-0 media test-a.jpg",
+      "result": "PASS",
+      "ms": 9
+    },
+    {
+      "name": "restored-cycle-0 media tile-a.jpg",
+      "result": "PASS",
+      "ms": 8
+    },
+    {
+      "name": "restored-cycle-0 media tile-a-2.jpg",
+      "result": "PASS",
+      "ms": 6
+    },
+    {
+      "name": "restored-cycle-0 media tile-a-3.jpg",
+      "result": "PASS",
+      "ms": 6
+    },
+    {
+      "name": "restored-cycle-0 media combo-private.jpg",
+      "result": "PASS",
+      "ms": 6
+    },
+    {
+      "name": "restored-cycle-0 media firing-a.jpg",
+      "result": "PASS",
+      "ms": 6
+    },
+    {
+      "name": "restored-cycle-0 media pricing-a.jpg",
+      "result": "PASS",
+      "ms": 7
+    },
+    {
+      "name": "restored-cycle-0 media sale-a.jpg",
+      "result": "PASS",
+      "ms": 6
+    },
+    {
+      "name": "restored-cycle-0 media project-a.jpg",
+      "result": "PASS",
+      "ms": 7
+    },
+    {
+      "name": "restored-cycle-0 media event-a.jpg",
+      "result": "PASS",
+      "ms": 6
+    },
+    {
+      "name": "restored-cycle-0 media avatar.jpg",
+      "result": "PASS",
+      "ms": 8
+    },
+    {
+      "name": "restored-cycle-0 media profile.jpg",
+      "result": "PASS",
+      "ms": 5
+    },
+    {
+      "name": "restored-cycle-0 public/community media contracts",
+      "result": "PASS",
+      "ms": 16
+    },
+    {
+      "name": "restored-cycle-0 relationships History and iCal",
+      "result": "PASS",
+      "ms": 22
+    },
+    {
+      "name": "restored-cycle-0 Forum image video HEAD ranges binding grants",
+      "result": "PASS",
+      "ms": 24
+    },
+    {
+      "name": "restored-cycle-0 Shop assets and purchaser isolation",
+      "result": "PASS",
+      "ms": 25
+    },
+    {
+      "name": "restored-cycle-0 actual HTTP browser Clay Glaze read-only and late response guards",
+      "result": "PASS",
+      "ms": 888
+    },
+    {
+      "name": "complete Calendar/iCal regressions after restored cycle 0",
+      "result": "PASS",
+      "ms": 2717
+    },
+    {
+      "name": "restored startup 1 stable before login",
+      "result": "PASS",
+      "ms": 7
+    },
+    {
+      "name": "auth restored-cycle-1 login account switching",
+      "result": "PASS",
+      "ms": 99
+    },
+    {
+      "name": "restored-cycle-1 media piece-a.jpg",
+      "result": "PASS",
+      "ms": 8
+    },
+    {
+      "name": "restored-cycle-1 media clay-a.jpg",
+      "result": "PASS",
+      "ms": 8
+    },
+    {
+      "name": "restored-cycle-1 media glaze-a.jpg",
+      "result": "PASS",
+      "ms": 6
+    },
+    {
+      "name": "restored-cycle-1 media test-a.jpg",
+      "result": "PASS",
+      "ms": 11
+    },
+    {
+      "name": "restored-cycle-1 media tile-a.jpg",
+      "result": "PASS",
+      "ms": 13
+    },
+    {
+      "name": "restored-cycle-1 media tile-a-2.jpg",
+      "result": "PASS",
+      "ms": 7
+    },
+    {
+      "name": "restored-cycle-1 media tile-a-3.jpg",
+      "result": "PASS",
+      "ms": 8
+    },
+    {
+      "name": "restored-cycle-1 media combo-private.jpg",
+      "result": "PASS",
+      "ms": 6
+    },
+    {
+      "name": "restored-cycle-1 media firing-a.jpg",
+      "result": "PASS",
+      "ms": 7
+    },
+    {
+      "name": "restored-cycle-1 media pricing-a.jpg",
+      "result": "PASS",
+      "ms": 10
+    },
+    {
+      "name": "restored-cycle-1 media sale-a.jpg",
+      "result": "PASS",
+      "ms": 14
+    },
+    {
+      "name": "restored-cycle-1 media project-a.jpg",
+      "result": "PASS",
+      "ms": 6
+    },
+    {
+      "name": "restored-cycle-1 media event-a.jpg",
+      "result": "PASS",
+      "ms": 7
+    },
+    {
+      "name": "restored-cycle-1 media avatar.jpg",
+      "result": "PASS",
+      "ms": 10
+    },
+    {
+      "name": "restored-cycle-1 media profile.jpg",
+      "result": "PASS",
+      "ms": 5
+    },
+    {
+      "name": "restored-cycle-1 public/community media contracts",
+      "result": "PASS",
+      "ms": 18
+    },
+    {
+      "name": "restored-cycle-1 relationships History and iCal",
+      "result": "PASS",
+      "ms": 32
+    },
+    {
+      "name": "restored-cycle-1 Forum image video HEAD ranges binding grants",
+      "result": "PASS",
+      "ms": 27
+    },
+    {
+      "name": "restored-cycle-1 Shop assets and purchaser isolation",
+      "result": "PASS",
+      "ms": 30
+    },
+    {
+      "name": "restored-cycle-1 actual HTTP browser Clay Glaze read-only and late response guards",
+      "result": "PASS",
+      "ms": 463
+    },
+    {
+      "name": "complete Calendar/iCal regressions after restored cycle 1",
+      "result": "PASS",
+      "ms": 2611
+    },
+    {
+      "name": "restored startup 2 stable before login",
+      "result": "PASS",
+      "ms": 6
+    },
+    {
+      "name": "auth restored-cycle-2 login account switching",
+      "result": "PASS",
+      "ms": 101
+    },
+    {
+      "name": "restored-cycle-2 media piece-a.jpg",
+      "result": "PASS",
+      "ms": 9
+    },
+    {
+      "name": "restored-cycle-2 media clay-a.jpg",
+      "result": "PASS",
+      "ms": 7
+    },
+    {
+      "name": "restored-cycle-2 media glaze-a.jpg",
+      "result": "PASS",
+      "ms": 6
+    },
+    {
+      "name": "restored-cycle-2 media test-a.jpg",
+      "result": "PASS",
+      "ms": 10
+    },
+    {
+      "name": "restored-cycle-2 media tile-a.jpg",
+      "result": "PASS",
+      "ms": 8
+    },
+    {
+      "name": "restored-cycle-2 media tile-a-2.jpg",
+      "result": "PASS",
+      "ms": 5
+    },
+    {
+      "name": "restored-cycle-2 media tile-a-3.jpg",
+      "result": "PASS",
+      "ms": 6
+    },
+    {
+      "name": "restored-cycle-2 media combo-private.jpg",
+      "result": "PASS",
+      "ms": 6
+    },
+    {
+      "name": "restored-cycle-2 media firing-a.jpg",
+      "result": "PASS",
+      "ms": 7
+    },
+    {
+      "name": "restored-cycle-2 media pricing-a.jpg",
+      "result": "PASS",
+      "ms": 6
+    },
+    {
+      "name": "restored-cycle-2 media sale-a.jpg",
+      "result": "PASS",
+      "ms": 6
+    },
+    {
+      "name": "restored-cycle-2 media project-a.jpg",
+      "result": "PASS",
+      "ms": 11
+    },
+    {
+      "name": "restored-cycle-2 media event-a.jpg",
+      "result": "PASS",
+      "ms": 6
+    },
+    {
+      "name": "restored-cycle-2 media avatar.jpg",
+      "result": "PASS",
+      "ms": 5
+    },
+    {
+      "name": "restored-cycle-2 media profile.jpg",
+      "result": "PASS",
+      "ms": 5
+    },
+    {
+      "name": "restored-cycle-2 public/community media contracts",
+      "result": "PASS",
+      "ms": 10
+    },
+    {
+      "name": "restored-cycle-2 relationships History and iCal",
+      "result": "PASS",
+      "ms": 21
+    },
+    {
+      "name": "restored-cycle-2 Forum image video HEAD ranges binding grants",
+      "result": "PASS",
+      "ms": 19
+    },
+    {
+      "name": "restored-cycle-2 Shop assets and purchaser isolation",
+      "result": "PASS",
+      "ms": 20
+    },
+    {
+      "name": "restored-cycle-2 actual HTTP browser Clay Glaze read-only and late response guards",
+      "result": "PASS",
+      "ms": 398
+    },
+    {
+      "name": "complete Calendar/iCal regressions after restored cycle 2",
+      "result": "PASS",
+      "ms": 2630
+    },
+    {
+      "name": "historical exact offline restore before intentional startup",
+      "result": "PASS",
+      "ms": 1528
+    },
+    {
+      "name": "historical compatibility rebuilds and every startup delta classified",
+      "result": "PASS",
+      "ms": 4
+    },
+    {
+      "name": "historical stable restart then existing migrate helper only",
+      "result": "PASS",
+      "ms": 1120
+    },
+    {
+      "name": "guarded firing_logs rebuild required after QL refuses without mutation",
+      "result": "PASS",
+      "ms": 999
+    },
+    {
+      "name": "guarded sales rebuild required after QL refuses without mutation",
+      "result": "PASS",
+      "ms": 1072
+    },
+    {
+      "name": "guarded test_tiles rebuild required after QL refuses without mutation",
+      "result": "PASS",
+      "ms": 922
+    },
+    {
+      "name": "guarded piece_glazes rebuild required after QL refuses without mutation",
+      "result": "PASS",
+      "ms": 892
+    },
+    {
+      "name": "entitlement matrix free",
+      "result": "PASS",
+      "ms": 114
+    },
+    {
+      "name": "entitlement matrix starter",
+      "result": "PASS",
+      "ms": 88
+    },
+    {
+      "name": "entitlement matrix basic",
+      "result": "PASS",
+      "ms": 83
+    },
+    {
+      "name": "entitlement matrix mid",
+      "result": "PASS",
+      "ms": 84
+    },
+    {
+      "name": "entitlement matrix top",
+      "result": "PASS",
+      "ms": 95
+    },
+    {
+      "name": "entitlement matrix promo",
+      "result": "PASS",
+      "ms": 92
+    },
+    {
+      "name": "entitlement matrix null",
+      "result": "PASS",
+      "ms": 86
+    },
+    {
+      "name": "entitlement matrix unknown",
+      "result": "PASS",
+      "ms": 94
+    },
+    {
+      "name": "missing account entitlement denied",
+      "result": "PASS",
+      "ms": 4
+    },
+    {
+      "name": "full startup normalization retains qualifying effective access",
+      "result": "PASS",
+      "ms": 299
+    },
+    {
+      "name": "separate secret rotation rejects old JWT and permits new login",
+      "result": "PASS",
+      "ms": 1091
+    },
+    {
+      "name": "Forum block unblock private merchant and Contact update on separate copy",
+      "result": "PASS",
+      "ms": 1250
+    },
+    {
+      "name": "failure copy interrupted-restore gate quarantine corrected restore",
+      "result": "PASS",
+      "ms": 2105
+    },
+    {
+      "name": "failure copy corrupt-db gate quarantine corrected restore",
+      "result": "PASS",
+      "ms": 2196
+    },
+    {
+      "name": "failure copy missing-media-subset gate quarantine corrected restore",
+      "result": "PASS",
+      "ms": 2461
+    },
+    {
+      "name": "failure copy empty-media gate quarantine corrected restore",
+      "result": "PASS",
+      "ms": 1976
+    },
+    {
+      "name": "failure copy orphan-media gate quarantine corrected restore",
+      "result": "PASS",
+      "ms": 2315
+    },
+    {
+      "name": "failure copy wrong-owner-filename gate quarantine corrected restore",
+      "result": "PASS",
+      "ms": 2452
+    },
+    {
+      "name": "failure copy dangling-relationship gate quarantine corrected restore",
+      "result": "PASS",
+      "ms": 1864
+    },
+    {
+      "name": "failure copy wrong-owner-contact gate quarantine corrected restore",
+      "result": "PASS",
+      "ms": 1859
+    },
+    {
+      "name": "failure copy missing-ql-table gate quarantine corrected restore",
+      "result": "PASS",
+      "ms": 1873
+    },
+    {
+      "name": "failure copy missing-trigger gate quarantine corrected restore",
+      "result": "PASS",
+      "ms": 1859
+    },
+    {
+      "name": "failure copy ledger-drift gate quarantine corrected restore",
+      "result": "PASS",
+      "ms": 2165
+    },
+    {
+      "name": "failure copy unreadable-media gate quarantine corrected restore",
+      "result": "PASS",
+      "ms": 2015
+    },
+    {
+      "name": "failure copy unwritable-db gate quarantine corrected restore",
+      "result": "PASS",
+      "ms": 2458
+    },
+    {
+      "name": "failure copy unwritable-directory gate quarantine corrected restore",
+      "result": "PASS",
+      "ms": 2283
+    },
+    {
+      "name": "failure copy missing-release-asset gate quarantine corrected restore",
+      "result": "PASS",
+      "ms": 2002
+    },
+    {
+      "name": "nonroot permission failures preserve data",
+      "result": "BLOCKED",
+      "error": "Nonroot process unavailable locally: EINVAL; must execute on nonroot CI runner"
+    },
+    {
+      "name": "source-specific account startup assignment is CHECK-safe and compatibility-preserving",
+      "result": "PASS",
+      "ms": 1508
+    },
+    {
+      "name": "both current Admin upgrade writers are CHECK-safe under real requests",
+      "result": "PASS",
+      "ms": 1061
+    }
+  ],
+  "diffs": {
+    "fresh-restart": [
+      {
+        "table": "users",
+        "id": "ab7dd70a-1035-4488-9aa2-e091072bf87b",
+        "before": {
+          "id": "ab7dd70a-1035-4488-9aa2-e091072bf87b",
+          "email": "fresh@example.invalid",
+          "password_hash": "$2a$10$8gMq2frQ8FeSDeSzXgB6Xu42nFA8Wv93KzB9IFi0pZwuuu2LpKZ5e",
+          "display_name": "fresh",
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": null,
+          "is_private": 0,
+          "tier": "free",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": null,
+          "stripe_subscription_id": null,
+          "billing_period": "monthly",
+          "admin_granted_access": 0,
+          "plan_expires_at": null,
+          "referral_code": "97D93FGA",
+          "referred_by": null,
+          "unit_system": "imperial",
+          "temp_unit": "fahrenheit",
+          "newsletter_subscribed": 0,
+          "created_at": "2026-10-02 00:01:31",
+          "updated_at": "2026-10-02 00:01:31",
+          "profile_photo": null,
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": "2026-10-02 00:01:31",
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": null,
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 0,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        },
+        "after": {
+          "id": "ab7dd70a-1035-4488-9aa2-e091072bf87b",
+          "email": "fresh@example.invalid",
+          "password_hash": "$2a$10$8gMq2frQ8FeSDeSzXgB6Xu42nFA8Wv93KzB9IFi0pZwuuu2LpKZ5e",
+          "display_name": "fresh",
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": null,
+          "is_private": 0,
+          "tier": "free",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": null,
+          "stripe_subscription_id": null,
+          "billing_period": "monthly",
+          "admin_granted_access": 0,
+          "plan_expires_at": null,
+          "referral_code": "97D93FGA",
+          "referred_by": null,
+          "unit_system": "imperial",
+          "temp_unit": "fahrenheit",
+          "newsletter_subscribed": 0,
+          "created_at": "2026-10-02 00:01:31",
+          "updated_at": "2026-10-02 00:01:31",
+          "profile_photo": null,
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": "2026-10-02 00:01:31",
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": null,
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        }
+      }
+    ],
+    "current-first": [
+      {
+        "table": "piece_photos",
+        "id": "piece-photo-a",
+        "before": {
+          "id": "piece-photo-a",
+          "piece_id": "piece-a",
+          "filename": "piece-a.jpg",
+          "original_name": null,
+          "stage": null,
+          "is_primary": 0,
+          "sort_order": 0,
+          "created_at": "2026-10-02 00:01:36",
+          "rotation": 0,
+          "phash": null,
+          "avg_color": null
+        },
+        "after": {
+          "id": "piece-photo-a",
+          "piece_id": "piece-a",
+          "filename": "piece-a.jpg",
+          "original_name": null,
+          "stage": null,
+          "is_primary": 0,
+          "sort_order": 0,
+          "created_at": "2026-10-02 00:01:36",
+          "rotation": 0,
+          "phash": "cfcb628b65268985",
+          "avg_color": "[{\"r\":30,\"g\":80,\"b\":179,\"weight\":1}]"
+        }
+      },
+      {
+        "table": "piece_photos",
+        "id": "piece-photo-b",
+        "before": {
+          "id": "piece-photo-b",
+          "piece_id": "piece-b",
+          "filename": "piece-b.jpg",
+          "original_name": null,
+          "stage": null,
+          "is_primary": 0,
+          "sort_order": 0,
+          "created_at": "2026-10-02 00:01:36",
+          "rotation": 0,
+          "phash": null,
+          "avg_color": null
+        },
+        "after": {
+          "id": "piece-photo-b",
+          "piece_id": "piece-b",
+          "filename": "piece-b.jpg",
+          "original_name": null,
+          "stage": null,
+          "is_primary": 0,
+          "sort_order": 0,
+          "created_at": "2026-10-02 00:01:36",
+          "rotation": 0,
+          "phash": "cfcb628b65268985",
+          "avg_color": "[{\"r\":30,\"g\":80,\"b\":179,\"weight\":1}]"
+        }
+      },
+      {
+        "table": "piece_photos",
+        "id": "public-photo",
+        "before": {
+          "id": "public-photo",
+          "piece_id": "public",
+          "filename": "public.jpg",
+          "original_name": null,
+          "stage": "finished",
+          "is_primary": 0,
+          "sort_order": 0,
+          "created_at": "2026-10-02 00:01:36",
+          "rotation": 0,
+          "phash": null,
+          "avg_color": null
+        },
+        "after": {
+          "id": "public-photo",
+          "piece_id": "public",
+          "filename": "public.jpg",
+          "original_name": null,
+          "stage": "finished",
+          "is_primary": 0,
+          "sort_order": 0,
+          "created_at": "2026-10-02 00:01:36",
+          "rotation": 0,
+          "phash": "cfcb628b65268985",
+          "avg_color": "[{\"r\":30,\"g\":80,\"b\":179,\"weight\":1}]"
+        }
+      },
+      {
+        "table": "user_stores",
+        "id": "37126e46-0a1d-4f2e-b4b0-b2d18d24b609",
+        "after": {
+          "id": "37126e46-0a1d-4f2e-b4b0-b2d18d24b609",
+          "user_id": "a",
+          "name": "My Website",
+          "url": "https://example.invalid/shop",
+          "platform": "website",
+          "sort_order": 0,
+          "created_at": "2026-10-02 00:01:36"
+        }
+      },
+      {
+        "table": "users",
+        "id": "a",
+        "before": {
+          "id": "a",
+          "email": "a@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": "avatar.jpg",
+          "is_private": 0,
+          "tier": "starter",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-a",
+          "stripe_subscription_id": "synthetic-subscription-a",
+          "billing_period": "monthly",
+          "admin_granted_access": 1,
+          "plan_expires_at": null,
+          "referral_code": null,
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": "profile.jpg",
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": null,
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": "https://example.invalid/shop",
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 0,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        },
+        "after": {
+          "id": "a",
+          "email": "a@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": "avatar.jpg",
+          "is_private": 0,
+          "tier": "starter",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-a",
+          "stripe_subscription_id": "synthetic-subscription-a",
+          "billing_period": "monthly",
+          "admin_granted_access": 1,
+          "plan_expires_at": null,
+          "referral_code": "9BUDE0QK",
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": "profile.jpg",
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": null,
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": "https://example.invalid/shop",
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        }
+      },
+      {
+        "table": "users",
+        "id": "basic",
+        "before": {
+          "id": "basic",
+          "email": "basic@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": null,
+          "is_private": 0,
+          "tier": "basic",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-basic",
+          "stripe_subscription_id": "synthetic-subscription-basic",
+          "billing_period": "monthly",
+          "admin_granted_access": 0,
+          "plan_expires_at": null,
+          "referral_code": "REHEARSAL-basic",
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": null,
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": null,
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": null,
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        },
+        "after": {
+          "id": "basic",
+          "email": "basic@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": null,
+          "is_private": 0,
+          "tier": "starter",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-basic",
+          "stripe_subscription_id": "synthetic-subscription-basic",
+          "billing_period": "monthly",
+          "admin_granted_access": 0,
+          "plan_expires_at": null,
+          "referral_code": "REHEARSAL-basic",
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": null,
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": null,
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": null,
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        }
+      },
+      {
+        "table": "users",
+        "id": "mid",
+        "before": {
+          "id": "mid",
+          "email": "mid@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": null,
+          "is_private": 0,
+          "tier": "mid",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-mid",
+          "stripe_subscription_id": "synthetic-subscription-mid",
+          "billing_period": "monthly",
+          "admin_granted_access": 0,
+          "plan_expires_at": null,
+          "referral_code": "REHEARSAL-mid",
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": null,
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": null,
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": null,
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        },
+        "after": {
+          "id": "mid",
+          "email": "mid@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": null,
+          "is_private": 0,
+          "tier": "starter",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-mid",
+          "stripe_subscription_id": "synthetic-subscription-mid",
+          "billing_period": "monthly",
+          "admin_granted_access": 0,
+          "plan_expires_at": null,
+          "referral_code": "REHEARSAL-mid",
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": null,
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": null,
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": null,
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        }
+      },
+      {
+        "table": "users",
+        "id": "promo",
+        "before": {
+          "id": "promo",
+          "email": "promo@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": null,
+          "is_private": 0,
+          "tier": "free",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-promo",
+          "stripe_subscription_id": "synthetic-subscription-promo",
+          "billing_period": "monthly",
+          "admin_granted_access": 0,
+          "plan_expires_at": null,
+          "referral_code": "REHEARSAL-promo",
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": null,
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": null,
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": null,
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        },
+        "after": {
+          "id": "promo",
+          "email": "promo@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": null,
+          "is_private": 0,
+          "tier": "starter",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-promo",
+          "stripe_subscription_id": "synthetic-subscription-promo",
+          "billing_period": "promo",
+          "admin_granted_access": 0,
+          "plan_expires_at": null,
+          "referral_code": "REHEARSAL-promo",
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": null,
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 1,
+          "last_login": null,
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": null,
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        }
+      },
+      {
+        "table": "users",
+        "id": "top",
+        "before": {
+          "id": "top",
+          "email": "top@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": null,
+          "is_private": 0,
+          "tier": "top",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-top",
+          "stripe_subscription_id": "synthetic-subscription-top",
+          "billing_period": "monthly",
+          "admin_granted_access": 0,
+          "plan_expires_at": null,
+          "referral_code": "REHEARSAL-top",
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": null,
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": null,
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": null,
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        },
+        "after": {
+          "id": "top",
+          "email": "top@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": null,
+          "is_private": 0,
+          "tier": "starter",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-top",
+          "stripe_subscription_id": "synthetic-subscription-top",
+          "billing_period": "monthly",
+          "admin_granted_access": 0,
+          "plan_expires_at": null,
+          "referral_code": "REHEARSAL-top",
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": null,
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": null,
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": null,
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        }
+      }
+    ],
+    "verification-restored-cycle-0": [
+      {
+        "table": "users",
+        "id": "a",
+        "before": {
+          "id": "a",
+          "email": "a@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": "avatar.jpg",
+          "is_private": 0,
+          "tier": "starter",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-a",
+          "stripe_subscription_id": "synthetic-subscription-a",
+          "billing_period": "monthly",
+          "admin_granted_access": 1,
+          "plan_expires_at": null,
+          "referral_code": "9BUDE0QK",
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": "profile.jpg",
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": null,
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": "https://example.invalid/shop",
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        },
+        "after": {
+          "id": "a",
+          "email": "a@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": "avatar.jpg",
+          "is_private": 0,
+          "tier": "starter",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-a",
+          "stripe_subscription_id": "synthetic-subscription-a",
+          "billing_period": "monthly",
+          "admin_granted_access": 1,
+          "plan_expires_at": null,
+          "referral_code": "9BUDE0QK",
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": "profile.jpg",
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": "2026-10-02 00:01:38",
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": "https://example.invalid/shop",
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        }
+      },
+      {
+        "table": "users",
+        "id": "b",
+        "before": {
+          "id": "b",
+          "email": "b@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": null,
+          "is_private": 0,
+          "tier": "starter",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-b",
+          "stripe_subscription_id": "synthetic-subscription-b",
+          "billing_period": "monthly",
+          "admin_granted_access": 0,
+          "plan_expires_at": null,
+          "referral_code": "REHEARSAL-b",
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": null,
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": null,
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": null,
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        },
+        "after": {
+          "id": "b",
+          "email": "b@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": null,
+          "is_private": 0,
+          "tier": "starter",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-b",
+          "stripe_subscription_id": "synthetic-subscription-b",
+          "billing_period": "monthly",
+          "admin_granted_access": 0,
+          "plan_expires_at": null,
+          "referral_code": "REHEARSAL-b",
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": null,
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": "2026-10-02 00:01:38",
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": null,
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        }
+      }
+    ],
+    "verification-restored-cycle-1": [
+      {
+        "table": "users",
+        "id": "a",
+        "before": {
+          "id": "a",
+          "email": "a@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": "avatar.jpg",
+          "is_private": 0,
+          "tier": "starter",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-a",
+          "stripe_subscription_id": "synthetic-subscription-a",
+          "billing_period": "monthly",
+          "admin_granted_access": 1,
+          "plan_expires_at": null,
+          "referral_code": "9BUDE0QK",
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": "profile.jpg",
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": "2026-10-02 00:01:38",
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": "https://example.invalid/shop",
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        },
+        "after": {
+          "id": "a",
+          "email": "a@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": "avatar.jpg",
+          "is_private": 0,
+          "tier": "starter",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-a",
+          "stripe_subscription_id": "synthetic-subscription-a",
+          "billing_period": "monthly",
+          "admin_granted_access": 1,
+          "plan_expires_at": null,
+          "referral_code": "9BUDE0QK",
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": "profile.jpg",
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": "2026-10-02 00:01:43",
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": "https://example.invalid/shop",
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        }
+      },
+      {
+        "table": "users",
+        "id": "b",
+        "before": {
+          "id": "b",
+          "email": "b@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": null,
+          "is_private": 0,
+          "tier": "starter",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-b",
+          "stripe_subscription_id": "synthetic-subscription-b",
+          "billing_period": "monthly",
+          "admin_granted_access": 0,
+          "plan_expires_at": null,
+          "referral_code": "REHEARSAL-b",
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": null,
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": "2026-10-02 00:01:38",
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": null,
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        },
+        "after": {
+          "id": "b",
+          "email": "b@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": null,
+          "is_private": 0,
+          "tier": "starter",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-b",
+          "stripe_subscription_id": "synthetic-subscription-b",
+          "billing_period": "monthly",
+          "admin_granted_access": 0,
+          "plan_expires_at": null,
+          "referral_code": "REHEARSAL-b",
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": null,
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": "2026-10-02 00:01:43",
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": null,
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        }
+      }
+    ],
+    "verification-restored-cycle-2": [
+      {
+        "table": "users",
+        "id": "a",
+        "before": {
+          "id": "a",
+          "email": "a@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": "avatar.jpg",
+          "is_private": 0,
+          "tier": "starter",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-a",
+          "stripe_subscription_id": "synthetic-subscription-a",
+          "billing_period": "monthly",
+          "admin_granted_access": 1,
+          "plan_expires_at": null,
+          "referral_code": "9BUDE0QK",
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": "profile.jpg",
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": "2026-10-02 00:01:43",
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": "https://example.invalid/shop",
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        },
+        "after": {
+          "id": "a",
+          "email": "a@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": "avatar.jpg",
+          "is_private": 0,
+          "tier": "starter",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-a",
+          "stripe_subscription_id": "synthetic-subscription-a",
+          "billing_period": "monthly",
+          "admin_granted_access": 1,
+          "plan_expires_at": null,
+          "referral_code": "9BUDE0QK",
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": "profile.jpg",
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": "2026-10-02 00:01:47",
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": "https://example.invalid/shop",
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        }
+      },
+      {
+        "table": "users",
+        "id": "b",
+        "before": {
+          "id": "b",
+          "email": "b@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": null,
+          "is_private": 0,
+          "tier": "starter",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-b",
+          "stripe_subscription_id": "synthetic-subscription-b",
+          "billing_period": "monthly",
+          "admin_granted_access": 0,
+          "plan_expires_at": null,
+          "referral_code": "REHEARSAL-b",
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": null,
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": "2026-10-02 00:01:43",
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": null,
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        },
+        "after": {
+          "id": "b",
+          "email": "b@example.invalid",
+          "password_hash": "$2a$10$UV3Y6hGsZBOltLBa/5qnHe0YNW4qKUGwrwLbZ0Em1Oj0GeyoP6Ov.",
+          "display_name": null,
+          "bio": null,
+          "location": null,
+          "website": null,
+          "avatar_filename": null,
+          "is_private": 0,
+          "tier": "starter",
+          "forum_tokens": 0,
+          "unlimited_tokens_until": null,
+          "stripe_customer_id": "synthetic-customer-b",
+          "stripe_subscription_id": "synthetic-subscription-b",
+          "billing_period": "monthly",
+          "admin_granted_access": 0,
+          "plan_expires_at": null,
+          "referral_code": "REHEARSAL-b",
+          "referred_by": null,
+          "unit_system": "metric",
+          "temp_unit": "celsius",
+          "newsletter_subscribed": 1,
+          "created_at": "2026-08-12 12:34:56",
+          "updated_at": "2026-10-02 00:01:36",
+          "profile_photo": null,
+          "username": null,
+          "free_months_remaining": 0,
+          "is_beta_tester": 0,
+          "last_login": "2026-10-02 00:01:47",
+          "iap_platform": null,
+          "iap_transaction_id": null,
+          "iap_expires_at": null,
+          "shop_url": null,
+          "shop_url_2": null,
+          "shop_url_3": null,
+          "city": null,
+          "state_region": null,
+          "country": null,
+          "findable": 0,
+          "stores_migrated": 1,
+          "ai_tokens": 0,
+          "potter_type": null,
+          "years_experience": null,
+          "studio_type": null,
+          "signup_source": null,
+          "default_labor_rate": null
+        }
+      }
+    ],
+    "historical": [
+      {
+        "kind": "legacy-rebuild",
+        "table": "firing_logs",
+        "before": "CREATE TABLE firing_logs (\n      id TEXT PRIMARY KEY,\n      user_id TEXT NOT NULL,\n      piece_id TEXT,\n      firing_type TEXT CHECK(firing_type IN ('bisque', 'glaze', 'raku', 'pit', 'wood', 'soda', 'salt', 'maintenance', 'element-change', 'thermocouple', 'preheat', 'soak', 'other')),\n      cone TEXT,\n      temperature TEXT,\n      atmosphere TEXT CHECK(atmosphere IN ('oxidation', 'reduction', 'neutral', NULL)),\n      kiln_name TEXT,\n      schedule TEXT,\n      duration TEXT,\n      firing_speed TEXT CHECK(firing_speed IN ('slow', 'medium', 'fast', 'custom', NULL)),\n      hold_used INTEGER DEFAULT 0,\n      hold_duration TEXT,\n      date TEXT,\n      results TEXT,\n      notes TEXT,\n      created_at TEXT DEFAULT (datetime('now')), custom_speed_detail TEXT, firing_time TEXT, firing_mode TEXT DEFAULT 'kiln-load', load_description TEXT, firing_mode_notes TEXT, start_time TEXT, end_time TEXT, open_temp TEXT,\n      FOREIGN KEY (user_id) REFERENCES users(id),\n      FOREIGN KEY (piece_id) REFERENCES pieces(id) ON DELETE SET NULL\n    )",
+        "after": "CREATE TABLE \"firing_logs\" (\n      id TEXT PRIMARY KEY,\n      user_id TEXT NOT NULL,\n      piece_id TEXT,\n      firing_type TEXT CHECK(firing_type IN ('lustre', 'bisque', 'glaze', 'raku', 'pit', 'wood', 'soda', 'salt', 'maintenance', 'element-change', 'thermocouple', 'preheat', 'soak', 'other')),\n      cone TEXT,\n      temperature TEXT,\n      atmosphere TEXT CHECK(atmosphere IN ('oxidation', 'reduction', 'neutral', NULL)),\n      kiln_name TEXT,\n      schedule TEXT,\n      duration TEXT,\n      firing_speed TEXT CHECK(firing_speed IN ('slow', 'medium', 'fast', 'custom', NULL)),\n      hold_used INTEGER DEFAULT 0,\n      hold_duration TEXT,\n      date TEXT,\n      results TEXT,\n      notes TEXT,\n      created_at TEXT DEFAULT (datetime('now')), custom_speed_detail TEXT, firing_time TEXT, firing_mode TEXT DEFAULT 'kiln-load', load_description TEXT, firing_mode_notes TEXT, start_time TEXT, end_time TEXT, open_temp TEXT,\n      FOREIGN KEY (user_id) REFERENCES users(id),\n      FOREIGN KEY (piece_id) REFERENCES pieces(id) ON DELETE SET NULL\n    )"
+      },
+      {
+        "kind": "legacy-rebuild",
+        "table": "piece_glazes",
+        "before": "CREATE TABLE piece_glazes (\n      id TEXT PRIMARY KEY,\n      piece_id TEXT NOT NULL,\n      glaze_id TEXT NOT NULL,\n      coats INTEGER DEFAULT 1,\n      application_method TEXT CHECK(application_method IN ('dip', 'brush', 'spray', 'pour', 'wax-resist', 'other', NULL)),\n      layer_order INTEGER DEFAULT 0,\n      notes TEXT,\n      custom_name TEXT DEFAULT NULL,\n      FOREIGN KEY (piece_id) REFERENCES pieces(id) ON DELETE CASCADE,\n      FOREIGN KEY (glaze_id) REFERENCES glazes(id) ON DELETE CASCADE\n    )",
+        "after": "CREATE TABLE \"piece_glazes\" (\n            id TEXT PRIMARY KEY,\n            piece_id TEXT NOT NULL,\n            glaze_id TEXT,\n            coats INTEGER DEFAULT 1,\n            application_method TEXT CHECK(application_method IN ('dip', 'brush', 'spray', 'pour', 'wax-resist', 'other', NULL)),\n            layer_order INTEGER DEFAULT 0,\n            notes TEXT,\n            custom_name TEXT DEFAULT NULL,\n            FOREIGN KEY (piece_id) REFERENCES pieces(id) ON DELETE CASCADE,\n            FOREIGN KEY (glaze_id) REFERENCES glazes(id) ON DELETE CASCADE\n          )"
+      },
+      {
+        "kind": "legacy-rebuild",
+        "table": "sales",
+        "before": "CREATE TABLE \"sales\" (\n      id TEXT PRIMARY KEY,\n      user_id TEXT NOT NULL,\n      piece_id TEXT,\n      date TEXT,\n      price REAL,\n      venue TEXT,\n      venue_type TEXT CHECK(venue_type IN ('market','online','other')), \n      buyer_name TEXT,\n      notes TEXT,\n      created_at TEXT DEFAULT (datetime('now')), quantity INTEGER DEFAULT 1, item_description TEXT, event_name TEXT, buyer_email TEXT, buyer_phone TEXT, image_filename TEXT, contact_id TEXT,\n      FOREIGN KEY (user_id) REFERENCES users(id),\n      FOREIGN KEY (piece_id) REFERENCES pieces(id) ON DELETE SET NULL\n    )",
+        "after": "CREATE TABLE \"sales\" (\n      id TEXT PRIMARY KEY,\n      user_id TEXT NOT NULL,\n      piece_id TEXT,\n      date TEXT,\n      price REAL,\n      venue TEXT,\n      venue_type TEXT , \n      buyer_name TEXT,\n      notes TEXT,\n      created_at TEXT DEFAULT (datetime('now')), quantity INTEGER DEFAULT 1, item_description TEXT, event_name TEXT, buyer_email TEXT, buyer_phone TEXT, image_filename TEXT, contact_id TEXT,\n      FOREIGN KEY (user_id) REFERENCES users(id),\n      FOREIGN KEY (piece_id) REFERENCES pieces(id) ON DELETE SET NULL\n    )"
+      },
+      {
+        "kind": "legacy-rebuild",
+        "table": "test_tiles",
+        "before": "CREATE TABLE test_tiles (\n      id TEXT PRIMARY KEY,\n      user_id TEXT NOT NULL,\n      name TEXT,\n      glaze_id TEXT,\n      glaze_name TEXT,\n      clay_body_id TEXT,\n      clay_name TEXT,\n      cone TEXT,\n      atmosphere TEXT CHECK(atmosphere IN ('oxidation', 'reduction', 'neutral', NULL)),\n      application_method TEXT CHECK(application_method IN ('dip', 'brush', 'spray', 'pour', 'other', NULL)),\n      coats INTEGER DEFAULT 1,\n      thickness TEXT CHECK(thickness IN ('thin', 'medium', 'thick', NULL)),\n      surface_result TEXT CHECK(surface_result IN ('gloss', 'satin', 'matte', 'crystal', 'metallic', 'other', NULL)),\n      color_result TEXT,\n      layered_over TEXT,\n      layered_under TEXT,\n      kiln_position TEXT,\n      firing_schedule TEXT,\n      photo_filename TEXT,\n      photo_filename2 TEXT,\n      photo_filename3 TEXT,\n      notes TEXT,\n      rating INTEGER CHECK(rating BETWEEN 1 AND 5 OR rating IS NULL),\n      tags TEXT,\n      created_at TEXT DEFAULT (datetime('now')),\n      updated_at TEXT DEFAULT (datetime('now')),\n      FOREIGN KEY (user_id) REFERENCES users(id),\n      FOREIGN KEY (glaze_id) REFERENCES glazes(id) ON DELETE SET NULL,\n      FOREIGN KEY (clay_body_id) REFERENCES clay_bodies(id) ON DELETE SET NULL\n    )",
+        "after": "CREATE TABLE \"test_tiles\" (\n            id TEXT PRIMARY KEY,\n            user_id TEXT NOT NULL,\n            name TEXT,\n            glaze_id TEXT,\n            glaze_name TEXT,\n            clay_body_id TEXT,\n            clay_name TEXT,\n            cone TEXT,\n            atmosphere TEXT CHECK(atmosphere IN ('oxidation', 'reduction', 'neutral', NULL)),\n            application_method TEXT CHECK(application_method IN ('dip', 'brush', 'spray', 'pour', 'other', NULL)),\n            coats INTEGER DEFAULT 1,\n            thickness TEXT CHECK(thickness IN ('thin', 'medium', 'thick', NULL)),\n            surface_result TEXT CHECK(surface_result IN ('gloss', 'satin', 'matte', 'crystal', 'metallic', 'underglaze', 'other', NULL)),\n            color_result TEXT,\n            layered_over TEXT,\n            layered_under TEXT,\n            kiln_position TEXT,\n            firing_schedule TEXT,\n            photo_filename TEXT,\n            photo_filename2 TEXT,\n            photo_filename3 TEXT,\n            notes TEXT,\n            rating INTEGER CHECK(rating BETWEEN 1 AND 5 OR rating IS NULL),\n            tags TEXT,\n            created_at TEXT DEFAULT (datetime('now')),\n            updated_at TEXT DEFAULT (datetime('now')),\n            FOREIGN KEY (user_id) REFERENCES users(id),\n            FOREIGN KEY (glaze_id) REFERENCES glazes(id) ON DELETE SET NULL,\n            FOREIGN KEY (clay_body_id) REFERENCES clay_bodies(id) ON DELETE SET NULL\n          )"
+      },
+      {
+        "kind": "additive-column",
+        "table": "users",
+        "column": "admin_granted_access",
+        "default": 0
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_ai_usage_user_month",
+          "tbl_name": "ai_usage",
+          "sql": "CREATE INDEX idx_ai_usage_user_month ON ai_usage(user_id, created_at)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_beta_email",
+          "tbl_name": "beta_signups",
+          "sql": "CREATE UNIQUE INDEX idx_beta_email ON beta_signups(email)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_blocked_user",
+          "tbl_name": "blocked_users",
+          "sql": "CREATE INDEX idx_blocked_user ON blocked_users(user_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_blog_published",
+          "tbl_name": "blog_posts",
+          "sql": "CREATE INDEX idx_blog_published ON blog_posts(is_published, published_at)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_blog_slug",
+          "tbl_name": "blog_posts",
+          "sql": "CREATE INDEX idx_blog_slug ON blog_posts(slug)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_blog_view_events_post",
+          "tbl_name": "blog_view_events",
+          "sql": "CREATE INDEX idx_blog_view_events_post ON blog_view_events(blog_post_id, created_at)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_blog_view_events_visitor",
+          "tbl_name": "blog_view_events",
+          "sql": "CREATE INDEX idx_blog_view_events_visitor ON blog_view_events(visitor_key, created_at)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_chemicals_user",
+          "tbl_name": "glaze_chemicals",
+          "sql": "CREATE INDEX idx_chemicals_user ON glaze_chemicals(user_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_clay_photos",
+          "tbl_name": "clay_photos",
+          "sql": "CREATE INDEX idx_clay_photos ON clay_photos(clay_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_clay_user",
+          "tbl_name": "clay_bodies",
+          "sql": "CREATE INDEX idx_clay_user ON clay_bodies(user_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_combo_comments",
+          "tbl_name": "combo_comments",
+          "sql": "CREATE INDEX idx_combo_comments ON combo_comments(combo_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_combo_likes",
+          "tbl_name": "combo_likes",
+          "sql": "CREATE INDEX idx_combo_likes ON combo_likes(combo_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_combos_share_id",
+          "tbl_name": "glaze_combos",
+          "sql": "CREATE INDEX idx_combos_share_id ON glaze_combos(share_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_combos_shared",
+          "tbl_name": "glaze_combos",
+          "sql": "CREATE INDEX idx_combos_shared ON glaze_combos(is_shared)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_contacts_user",
+          "tbl_name": "contacts",
+          "sql": "CREATE INDEX idx_contacts_user ON contacts(user_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_email_sends_date",
+          "tbl_name": "email_sends",
+          "sql": "CREATE INDEX idx_email_sends_date ON email_sends(sent_at DESC)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_email_sends_type",
+          "tbl_name": "email_sends",
+          "sql": "CREATE INDEX idx_email_sends_type ON email_sends(type)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_events_date",
+          "tbl_name": "events",
+          "sql": "CREATE INDEX idx_events_date ON events(event_date)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_events_user",
+          "tbl_name": "events",
+          "sql": "CREATE INDEX idx_events_user ON events(user_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_firing_photos",
+          "tbl_name": "firing_photos",
+          "sql": "CREATE INDEX idx_firing_photos ON firing_photos(firing_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_firing_user",
+          "tbl_name": "firing_logs",
+          "sql": "CREATE INDEX idx_firing_user ON firing_logs(user_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_forum_posts_cat",
+          "tbl_name": "forum_posts",
+          "sql": "CREATE INDEX idx_forum_posts_cat ON forum_posts(category_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_forum_posts_user",
+          "tbl_name": "forum_posts",
+          "sql": "CREATE INDEX idx_forum_posts_user ON forum_posts(user_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_forum_replies_post",
+          "tbl_name": "forum_replies",
+          "sql": "CREATE INDEX idx_forum_replies_post ON forum_replies(post_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_glaze_clay_tests_glaze",
+          "tbl_name": "glaze_clay_tests",
+          "sql": "CREATE INDEX idx_glaze_clay_tests_glaze ON glaze_clay_tests(glaze_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_glaze_photos",
+          "tbl_name": "glaze_photos",
+          "sql": "CREATE INDEX idx_glaze_photos ON glaze_photos(glaze_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_glazes_user",
+          "tbl_name": "glazes",
+          "sql": "CREATE INDEX idx_glazes_user ON glazes(user_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_goals_user",
+          "tbl_name": "goals",
+          "sql": "CREATE INDEX idx_goals_user ON goals(user_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_iap_transaction",
+          "tbl_name": "iap_purchases",
+          "sql": "CREATE INDEX idx_iap_transaction ON iap_purchases(transaction_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_iap_user",
+          "tbl_name": "iap_purchases",
+          "sql": "CREATE INDEX idx_iap_user ON iap_purchases(user_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_messages_conv",
+          "tbl_name": "messages",
+          "sql": "CREATE INDEX idx_messages_conv ON messages(from_user_id, to_user_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_messages_to",
+          "tbl_name": "messages",
+          "sql": "CREATE INDEX idx_messages_to ON messages(to_user_id, is_read)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_newsletter_email",
+          "tbl_name": "newsletter_subscribers",
+          "sql": "CREATE INDEX idx_newsletter_email ON newsletter_subscribers(email)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_newsletter_sends_date",
+          "tbl_name": "newsletter_sends",
+          "sql": "CREATE INDEX idx_newsletter_sends_date ON newsletter_sends(sent_at DESC)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_newsletter_sends_post",
+          "tbl_name": "newsletter_sends",
+          "sql": "CREATE INDEX idx_newsletter_sends_post ON newsletter_sends(blog_post_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_newsletter_tracking_send",
+          "tbl_name": "newsletter_tracking",
+          "sql": "CREATE INDEX idx_newsletter_tracking_send ON newsletter_tracking(send_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_newsletter_tracking_type",
+          "tbl_name": "newsletter_tracking",
+          "sql": "CREATE INDEX idx_newsletter_tracking_type ON newsletter_tracking(event_type)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_notifications_user",
+          "tbl_name": "notifications",
+          "sql": "CREATE INDEX idx_notifications_user ON notifications(user_id, is_read)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_page_views_date",
+          "tbl_name": "page_views",
+          "sql": "CREATE INDEX idx_page_views_date ON page_views(created_at)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_page_views_path",
+          "tbl_name": "page_views",
+          "sql": "CREATE INDEX idx_page_views_path ON page_views(path)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_photos_piece",
+          "tbl_name": "piece_photos",
+          "sql": "CREATE INDEX idx_photos_piece ON piece_photos(piece_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_piece_glazes_piece",
+          "tbl_name": "piece_glazes",
+          "sql": "CREATE INDEX idx_piece_glazes_piece ON piece_glazes(piece_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_pieces_clay",
+          "tbl_name": "pieces",
+          "sql": "CREATE INDEX idx_pieces_clay ON pieces(clay_body_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_pieces_status",
+          "tbl_name": "pieces",
+          "sql": "CREATE INDEX idx_pieces_status ON pieces(status)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_pieces_user",
+          "tbl_name": "pieces",
+          "sql": "CREATE INDEX idx_pieces_user ON pieces(user_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_pricing_calculations_user",
+          "tbl_name": "pricing_calculations",
+          "sql": "CREATE INDEX idx_pricing_calculations_user ON pricing_calculations(user_id, created_at)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_project_photos",
+          "tbl_name": "project_photos",
+          "sql": "CREATE INDEX idx_project_photos ON project_photos(project_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_projects_user",
+          "tbl_name": "projects",
+          "sql": "CREATE INDEX idx_projects_user ON projects(user_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_push_tokens_user",
+          "tbl_name": "push_tokens",
+          "sql": "CREATE INDEX idx_push_tokens_user ON push_tokens(user_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_referral_referrer",
+          "tbl_name": "referral_rewards",
+          "sql": "CREATE INDEX idx_referral_referrer ON referral_rewards(referrer_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_sales_user",
+          "tbl_name": "sales",
+          "sql": "CREATE INDEX idx_sales_user ON sales(user_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_studio_notes_user",
+          "tbl_name": "studio_notes",
+          "sql": "CREATE INDEX idx_studio_notes_user ON studio_notes(user_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_test_tiles_clay",
+          "tbl_name": "test_tiles",
+          "sql": "CREATE INDEX idx_test_tiles_clay ON test_tiles(clay_body_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_test_tiles_glaze",
+          "tbl_name": "test_tiles",
+          "sql": "CREATE INDEX idx_test_tiles_glaze ON test_tiles(glaze_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_test_tiles_user",
+          "tbl_name": "test_tiles",
+          "sql": "CREATE INDEX idx_test_tiles_user ON test_tiles(user_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_user_activity_action",
+          "tbl_name": "user_activity",
+          "sql": "CREATE INDEX idx_user_activity_action ON user_activity(action)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_user_activity_date",
+          "tbl_name": "user_activity",
+          "sql": "CREATE INDEX idx_user_activity_date ON user_activity(created_at)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_user_activity_user",
+          "tbl_name": "user_activity",
+          "sql": "CREATE INDEX idx_user_activity_user ON user_activity(user_id)"
+        }
+      },
+      {
+        "kind": "additive-schema",
+        "object": {
+          "type": "index",
+          "name": "idx_user_stores_user_id",
+          "tbl_name": "user_stores",
+          "sql": "CREATE INDEX idx_user_stores_user_id ON user_stores(user_id)"
+        }
+      },
+      {
+        "kind": "source-seeding",
+        "table": "admin_docs",
+        "count": 3
+      },
+      {
+        "kind": "source-seeding",
+        "table": "blog_posts",
+        "count": 6
+      },
+      {
+        "kind": "source-seeding",
+        "table": "email_sends",
+        "count": 1
+      },
+      {
+        "kind": "source-seeding",
+        "table": "forum_categories",
+        "count": 13
+      },
+      {
+        "kind": "source-seeding",
+        "table": "migrations",
+        "count": 7
+      },
+      {
+        "kind": "photo-signature",
+        "id": "piece-photo-a"
+      },
+      {
+        "kind": "photo-signature",
+        "id": "piece-photo-b"
+      },
+      {
+        "kind": "tier-normalization",
+        "id": "a",
+        "from": "basic",
+        "to": "starter"
+      },
+      {
+        "kind": "tier-normalization",
+        "id": "b",
+        "from": "basic",
+        "to": "starter"
+      }
+    ]
+  },
+  "manifests": {
+    "current": "c6259ffad0d7b5fa5b941b7389f949587e3e714732b0a5cfdff7a296eebfcaaf",
+    "historical": "097137d753ba1133839d600229f9ec40ce1658cc41028049aef68bf7776e9af9"
+  },
+  "blockers": [],
+  "limitations": [
+    "Global /uploads remains unrestricted.",
+    "JWT signature/expiry controls validity; logout/restart/replacement login do not universally revoke JWTs.",
+    "Client guards do not constitute server token revocation.",
+    "Forum playback grants are memory-only and reset on restart.",
+    "Startup normalizes basic/mid/top to starter and synchronizes beta access.",
+    "Some source initialization errors are swallowed.",
+    "No recovery generation marker or create idempotency guarantee: valid same-account stale queued operations may replay after rollback.",
+    "Server backup excludes mobile SQLite, AsyncStorage and device queues.",
+    "Production infrastructure snapshot consistency, retention, restore behavior, capacity, contents and non-disk assets remain unknown."
+  ],
+  "verification": {
+    "backend": {
+      "expectedExistingCount": 1314,
+      "adminDemographicsChecks": 45,
+      "shopAssetChecks": 13,
+      "specialAccountBillingChecks": 17,
+      "adminGrantedBillingChecks": 64,
+      "expectedCompleteCount": 1453,
+      "command": "node --require ./ql/rehearsal/suite-isolate.cjs ql/verify-phase1.cjs"
+    },
+    "strictPhase1": 37,
+    "mobileQueue": {
+      "source": "7ab57c662daa2c8d97cfbd9a3cc454bbe2cd1a8e",
+      "tests": 64,
+      "result": "PASS local; reused source/tests match checkpoint blobs; mobile unchanged"
+    },
+    "editorPreservation": 95,
+    "initialization": 53
+  },
+  "productionAccess": false,
+  "phase3": "closed",
+  "releaseAsset": {
+    "path": "public/shop/the-potters-mud-log.pdf",
+    "size": 91028,
+    "sha256": "760a69c64295bc660fff4f6383494b9f66ed7abc1405c3807ac84a507b7599d1",
+    "mime": "application/pdf",
+    "pages": 113,
+    "sourceCommit": "643cd0f5b5f26949d0d550f009ebe5eb1c2311f0",
+    "sourcePath": "public/shop/the-potters-mud-log.pdf"
+  },
+  "calendarRegressions": {
+    "fresh": [
+      {
+        "file": "tests/directory-calendar.cjs",
+        "status": 0
+      },
+      {
+        "file": "tests/website-api.cjs",
+        "status": 0
+      },
+      {
+        "file": "tests/website-dom.cjs",
+        "status": 0
+      }
+    ],
+    "restored-0": [
+      {
+        "file": "tests/directory-calendar.cjs",
+        "status": 0
+      },
+      {
+        "file": "tests/website-api.cjs",
+        "status": 0
+      },
+      {
+        "file": "tests/website-dom.cjs",
+        "status": 0
+      }
+    ],
+    "restored-1": [
+      {
+        "file": "tests/directory-calendar.cjs",
+        "status": 0
+      },
+      {
+        "file": "tests/website-api.cjs",
+        "status": 0
+      },
+      {
+        "file": "tests/website-dom.cjs",
+        "status": 0
+      }
+    ],
+    "restored-2": [
+      {
+        "file": "tests/directory-calendar.cjs",
+        "status": 0
+      },
+      {
+        "file": "tests/website-api.cjs",
+        "status": 0
+      },
+      {
+        "file": "tests/website-dom.cjs",
+        "status": 0
+      }
+    ]
+  },
+  "relationshipAudit": {
+    "audit": {
+      "formatVersion": 1,
+      "migrationState": "installed",
+      "fileInventoryChecked": true,
+      "firingStates": {
+        "legacyOnly": 2,
+        "qlOnly": 1,
+        "matchingPair": 1,
+        "additionalSharedPair": 0,
+        "unlinked": 1
+      },
+      "counts": {},
+      "issues": []
+    },
+    "legacyContacts": []
+  },
+  "offlineRestore": {
+    "databaseBytes": "exact",
+    "schemaRowsRelationships": "exact",
+    "mediaPathsBytesPermissions": "exact",
+    "integrity": [
+      {
+        "integrity_check": "ok"
+      }
+    ],
+    "foreignKeys": []
+  },
+  "restored": "restored-0",
+  "entitlementMatrix": [
+    {
+      "tier": "free",
+      "qualified": false,
+      "status": 403
+    },
+    {
+      "tier": "starter",
+      "qualified": true,
+      "status": 200
+    },
+    {
+      "tier": "basic",
+      "qualified": true,
+      "status": 200
+    },
+    {
+      "tier": "mid",
+      "qualified": true,
+      "status": 200
+    },
+    {
+      "tier": "top",
+      "qualified": true,
+      "status": 200
+    },
+    {
+      "tier": "promo",
+      "qualified": true,
+      "status": 200
+    },
+    {
+      "tier": null,
+      "qualified": false,
+      "status": 403
+    },
+    {
+      "tier": "unknown",
+      "qualified": false,
+      "status": 403
+    }
+  ],
+  "failureInjection": [
+    {
+      "name": "interrupted-restore",
+      "manifestGate": "rejected",
+      "quarantine": "retained",
+      "correctedRestore": "PASS"
+    },
+    {
+      "name": "corrupt-db",
+      "manifestGate": "rejected",
+      "quarantine": "retained",
+      "correctedRestore": "PASS"
+    },
+    {
+      "name": "missing-media-subset",
+      "manifestGate": "rejected",
+      "quarantine": "retained",
+      "correctedRestore": "PASS"
+    },
+    {
+      "name": "empty-media",
+      "manifestGate": "rejected",
+      "quarantine": "retained",
+      "correctedRestore": "PASS"
+    },
+    {
+      "name": "orphan-media",
+      "manifestGate": "rejected",
+      "quarantine": "retained",
+      "correctedRestore": "PASS"
+    },
+    {
+      "name": "wrong-owner-filename",
+      "manifestGate": "rejected",
+      "quarantine": "retained",
+      "correctedRestore": "PASS"
+    },
+    {
+      "name": "dangling-relationship",
+      "manifestGate": "rejected",
+      "quarantine": "retained",
+      "correctedRestore": "PASS"
+    },
+    {
+      "name": "wrong-owner-contact",
+      "manifestGate": "rejected",
+      "quarantine": "retained",
+      "correctedRestore": "PASS"
+    },
+    {
+      "name": "missing-ql-table",
+      "manifestGate": "rejected",
+      "quarantine": "retained",
+      "correctedRestore": "PASS"
+    },
+    {
+      "name": "missing-trigger",
+      "manifestGate": "rejected",
+      "quarantine": "retained",
+      "correctedRestore": "PASS"
+    },
+    {
+      "name": "ledger-drift",
+      "manifestGate": "rejected",
+      "quarantine": "retained",
+      "correctedRestore": "PASS"
+    },
+    {
+      "name": "unreadable-media",
+      "manifestGate": "rejected",
+      "quarantine": "retained",
+      "correctedRestore": "PASS"
+    },
+    {
+      "name": "unwritable-db",
+      "manifestGate": "rejected",
+      "quarantine": "retained",
+      "correctedRestore": "PASS"
+    },
+    {
+      "name": "unwritable-directory",
+      "manifestGate": "rejected",
+      "quarantine": "retained",
+      "correctedRestore": "PASS"
+    },
+    {
+      "name": "missing-release-asset",
+      "manifestGate": "rejected",
+      "quarantine": "retained",
+      "correctedRestore": "PASS"
+    }
+  ],
+  "final": "BLOCKED",
+  "rehearsal": "BLOCKED",
+  "counts": {
+    "passed": 114,
+    "failed": 0,
+    "blocked": 1,
+    "cancellations": 0,
+    "skips": 0,
+    "todos": 0
+  }
+}

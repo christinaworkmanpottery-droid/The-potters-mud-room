@@ -1,0 +1,26 @@
+{
+  "cold": {
+    "queries": 516,
+    "rankingScoreConfidenceWinningPhotoAndAccountParity": true,
+    "frozenSHA256": "e532ceb0853fe51a9dc66b5b6ac629b605c5caf7deaa7f954325a509f2551a04",
+    "currentSHA256": "e532ceb0853fe51a9dc66b5b6ac629b605c5caf7deaa7f954325a509f2551a04"
+  },
+  "warm": {
+    "queries": 516,
+    "rankingScoreConfidenceWinningPhotoAndAccountParity": true,
+    "frozenSHA256": "e532ceb0853fe51a9dc66b5b6ac629b605c5caf7deaa7f954325a509f2551a04",
+    "currentSHA256": "e532ceb0853fe51a9dc66b5b6ac629b605c5caf7deaa7f954325a509f2551a04"
+  },
+  "repeat": {
+    "queries": 516,
+    "rankingScoreConfidenceWinningPhotoAndAccountParity": true,
+    "frozenSHA256": "e532ceb0853fe51a9dc66b5b6ac629b605c5caf7deaa7f954325a509f2551a04",
+    "currentSHA256": "e532ceb0853fe51a9dc66b5b6ac629b605c5caf7deaa7f954325a509f2551a04"
+  },
+  "plain": {
+    "queries": 516,
+    "rankingScoreConfidenceWinningPhotoAndAccountParity": true,
+    "frozenSHA256": "e532ceb0853fe51a9dc66b5b6ac629b605c5caf7deaa7f954325a509f2551a04",
+    "currentSHA256": "e532ceb0853fe51a9dc66b5b6ac629b605c5caf7deaa7f954325a509f2551a04"
+  }
+}

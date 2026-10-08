@@ -1,0 +1,3 @@
+'use strict';
+const c=require('./core.cjs');
+module.exports=function calendar(stage,report){const runs=[];for(const file of ['tests/directory-calendar.cjs','tests/website-api.cjs','tests/website-dom.cjs']){const r=c.spawnSync(process.execPath,['--require',c.path.join(__dirname,'suite-isolate.cjs'),file],{cwd:c.source,env:{PATH:process.env.PATH,NODE_ENV:'test'},encoding:'utf8',timeout:90000});c.assert.equal(r.status,0,r.stdout+r.stderr);c.assert.doesNotMatch(r.stdout,/^# (fail|cancelled|skipped|todo) [1-9]/m);runs.push({file,status:r.status});}report.calendarRegressions??={};report.calendarRegressions[stage]=runs;};

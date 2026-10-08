@@ -1,0 +1,1934 @@
+{
+  "version": 1,
+  "seed": 20261001,
+  "pieces": [
+    {
+      "id": "B01",
+      "owner": "A",
+      "group": "B",
+      "index": 0,
+      "family": "B-pair-0",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B02",
+      "owner": "A",
+      "group": "B",
+      "index": 1,
+      "family": "B-pair-0",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B03",
+      "owner": "A",
+      "group": "B",
+      "index": 2,
+      "family": "B-pair-1",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B04",
+      "owner": "A",
+      "group": "B",
+      "index": 3,
+      "family": "B-pair-1",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B05",
+      "owner": "A",
+      "group": "B",
+      "index": 4,
+      "family": "B-pair-2",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B06",
+      "owner": "A",
+      "group": "B",
+      "index": 5,
+      "family": "B-pair-2",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B07",
+      "owner": "A",
+      "group": "B",
+      "index": 6,
+      "family": "B-pair-3",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B08",
+      "owner": "A",
+      "group": "B",
+      "index": 7,
+      "family": "B-pair-3",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B09",
+      "owner": "A",
+      "group": "B",
+      "index": 8,
+      "family": "B-pair-4",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B10",
+      "owner": "A",
+      "group": "B",
+      "index": 9,
+      "family": "B-pair-4",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B11",
+      "owner": "A",
+      "group": "B",
+      "index": 10,
+      "family": "B-pair-5",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B12",
+      "owner": "A",
+      "group": "B",
+      "index": 11,
+      "family": "B-pair-5",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B13",
+      "owner": "A",
+      "group": "B",
+      "index": 12,
+      "family": "B-pair-6",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B14",
+      "owner": "A",
+      "group": "B",
+      "index": 13,
+      "family": "B-pair-6",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B15",
+      "owner": "A",
+      "group": "B",
+      "index": 14,
+      "family": "B-pair-7",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "B16",
+      "owner": "A",
+      "group": "B",
+      "index": 15,
+      "family": "B-pair-7",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "L01",
+      "owner": "A",
+      "group": "L",
+      "index": 0,
+      "family": "L-pair-0",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "L02",
+      "owner": "A",
+      "group": "L",
+      "index": 1,
+      "family": "L-pair-0",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "L03",
+      "owner": "A",
+      "group": "L",
+      "index": 2,
+      "family": "L-pair-1",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "L04",
+      "owner": "A",
+      "group": "L",
+      "index": 3,
+      "family": "L-pair-1",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "L05",
+      "owner": "A",
+      "group": "L",
+      "index": 4,
+      "family": "L-pair-2",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "L06",
+      "owner": "A",
+      "group": "L",
+      "index": 5,
+      "family": "L-pair-2",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "L07",
+      "owner": "A",
+      "group": "L",
+      "index": 6,
+      "family": "L-pair-3",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "L08",
+      "owner": "A",
+      "group": "L",
+      "index": 7,
+      "family": "L-pair-3",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "L09",
+      "owner": "A",
+      "group": "L",
+      "index": 8,
+      "family": "L-pair-4",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "L10",
+      "owner": "A",
+      "group": "L",
+      "index": 9,
+      "family": "L-pair-4",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "L11",
+      "owner": "A",
+      "group": "L",
+      "index": 10,
+      "family": "L-pair-5",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "L12",
+      "owner": "A",
+      "group": "L",
+      "index": 11,
+      "family": "L-pair-5",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "L13",
+      "owner": "A",
+      "group": "L",
+      "index": 12,
+      "family": "L-pair-6",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "L14",
+      "owner": "A",
+      "group": "L",
+      "index": 13,
+      "family": "L-pair-6",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "L15",
+      "owner": "A",
+      "group": "L",
+      "index": 14,
+      "family": "L-pair-7",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "L16",
+      "owner": "A",
+      "group": "L",
+      "index": 15,
+      "family": "L-pair-7",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "D01",
+      "owner": "A",
+      "group": "D",
+      "index": 0,
+      "family": "D-pair-0",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "D02",
+      "owner": "A",
+      "group": "D",
+      "index": 1,
+      "family": "D-pair-0",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "D03",
+      "owner": "A",
+      "group": "D",
+      "index": 2,
+      "family": "D-pair-1",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "D04",
+      "owner": "A",
+      "group": "D",
+      "index": 3,
+      "family": "D-pair-1",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "D05",
+      "owner": "A",
+      "group": "D",
+      "index": 4,
+      "family": "D-pair-2",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "D06",
+      "owner": "A",
+      "group": "D",
+      "index": 5,
+      "family": "D-pair-2",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "D07",
+      "owner": "A",
+      "group": "D",
+      "index": 6,
+      "family": "D-pair-3",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "D08",
+      "owner": "A",
+      "group": "D",
+      "index": 7,
+      "family": "D-pair-3",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "M01",
+      "owner": "A",
+      "group": "M",
+      "index": 0,
+      "family": "M-pair-0",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "M02",
+      "owner": "A",
+      "group": "M",
+      "index": 1,
+      "family": "M-pair-0",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "M03",
+      "owner": "A",
+      "group": "M",
+      "index": 2,
+      "family": "M-pair-1",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "M04",
+      "owner": "A",
+      "group": "M",
+      "index": 3,
+      "family": "M-pair-1",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "M05",
+      "owner": "A",
+      "group": "M",
+      "index": 4,
+      "family": "M-pair-2",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "M06",
+      "owner": "A",
+      "group": "M",
+      "index": 5,
+      "family": "M-pair-2",
+      "split": "development",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "M07",
+      "owner": "A",
+      "group": "M",
+      "index": 6,
+      "family": "M-pair-3",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "M08",
+      "owner": "A",
+      "group": "M",
+      "index": 7,
+      "family": "M-pair-3",
+      "split": "holdout",
+      "nearDuplicate": true,
+      "provenance": "Procedural SVG pottery; original test-owned geometry; seed 20261001",
+      "license": "CC0-1.0"
+    }
+  ],
+  "references": [
+    {
+      "id": "B01-ref-0",
+      "piece": "B01",
+      "owner": "A",
+      "view": 0,
+      "file": "images/B01-ref-0.png",
+      "sha256": "e979317dc0f2a719ba16224112fc58db815182ea638344b3540231941d17f954"
+    },
+    {
+      "id": "B01-ref-1",
+      "piece": "B01",
+      "owner": "A",
+      "view": 1,
+      "file": "images/B01-ref-1.png",
+      "sha256": "ad796b67bc5d689f576e4d73f552d7e1acab67b937ed4220021ac2936d2a8bc8"
+    },
+    {
+      "id": "B01-ref-2",
+      "piece": "B01",
+      "owner": "A",
+      "view": 2,
+      "file": "images/B01-ref-2.png",
+      "sha256": "943fca03a90f3e18d057a00be16565b409675225388ef73e542039ad1de7489f"
+    },
+    {
+      "id": "B02-ref-0",
+      "piece": "B02",
+      "owner": "A",
+      "view": 0,
+      "file": "images/B02-ref-0.png",
+      "sha256": "bac7f723339009b22149f5c691f9389023e972ab0d67fa1e788fb6ff0ddd736c"
+    },
+    {
+      "id": "B02-ref-1",
+      "piece": "B02",
+      "owner": "A",
+      "view": 1,
+      "file": "images/B02-ref-1.png",
+      "sha256": "79bd99ce70b5d86dfb40f8d1e04314153bff08216bfbf8a3ad35bd2ecb37ee64"
+    },
+    {
+      "id": "B02-ref-2",
+      "piece": "B02",
+      "owner": "A",
+      "view": 2,
+      "file": "images/B02-ref-2.png",
+      "sha256": "5bed6d4489175e2e4e92c7ece52d9ae98943911e52ea7a5a6869aef214c3119c"
+    },
+    {
+      "id": "B03-ref-0",
+      "piece": "B03",
+      "owner": "A",
+      "view": 0,
+      "file": "images/B03-ref-0.png",
+      "sha256": "6b9115ee641a970a4cdd94718349252aabcd9f8223d4e8152523edaca1e8746b"
+    },
+    {
+      "id": "B03-ref-1",
+      "piece": "B03",
+      "owner": "A",
+      "view": 1,
+      "file": "images/B03-ref-1.png",
+      "sha256": "22b9c3815d9dfb30557bdc470e0e82e59d95f9b5ab39f76a7158fa40a10d05ce"
+    },
+    {
+      "id": "B03-ref-2",
+      "piece": "B03",
+      "owner": "A",
+      "view": 2,
+      "file": "images/B03-ref-2.png",
+      "sha256": "f7cc80f2b102551552275e85871f89f8f902fd0896e71fef5972fd8ce585a685"
+    },
+    {
+      "id": "B04-ref-0",
+      "piece": "B04",
+      "owner": "A",
+      "view": 0,
+      "file": "images/B04-ref-0.png",
+      "sha256": "6d79350f953ea22947fac200f08bbc84933b296dcb6e96f3e396e967f5e103bb"
+    },
+    {
+      "id": "B04-ref-1",
+      "piece": "B04",
+      "owner": "A",
+      "view": 1,
+      "file": "images/B04-ref-1.png",
+      "sha256": "3a4317607e4d2275467dda987a1e91500a719c11b5f990e899af66126ffb5046"
+    },
+    {
+      "id": "B04-ref-2",
+      "piece": "B04",
+      "owner": "A",
+      "view": 2,
+      "file": "images/B04-ref-2.png",
+      "sha256": "09a6f70b4edf51b16c323f6d96462f121e4acda332ed70c8a3739cb4c2934ef0"
+    },
+    {
+      "id": "B05-ref-0",
+      "piece": "B05",
+      "owner": "A",
+      "view": 0,
+      "file": "images/B05-ref-0.png",
+      "sha256": "ef94e574ee2b1bd06f361017af00a48553c8c72a4fbe0dd28f4cfe06a55d25c5"
+    },
+    {
+      "id": "B05-ref-1",
+      "piece": "B05",
+      "owner": "A",
+      "view": 1,
+      "file": "images/B05-ref-1.png",
+      "sha256": "837f6335673887dcd1774a737900b443698371fbc84486ef086b9fcb9269224b"
+    },
+    {
+      "id": "B05-ref-2",
+      "piece": "B05",
+      "owner": "A",
+      "view": 2,
+      "file": "images/B05-ref-2.png",
+      "sha256": "afe28613f6d3852e89ed7c68f3b4d926f9d00003f1e3dccb976807a844e5d986"
+    },
+    {
+      "id": "B06-ref-0",
+      "piece": "B06",
+      "owner": "A",
+      "view": 0,
+      "file": "images/B06-ref-0.png",
+      "sha256": "302a2763349bde670ba28bcadf93a091f33abc836d13667d2dd1ae45e31e6b9a"
+    },
+    {
+      "id": "B06-ref-1",
+      "piece": "B06",
+      "owner": "A",
+      "view": 1,
+      "file": "images/B06-ref-1.png",
+      "sha256": "a55e8754c4d0e6af5b03bb651d99eb50bb08136604217cb8b70d792e08e2445c"
+    },
+    {
+      "id": "B06-ref-2",
+      "piece": "B06",
+      "owner": "A",
+      "view": 2,
+      "file": "images/B06-ref-2.png",
+      "sha256": "69a88966c5ecc41098754b3d20c9839bacd5b49e78716032ab3bc3fc4f26e9ce"
+    },
+    {
+      "id": "B07-ref-0",
+      "piece": "B07",
+      "owner": "A",
+      "view": 0,
+      "file": "images/B07-ref-0.png",
+      "sha256": "33df7924d6742c54f2a9b413ba367ad4060f6ce605d378121869ce5a7ff3c054"
+    },
+    {
+      "id": "B07-ref-1",
+      "piece": "B07",
+      "owner": "A",
+      "view": 1,
+      "file": "images/B07-ref-1.png",
+      "sha256": "30d761b8c9ee81a93a9d29c705a50e7be6f90a8dcad941079be0abf9ababc820"
+    },
+    {
+      "id": "B07-ref-2",
+      "piece": "B07",
+      "owner": "A",
+      "view": 2,
+      "file": "images/B07-ref-2.png",
+      "sha256": "eb41d0138c16714ba7e8b53a94bb9fefcea4ff337745c0f3f6884a30c20945e0"
+    },
+    {
+      "id": "B08-ref-0",
+      "piece": "B08",
+      "owner": "A",
+      "view": 0,
+      "file": "images/B08-ref-0.png",
+      "sha256": "ece3ff8f179acebbfcff1a0ff038e5cf6ae754788656da807389ba4ea1a8bcf8"
+    },
+    {
+      "id": "B08-ref-1",
+      "piece": "B08",
+      "owner": "A",
+      "view": 1,
+      "file": "images/B08-ref-1.png",
+      "sha256": "03b11d84a20c58ba7d88bf757da8688e527a5a7f0ef0e08b13878857e423f426"
+    },
+    {
+      "id": "B08-ref-2",
+      "piece": "B08",
+      "owner": "A",
+      "view": 2,
+      "file": "images/B08-ref-2.png",
+      "sha256": "c13951575f6a2eed730e4e477809caeb662b5853dc09defcd4b3c3972d613c43"
+    },
+    {
+      "id": "B09-ref-0",
+      "piece": "B09",
+      "owner": "A",
+      "view": 0,
+      "file": "images/B09-ref-0.png",
+      "sha256": "06215a05abd632a2bdd1ccb6dac0ceeaa276d9bd397602381b47e845815baac3"
+    },
+    {
+      "id": "B09-ref-1",
+      "piece": "B09",
+      "owner": "A",
+      "view": 1,
+      "file": "images/B09-ref-1.png",
+      "sha256": "cc436577d0cfe8adfb537097527be087e49ff815e1b33df1f7c6eacfca7a6910"
+    },
+    {
+      "id": "B09-ref-2",
+      "piece": "B09",
+      "owner": "A",
+      "view": 2,
+      "file": "images/B09-ref-2.png",
+      "sha256": "eff8dc7bcccaba0579e66d086b340fd4f6165caba0f858774f7808e4d29056cd"
+    },
+    {
+      "id": "B10-ref-0",
+      "piece": "B10",
+      "owner": "A",
+      "view": 0,
+      "file": "images/B10-ref-0.png",
+      "sha256": "23890b9f6697e36e18c4ab41bcf00339b3ada69e2ff4f96122df55b3b07899f7"
+    },
+    {
+      "id": "B10-ref-1",
+      "piece": "B10",
+      "owner": "A",
+      "view": 1,
+      "file": "images/B10-ref-1.png",
+      "sha256": "e1d9e55a5d292a9753716bf2677fcc80d1f6b305ad68a3b467a01f91895c14b6"
+    },
+    {
+      "id": "B10-ref-2",
+      "piece": "B10",
+      "owner": "A",
+      "view": 2,
+      "file": "images/B10-ref-2.png",
+      "sha256": "c321de112c897426945ad1d31410582cd90372d28ead746caa455145ec3af651"
+    },
+    {
+      "id": "B11-ref-0",
+      "piece": "B11",
+      "owner": "A",
+      "view": 0,
+      "file": "images/B11-ref-0.png",
+      "sha256": "d8273419decee282998ab771a41877295afce4941e83463529a6b1d3896173b7"
+    },
+    {
+      "id": "B11-ref-1",
+      "piece": "B11",
+      "owner": "A",
+      "view": 1,
+      "file": "images/B11-ref-1.png",
+      "sha256": "290c6afae7dc37121834f1ff2037815753c6a1687e471c374528a280ee2336c5"
+    },
+    {
+      "id": "B11-ref-2",
+      "piece": "B11",
+      "owner": "A",
+      "view": 2,
+      "file": "images/B11-ref-2.png",
+      "sha256": "a079332546c60ac64a7079eafa78a6d87c5469f92ff14d804d1154164d5eb7d7"
+    },
+    {
+      "id": "B12-ref-0",
+      "piece": "B12",
+      "owner": "A",
+      "view": 0,
+      "file": "images/B12-ref-0.png",
+      "sha256": "ab2b214d3f6259899a6083fe63fae8e0a73796b13efd5965e60a303f278b5fb9"
+    },
+    {
+      "id": "B12-ref-1",
+      "piece": "B12",
+      "owner": "A",
+      "view": 1,
+      "file": "images/B12-ref-1.png",
+      "sha256": "6d2b302ae3df67ba64186130904c4f1fc2e459a042a096bd7a11a7bc5bea927a"
+    },
+    {
+      "id": "B12-ref-2",
+      "piece": "B12",
+      "owner": "A",
+      "view": 2,
+      "file": "images/B12-ref-2.png",
+      "sha256": "760b68c5e4533613fd3b7f23a3cb03f7859f4338c54d744ed07ed39cefb7c9c9"
+    },
+    {
+      "id": "B13-ref-0",
+      "piece": "B13",
+      "owner": "A",
+      "view": 0,
+      "file": "images/B13-ref-0.png",
+      "sha256": "d8a226ea6ee3cada13f4d6540a72735437f33f3b84207ebd148e62ffbcc8d9f0"
+    },
+    {
+      "id": "B13-ref-1",
+      "piece": "B13",
+      "owner": "A",
+      "view": 1,
+      "file": "images/B13-ref-1.png",
+      "sha256": "729adedd8d8d4399df489b57d3d339cb32aab5b34b2daa5225ff901449c6e9fa"
+    },
+    {
+      "id": "B13-ref-2",
+      "piece": "B13",
+      "owner": "A",
+      "view": 2,
+      "file": "images/B13-ref-2.png",
+      "sha256": "2377c215733a900f184b6107e478d283ae006f0344bd596e92daa74372f20967"
+    },
+    {
+      "id": "B14-ref-0",
+      "piece": "B14",
+      "owner": "A",
+      "view": 0,
+      "file": "images/B14-ref-0.png",
+      "sha256": "27173d32e542a9c2805a8e1eaaea1099908a8f1f2eb190734b671fb763d280d0"
+    },
+    {
+      "id": "B14-ref-1",
+      "piece": "B14",
+      "owner": "A",
+      "view": 1,
+      "file": "images/B14-ref-1.png",
+      "sha256": "1c026465adc283844a2edd63f3d9a1b216bfd64f777ca8c197e4c29aac1dd634"
+    },
+    {
+      "id": "B14-ref-2",
+      "piece": "B14",
+      "owner": "A",
+      "view": 2,
+      "file": "images/B14-ref-2.png",
+      "sha256": "f27c6c01ed1ccf8070e9202287476ea3bfefeeae5fe40fe9f05cdb8166b9d7c5"
+    },
+    {
+      "id": "B15-ref-0",
+      "piece": "B15",
+      "owner": "A",
+      "view": 0,
+      "file": "images/B15-ref-0.png",
+      "sha256": "b124e7aa6e339bec1bb8edf31fd4615716094e17326340c9b442be4d9d06cc5d"
+    },
+    {
+      "id": "B15-ref-1",
+      "piece": "B15",
+      "owner": "A",
+      "view": 1,
+      "file": "images/B15-ref-1.png",
+      "sha256": "5ddd1e2e3b71d36f6c6bf59e639d6e50de27ac5f7895bb53e8c1e873b0c8b8db"
+    },
+    {
+      "id": "B15-ref-2",
+      "piece": "B15",
+      "owner": "A",
+      "view": 2,
+      "file": "images/B15-ref-2.png",
+      "sha256": "29b41eb4192ea25d947fa200931ca1047adae6f14f386e98be4a14b9e8cda391"
+    },
+    {
+      "id": "B16-ref-0",
+      "piece": "B16",
+      "owner": "A",
+      "view": 0,
+      "file": "images/B16-ref-0.png",
+      "sha256": "d0d0ebb0c09d479207a265e4fc6b1639b27089498795e1edbdce3f1327934c2f"
+    },
+    {
+      "id": "B16-ref-1",
+      "piece": "B16",
+      "owner": "A",
+      "view": 1,
+      "file": "images/B16-ref-1.png",
+      "sha256": "9b42cabde32fa14b4b527317aac7661318918e627ed96dae901b30f1416da464"
+    },
+    {
+      "id": "B16-ref-2",
+      "piece": "B16",
+      "owner": "A",
+      "view": 2,
+      "file": "images/B16-ref-2.png",
+      "sha256": "f54454b9b9b3ecd4a01eb249e67fed31760d5122a99d488d4ceb0517f6dd086a"
+    },
+    {
+      "id": "L01-ref-0",
+      "piece": "L01",
+      "owner": "A",
+      "view": 0,
+      "file": "images/L01-ref-0.png",
+      "sha256": "6d9892833c11a1557e4edfc2167c65d7d80305ee18c9dadb1897341bd1aef814"
+    },
+    {
+      "id": "L01-ref-1",
+      "piece": "L01",
+      "owner": "A",
+      "view": 1,
+      "file": "images/L01-ref-1.png",
+      "sha256": "ab8351a9154498f9f4596bfd505b835390f76101638c5fc4316526ecf0094727"
+    },
+    {
+      "id": "L01-ref-2",
+      "piece": "L01",
+      "owner": "A",
+      "view": 2,
+      "file": "images/L01-ref-2.png",
+      "sha256": "43a3715799fbeabdd0720f61ad6252556e367be6eb04e9d008c5cc42fea19c85"
+    },
+    {
+      "id": "L02-ref-0",
+      "piece": "L02",
+      "owner": "A",
+      "view": 0,
+      "file": "images/L02-ref-0.png",
+      "sha256": "a76a1c6339e9d34e2a96a3813575b75aab75f2195322e2d416ea6a0673e4f247"
+    },
+    {
+      "id": "L02-ref-1",
+      "piece": "L02",
+      "owner": "A",
+      "view": 1,
+      "file": "images/L02-ref-1.png",
+      "sha256": "37289d95252a627294cd979b07e67da0ad8a727610d8dda9425d5bc4e3b6d9a6"
+    },
+    {
+      "id": "L02-ref-2",
+      "piece": "L02",
+      "owner": "A",
+      "view": 2,
+      "file": "images/L02-ref-2.png",
+      "sha256": "82914c7b675797fcbc7793e201f6cccb851d74355a903c8bd71d64e908ae44c5"
+    },
+    {
+      "id": "L03-ref-0",
+      "piece": "L03",
+      "owner": "A",
+      "view": 0,
+      "file": "images/L03-ref-0.png",
+      "sha256": "59bac124cdb5471af0fd53b4d280630af2139a061482958a9e659c61631c64ba"
+    },
+    {
+      "id": "L03-ref-1",
+      "piece": "L03",
+      "owner": "A",
+      "view": 1,
+      "file": "images/L03-ref-1.png",
+      "sha256": "c32a4f230ffc1d3e7d25833778f481bd022aee515cc069d4e59ab38ca8fa4181"
+    },
+    {
+      "id": "L03-ref-2",
+      "piece": "L03",
+      "owner": "A",
+      "view": 2,
+      "file": "images/L03-ref-2.png",
+      "sha256": "554d7c6d4eaa4a221fea6396279ce165abdb912b7d1013882998f4618475b3e2"
+    },
+    {
+      "id": "L04-ref-0",
+      "piece": "L04",
+      "owner": "A",
+      "view": 0,
+      "file": "images/L04-ref-0.png",
+      "sha256": "6dbf9920d6a213e9fcd3a05c2bb22db8d56f7330020f7811e8c1cb110e99e87e"
+    },
+    {
+      "id": "L04-ref-1",
+      "piece": "L04",
+      "owner": "A",
+      "view": 1,
+      "file": "images/L04-ref-1.png",
+      "sha256": "6b599aad0c865212f86b10786d80313edc3a0854513ac469741d243602b5b6b8"
+    },
+    {
+      "id": "L04-ref-2",
+      "piece": "L04",
+      "owner": "A",
+      "view": 2,
+      "file": "images/L04-ref-2.png",
+      "sha256": "492f34ca83961e2b44c2619b610b6909240e5a3c4751384fb8e282cf368439fe"
+    },
+    {
+      "id": "L05-ref-0",
+      "piece": "L05",
+      "owner": "A",
+      "view": 0,
+      "file": "images/L05-ref-0.png",
+      "sha256": "50c17fa0f18d5ce1be0e4603a4bd3270cbf30ae53554798587c620c83ca633fd"
+    },
+    {
+      "id": "L05-ref-1",
+      "piece": "L05",
+      "owner": "A",
+      "view": 1,
+      "file": "images/L05-ref-1.png",
+      "sha256": "f4354af3e86272e4d9506e336691eaa08d8ac89ad551b23e310c0a9e4478c228"
+    },
+    {
+      "id": "L05-ref-2",
+      "piece": "L05",
+      "owner": "A",
+      "view": 2,
+      "file": "images/L05-ref-2.png",
+      "sha256": "2353455a16d02af7a543157cada3ced5b47714c3d88acadf79de818a378f0aac"
+    },
+    {
+      "id": "L06-ref-0",
+      "piece": "L06",
+      "owner": "A",
+      "view": 0,
+      "file": "images/L06-ref-0.png",
+      "sha256": "2ca960567379a2299c908c52c35e06c2659efe4e60dc564f9e14f4608c51e7f4"
+    },
+    {
+      "id": "L06-ref-1",
+      "piece": "L06",
+      "owner": "A",
+      "view": 1,
+      "file": "images/L06-ref-1.png",
+      "sha256": "4fade0bfcd9f033a0ed453fbb0fca39232717e16df91706198cc899e14b4201e"
+    },
+    {
+      "id": "L06-ref-2",
+      "piece": "L06",
+      "owner": "A",
+      "view": 2,
+      "file": "images/L06-ref-2.png",
+      "sha256": "10c5ae5946b60634b2f2d1cbd8101b0e682534bbec8812fb7e35b074a4f7bba8"
+    },
+    {
+      "id": "L07-ref-0",
+      "piece": "L07",
+      "owner": "A",
+      "view": 0,
+      "file": "images/L07-ref-0.png",
+      "sha256": "d0a9d1d86f7b39bebd852bd44d30b08c1bfd1fa3d4c4cdcf9f94e23fd830cd09"
+    },
+    {
+      "id": "L07-ref-1",
+      "piece": "L07",
+      "owner": "A",
+      "view": 1,
+      "file": "images/L07-ref-1.png",
+      "sha256": "0c6b1616144465e7d5024b3a2f4a604c6de384dd43b3c37ca428a41160e50689"
+    },
+    {
+      "id": "L07-ref-2",
+      "piece": "L07",
+      "owner": "A",
+      "view": 2,
+      "file": "images/L07-ref-2.png",
+      "sha256": "a0acebdd194ff77c27d3594f3f01d9037beed4277aab0ae462186e9323477118"
+    },
+    {
+      "id": "L08-ref-0",
+      "piece": "L08",
+      "owner": "A",
+      "view": 0,
+      "file": "images/L08-ref-0.png",
+      "sha256": "1ece9f4016e49807458135811254bdf885c6809b40b547213ca5c0720657529f"
+    },
+    {
+      "id": "L08-ref-1",
+      "piece": "L08",
+      "owner": "A",
+      "view": 1,
+      "file": "images/L08-ref-1.png",
+      "sha256": "caf314e808bf9173579831278f3e22f4278193bbf18127c44d97e6d0e32e5686"
+    },
+    {
+      "id": "L08-ref-2",
+      "piece": "L08",
+      "owner": "A",
+      "view": 2,
+      "file": "images/L08-ref-2.png",
+      "sha256": "a796a6781bdda298e823e18f0d62fece22b5fccfef9ec958ac4c612f4c6f111f"
+    },
+    {
+      "id": "L09-ref-0",
+      "piece": "L09",
+      "owner": "A",
+      "view": 0,
+      "file": "images/L09-ref-0.png",
+      "sha256": "8c0d75d9a7b192f7ad526d11b30bfcf23b4dce8668bd68be2ee407f240356e4a"
+    },
+    {
+      "id": "L09-ref-1",
+      "piece": "L09",
+      "owner": "A",
+      "view": 1,
+      "file": "images/L09-ref-1.png",
+      "sha256": "613c3b7f27462dab24e3271736422b8b2ef8136efb7508c1fe75b8b20d94eac1"
+    },
+    {
+      "id": "L09-ref-2",
+      "piece": "L09",
+      "owner": "A",
+      "view": 2,
+      "file": "images/L09-ref-2.png",
+      "sha256": "4060b1c1c436e5ff4e156c4c4cb698f61517cafce6cd9c7d6902fafae16e2373"
+    },
+    {
+      "id": "L10-ref-0",
+      "piece": "L10",
+      "owner": "A",
+      "view": 0,
+      "file": "images/L10-ref-0.png",
+      "sha256": "90d29f50ba44bb4e5323e7f96f131d3c793de9ddfe1cd25d141f3202536bf8c8"
+    },
+    {
+      "id": "L10-ref-1",
+      "piece": "L10",
+      "owner": "A",
+      "view": 1,
+      "file": "images/L10-ref-1.png",
+      "sha256": "471cdbfb4e1a02e7e2eea89a64e58b9e9dab318c7eda1a1cac00ba4e8649b1fa"
+    },
+    {
+      "id": "L10-ref-2",
+      "piece": "L10",
+      "owner": "A",
+      "view": 2,
+      "file": "images/L10-ref-2.png",
+      "sha256": "64040244da5d381eae50c950991627e63d36510c68d2dbcd0990668eef94b4f6"
+    },
+    {
+      "id": "L11-ref-0",
+      "piece": "L11",
+      "owner": "A",
+      "view": 0,
+      "file": "images/L11-ref-0.png",
+      "sha256": "7c33e4686a52de3f75570cb3c921cc9d3bbdd1d4db3fcab5def4cf0826b9b0ee"
+    },
+    {
+      "id": "L11-ref-1",
+      "piece": "L11",
+      "owner": "A",
+      "view": 1,
+      "file": "images/L11-ref-1.png",
+      "sha256": "6b67463e3b41a65d30fb0b4e3729688f9a9b2965b52e129989bb5ac4f47fb75b"
+    },
+    {
+      "id": "L11-ref-2",
+      "piece": "L11",
+      "owner": "A",
+      "view": 2,
+      "file": "images/L11-ref-2.png",
+      "sha256": "f6960180ac9989011aba32596e1947e3aa3f708b1f16bb18527e48ff30057c61"
+    },
+    {
+      "id": "L12-ref-0",
+      "piece": "L12",
+      "owner": "A",
+      "view": 0,
+      "file": "images/L12-ref-0.png",
+      "sha256": "f4607a9f89d7becb20014e12054e3e6cfa11a2b572cc46e21dc6467fb1537f04"
+    },
+    {
+      "id": "L12-ref-1",
+      "piece": "L12",
+      "owner": "A",
+      "view": 1,
+      "file": "images/L12-ref-1.png",
+      "sha256": "5903fc0865f0e86d2ca0f87bb179b85543e0669d27a4f7fa48434f1a07e8f198"
+    },
+    {
+      "id": "L12-ref-2",
+      "piece": "L12",
+      "owner": "A",
+      "view": 2,
+      "file": "images/L12-ref-2.png",
+      "sha256": "1af8a847f70b1d4761a92e7e8ba0c9e341eef88b663e1c519795f59c511f82c0"
+    },
+    {
+      "id": "L13-ref-0",
+      "piece": "L13",
+      "owner": "A",
+      "view": 0,
+      "file": "images/L13-ref-0.png",
+      "sha256": "e7234860e2d2525a31e980476994fdb6160e241315a9e9ab5a7e722f6b731cd4"
+    },
+    {
+      "id": "L13-ref-1",
+      "piece": "L13",
+      "owner": "A",
+      "view": 1,
+      "file": "images/L13-ref-1.png",
+      "sha256": "175828fbf6222b7810436335b9118080ecffc0b350181801184193ab4497118b"
+    },
+    {
+      "id": "L13-ref-2",
+      "piece": "L13",
+      "owner": "A",
+      "view": 2,
+      "file": "images/L13-ref-2.png",
+      "sha256": "da0b3264b06aad6913579867fba1623708b1238a7a64463fba4ef84507cb7952"
+    },
+    {
+      "id": "L14-ref-0",
+      "piece": "L14",
+      "owner": "A",
+      "view": 0,
+      "file": "images/L14-ref-0.png",
+      "sha256": "85e2924f9b14f0b84f4b83ce700f83714d87b4b8ebb43902f085be054cfb76aa"
+    },
+    {
+      "id": "L14-ref-1",
+      "piece": "L14",
+      "owner": "A",
+      "view": 1,
+      "file": "images/L14-ref-1.png",
+      "sha256": "4b8cc35697478bad1fa80c5c70cb5a08f6b85faa71ae5caa7e3b57b36430cba6"
+    },
+    {
+      "id": "L14-ref-2",
+      "piece": "L14",
+      "owner": "A",
+      "view": 2,
+      "file": "images/L14-ref-2.png",
+      "sha256": "8837b2328e836a417e8974c30e92d6196cb7f10615ffd10c20484ff257be4026"
+    },
+    {
+      "id": "L15-ref-0",
+      "piece": "L15",
+      "owner": "A",
+      "view": 0,
+      "file": "images/L15-ref-0.png",
+      "sha256": "39846893d4f057b0432fbd8c2334f7cc9c500c88b555f1adc6dfae38f575e682"
+    },
+    {
+      "id": "L15-ref-1",
+      "piece": "L15",
+      "owner": "A",
+      "view": 1,
+      "file": "images/L15-ref-1.png",
+      "sha256": "193eb8feaf8edabcef84f0d4a8129988b6d47d5d6b171c3c716f5ecf89d7999d"
+    },
+    {
+      "id": "L15-ref-2",
+      "piece": "L15",
+      "owner": "A",
+      "view": 2,
+      "file": "images/L15-ref-2.png",
+      "sha256": "ed6848a7c307c2a8c44551e25612c9b2c8288dfa74a810c25b75aaf3426c7f87"
+    },
+    {
+      "id": "L16-ref-0",
+      "piece": "L16",
+      "owner": "A",
+      "view": 0,
+      "file": "images/L16-ref-0.png",
+      "sha256": "92c9e479a63666ac81ca0dffbf3920741bdfa64de7fce0744da4c559d1a75097"
+    },
+    {
+      "id": "L16-ref-1",
+      "piece": "L16",
+      "owner": "A",
+      "view": 1,
+      "file": "images/L16-ref-1.png",
+      "sha256": "615f6dbae71676fc0aa554f121749533ede4b0d530b2c8cc4ec89f195a10ff96"
+    },
+    {
+      "id": "L16-ref-2",
+      "piece": "L16",
+      "owner": "A",
+      "view": 2,
+      "file": "images/L16-ref-2.png",
+      "sha256": "da6f22193b38af81e90f0caaf5bb81c6002f84614ff1f63cd885c0f2eb797c6a"
+    },
+    {
+      "id": "D01-ref-0",
+      "piece": "D01",
+      "owner": "A",
+      "view": 0,
+      "file": "images/D01-ref-0.png",
+      "sha256": "de814c6a267c592dd2586ec18b6437e12a98eb4ad01b2e700a45a6e8e80eea22"
+    },
+    {
+      "id": "D01-ref-1",
+      "piece": "D01",
+      "owner": "A",
+      "view": 1,
+      "file": "images/D01-ref-1.png",
+      "sha256": "3211ea8dbbb3d11ec479ba1e99302b26845a260f3ce15dfbb2c0f3e23c2f9978"
+    },
+    {
+      "id": "D01-ref-2",
+      "piece": "D01",
+      "owner": "A",
+      "view": 2,
+      "file": "images/D01-ref-2.png",
+      "sha256": "d907201dc13aa93ba9e0090b6a6d0c35ae3a05f497f9eaa19cc22c1f14a8854f"
+    },
+    {
+      "id": "D02-ref-0",
+      "piece": "D02",
+      "owner": "A",
+      "view": 0,
+      "file": "images/D02-ref-0.png",
+      "sha256": "9f1d4ba58066d00f506420f931a975f853f9ed030c85f217c43e9054848ddb0e"
+    },
+    {
+      "id": "D02-ref-1",
+      "piece": "D02",
+      "owner": "A",
+      "view": 1,
+      "file": "images/D02-ref-1.png",
+      "sha256": "0e420988c6c53049e0d85cd94d29bff50fe3e1aca32aa5566c4e63ff323111c1"
+    },
+    {
+      "id": "D02-ref-2",
+      "piece": "D02",
+      "owner": "A",
+      "view": 2,
+      "file": "images/D02-ref-2.png",
+      "sha256": "0ebb1b1bb647e63611c38013e3050df6b5c0a9ade48baf4b917b32a5e949fab1"
+    },
+    {
+      "id": "D03-ref-0",
+      "piece": "D03",
+      "owner": "A",
+      "view": 0,
+      "file": "images/D03-ref-0.png",
+      "sha256": "945a68012e15bbdda6005f4c232108d80c00eee7b316aa2b04552915b31f4708"
+    },
+    {
+      "id": "D03-ref-1",
+      "piece": "D03",
+      "owner": "A",
+      "view": 1,
+      "file": "images/D03-ref-1.png",
+      "sha256": "f333ff16f4c67c59df201d759d6692cebd2f124ffcaf800430fea3b31e3b2bcc"
+    },
+    {
+      "id": "D03-ref-2",
+      "piece": "D03",
+      "owner": "A",
+      "view": 2,
+      "file": "images/D03-ref-2.png",
+      "sha256": "6786089ab2552a7bb88852588339b46392b0845cd5bba661ce69556d7d1f9ae9"
+    },
+    {
+      "id": "D04-ref-0",
+      "piece": "D04",
+      "owner": "A",
+      "view": 0,
+      "file": "images/D04-ref-0.png",
+      "sha256": "624d2fdcb181e3568c97004d190277bd49f1420a161e56d27054fd14354e3f92"
+    },
+    {
+      "id": "D04-ref-1",
+      "piece": "D04",
+      "owner": "A",
+      "view": 1,
+      "file": "images/D04-ref-1.png",
+      "sha256": "79653e7e8d8239d54b3d2645bf7497be6541e4b6723ff96aad5792c91781e0e6"
+    },
+    {
+      "id": "D04-ref-2",
+      "piece": "D04",
+      "owner": "A",
+      "view": 2,
+      "file": "images/D04-ref-2.png",
+      "sha256": "4215f1abe4d395c7b0be4d5527b8b0433cedc24c68f9a188e254a39835e80d71"
+    },
+    {
+      "id": "D05-ref-0",
+      "piece": "D05",
+      "owner": "A",
+      "view": 0,
+      "file": "images/D05-ref-0.png",
+      "sha256": "95ae974df4300eaeebe0fbde956506cb0fb89a719a811e1146c138e31f131bfe"
+    },
+    {
+      "id": "D05-ref-1",
+      "piece": "D05",
+      "owner": "A",
+      "view": 1,
+      "file": "images/D05-ref-1.png",
+      "sha256": "1204c8248d8b75e327e414c90a3ae230b7b5d054a0413f0a51bfeba0c42fade8"
+    },
+    {
+      "id": "D05-ref-2",
+      "piece": "D05",
+      "owner": "A",
+      "view": 2,
+      "file": "images/D05-ref-2.png",
+      "sha256": "c555f4ad1fc4f05c0f33bd30ce43433be6dbe6580f7bfe0862ba2a31192852eb"
+    },
+    {
+      "id": "D06-ref-0",
+      "piece": "D06",
+      "owner": "A",
+      "view": 0,
+      "file": "images/D06-ref-0.png",
+      "sha256": "04f63a967b3f852ea8447425babf2ad12257c9e1a3cc6363c009ca62bfea7944"
+    },
+    {
+      "id": "D06-ref-1",
+      "piece": "D06",
+      "owner": "A",
+      "view": 1,
+      "file": "images/D06-ref-1.png",
+      "sha256": "c22e46086b82184de03ff58b03f9a186e3766fe65f2f4dc95477e139161102b5"
+    },
+    {
+      "id": "D06-ref-2",
+      "piece": "D06",
+      "owner": "A",
+      "view": 2,
+      "file": "images/D06-ref-2.png",
+      "sha256": "a1e5102e15d54c3f8434269ce3defee90a354aced576c90b81beb61f90abe40d"
+    },
+    {
+      "id": "D07-ref-0",
+      "piece": "D07",
+      "owner": "A",
+      "view": 0,
+      "file": "images/D07-ref-0.png",
+      "sha256": "ed7ffdf852e94f7e0fc79b042408c41cf10ef636cde0bcc89972b57a1b299c4f"
+    },
+    {
+      "id": "D07-ref-1",
+      "piece": "D07",
+      "owner": "A",
+      "view": 1,
+      "file": "images/D07-ref-1.png",
+      "sha256": "60fe5a4af7b3225bb3ca20ab95bcd517847df90bd394b3f2d84e5f9daf07d523"
+    },
+    {
+      "id": "D07-ref-2",
+      "piece": "D07",
+      "owner": "A",
+      "view": 2,
+      "file": "images/D07-ref-2.png",
+      "sha256": "ff389ac468e2e8a680326bd6e0118c37a9e629c589db1ba17466e6677c2d42b7"
+    },
+    {
+      "id": "D08-ref-0",
+      "piece": "D08",
+      "owner": "A",
+      "view": 0,
+      "file": "images/D08-ref-0.png",
+      "sha256": "ebc6c8a8b85dc03e73265a610ef5886fa10ee3ec7a5c927fdfcd25e2305212a1"
+    },
+    {
+      "id": "D08-ref-1",
+      "piece": "D08",
+      "owner": "A",
+      "view": 1,
+      "file": "images/D08-ref-1.png",
+      "sha256": "d1066b8d56d2f8384e7bbdd3eebaa39fd8f27e2c59910c8e2667dbe8a9696bef"
+    },
+    {
+      "id": "D08-ref-2",
+      "piece": "D08",
+      "owner": "A",
+      "view": 2,
+      "file": "images/D08-ref-2.png",
+      "sha256": "ed018ec0a9bf97388992c7b9955380ec421d7a3415216b1bb64678e982366575"
+    },
+    {
+      "id": "M01-ref-0",
+      "piece": "M01",
+      "owner": "A",
+      "view": 0,
+      "file": "images/M01-ref-0.png",
+      "sha256": "3ccccc36524fbd64f4063ee6017e54f5d8da5e7a13963ddf33e3f16baacab7f3"
+    },
+    {
+      "id": "M01-ref-1",
+      "piece": "M01",
+      "owner": "A",
+      "view": 1,
+      "file": "images/M01-ref-1.png",
+      "sha256": "c0e24c02a845e95525b96c81d4906462e0e9fda65aae3640110efcbf9bc6fa52"
+    },
+    {
+      "id": "M01-ref-2",
+      "piece": "M01",
+      "owner": "A",
+      "view": 2,
+      "file": "images/M01-ref-2.png",
+      "sha256": "71cfaff4c5d45433adcb2f4f21ad7a598784d5650b6a9c691c04b960df237a50"
+    },
+    {
+      "id": "M02-ref-0",
+      "piece": "M02",
+      "owner": "A",
+      "view": 0,
+      "file": "images/M02-ref-0.png",
+      "sha256": "023f7e88a545d808b96736d06e019c97189bc74f6042ac5fa2f01e70f895c450"
+    },
+    {
+      "id": "M02-ref-1",
+      "piece": "M02",
+      "owner": "A",
+      "view": 1,
+      "file": "images/M02-ref-1.png",
+      "sha256": "9f91e04ef38ccd04a36b36df5a0f3a0fc69811c84e43b13f9cc64111450bcde6"
+    },
+    {
+      "id": "M02-ref-2",
+      "piece": "M02",
+      "owner": "A",
+      "view": 2,
+      "file": "images/M02-ref-2.png",
+      "sha256": "ac5d75ab9283363360b8e45b4a59d05048340e01b23d66214c863b95a06edf67"
+    },
+    {
+      "id": "M03-ref-0",
+      "piece": "M03",
+      "owner": "A",
+      "view": 0,
+      "file": "images/M03-ref-0.png",
+      "sha256": "b501165ce6b36ae9071db37daca4d0af4146732ff818b665bb1d1eb7e06b1ccf"
+    },
+    {
+      "id": "M03-ref-1",
+      "piece": "M03",
+      "owner": "A",
+      "view": 1,
+      "file": "images/M03-ref-1.png",
+      "sha256": "b6b2418176fa55c4b12c7c64f8a1a2c2504515c1937995b602091bccb54217c1"
+    },
+    {
+      "id": "M03-ref-2",
+      "piece": "M03",
+      "owner": "A",
+      "view": 2,
+      "file": "images/M03-ref-2.png",
+      "sha256": "6f2f9f63851f7db9a25696e12fd3eda1ef3be1909ffd4336ad0086156f8500ef"
+    },
+    {
+      "id": "M04-ref-0",
+      "piece": "M04",
+      "owner": "A",
+      "view": 0,
+      "file": "images/M04-ref-0.png",
+      "sha256": "c635a2b8c226c8494474c951a41a120b4c2fe34b207b98abf7a3574daedd7a1d"
+    },
+    {
+      "id": "M04-ref-1",
+      "piece": "M04",
+      "owner": "A",
+      "view": 1,
+      "file": "images/M04-ref-1.png",
+      "sha256": "ac398e0ef1fa905df951e0edfb1a5c5d949a2a9d651ea9c3b667b897d7814945"
+    },
+    {
+      "id": "M04-ref-2",
+      "piece": "M04",
+      "owner": "A",
+      "view": 2,
+      "file": "images/M04-ref-2.png",
+      "sha256": "2456ea78aaccd49faa17e746b5d004c495c144aac5201033c971513aad8f01d3"
+    },
+    {
+      "id": "M05-ref-0",
+      "piece": "M05",
+      "owner": "A",
+      "view": 0,
+      "file": "images/M05-ref-0.png",
+      "sha256": "6af41a02e053c4a49d7aea9bf813381e73e046814835dae4c6b8fa314e757455"
+    },
+    {
+      "id": "M05-ref-1",
+      "piece": "M05",
+      "owner": "A",
+      "view": 1,
+      "file": "images/M05-ref-1.png",
+      "sha256": "b61e4672a46734271c69abc7e6b75c675cb899a997b302c8e738dbb72061be07"
+    },
+    {
+      "id": "M05-ref-2",
+      "piece": "M05",
+      "owner": "A",
+      "view": 2,
+      "file": "images/M05-ref-2.png",
+      "sha256": "a703eb5e5dfd40d1f98c9dc13ca0a314b7eb4c7306cee6375f6607e1696d65b7"
+    },
+    {
+      "id": "M06-ref-0",
+      "piece": "M06",
+      "owner": "A",
+      "view": 0,
+      "file": "images/M06-ref-0.png",
+      "sha256": "4c1b3c692f1263df41dcbaa7bd974748fc82a4d97716ee3282577e828b9a7f30"
+    },
+    {
+      "id": "M06-ref-1",
+      "piece": "M06",
+      "owner": "A",
+      "view": 1,
+      "file": "images/M06-ref-1.png",
+      "sha256": "8362ff40d193a8d7599aab8813bc14956b6bd3a91b27ed9149b15fb4ef4e4561"
+    },
+    {
+      "id": "M06-ref-2",
+      "piece": "M06",
+      "owner": "A",
+      "view": 2,
+      "file": "images/M06-ref-2.png",
+      "sha256": "64325992ba2004e40ad4effb5baf97e2dde6e1b25286c5cdafb0cd687adee913"
+    },
+    {
+      "id": "M07-ref-0",
+      "piece": "M07",
+      "owner": "A",
+      "view": 0,
+      "file": "images/M07-ref-0.png",
+      "sha256": "9535036010fabe96215d4ff5ce01bcb0b764b1d9fd8b206496d725aba9f22197"
+    },
+    {
+      "id": "M07-ref-1",
+      "piece": "M07",
+      "owner": "A",
+      "view": 1,
+      "file": "images/M07-ref-1.png",
+      "sha256": "fa89835233fdc9a1d06db1fe7a46c73324a9ad5b11ae8b72980a5423be6990bb"
+    },
+    {
+      "id": "M07-ref-2",
+      "piece": "M07",
+      "owner": "A",
+      "view": 2,
+      "file": "images/M07-ref-2.png",
+      "sha256": "661a01cf034c653fd068aee5efa568e7e0b01add0e7c154e8baeadb70a1dc781"
+    },
+    {
+      "id": "M08-ref-0",
+      "piece": "M08",
+      "owner": "A",
+      "view": 0,
+      "file": "images/M08-ref-0.png",
+      "sha256": "68ef321bcea711d52b01f4bdea11e3c60f509936d6c9d86961f47604db588b61"
+    },
+    {
+      "id": "M08-ref-1",
+      "piece": "M08",
+      "owner": "A",
+      "view": 1,
+      "file": "images/M08-ref-1.png",
+      "sha256": "fc9e1fc5564ace86ac27c37d3524f2c7e4ca6f5dcd36bf8a611caa73ff429d8a"
+    },
+    {
+      "id": "M08-ref-2",
+      "piece": "M08",
+      "owner": "A",
+      "view": 2,
+      "file": "images/M08-ref-2.png",
+      "sha256": "8c9af4db64b0a5afa1a9ee4d2d32d40baf2bcf1647777fe6449b183a61c537af"
+    }
+  ],
+  "privacy": {
+    "owner": "B",
+    "pieces": [
+      {
+        "id": "B-private-B01",
+        "source": "B01",
+        "title": "B_SECRET_B01"
+      },
+      {
+        "id": "B-private-B02",
+        "source": "B02",
+        "title": "B_SECRET_B02"
+      },
+      {
+        "id": "B-private-B03",
+        "source": "B03",
+        "title": "B_SECRET_B03"
+      },
+      {
+        "id": "B-private-B04",
+        "source": "B04",
+        "title": "B_SECRET_B04"
+      },
+      {
+        "id": "B-private-B05",
+        "source": "B05",
+        "title": "B_SECRET_B05"
+      },
+      {
+        "id": "B-private-B06",
+        "source": "B06",
+        "title": "B_SECRET_B06"
+      },
+      {
+        "id": "B-private-B07",
+        "source": "B07",
+        "title": "B_SECRET_B07"
+      },
+      {
+        "id": "B-private-B08",
+        "source": "B08",
+        "title": "B_SECRET_B08"
+      },
+      {
+        "id": "B-private-B09",
+        "source": "B09",
+        "title": "B_SECRET_B09"
+      },
+      {
+        "id": "B-private-B10",
+        "source": "B10",
+        "title": "B_SECRET_B10"
+      },
+      {
+        "id": "B-private-B11",
+        "source": "B11",
+        "title": "B_SECRET_B11"
+      },
+      {
+        "id": "B-private-B12",
+        "source": "B12",
+        "title": "B_SECRET_B12"
+      },
+      {
+        "id": "B-private-B13",
+        "source": "B13",
+        "title": "B_SECRET_B13"
+      },
+      {
+        "id": "B-private-B14",
+        "source": "B14",
+        "title": "B_SECRET_B14"
+      },
+      {
+        "id": "B-private-B15",
+        "source": "B15",
+        "title": "B_SECRET_B15"
+      },
+      {
+        "id": "B-private-B16",
+        "source": "B16",
+        "title": "B_SECRET_B16"
+      },
+      {
+        "id": "B-private-L01",
+        "source": "L01",
+        "title": "B_SECRET_L01"
+      },
+      {
+        "id": "B-private-L02",
+        "source": "L02",
+        "title": "B_SECRET_L02"
+      },
+      {
+        "id": "B-private-L03",
+        "source": "L03",
+        "title": "B_SECRET_L03"
+      },
+      {
+        "id": "B-private-L04",
+        "source": "L04",
+        "title": "B_SECRET_L04"
+      },
+      {
+        "id": "B-private-L05",
+        "source": "L05",
+        "title": "B_SECRET_L05"
+      },
+      {
+        "id": "B-private-L06",
+        "source": "L06",
+        "title": "B_SECRET_L06"
+      },
+      {
+        "id": "B-private-L07",
+        "source": "L07",
+        "title": "B_SECRET_L07"
+      },
+      {
+        "id": "B-private-L08",
+        "source": "L08",
+        "title": "B_SECRET_L08"
+      },
+      {
+        "id": "B-private-L09",
+        "source": "L09",
+        "title": "B_SECRET_L09"
+      },
+      {
+        "id": "B-private-L10",
+        "source": "L10",
+        "title": "B_SECRET_L10"
+      },
+      {
+        "id": "B-private-L11",
+        "source": "L11",
+        "title": "B_SECRET_L11"
+      },
+      {
+        "id": "B-private-L12",
+        "source": "L12",
+        "title": "B_SECRET_L12"
+      },
+      {
+        "id": "B-private-L13",
+        "source": "L13",
+        "title": "B_SECRET_L13"
+      },
+      {
+        "id": "B-private-L14",
+        "source": "L14",
+        "title": "B_SECRET_L14"
+      },
+      {
+        "id": "B-private-L15",
+        "source": "L15",
+        "title": "B_SECRET_L15"
+      },
+      {
+        "id": "B-private-L16",
+        "source": "L16",
+        "title": "B_SECRET_L16"
+      },
+      {
+        "id": "B-private-D01",
+        "source": "D01",
+        "title": "B_SECRET_D01"
+      },
+      {
+        "id": "B-private-D02",
+        "source": "D02",
+        "title": "B_SECRET_D02"
+      },
+      {
+        "id": "B-private-D03",
+        "source": "D03",
+        "title": "B_SECRET_D03"
+      },
+      {
+        "id": "B-private-D04",
+        "source": "D04",
+        "title": "B_SECRET_D04"
+      },
+      {
+        "id": "B-private-D05",
+        "source": "D05",
+        "title": "B_SECRET_D05"
+      },
+      {
+        "id": "B-private-D06",
+        "source": "D06",
+        "title": "B_SECRET_D06"
+      },
+      {
+        "id": "B-private-D07",
+        "source": "D07",
+        "title": "B_SECRET_D07"
+      },
+      {
+        "id": "B-private-D08",
+        "source": "D08",
+        "title": "B_SECRET_D08"
+      },
+      {
+        "id": "B-private-M01",
+        "source": "M01",
+        "title": "B_SECRET_M01"
+      },
+      {
+        "id": "B-private-M02",
+        "source": "M02",
+        "title": "B_SECRET_M02"
+      },
+      {
+        "id": "B-private-M03",
+        "source": "M03",
+        "title": "B_SECRET_M03"
+      },
+      {
+        "id": "B-private-M04",
+        "source": "M04",
+        "title": "B_SECRET_M04"
+      },
+      {
+        "id": "B-private-M05",
+        "source": "M05",
+        "title": "B_SECRET_M05"
+      },
+      {
+        "id": "B-private-M06",
+        "source": "M06",
+        "title": "B_SECRET_M06"
+      },
+      {
+        "id": "B-private-M07",
+        "source": "M07",
+        "title": "B_SECRET_M07"
+      },
+      {
+        "id": "B-private-M08",
+        "source": "M08",
+        "title": "B_SECRET_M08"
+      }
+    ],
+    "note": "48 additional security-only mirror Pieces, 144 identical-reference images; excluded from 48-Piece retrieval corpus"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "accepted_parent": "65fac752f3f3cc6fc74dbd008e5c9279491d103e",
+  "runtime": "Node 22; version in runtime.txt",
+  "final_assistant_suite": {
+    "tests": 358,
+    "pass": 358,
+    "fail": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "complete_ql_runner": {
+    "tests": 1835,
+    "pass": 1835,
+    "fail": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "complete_ql_runner_exit": 0,
+  "note": "Complete runner passed before the last two client cancellation safeguards; final affected assistant suite rerun after all edits. No real iPhone microphone pass claimed. Node 24 trial crashed in existing better-sqlite3; tests rerun with project Node 22.",
+  "final_source_sha256": {
+    "public/ql-assistant.js": "a288e9dab9a1d9b7119bca5929d3566028f5273894e732deecb2fca53c24c10a",
+    "server.js": "7fae2f7491aab071bf5e6acab31797602d4e4f789fe158923cd431b9835acbb9",
+    "tests/ql-assistant-hands-free.cjs": "74dfac71e57abbee098410a3b278ecb87b66b17b1649597a0447d582928fc4d7",
+    "tests/ql-assistant-voice-http.cjs": "9417c284ad669bef750ee4115569ebf3fbf5b23ad99d7a9e9d808f0485e3b119",
+    "tests/ql-assistant-voice-web.cjs": "e8a321b2c18fa43bbc2e183609a830542109d7afecdddeb58755bd590e778bf2",
+    "tests/ql-assistant-web.cjs": "2ba02623e194f0360076c8a058e1f1a1e9ebac6f6eb5e3856c72a310784ba03e",
+    "tests/ql-assistant-web-http.cjs": "27757fcdf381fd0ff474b715c7d71b263ab68352ee3e8900bba61590dbead631",
+    "tests/ql-assistant-core.cjs": "464ac475436569cf96fe0d6c6c6d3eda7ef03e8be4d272bc0d14ad0300b9bd77",
+    "tests/ql-assistant-http.cjs": "4530b36e6dbed189f36fdb1a33762b2b9a160f315eae2e913d46a5a09fca5668",
+    "tests/ql-assistant-expansion.cjs": "4dfc1bd4e3483cea1f22eec97e4755be75e9f5d5c738096dbfb9626b43056e55"
+  },
+  "commands": [
+    "node --require ./ql/rehearsal/suite-isolate.cjs ql/verify-phase1.cjs",
+    "node --require ./ql/rehearsal/suite-isolate.cjs --test --test-concurrency=1 --test-reporter=tap tests/ql-assistant-hands-free.cjs tests/ql-assistant-voice-web.cjs tests/ql-assistant-voice-http.cjs tests/ql-assistant-web.cjs tests/ql-assistant-web-http.cjs tests/ql-assistant-core.cjs tests/ql-assistant-http.cjs tests/ql-assistant-expansion.cjs"
+  ]
+}

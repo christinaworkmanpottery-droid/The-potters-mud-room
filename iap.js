@@ -27,6 +27,63 @@ const GOOGLE_PACKAGE_NAME = process.env.GOOGLE_PACKAGE_NAME || 'com.pottersmudro
 
 const VALID_PRODUCT_IDS = ['starter_monthly', 'starter_yearly'];
 
+const SPECIAL_GRANDFATHERED_EMAILS = Object.freeze([
+  'jgk1020@gmail.com',
+  'awhiteman96@gmail.com',
+  'christinaworkmanpottery@gmail.com',
+]);
+const SPECIAL_GRANDFATHERED_EMAIL_SET = new Set(SPECIAL_GRANDFATHERED_EMAILS);
+
+function normalizedEmail(email) {
+  return typeof email === 'string' ? email.trim().toLowerCase() : '';
+}
+
+function isSpecialGrandfatheredEmail(email) {
+  return SPECIAL_GRANDFATHERED_EMAIL_SET.has(normalizedEmail(email));
+}
+
+function isSpecialGrandfatheredUser(user) {
+  return !!user && user.tier === 'starter' && isSpecialGrandfatheredEmail(user.email);
+}
+
+function isAdminGrantedUser(user) {
+  return !!user && user.tier === 'starter' && user.admin_granted_access === 1;
+}
+
+function isGrandfatheredPaidUser(user) {
+  return !!user
+    && user.tier === 'starter'
+    && (
+      user.billing_period === 'stripe-monthly'
+      || (isSpecialGrandfatheredEmail(user.email) && user.billing_period !== 'promo')
+    );
+}
+
+function compatibleBillingPeriod(user) {
+  if (!user) return null;
+  // Legacy clients use this display marker for paid-equivalent access, never provider evidence.
+  if (isAdminGrantedUser(user)) return 'stripe-monthly';
+  if (user.billing_period === 'promo' || user.billing_period === 'yearly') return user.billing_period;
+  if (isSpecialGrandfatheredUser(user)
+      && (user.billing_period === 'monthly' || user.billing_period == null || user.billing_period === 'stripe-monthly')) {
+    return 'stripe-monthly';
+  }
+  return user.billing_period ?? null;
+}
+
+function normalizeSpecialAccountBilling(db) {
+  const placeholders = SPECIAL_GRANDFATHERED_EMAILS.map(() => '?').join(',');
+  return db.prepare(`
+    UPDATE users
+    SET tier='starter',
+        billing_period=CASE
+          WHEN billing_period IN ('monthly','yearly','promo') THEN billing_period
+          ELSE 'monthly'
+        END
+    WHERE LOWER(email) IN (${placeholders})
+  `).run(...SPECIAL_GRANDFATHERED_EMAILS);
+}
+
 // Apple verification endpoints
 const APPLE_PROD_URL = 'https://buy.itunes.apple.com/verifyReceipt';
 const APPLE_SANDBOX_URL = 'https://sandbox.itunes.apple.com/verifyReceipt';
@@ -88,15 +145,19 @@ function isIAPActive(db, userId) {
  */
 function hasPremiumAccess(db, userId) {
   const u = db.prepare(
-    'SELECT tier, billing_period, plan_expires_at, iap_expires_at FROM users WHERE id=?'
+    'SELECT * FROM users WHERE id=?'
   ).get(userId);
   if (!u) return false;
+
+  if (isAdminGrantedUser(u)) return true;
 
   // Promo / beta
   if (u.billing_period === 'promo') return true;
 
-  // Grandfathered Stripe-monthly (the two original subscribers)
+  // Historical marker remains supported, while the exact startup compatibility
+  // accounts can use CHECK-compatible billing storage without losing access.
   if (u.billing_period === 'stripe-monthly' && u.tier === 'starter') return true;
+  if (isSpecialGrandfatheredUser(u)) return true;
 
   // Active Stripe subscription with expiry
   if (u.tier === 'starter' && u.plan_expires_at) {
@@ -528,4 +589,11 @@ module.exports = {
   verifyAndroidPurchase,
   parseGoogleNotification,
   VALID_PRODUCT_IDS,
+  SPECIAL_GRANDFATHERED_EMAILS,
+  isSpecialGrandfatheredEmail,
+  isSpecialGrandfatheredUser,
+  isGrandfatheredPaidUser,
+  isAdminGrantedUser,
+  compatibleBillingPeriod,
+  normalizeSpecialAccountBilling,
 };

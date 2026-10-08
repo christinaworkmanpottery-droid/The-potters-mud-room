@@ -1,0 +1,23 @@
+{
+  "completeBackendQL": {
+    "passed": 1603,
+    "tap": 1366,
+    "standalone": 237,
+    "failed": 0,
+    "skipped": 0,
+    "cancelled": 0,
+    "todo": 0
+  },
+  "eval1": {
+    "passed": 40
+  },
+  "strict": {
+    "passed": 37
+  },
+  "localRecovery": {
+    "passed": 114,
+    "blocked": 1,
+    "reason": "Non-root child unavailable (EINVAL); exact-head GitHub Actions required"
+  },
+  "shippingFilesChanged": false
+}

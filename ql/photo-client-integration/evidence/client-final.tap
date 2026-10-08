@@ -1,0 +1,187 @@
+(node:6) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+TAP version 13
+# (node:13) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: click opens exact Piece through canonical viewer
+ok 1 - click opens exact Piece through canonical viewer
+  ---
+  duration_ms: 79.48687
+  type: 'test'
+  ...
+# Subtest: tap opens exact Piece through canonical viewer
+ok 2 - tap opens exact Piece through canonical viewer
+  ---
+  duration_ms: 13.265877
+  type: 'test'
+  ...
+# Subtest: query replacement prevents stale card activation and pending viewer completion
+ok 3 - query replacement prevents stale card activation and pending viewer completion
+  ---
+  duration_ms: 14.361338
+  type: 'test'
+  ...
+# Subtest: session replacement prevents stale card activation and pending viewer completion
+ok 4 - session replacement prevents stale card activation and pending viewer completion
+  ---
+  duration_ms: 15.549248
+  type: 'test'
+  ...
+# Subtest: retry sends identical current failed file and cannot submit twice
+ok 5 - retry sends identical current failed file and cannot submit twice
+  ---
+  duration_ms: 24.100531
+  type: 'test'
+  ...
+# Subtest: replacement invalidates captured retry even if invoked after new query
+ok 6 - replacement invalidates captured retry even if invoked after new query
+  ---
+  duration_ms: 6.594887
+  type: 'test'
+  ...
+# Subtest: session reset invalidates retry target
+ok 7 - session reset invalidates retry target
+  ---
+  duration_ms: 5.592636
+  type: 'test'
+  ...
+# Subtest: same-file input is reset for subsequent selection
+ok 8 - same-file input is reset for subsequent selection
+  ---
+  duration_ms: 5.222739
+  type: 'test'
+  ...
+# Subtest: picker and retry use native keyboard buttons and status announcement
+ok 9 - picker and retry use native keyboard buttons and status announcement
+  ---
+  duration_ms: 298.124796
+  type: 'test'
+  ...
+# Subtest: viewer errors are caught and permit another activation
+ok 10 - viewer errors are caught and permit another activation
+  ---
+  duration_ms: 12.430709
+  type: 'test'
+  ...
+# (node:14) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: native upload metadata crosses actual Safety-1 HTTP boundary
+    # Subtest: ios jpg undefined 200
+    ok 1 - ios jpg undefined 200
+      ---
+      duration_ms: 5312.445396
+      type: 'test'
+      ...
+    # Subtest: ios JPG image/jpg 200
+    ok 2 - ios JPG image/jpg 200
+      ---
+      duration_ms: 58.541474
+      type: 'test'
+      ...
+    # Subtest: ios jpeg image/jpeg 200
+    ok 3 - ios jpeg image/jpeg 200
+      ---
+      duration_ms: 81.222617
+      type: 'test'
+      ...
+    # Subtest: ios png image/png 200
+    ok 4 - ios png image/png 200
+      ---
+      duration_ms: 89.059265
+      type: 'test'
+      ...
+    # Subtest: ios svg image/svg+xml 415
+    ok 5 - ios svg image/svg+xml 415
+      ---
+      duration_ms: 23.140996
+      type: 'test'
+      ...
+    # Subtest: ios jpg image/jpeg 400
+    ok 6 - ios jpg image/jpeg 400
+      ---
+      duration_ms: 29.063074
+      type: 'test'
+      ...
+    # Subtest: android jpg undefined 200
+    ok 7 - android jpg undefined 200
+      ---
+      duration_ms: 62.440959
+      type: 'test'
+      ...
+    # Subtest: android JPG image/jpg 200
+    ok 8 - android JPG image/jpg 200
+      ---
+      duration_ms: 84.139072
+      type: 'test'
+      ...
+    # Subtest: android jpeg image/jpeg 200
+    ok 9 - android jpeg image/jpeg 200
+      ---
+      duration_ms: 64.143425
+      type: 'test'
+      ...
+    # Subtest: android png image/png 200
+    ok 10 - android png image/png 200
+      ---
+      duration_ms: 75.402959
+      type: 'test'
+      ...
+    # Subtest: android svg image/svg+xml 415
+    ok 11 - android svg image/svg+xml 415
+      ---
+      duration_ms: 29.634169
+      type: 'test'
+      ...
+    # Subtest: android jpg image/jpeg 400
+    ok 12 - android jpg image/jpeg 400
+      ---
+      duration_ms: 33.491542
+      type: 'test'
+      ...
+    1..12
+ok 11 - native upload metadata crosses actual Safety-1 HTTP boundary
+  ---
+  duration_ms: 6633.103642
+  type: 'test'
+  ...
+# (node:15) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: Photo Lookup opens fresh canonical Piece and preserves Back to Pieces contract
+ok 12 - Photo Lookup opens fresh canonical Piece and preserves Back to Pieces contract
+  ---
+  duration_ms: 682.843981
+  type: 'test'
+  ...
+# Subtest: canonical Photo Lookup viewer guards deleted
+ok 13 - canonical Photo Lookup viewer guards deleted
+  ---
+  duration_ms: 443.87893
+  type: 'test'
+  ...
+# Subtest: canonical Photo Lookup viewer guards foreign
+ok 14 - canonical Photo Lookup viewer guards foreign
+  ---
+  duration_ms: 464.209017
+  type: 'test'
+  ...
+# Subtest: canonical Photo Lookup viewer guards replaced
+ok 15 - canonical Photo Lookup viewer guards replaced
+  ---
+  duration_ms: 819.834766
+  type: 'test'
+  ...
+# Subtest: canonical Photo Lookup viewer guards session
+ok 16 - canonical Photo Lookup viewer guards session
+  ---
+  duration_ms: 363.815567
+  type: 'test'
+  ...
+1..16
+# tests 28
+# suites 0
+# pass 28
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6794.804322

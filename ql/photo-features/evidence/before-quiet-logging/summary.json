@@ -1,0 +1,1111 @@
+{
+  "version": 1,
+  "serverSha256": "6492c67147c2e90db0f986d8f9c390f89a99fb78a2d6b5086d57ec3a94e0ee25",
+  "fixtureSha256": "bf14c36be04ac770d6ed71c3480bdc2ea34f5057e74ef188201775a5126d3e60",
+  "querySha256": "7cc68e4a9ab784b84896b3bb85a02dcd2f50b5a866953a48c3452a6dad67dc26",
+  "runtime": {
+    "node": "v22.16.0",
+    "sharp": {
+      "aom": "3.14.1",
+      "archive": "3.8.7",
+      "cairo": "1.18.4",
+      "cgif": "0.5.3",
+      "exif": "0.6.26",
+      "expat": "2.8.1",
+      "ffi": "3.5.2",
+      "fontconfig": "2.18.1",
+      "freetype": "2.14.3",
+      "fribidi": "1.0.16",
+      "glib": "2.89.0",
+      "harfbuzz": "14.2.1",
+      "heif": "1.23.0",
+      "highway": "1.4.0",
+      "imagequant": "2.4.1",
+      "lcms": "2.19.1",
+      "mozjpeg": "0826579",
+      "pango": "1.57.1",
+      "pixman": "0.46.4",
+      "png": "1.6.58",
+      "proxy-libintl": "0.5",
+      "rsvg": "2.62.3",
+      "tiff": "627f9f5",
+      "uhdr": "1acdbed",
+      "vips": "8.18.3",
+      "webp": "1.6.0",
+      "xml2": "2.15.3",
+      "zlib-ng": "2.3.3",
+      "sharp": "0.35.2"
+    },
+    "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+    "platform": "linux",
+    "arch": "x64"
+  },
+  "counts": {
+    "pieces": 48,
+    "referenceImages": 144,
+    "queries": 516,
+    "positive": 384,
+    "ambiguous": 32,
+    "noMatch": 100,
+    "privacyOnlyPieces": 48,
+    "privacyOnlyReferences": 144
+  },
+  "cold": {
+    "positive": {
+      "n": 384,
+      "top1": 0.4947916666666667,
+      "top3": 0.7838541666666666,
+      "rankFound": {
+        "n": 366,
+        "min": 1,
+        "p05": 1,
+        "p50": 1,
+        "p95": 12,
+        "max": 38,
+        "mean": 3.1448087431693987
+      },
+      "missing": 18,
+      "notEvaluated": 0
+    },
+    "subsets": {
+      "B": {
+        "n": 128,
+        "top1": 0.3671875,
+        "top3": 0.796875,
+        "rankFound": {
+          "n": 120,
+          "min": 1,
+          "p05": 1,
+          "p50": 2,
+          "p95": 6,
+          "max": 11,
+          "mean": 2.308333333333333
+        },
+        "missing": 8,
+        "notEvaluated": 0
+      },
+      "L": {
+        "n": 128,
+        "top1": 0.546875,
+        "top3": 0.703125,
+        "rankFound": {
+          "n": 123,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 27,
+          "max": 38,
+          "mean": 4.609756097560975
+        },
+        "missing": 5,
+        "notEvaluated": 0
+      },
+      "D": {
+        "n": 64,
+        "top1": 0.5625,
+        "top3": 0.78125,
+        "rankFound": {
+          "n": 64,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 14,
+          "max": 24,
+          "mean": 3.53125
+        },
+        "missing": 0,
+        "notEvaluated": 0
+      },
+      "M": {
+        "n": 64,
+        "top1": 0.578125,
+        "top3": 0.921875,
+        "rankFound": {
+          "n": 59,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 2,
+          "max": 2,
+          "mean": 1.3728813559322033
+        },
+        "missing": 5,
+        "notEvaluated": 0
+      },
+      "nearDuplicate": {
+        "n": 384,
+        "top1": 0.4947916666666667,
+        "top3": 0.7838541666666666,
+        "rankFound": {
+          "n": 366,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 12,
+          "max": 38,
+          "mean": 3.1448087431693987
+        },
+        "missing": 18,
+        "notEvaluated": 0
+      },
+      "lightingBackground": {
+        "n": 144,
+        "top1": 0.5833333333333334,
+        "top3": 0.8263888888888888,
+        "rankFound": {
+          "n": 128,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 4,
+          "max": 28,
+          "mean": 1.8828125
+        },
+        "missing": 16,
+        "notEvaluated": 0
+      },
+      "cropOrientation": {
+        "n": 96,
+        "top1": 0.20833333333333334,
+        "top3": 0.4583333333333333,
+        "rankFound": {
+          "n": 95,
+          "min": 1,
+          "p05": 1,
+          "p50": 4,
+          "p95": 28,
+          "max": 38,
+          "mean": 7.273684210526316
+        },
+        "missing": 1,
+        "notEvaluated": 0
+      },
+      "duplicate": {
+        "n": 48,
+        "top1": 0.6875,
+        "top3": 0.9375,
+        "rankFound": {
+          "n": 48,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 4,
+          "max": 6,
+          "mean": 1.5416666666666667
+        },
+        "missing": 0,
+        "notEvaluated": 0
+      },
+      "independentViews": {
+        "n": 336,
+        "top1": 0.46726190476190477,
+        "top3": 0.7619047619047619,
+        "rankFound": {
+          "n": 318,
+          "min": 1,
+          "p05": 1,
+          "p50": 2,
+          "p95": 14,
+          "max": 38,
+          "mean": 3.3867924528301887
+        },
+        "missing": 18,
+        "notEvaluated": 0
+      },
+      "development": {
+        "n": 192,
+        "top1": 0.4739583333333333,
+        "top3": 0.765625,
+        "rankFound": {
+          "n": 181,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 11,
+          "max": 38,
+          "mean": 3.149171270718232
+        },
+        "missing": 11,
+        "notEvaluated": 0
+      },
+      "holdout": {
+        "n": 192,
+        "top1": 0.515625,
+        "top3": 0.8020833333333334,
+        "rankFound": {
+          "n": 185,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 16,
+          "max": 34,
+          "mean": 3.1405405405405404
+        },
+        "missing": 7,
+        "notEvaluated": 0
+      }
+    },
+    "pieceMacroTop1": 0.4947916666666667,
+    "noMatch": {
+      "n": 100,
+      "falsePositives": 100,
+      "falsePositiveRate": 1,
+      "policy": "Any API-returned match is a positive; no added confidence threshold"
+    },
+    "ambiguous": {
+      "n": 32,
+      "acceptableTop1": 0.8125,
+      "acceptableTop3": 1,
+      "bothAcceptableTop3": 0.9375,
+      "explicitUncertainty": 0
+    },
+    "latencyMs": {
+      "n": 516,
+      "min": 1640.0645169999916,
+      "p05": 1723.5218619999941,
+      "p50": 2037.0341159999953,
+      "p95": 2850.338764999993,
+      "max": 3978.147319999989,
+      "mean": 2134.3191781627897
+    },
+    "scores": {
+      "correctTop1": {
+        "n": 190,
+        "min": 0.6383050081101151,
+        "p05": 0.7128960072182047,
+        "p50": 0.9668807289175834,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.9235695592397594
+      },
+      "incorrectTop1": {
+        "n": 194,
+        "min": 0.6349010706648915,
+        "p05": 0.651412332668157,
+        "p50": 0.8785827558114175,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.8546626409170434
+      },
+      "correctPiece": {
+        "n": 366,
+        "min": 0.5022427900817492,
+        "p05": 0.6184895833333334,
+        "p50": 0.9249999999999999,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.8818206690842579
+      },
+      "ambiguous": {
+        "n": 32,
+        "min": 0.9679122969895029,
+        "p05": 0.9679122969895029,
+        "p50": 0.9996725192560223,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.9903509401389472
+      },
+      "noMatch": {
+        "n": 100,
+        "min": 0.616459784909771,
+        "p05": 0.6250220340661516,
+        "p50": 0.8366361947467353,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.8113123136049433
+      },
+      "bins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.5,
+          "to": 0.6,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.6,
+          "to": 0.7,
+          "correct": 7,
+          "incorrect": 49,
+          "ambiguous": 0,
+          "noMatch": 41
+        },
+        {
+          "from": 0.7,
+          "to": 0.8,
+          "correct": 14,
+          "incorrect": 19,
+          "ambiguous": 0,
+          "noMatch": 6
+        },
+        {
+          "from": 0.8,
+          "to": 0.9,
+          "correct": 45,
+          "incorrect": 49,
+          "ambiguous": 0,
+          "noMatch": 11
+        },
+        {
+          "from": 0.9,
+          "to": 1,
+          "correct": 124,
+          "incorrect": 77,
+          "ambiguous": 32,
+          "noMatch": 42
+        }
+      ]
+    }
+  },
+  "warm": {
+    "positive": {
+      "n": 384,
+      "top1": 0.4947916666666667,
+      "top3": 0.7838541666666666,
+      "rankFound": {
+        "n": 366,
+        "min": 1,
+        "p05": 1,
+        "p50": 1,
+        "p95": 12,
+        "max": 38,
+        "mean": 3.1448087431693987
+      },
+      "missing": 18,
+      "notEvaluated": 0
+    },
+    "subsets": {
+      "B": {
+        "n": 128,
+        "top1": 0.3671875,
+        "top3": 0.796875,
+        "rankFound": {
+          "n": 120,
+          "min": 1,
+          "p05": 1,
+          "p50": 2,
+          "p95": 6,
+          "max": 11,
+          "mean": 2.308333333333333
+        },
+        "missing": 8,
+        "notEvaluated": 0
+      },
+      "L": {
+        "n": 128,
+        "top1": 0.546875,
+        "top3": 0.703125,
+        "rankFound": {
+          "n": 123,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 27,
+          "max": 38,
+          "mean": 4.609756097560975
+        },
+        "missing": 5,
+        "notEvaluated": 0
+      },
+      "D": {
+        "n": 64,
+        "top1": 0.5625,
+        "top3": 0.78125,
+        "rankFound": {
+          "n": 64,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 14,
+          "max": 24,
+          "mean": 3.53125
+        },
+        "missing": 0,
+        "notEvaluated": 0
+      },
+      "M": {
+        "n": 64,
+        "top1": 0.578125,
+        "top3": 0.921875,
+        "rankFound": {
+          "n": 59,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 2,
+          "max": 2,
+          "mean": 1.3728813559322033
+        },
+        "missing": 5,
+        "notEvaluated": 0
+      },
+      "nearDuplicate": {
+        "n": 384,
+        "top1": 0.4947916666666667,
+        "top3": 0.7838541666666666,
+        "rankFound": {
+          "n": 366,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 12,
+          "max": 38,
+          "mean": 3.1448087431693987
+        },
+        "missing": 18,
+        "notEvaluated": 0
+      },
+      "lightingBackground": {
+        "n": 144,
+        "top1": 0.5833333333333334,
+        "top3": 0.8263888888888888,
+        "rankFound": {
+          "n": 128,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 4,
+          "max": 28,
+          "mean": 1.8828125
+        },
+        "missing": 16,
+        "notEvaluated": 0
+      },
+      "cropOrientation": {
+        "n": 96,
+        "top1": 0.20833333333333334,
+        "top3": 0.4583333333333333,
+        "rankFound": {
+          "n": 95,
+          "min": 1,
+          "p05": 1,
+          "p50": 4,
+          "p95": 28,
+          "max": 38,
+          "mean": 7.273684210526316
+        },
+        "missing": 1,
+        "notEvaluated": 0
+      },
+      "duplicate": {
+        "n": 48,
+        "top1": 0.6875,
+        "top3": 0.9375,
+        "rankFound": {
+          "n": 48,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 4,
+          "max": 6,
+          "mean": 1.5416666666666667
+        },
+        "missing": 0,
+        "notEvaluated": 0
+      },
+      "independentViews": {
+        "n": 336,
+        "top1": 0.46726190476190477,
+        "top3": 0.7619047619047619,
+        "rankFound": {
+          "n": 318,
+          "min": 1,
+          "p05": 1,
+          "p50": 2,
+          "p95": 14,
+          "max": 38,
+          "mean": 3.3867924528301887
+        },
+        "missing": 18,
+        "notEvaluated": 0
+      },
+      "development": {
+        "n": 192,
+        "top1": 0.4739583333333333,
+        "top3": 0.765625,
+        "rankFound": {
+          "n": 181,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 11,
+          "max": 38,
+          "mean": 3.149171270718232
+        },
+        "missing": 11,
+        "notEvaluated": 0
+      },
+      "holdout": {
+        "n": 192,
+        "top1": 0.515625,
+        "top3": 0.8020833333333334,
+        "rankFound": {
+          "n": 185,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 16,
+          "max": 34,
+          "mean": 3.1405405405405404
+        },
+        "missing": 7,
+        "notEvaluated": 0
+      }
+    },
+    "pieceMacroTop1": 0.4947916666666667,
+    "noMatch": {
+      "n": 100,
+      "falsePositives": 100,
+      "falsePositiveRate": 1,
+      "policy": "Any API-returned match is a positive; no added confidence threshold"
+    },
+    "ambiguous": {
+      "n": 32,
+      "acceptableTop1": 0.8125,
+      "acceptableTop3": 1,
+      "bothAcceptableTop3": 0.9375,
+      "explicitUncertainty": 0
+    },
+    "latencyMs": {
+      "n": 516,
+      "min": 20.570392000023276,
+      "p05": 23.475639999844134,
+      "p50": 28.794797000009567,
+      "p95": 41.27418800001033,
+      "max": 81.93696200009435,
+      "mean": 30.23853572480996
+    },
+    "scores": {
+      "correctTop1": {
+        "n": 190,
+        "min": 0.6383050081101151,
+        "p05": 0.7128960072182047,
+        "p50": 0.9668807289175834,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.9235695592397594
+      },
+      "incorrectTop1": {
+        "n": 194,
+        "min": 0.6349010706648915,
+        "p05": 0.651412332668157,
+        "p50": 0.8785827558114175,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.8546626409170434
+      },
+      "correctPiece": {
+        "n": 366,
+        "min": 0.5022427900817492,
+        "p05": 0.6184895833333334,
+        "p50": 0.9249999999999999,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.8818206690842579
+      },
+      "ambiguous": {
+        "n": 32,
+        "min": 0.9679122969895029,
+        "p05": 0.9679122969895029,
+        "p50": 0.9996725192560223,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.9903509401389472
+      },
+      "noMatch": {
+        "n": 100,
+        "min": 0.616459784909771,
+        "p05": 0.6250220340661516,
+        "p50": 0.8366361947467353,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.8113123136049433
+      },
+      "bins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.5,
+          "to": 0.6,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.6,
+          "to": 0.7,
+          "correct": 7,
+          "incorrect": 49,
+          "ambiguous": 0,
+          "noMatch": 41
+        },
+        {
+          "from": 0.7,
+          "to": 0.8,
+          "correct": 14,
+          "incorrect": 19,
+          "ambiguous": 0,
+          "noMatch": 6
+        },
+        {
+          "from": 0.8,
+          "to": 0.9,
+          "correct": 45,
+          "incorrect": 49,
+          "ambiguous": 0,
+          "noMatch": 11
+        },
+        {
+          "from": 0.9,
+          "to": 1,
+          "correct": 124,
+          "incorrect": 77,
+          "ambiguous": 32,
+          "noMatch": 42
+        }
+      ]
+    }
+  },
+  "plain": {
+    "positive": {
+      "n": 384,
+      "top1": 0.4947916666666667,
+      "top3": 0.7838541666666666,
+      "rankFound": {
+        "n": 366,
+        "min": 1,
+        "p05": 1,
+        "p50": 1,
+        "p95": 12,
+        "max": 38,
+        "mean": 3.1448087431693987
+      },
+      "missing": 18,
+      "notEvaluated": 0
+    },
+    "subsets": {
+      "B": {
+        "n": 128,
+        "top1": 0.3671875,
+        "top3": 0.796875,
+        "rankFound": {
+          "n": 120,
+          "min": 1,
+          "p05": 1,
+          "p50": 2,
+          "p95": 6,
+          "max": 11,
+          "mean": 2.308333333333333
+        },
+        "missing": 8,
+        "notEvaluated": 0
+      },
+      "L": {
+        "n": 128,
+        "top1": 0.546875,
+        "top3": 0.703125,
+        "rankFound": {
+          "n": 123,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 27,
+          "max": 38,
+          "mean": 4.609756097560975
+        },
+        "missing": 5,
+        "notEvaluated": 0
+      },
+      "D": {
+        "n": 64,
+        "top1": 0.5625,
+        "top3": 0.78125,
+        "rankFound": {
+          "n": 64,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 14,
+          "max": 24,
+          "mean": 3.53125
+        },
+        "missing": 0,
+        "notEvaluated": 0
+      },
+      "M": {
+        "n": 64,
+        "top1": 0.578125,
+        "top3": 0.921875,
+        "rankFound": {
+          "n": 59,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 2,
+          "max": 2,
+          "mean": 1.3728813559322033
+        },
+        "missing": 5,
+        "notEvaluated": 0
+      },
+      "nearDuplicate": {
+        "n": 384,
+        "top1": 0.4947916666666667,
+        "top3": 0.7838541666666666,
+        "rankFound": {
+          "n": 366,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 12,
+          "max": 38,
+          "mean": 3.1448087431693987
+        },
+        "missing": 18,
+        "notEvaluated": 0
+      },
+      "lightingBackground": {
+        "n": 144,
+        "top1": 0.5833333333333334,
+        "top3": 0.8263888888888888,
+        "rankFound": {
+          "n": 128,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 4,
+          "max": 28,
+          "mean": 1.8828125
+        },
+        "missing": 16,
+        "notEvaluated": 0
+      },
+      "cropOrientation": {
+        "n": 96,
+        "top1": 0.20833333333333334,
+        "top3": 0.4583333333333333,
+        "rankFound": {
+          "n": 95,
+          "min": 1,
+          "p05": 1,
+          "p50": 4,
+          "p95": 28,
+          "max": 38,
+          "mean": 7.273684210526316
+        },
+        "missing": 1,
+        "notEvaluated": 0
+      },
+      "duplicate": {
+        "n": 48,
+        "top1": 0.6875,
+        "top3": 0.9375,
+        "rankFound": {
+          "n": 48,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 4,
+          "max": 6,
+          "mean": 1.5416666666666667
+        },
+        "missing": 0,
+        "notEvaluated": 0
+      },
+      "independentViews": {
+        "n": 336,
+        "top1": 0.46726190476190477,
+        "top3": 0.7619047619047619,
+        "rankFound": {
+          "n": 318,
+          "min": 1,
+          "p05": 1,
+          "p50": 2,
+          "p95": 14,
+          "max": 38,
+          "mean": 3.3867924528301887
+        },
+        "missing": 18,
+        "notEvaluated": 0
+      },
+      "development": {
+        "n": 192,
+        "top1": 0.4739583333333333,
+        "top3": 0.765625,
+        "rankFound": {
+          "n": 181,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 11,
+          "max": 38,
+          "mean": 3.149171270718232
+        },
+        "missing": 11,
+        "notEvaluated": 0
+      },
+      "holdout": {
+        "n": 192,
+        "top1": 0.515625,
+        "top3": 0.8020833333333334,
+        "rankFound": {
+          "n": 185,
+          "min": 1,
+          "p05": 1,
+          "p50": 1,
+          "p95": 16,
+          "max": 34,
+          "mean": 3.1405405405405404
+        },
+        "missing": 7,
+        "notEvaluated": 0
+      }
+    },
+    "pieceMacroTop1": 0.4947916666666667,
+    "noMatch": {
+      "n": 100,
+      "falsePositives": 100,
+      "falsePositiveRate": 1,
+      "policy": "Any API-returned match is a positive; no added confidence threshold"
+    },
+    "ambiguous": {
+      "n": 32,
+      "acceptableTop1": 0.8125,
+      "acceptableTop3": 1,
+      "bothAcceptableTop3": 0.9375,
+      "explicitUncertainty": 0
+    },
+    "latencyMs": {
+      "n": 516,
+      "min": 21.88464599987492,
+      "p05": 24.302537000039592,
+      "p50": 30.120154000120237,
+      "p95": 45.458982000127435,
+      "max": 124.70609500003047,
+      "mean": 32.204431352707786
+    },
+    "scores": {
+      "correctTop1": {
+        "n": 190,
+        "min": 0.6383050081101151,
+        "p05": 0.7128960072182047,
+        "p50": 0.9668807289175834,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.9235695592397594
+      },
+      "incorrectTop1": {
+        "n": 194,
+        "min": 0.6349010706648915,
+        "p05": 0.651412332668157,
+        "p50": 0.8785827558114175,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.8546626409170434
+      },
+      "correctPiece": {
+        "n": 366,
+        "min": 0.5022427900817492,
+        "p05": 0.6184895833333334,
+        "p50": 0.9249999999999999,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.8818206690842579
+      },
+      "ambiguous": {
+        "n": 32,
+        "min": 0.9679122969895029,
+        "p05": 0.9679122969895029,
+        "p50": 0.9996725192560223,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.9903509401389472
+      },
+      "noMatch": {
+        "n": 100,
+        "min": 0.616459784909771,
+        "p05": 0.6250220340661516,
+        "p50": 0.8366361947467353,
+        "p95": 1,
+        "max": 1,
+        "mean": 0.8113123136049433
+      },
+      "bins": [
+        {
+          "from": 0,
+          "to": 0.1,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.1,
+          "to": 0.2,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.2,
+          "to": 0.3,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.3,
+          "to": 0.4,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.4,
+          "to": 0.5,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.5,
+          "to": 0.6,
+          "correct": 0,
+          "incorrect": 0,
+          "ambiguous": 0,
+          "noMatch": 0
+        },
+        {
+          "from": 0.6,
+          "to": 0.7,
+          "correct": 7,
+          "incorrect": 49,
+          "ambiguous": 0,
+          "noMatch": 41
+        },
+        {
+          "from": 0.7,
+          "to": 0.8,
+          "correct": 14,
+          "incorrect": 19,
+          "ambiguous": 0,
+          "noMatch": 6
+        },
+        {
+          "from": 0.8,
+          "to": 0.9,
+          "correct": 45,
+          "incorrect": 49,
+          "ambiguous": 0,
+          "noMatch": 11
+        },
+        {
+          "from": 0.9,
+          "to": 1,
+          "correct": 124,
+          "incorrect": 77,
+          "ambiguous": 32,
+          "noMatch": 42
+        }
+      ]
+    }
+  },
+  "determinism": {
+    "compared": 1032,
+    "differences": []
+  },
+  "multiPhoto": {
+    "rows": 448,
+    "differentFromFirst": 179,
+    "matchingPhotoExposed": false
+  },
+  "productionUntouched": true,
+  "testFlight49Unchanged": true,
+  "algorithmBaselineCheckpoint": "5fff6c4daf0b16de7f744fa541d8a94034b83f88",
+  "parentCheckpoint": "7686bb32fd6475a2f870ef789eaafde09ff46d23",
+  "slice": "Features-1"
+}

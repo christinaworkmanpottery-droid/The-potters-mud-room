@@ -1,0 +1,45 @@
+(node:6) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+cold 2
+cold 0
+cold 1
+cold 3
+cold 101
+cold 100
+cold 102
+cold 103
+cold 201
+cold 200
+cold 202
+cold 203
+cold 301
+cold 300
+cold 302
+cold 303
+cold 401
+cold 403
+cold 402
+cold 400
+cold 501
+cold 503
+cold 502
+cold 500
+warm 0
+warm 100
+warm 200
+warm 300
+warm 400
+warm 500
+repeat 0
+repeat 100
+repeat 200
+repeat 300
+repeat 400
+repeat 500
+plain 0
+plain 100
+plain 200
+plain 300
+plain 400
+plain 500
+{"counts":{"pieces":48,"referenceImages":144,"queries":516,"positive":384,"ambiguous":32,"noMatch":100,"privacyOnlyPieces":48,"privacyOnlyReferences":144},"top1":0.4947916666666667,"top3":0.7838541666666666,"coldAbsent":0,"latency":{"n":516,"min":13.022025000012945,"p05":15.327066999976523,"p50":19.60015499999281,"p95":30.08146899996791,"max":50.32334100001026,"mean":21.05997995736315}}

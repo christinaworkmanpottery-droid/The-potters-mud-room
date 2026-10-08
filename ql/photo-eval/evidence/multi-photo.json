@@ -1,0 +1,4034 @@
+[
+  {
+    "query": "B01-duplicate",
+    "piece": "B01",
+    "winningPhoto": "B01-ref-1",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B01-independent",
+    "piece": "B01",
+    "winningPhoto": "B01-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B01-angle",
+    "piece": "B01",
+    "winningPhoto": "B01-ref-1",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B01-lighting",
+    "piece": "B01",
+    "winningPhoto": "B01-ref-0",
+    "score": 0.9780546965411545,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B01-cast",
+    "piece": "B01",
+    "winningPhoto": null,
+    "score": null,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": null,
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B01-background",
+    "piece": "B01",
+    "winningPhoto": "B01-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B01-crop",
+    "piece": "B01",
+    "winningPhoto": "B01-ref-2",
+    "score": 0.8621862902015167,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B01-orientation",
+    "piece": "B01",
+    "winningPhoto": "B01-ref-0",
+    "score": 0.840625,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B02-duplicate",
+    "piece": "B02",
+    "winningPhoto": "B02-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B02-independent",
+    "piece": "B02",
+    "winningPhoto": "B02-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B02-angle",
+    "piece": "B02",
+    "winningPhoto": "B02-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B02-lighting",
+    "piece": "B02",
+    "winningPhoto": "B02-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B02-cast",
+    "piece": "B02",
+    "winningPhoto": "B02-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B02-background",
+    "piece": "B02",
+    "winningPhoto": "B02-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B02-crop",
+    "piece": "B02",
+    "winningPhoto": "B02-ref-2",
+    "score": 0.8526582335720865,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B02-orientation",
+    "piece": "B02",
+    "winningPhoto": "B02-ref-1",
+    "score": 0.8518642028260894,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B03-duplicate",
+    "piece": "B03",
+    "winningPhoto": "B03-ref-1",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B03-independent",
+    "piece": "B03",
+    "winningPhoto": "B03-ref-0",
+    "score": 0.9910077167228032,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B03-angle",
+    "piece": "B03",
+    "winningPhoto": "B03-ref-1",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B03-lighting",
+    "piece": "B03",
+    "winningPhoto": "B03-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B03-cast",
+    "piece": "B03",
+    "winningPhoto": null,
+    "score": null,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": null,
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B03-background",
+    "piece": "B03",
+    "winningPhoto": "B03-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B03-crop",
+    "piece": "B03",
+    "winningPhoto": "B03-ref-0",
+    "score": 0.8672231361569746,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B03-orientation",
+    "piece": "B03",
+    "winningPhoto": "B03-ref-2",
+    "score": 0.8888082673105782,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B04-duplicate",
+    "piece": "B04",
+    "winningPhoto": "B04-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B04-independent",
+    "piece": "B04",
+    "winningPhoto": "B04-ref-0",
+    "score": 0.9901259141298474,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B04-angle",
+    "piece": "B04",
+    "winningPhoto": "B04-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B04-lighting",
+    "piece": "B04",
+    "winningPhoto": "B04-ref-0",
+    "score": 0.9364753686054275,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B04-cast",
+    "piece": "B04",
+    "winningPhoto": "B04-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B04-background",
+    "piece": "B04",
+    "winningPhoto": "B04-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B04-crop",
+    "piece": "B04",
+    "winningPhoto": "B04-ref-0",
+    "score": 0.8758870628756593,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B04-orientation",
+    "piece": "B04",
+    "winningPhoto": "B04-ref-1",
+    "score": 0.8669151829154488,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B05-duplicate",
+    "piece": "B05",
+    "winningPhoto": "B05-ref-1",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B05-independent",
+    "piece": "B05",
+    "winningPhoto": "B05-ref-1",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B05-angle",
+    "piece": "B05",
+    "winningPhoto": "B05-ref-1",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B05-lighting",
+    "piece": "B05",
+    "winningPhoto": "B05-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B05-cast",
+    "piece": "B05",
+    "winningPhoto": null,
+    "score": null,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": null,
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B05-background",
+    "piece": "B05",
+    "winningPhoto": "B05-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B05-crop",
+    "piece": "B05",
+    "winningPhoto": "B05-ref-1",
+    "score": 0.8734074544623079,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B05-orientation",
+    "piece": "B05",
+    "winningPhoto": "B05-ref-1",
+    "score": 0.8761408368125296,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B06-duplicate",
+    "piece": "B06",
+    "winningPhoto": "B06-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B06-independent",
+    "piece": "B06",
+    "winningPhoto": "B06-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B06-angle",
+    "piece": "B06",
+    "winningPhoto": "B06-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B06-lighting",
+    "piece": "B06",
+    "winningPhoto": "B06-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B06-cast",
+    "piece": "B06",
+    "winningPhoto": "B06-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B06-background",
+    "piece": "B06",
+    "winningPhoto": "B06-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B06-crop",
+    "piece": "B06",
+    "winningPhoto": "B06-ref-1",
+    "score": 0.858178632161848,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B06-orientation",
+    "piece": "B06",
+    "winningPhoto": "B06-ref-0",
+    "score": 0.8769508832182377,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B07-duplicate",
+    "piece": "B07",
+    "winningPhoto": "B07-ref-1",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B07-independent",
+    "piece": "B07",
+    "winningPhoto": "B07-ref-1",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B07-angle",
+    "piece": "B07",
+    "winningPhoto": "B07-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B07-lighting",
+    "piece": "B07",
+    "winningPhoto": "B07-ref-0",
+    "score": 0.9795729979112295,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B07-cast",
+    "piece": "B07",
+    "winningPhoto": null,
+    "score": null,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": null,
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B07-background",
+    "piece": "B07",
+    "winningPhoto": "B07-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B07-crop",
+    "piece": "B07",
+    "winningPhoto": "B07-ref-2",
+    "score": 0.8810478567320692,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B07-orientation",
+    "piece": "B07",
+    "winningPhoto": "B07-ref-0",
+    "score": 0.8781249999999999,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B08-duplicate",
+    "piece": "B08",
+    "winningPhoto": "B08-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B08-independent",
+    "piece": "B08",
+    "winningPhoto": "B08-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B08-angle",
+    "piece": "B08",
+    "winningPhoto": "B08-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B08-lighting",
+    "piece": "B08",
+    "winningPhoto": "B08-ref-0",
+    "score": 0.9238709309937456,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B08-cast",
+    "piece": "B08",
+    "winningPhoto": "B08-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B08-background",
+    "piece": "B08",
+    "winningPhoto": "B08-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B08-crop",
+    "piece": "B08",
+    "winningPhoto": "B08-ref-2",
+    "score": 0.8739613343695303,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B08-orientation",
+    "piece": "B08",
+    "winningPhoto": "B08-ref-2",
+    "score": 0.8661919932875218,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B09-duplicate",
+    "piece": "B09",
+    "winningPhoto": "B09-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B09-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B09-independent",
+    "piece": "B09",
+    "winningPhoto": "B09-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B09-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B09-angle",
+    "piece": "B09",
+    "winningPhoto": "B09-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B09-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B09-lighting",
+    "piece": "B09",
+    "winningPhoto": "B09-ref-0",
+    "score": 0.968293836831841,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B09-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B09-cast",
+    "piece": "B09",
+    "winningPhoto": null,
+    "score": null,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": null,
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B09-background",
+    "piece": "B09",
+    "winningPhoto": "B09-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B09-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B09-crop",
+    "piece": "B09",
+    "winningPhoto": "B09-ref-1",
+    "score": 0.8685674302095595,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B09-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B09-orientation",
+    "piece": "B09",
+    "winningPhoto": "B09-ref-2",
+    "score": 0.8578123543623322,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B09-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B10-duplicate",
+    "piece": "B10",
+    "winningPhoto": "B10-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B10-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B10-independent",
+    "piece": "B10",
+    "winningPhoto": "B10-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B10-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B10-angle",
+    "piece": "B10",
+    "winningPhoto": "B10-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B10-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B10-lighting",
+    "piece": "B10",
+    "winningPhoto": "B10-ref-0",
+    "score": 0.9318327811145559,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B10-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B10-cast",
+    "piece": "B10",
+    "winningPhoto": "B10-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B10-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B10-background",
+    "piece": "B10",
+    "winningPhoto": "B10-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B10-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B10-crop",
+    "piece": "B10",
+    "winningPhoto": "B10-ref-0",
+    "score": 0.8557397660180305,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B10-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B10-orientation",
+    "piece": "B10",
+    "winningPhoto": "B10-ref-1",
+    "score": 0.8761478129393695,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B10-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B11-duplicate",
+    "piece": "B11",
+    "winningPhoto": "B11-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B11-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B11-independent",
+    "piece": "B11",
+    "winningPhoto": "B11-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B11-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B11-angle",
+    "piece": "B11",
+    "winningPhoto": "B11-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B11-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B11-lighting",
+    "piece": "B11",
+    "winningPhoto": "B11-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B11-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B11-cast",
+    "piece": "B11",
+    "winningPhoto": null,
+    "score": null,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": null,
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B11-background",
+    "piece": "B11",
+    "winningPhoto": "B11-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B11-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B11-crop",
+    "piece": "B11",
+    "winningPhoto": "B11-ref-2",
+    "score": 0.8936667622507878,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B11-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B11-orientation",
+    "piece": "B11",
+    "winningPhoto": "B11-ref-2",
+    "score": 0.8571117847424583,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B11-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B12-duplicate",
+    "piece": "B12",
+    "winningPhoto": "B12-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B12-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B12-independent",
+    "piece": "B12",
+    "winningPhoto": "B12-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B12-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B12-angle",
+    "piece": "B12",
+    "winningPhoto": "B12-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B12-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B12-lighting",
+    "piece": "B12",
+    "winningPhoto": "B12-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B12-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B12-cast",
+    "piece": "B12",
+    "winningPhoto": "B12-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B12-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B12-background",
+    "piece": "B12",
+    "winningPhoto": "B12-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B12-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B12-crop",
+    "piece": "B12",
+    "winningPhoto": "B12-ref-2",
+    "score": 0.8841017745480688,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B12-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B12-orientation",
+    "piece": "B12",
+    "winningPhoto": "B12-ref-1",
+    "score": 0.8590902123983739,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B12-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B13-duplicate",
+    "piece": "B13",
+    "winningPhoto": "B13-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B13-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B13-independent",
+    "piece": "B13",
+    "winningPhoto": "B13-ref-1",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B13-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B13-angle",
+    "piece": "B13",
+    "winningPhoto": "B13-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B13-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B13-lighting",
+    "piece": "B13",
+    "winningPhoto": "B13-ref-0",
+    "score": 0.9745272778584644,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B13-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B13-cast",
+    "piece": "B13",
+    "winningPhoto": null,
+    "score": null,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": null,
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B13-background",
+    "piece": "B13",
+    "winningPhoto": "B13-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B13-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B13-crop",
+    "piece": "B13",
+    "winningPhoto": "B13-ref-1",
+    "score": 0.8721609662345406,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B13-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B13-orientation",
+    "piece": "B13",
+    "winningPhoto": "B13-ref-1",
+    "score": 0.8665153514550321,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B13-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B14-duplicate",
+    "piece": "B14",
+    "winningPhoto": "B14-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B14-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B14-independent",
+    "piece": "B14",
+    "winningPhoto": "B14-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B14-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B14-angle",
+    "piece": "B14",
+    "winningPhoto": "B14-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B14-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B14-lighting",
+    "piece": "B14",
+    "winningPhoto": "B14-ref-0",
+    "score": 0.9211063417641895,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B14-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B14-cast",
+    "piece": "B14",
+    "winningPhoto": "B14-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B14-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B14-background",
+    "piece": "B14",
+    "winningPhoto": "B14-ref-0",
+    "score": 0.9957933121939642,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B14-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B14-crop",
+    "piece": "B14",
+    "winningPhoto": "B14-ref-1",
+    "score": 0.8690285535319066,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B14-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B14-orientation",
+    "piece": "B14",
+    "winningPhoto": "B14-ref-1",
+    "score": 0.8680088927380674,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B14-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B15-duplicate",
+    "piece": "B15",
+    "winningPhoto": "B15-ref-1",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B15-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B15-independent",
+    "piece": "B15",
+    "winningPhoto": "B15-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B15-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B15-angle",
+    "piece": "B15",
+    "winningPhoto": "B15-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B15-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B15-lighting",
+    "piece": "B15",
+    "winningPhoto": "B15-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B15-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B15-cast",
+    "piece": "B15",
+    "winningPhoto": null,
+    "score": null,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": null,
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B15-background",
+    "piece": "B15",
+    "winningPhoto": "B15-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B15-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B15-crop",
+    "piece": "B15",
+    "winningPhoto": "B15-ref-2",
+    "score": 0.8705834421242318,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B15-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B15-orientation",
+    "piece": "B15",
+    "winningPhoto": "B15-ref-0",
+    "score": 0.859375,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B15-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B16-duplicate",
+    "piece": "B16",
+    "winningPhoto": "B16-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B16-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B16-independent",
+    "piece": "B16",
+    "winningPhoto": "B16-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B16-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B16-angle",
+    "piece": "B16",
+    "winningPhoto": "B16-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B16-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B16-lighting",
+    "piece": "B16",
+    "winningPhoto": "B16-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B16-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B16-cast",
+    "piece": "B16",
+    "winningPhoto": "B16-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B16-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B16-background",
+    "piece": "B16",
+    "winningPhoto": "B16-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B16-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B16-crop",
+    "piece": "B16",
+    "winningPhoto": "B16-ref-2",
+    "score": 0.8650323608369413,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B16-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B16-orientation",
+    "piece": "B16",
+    "winningPhoto": "B16-ref-1",
+    "score": 0.8951714935617685,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B16-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L01-duplicate",
+    "piece": "L01",
+    "winningPhoto": "L01-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L01-independent",
+    "piece": "L01",
+    "winningPhoto": "L01-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L01-angle",
+    "piece": "L01",
+    "winningPhoto": "L01-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L01-lighting",
+    "piece": "L01",
+    "winningPhoto": "L01-ref-0",
+    "score": 0.9625124979031048,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L01-cast",
+    "piece": "L01",
+    "winningPhoto": "L01-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L01-background",
+    "piece": "L01",
+    "winningPhoto": "L01-ref-0",
+    "score": 0.7937398233049793,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L01-crop",
+    "piece": "L01",
+    "winningPhoto": "L01-ref-0",
+    "score": 0.7493513148693411,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L01-orientation",
+    "piece": "L01",
+    "winningPhoto": "L01-ref-0",
+    "score": 0.7653003914464336,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L02-duplicate",
+    "piece": "L02",
+    "winningPhoto": "L02-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L02-independent",
+    "piece": "L02",
+    "winningPhoto": "L02-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L02-angle",
+    "piece": "L02",
+    "winningPhoto": "L02-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L02-lighting",
+    "piece": "L02",
+    "winningPhoto": "L02-ref-1",
+    "score": 0.8488420891287665,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L02-cast",
+    "piece": "L02",
+    "winningPhoto": null,
+    "score": null,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": null,
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L02-background",
+    "piece": "L02",
+    "winningPhoto": "L02-ref-1",
+    "score": 0.7930607130873585,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L02-crop",
+    "piece": "L02",
+    "winningPhoto": "L02-ref-2",
+    "score": 0.7488244068963585,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L02-orientation",
+    "piece": "L02",
+    "winningPhoto": "L02-ref-0",
+    "score": 0.7772370323068051,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L03-duplicate",
+    "piece": "L03",
+    "winningPhoto": "L03-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L03-independent",
+    "piece": "L03",
+    "winningPhoto": "L03-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L03-angle",
+    "piece": "L03",
+    "winningPhoto": "L03-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L03-lighting",
+    "piece": "L03",
+    "winningPhoto": "L03-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L03-cast",
+    "piece": "L03",
+    "winningPhoto": "L03-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L03-background",
+    "piece": "L03",
+    "winningPhoto": "L03-ref-0",
+    "score": 0.8663574223008512,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L03-crop",
+    "piece": "L03",
+    "winningPhoto": "L03-ref-2",
+    "score": 0.7499764858337223,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L03-orientation",
+    "piece": "L03",
+    "winningPhoto": "L03-ref-0",
+    "score": 0.765625,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L04-duplicate",
+    "piece": "L04",
+    "winningPhoto": "L04-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L04-independent",
+    "piece": "L04",
+    "winningPhoto": "L04-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L04-angle",
+    "piece": "L04",
+    "winningPhoto": "L04-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L04-lighting",
+    "piece": "L04",
+    "winningPhoto": "L04-ref-0",
+    "score": 0.9551846108496679,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L04-cast",
+    "piece": "L04",
+    "winningPhoto": null,
+    "score": null,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": null,
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L04-background",
+    "piece": "L04",
+    "winningPhoto": "L04-ref-0",
+    "score": 0.8723261746051869,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L04-crop",
+    "piece": "L04",
+    "winningPhoto": "L04-ref-0",
+    "score": 0.765061240615028,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L04-orientation",
+    "piece": "L04",
+    "winningPhoto": "L04-ref-2",
+    "score": 0.7784050783592329,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L05-duplicate",
+    "piece": "L05",
+    "winningPhoto": "L05-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L05-independent",
+    "piece": "L05",
+    "winningPhoto": "L05-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L05-angle",
+    "piece": "L05",
+    "winningPhoto": "L05-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L05-lighting",
+    "piece": "L05",
+    "winningPhoto": "L05-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L05-cast",
+    "piece": "L05",
+    "winningPhoto": "L05-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L05-background",
+    "piece": "L05",
+    "winningPhoto": "L05-ref-0",
+    "score": 0.859375,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L05-crop",
+    "piece": "L05",
+    "winningPhoto": "L05-ref-1",
+    "score": 0.7635497547958985,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L05-orientation",
+    "piece": "L05",
+    "winningPhoto": "L05-ref-0",
+    "score": 0.7472495174724951,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L06-duplicate",
+    "piece": "L06",
+    "winningPhoto": "L06-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L06-independent",
+    "piece": "L06",
+    "winningPhoto": null,
+    "score": null,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": null,
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L06-angle",
+    "piece": "L06",
+    "winningPhoto": "L06-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L06-lighting",
+    "piece": "L06",
+    "winningPhoto": "L06-ref-0",
+    "score": 0.9420009550914185,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L06-cast",
+    "piece": "L06",
+    "winningPhoto": null,
+    "score": null,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": null,
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L06-background",
+    "piece": "L06",
+    "winningPhoto": "L06-ref-0",
+    "score": 0.84375,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L06-crop",
+    "piece": "L06",
+    "winningPhoto": null,
+    "score": null,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": null,
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L06-orientation",
+    "piece": "L06",
+    "winningPhoto": "L06-ref-2",
+    "score": 0.7659660097321381,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L07-duplicate",
+    "piece": "L07",
+    "winningPhoto": "L07-ref-1",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L07-independent",
+    "piece": "L07",
+    "winningPhoto": "L07-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L07-angle",
+    "piece": "L07",
+    "winningPhoto": "L07-ref-2",
+    "score": 0.9766635558069381,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L07-lighting",
+    "piece": "L07",
+    "winningPhoto": "L07-ref-0",
+    "score": 0.8823707026932677,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L07-cast",
+    "piece": "L07",
+    "winningPhoto": "L07-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L07-background",
+    "piece": "L07",
+    "winningPhoto": "L07-ref-0",
+    "score": 0.7991557702187786,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L07-crop",
+    "piece": "L07",
+    "winningPhoto": "L07-ref-2",
+    "score": 0.602691348098099,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L07-orientation",
+    "piece": "L07",
+    "winningPhoto": "L07-ref-0",
+    "score": 0.7421875,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L08-duplicate",
+    "piece": "L08",
+    "winningPhoto": "L08-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L08-independent",
+    "piece": "L08",
+    "winningPhoto": "L08-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L08-angle",
+    "piece": "L08",
+    "winningPhoto": "L08-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L08-lighting",
+    "piece": "L08",
+    "winningPhoto": "L08-ref-0",
+    "score": 0.8406060847878296,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L08-cast",
+    "piece": "L08",
+    "winningPhoto": "L08-ref-2",
+    "score": 0.7349416938055935,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L08-background",
+    "piece": "L08",
+    "winningPhoto": "L08-ref-0",
+    "score": 0.7907228116416385,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L08-crop",
+    "piece": "L08",
+    "winningPhoto": "L08-ref-2",
+    "score": 0.7368891837436728,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L08-orientation",
+    "piece": "L08",
+    "winningPhoto": "L08-ref-1",
+    "score": 0.7791572607908568,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L09-duplicate",
+    "piece": "L09",
+    "winningPhoto": "L09-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L09-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L09-independent",
+    "piece": "L09",
+    "winningPhoto": "L09-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L09-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L09-angle",
+    "piece": "L09",
+    "winningPhoto": "L09-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L09-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L09-lighting",
+    "piece": "L09",
+    "winningPhoto": "L09-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L09-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L09-cast",
+    "piece": "L09",
+    "winningPhoto": "L09-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L09-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L09-background",
+    "piece": "L09",
+    "winningPhoto": "L09-ref-0",
+    "score": 0.8063023943803185,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L09-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L09-crop",
+    "piece": "L09",
+    "winningPhoto": "L09-ref-0",
+    "score": 0.6227425572027921,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L09-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L09-orientation",
+    "piece": "L09",
+    "winningPhoto": "L09-ref-2",
+    "score": 0.7376776960784315,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L09-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L10-duplicate",
+    "piece": "L10",
+    "winningPhoto": "L10-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L10-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L10-independent",
+    "piece": "L10",
+    "winningPhoto": "L10-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L10-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L10-angle",
+    "piece": "L10",
+    "winningPhoto": "L10-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L10-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L10-lighting",
+    "piece": "L10",
+    "winningPhoto": "L10-ref-0",
+    "score": 0.9328451661554823,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L10-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L10-cast",
+    "piece": "L10",
+    "winningPhoto": "L10-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L10-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L10-background",
+    "piece": "L10",
+    "winningPhoto": "L10-ref-0",
+    "score": 0.7884894697310996,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L10-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L10-crop",
+    "piece": "L10",
+    "winningPhoto": "L10-ref-2",
+    "score": 0.6540799800336536,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L10-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L10-orientation",
+    "piece": "L10",
+    "winningPhoto": "L10-ref-2",
+    "score": 0.749018527718428,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L10-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L11-duplicate",
+    "piece": "L11",
+    "winningPhoto": "L11-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L11-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L11-independent",
+    "piece": "L11",
+    "winningPhoto": "L11-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L11-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L11-angle",
+    "piece": "L11",
+    "winningPhoto": "L11-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L11-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L11-lighting",
+    "piece": "L11",
+    "winningPhoto": "L11-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L11-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L11-cast",
+    "piece": "L11",
+    "winningPhoto": "L11-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L11-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L11-background",
+    "piece": "L11",
+    "winningPhoto": "L11-ref-0",
+    "score": 0.8109375,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L11-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L11-crop",
+    "piece": "L11",
+    "winningPhoto": "L11-ref-1",
+    "score": 0.7270926485238756,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L11-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L11-orientation",
+    "piece": "L11",
+    "winningPhoto": "L11-ref-1",
+    "score": 0.73551376987803,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L11-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L12-duplicate",
+    "piece": "L12",
+    "winningPhoto": "L12-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L12-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L12-independent",
+    "piece": "L12",
+    "winningPhoto": "L12-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L12-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L12-angle",
+    "piece": "L12",
+    "winningPhoto": "L12-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L12-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L12-lighting",
+    "piece": "L12",
+    "winningPhoto": "L12-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L12-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L12-cast",
+    "piece": "L12",
+    "winningPhoto": "L12-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L12-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L12-background",
+    "piece": "L12",
+    "winningPhoto": "L12-ref-0",
+    "score": 0.79375,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L12-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L12-crop",
+    "piece": "L12",
+    "winningPhoto": "L12-ref-1",
+    "score": 0.6716478268834892,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L12-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L12-orientation",
+    "piece": "L12",
+    "winningPhoto": "L12-ref-0",
+    "score": 0.759375,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L12-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L13-duplicate",
+    "piece": "L13",
+    "winningPhoto": "L13-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L13-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L13-independent",
+    "piece": "L13",
+    "winningPhoto": "L13-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L13-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L13-angle",
+    "piece": "L13",
+    "winningPhoto": "L13-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L13-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L13-lighting",
+    "piece": "L13",
+    "winningPhoto": "L13-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L13-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L13-cast",
+    "piece": "L13",
+    "winningPhoto": "L13-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L13-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L13-background",
+    "piece": "L13",
+    "winningPhoto": "L13-ref-0",
+    "score": 0.8136737973765493,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L13-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L13-crop",
+    "piece": "L13",
+    "winningPhoto": "L13-ref-0",
+    "score": 0.7154102571888812,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L13-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L13-orientation",
+    "piece": "L13",
+    "winningPhoto": "L13-ref-1",
+    "score": 0.7421875,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L13-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L14-duplicate",
+    "piece": "L14",
+    "winningPhoto": "L14-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L14-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L14-independent",
+    "piece": "L14",
+    "winningPhoto": "L14-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L14-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L14-angle",
+    "piece": "L14",
+    "winningPhoto": "L14-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L14-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L14-lighting",
+    "piece": "L14",
+    "winningPhoto": "L14-ref-0",
+    "score": 0.9736279627394561,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L14-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L14-cast",
+    "piece": "L14",
+    "winningPhoto": "L14-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L14-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L14-background",
+    "piece": "L14",
+    "winningPhoto": "L14-ref-0",
+    "score": 0.7800262570959484,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L14-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L14-crop",
+    "piece": "L14",
+    "winningPhoto": "L14-ref-0",
+    "score": 0.6780763869558689,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L14-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L14-orientation",
+    "piece": "L14",
+    "winningPhoto": "L14-ref-1",
+    "score": 0.7903676470588235,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L14-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L15-duplicate",
+    "piece": "L15",
+    "winningPhoto": "L15-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L15-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L15-independent",
+    "piece": "L15",
+    "winningPhoto": "L15-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L15-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L15-angle",
+    "piece": "L15",
+    "winningPhoto": "L15-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L15-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L15-lighting",
+    "piece": "L15",
+    "winningPhoto": "L15-ref-1",
+    "score": 0.9968053518367499,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L15-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L15-cast",
+    "piece": "L15",
+    "winningPhoto": "L15-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L15-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L15-background",
+    "piece": "L15",
+    "winningPhoto": "L15-ref-0",
+    "score": 0.8624999999999999,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L15-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L15-crop",
+    "piece": "L15",
+    "winningPhoto": "L15-ref-1",
+    "score": 0.7156214238557409,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L15-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L15-orientation",
+    "piece": "L15",
+    "winningPhoto": "L15-ref-1",
+    "score": 0.7585255602240897,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L15-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L16-duplicate",
+    "piece": "L16",
+    "winningPhoto": "L16-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L16-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L16-independent",
+    "piece": "L16",
+    "winningPhoto": "L16-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L16-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L16-angle",
+    "piece": "L16",
+    "winningPhoto": "L16-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L16-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L16-lighting",
+    "piece": "L16",
+    "winningPhoto": "L16-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L16-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L16-cast",
+    "piece": "L16",
+    "winningPhoto": "L16-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L16-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L16-background",
+    "piece": "L16",
+    "winningPhoto": "L16-ref-0",
+    "score": 0.8453125,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L16-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L16-crop",
+    "piece": "L16",
+    "winningPhoto": "L16-ref-0",
+    "score": 0.7182506912364186,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L16-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L16-orientation",
+    "piece": "L16",
+    "winningPhoto": "L16-ref-0",
+    "score": 0.7421875,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L16-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D01-duplicate",
+    "piece": "D01",
+    "winningPhoto": "D01-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D01-independent",
+    "piece": "D01",
+    "winningPhoto": "D01-ref-2",
+    "score": 0.9640102621040719,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D01-angle",
+    "piece": "D01",
+    "winningPhoto": "D01-ref-1",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D01-lighting",
+    "piece": "D01",
+    "winningPhoto": "D01-ref-0",
+    "score": 0.8702522785726904,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D01-cast",
+    "piece": "D01",
+    "winningPhoto": "D01-ref-0",
+    "score": 0.9135718110687225,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D01-background",
+    "piece": "D01",
+    "winningPhoto": "D01-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D01-crop",
+    "piece": "D01",
+    "winningPhoto": "D01-ref-1",
+    "score": 0.7585737878768964,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D01-orientation",
+    "piece": "D01",
+    "winningPhoto": "D01-ref-1",
+    "score": 0.7744565643058373,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D02-duplicate",
+    "piece": "D02",
+    "winningPhoto": "D02-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D02-independent",
+    "piece": "D02",
+    "winningPhoto": "D02-ref-2",
+    "score": 0.9615955616556293,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D02-angle",
+    "piece": "D02",
+    "winningPhoto": "D02-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D02-lighting",
+    "piece": "D02",
+    "winningPhoto": "D02-ref-0",
+    "score": 0.8554752086618456,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D02-cast",
+    "piece": "D02",
+    "winningPhoto": "D02-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D02-background",
+    "piece": "D02",
+    "winningPhoto": "D02-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D02-crop",
+    "piece": "D02",
+    "winningPhoto": "D02-ref-0",
+    "score": 0.7901405249102886,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D02-orientation",
+    "piece": "D02",
+    "winningPhoto": "D02-ref-1",
+    "score": 0.8103426627832673,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D03-duplicate",
+    "piece": "D03",
+    "winningPhoto": "D03-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D03-independent",
+    "piece": "D03",
+    "winningPhoto": "D03-ref-1",
+    "score": 0.8796546122709398,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D03-angle",
+    "piece": "D03",
+    "winningPhoto": "D03-ref-1",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D03-lighting",
+    "piece": "D03",
+    "winningPhoto": "D03-ref-0",
+    "score": 0.8471061275431224,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D03-cast",
+    "piece": "D03",
+    "winningPhoto": "D03-ref-0",
+    "score": 0.9854493687659254,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D03-background",
+    "piece": "D03",
+    "winningPhoto": "D03-ref-0",
+    "score": 0.9627945366002261,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D03-crop",
+    "piece": "D03",
+    "winningPhoto": "D03-ref-1",
+    "score": 0.7746925110849271,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D03-orientation",
+    "piece": "D03",
+    "winningPhoto": "D03-ref-0",
+    "score": 0.7421875,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D04-duplicate",
+    "piece": "D04",
+    "winningPhoto": "D04-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D04-independent",
+    "piece": "D04",
+    "winningPhoto": "D04-ref-1",
+    "score": 0.9464949203401706,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D04-angle",
+    "piece": "D04",
+    "winningPhoto": "D04-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D04-lighting",
+    "piece": "D04",
+    "winningPhoto": "D04-ref-0",
+    "score": 0.868445160488871,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D04-cast",
+    "piece": "D04",
+    "winningPhoto": "D04-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D04-background",
+    "piece": "D04",
+    "winningPhoto": "D04-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D04-crop",
+    "piece": "D04",
+    "winningPhoto": "D04-ref-1",
+    "score": 0.7935398223909493,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D04-orientation",
+    "piece": "D04",
+    "winningPhoto": "D04-ref-2",
+    "score": 0.7590611247216804,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D05-duplicate",
+    "piece": "D05",
+    "winningPhoto": "D05-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D05-independent",
+    "piece": "D05",
+    "winningPhoto": "D05-ref-1",
+    "score": 0.8705675671568628,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D05-angle",
+    "piece": "D05",
+    "winningPhoto": "D05-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D05-lighting",
+    "piece": "D05",
+    "winningPhoto": "D05-ref-0",
+    "score": 0.8336998253620147,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D05-cast",
+    "piece": "D05",
+    "winningPhoto": "D05-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D05-background",
+    "piece": "D05",
+    "winningPhoto": "D05-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D05-crop",
+    "piece": "D05",
+    "winningPhoto": "D05-ref-0",
+    "score": 0.7593382640452064,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D05-orientation",
+    "piece": "D05",
+    "winningPhoto": "D05-ref-0",
+    "score": 0.725,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D06-duplicate",
+    "piece": "D06",
+    "winningPhoto": "D06-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D06-independent",
+    "piece": "D06",
+    "winningPhoto": "D06-ref-1",
+    "score": 0.9374091345473214,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D06-angle",
+    "piece": "D06",
+    "winningPhoto": "D06-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D06-lighting",
+    "piece": "D06",
+    "winningPhoto": "D06-ref-1",
+    "score": 0.8255917704774481,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D06-cast",
+    "piece": "D06",
+    "winningPhoto": "D06-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D06-background",
+    "piece": "D06",
+    "winningPhoto": "D06-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D06-crop",
+    "piece": "D06",
+    "winningPhoto": "D06-ref-0",
+    "score": 0.7339154359139427,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D06-orientation",
+    "piece": "D06",
+    "winningPhoto": "D06-ref-1",
+    "score": 0.7763285667733641,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D07-duplicate",
+    "piece": "D07",
+    "winningPhoto": "D07-ref-1",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D07-independent",
+    "piece": "D07",
+    "winningPhoto": "D07-ref-2",
+    "score": 0.9568206591911765,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D07-angle",
+    "piece": "D07",
+    "winningPhoto": "D07-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D07-lighting",
+    "piece": "D07",
+    "winningPhoto": "D07-ref-0",
+    "score": 0.9141925445439443,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D07-cast",
+    "piece": "D07",
+    "winningPhoto": "D07-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D07-background",
+    "piece": "D07",
+    "winningPhoto": "D07-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D07-crop",
+    "piece": "D07",
+    "winningPhoto": "D07-ref-2",
+    "score": 0.7863992829150811,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D07-orientation",
+    "piece": "D07",
+    "winningPhoto": "D07-ref-1",
+    "score": 0.7353833726071832,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D08-duplicate",
+    "piece": "D08",
+    "winningPhoto": "D08-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D08-independent",
+    "piece": "D08",
+    "winningPhoto": "D08-ref-1",
+    "score": 0.9400940923647712,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D08-angle",
+    "piece": "D08",
+    "winningPhoto": "D08-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D08-lighting",
+    "piece": "D08",
+    "winningPhoto": "D08-ref-1",
+    "score": 0.8191977998555123,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D08-cast",
+    "piece": "D08",
+    "winningPhoto": "D08-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D08-background",
+    "piece": "D08",
+    "winningPhoto": "D08-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "D08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D08-crop",
+    "piece": "D08",
+    "winningPhoto": "D08-ref-2",
+    "score": 0.7697852613577791,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "D08-orientation",
+    "piece": "D08",
+    "winningPhoto": "D08-ref-1",
+    "score": 0.8043914897143118,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "D08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M01-duplicate",
+    "piece": "M01",
+    "winningPhoto": "M01-ref-1",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M01-independent",
+    "piece": "M01",
+    "winningPhoto": "M01-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M01-angle",
+    "piece": "M01",
+    "winningPhoto": "M01-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M01-lighting",
+    "piece": "M01",
+    "winningPhoto": "M01-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M01-cast",
+    "piece": "M01",
+    "winningPhoto": "M01-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M01-background",
+    "piece": "M01",
+    "winningPhoto": "M01-ref-0",
+    "score": 0.9971399204937912,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M01-crop",
+    "piece": "M01",
+    "winningPhoto": "M01-ref-2",
+    "score": 0.8458364290069899,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M01-orientation",
+    "piece": "M01",
+    "winningPhoto": "M01-ref-0",
+    "score": 0.85,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M02-duplicate",
+    "piece": "M02",
+    "winningPhoto": "M02-ref-1",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M02-independent",
+    "piece": "M02",
+    "winningPhoto": "M02-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M02-angle",
+    "piece": "M02",
+    "winningPhoto": "M02-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M02-lighting",
+    "piece": "M02",
+    "winningPhoto": "M02-ref-0",
+    "score": 0.954657305858057,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M02-cast",
+    "piece": "M02",
+    "winningPhoto": null,
+    "score": null,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": null,
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M02-background",
+    "piece": "M02",
+    "winningPhoto": "M02-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M02-crop",
+    "piece": "M02",
+    "winningPhoto": "M02-ref-2",
+    "score": 0.8645864290069898,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M02-orientation",
+    "piece": "M02",
+    "winningPhoto": "M02-ref-0",
+    "score": 0.8868324077773927,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M03-duplicate",
+    "piece": "M03",
+    "winningPhoto": "M03-ref-1",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M03-independent",
+    "piece": "M03",
+    "winningPhoto": "M03-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M03-angle",
+    "piece": "M03",
+    "winningPhoto": "M03-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M03-lighting",
+    "piece": "M03",
+    "winningPhoto": "M03-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M03-cast",
+    "piece": "M03",
+    "winningPhoto": "M03-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M03-background",
+    "piece": "M03",
+    "winningPhoto": "M03-ref-0",
+    "score": 0.9232813101709488,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M03-crop",
+    "piece": "M03",
+    "winningPhoto": "M03-ref-0",
+    "score": 0.86163334049797,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M03-orientation",
+    "piece": "M03",
+    "winningPhoto": "M03-ref-0",
+    "score": 0.85,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M04-duplicate",
+    "piece": "M04",
+    "winningPhoto": "M04-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M04-independent",
+    "piece": "M04",
+    "winningPhoto": "M04-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M04-angle",
+    "piece": "M04",
+    "winningPhoto": "M04-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M04-lighting",
+    "piece": "M04",
+    "winningPhoto": "M04-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M04-cast",
+    "piece": "M04",
+    "winningPhoto": null,
+    "score": null,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": null,
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M04-background",
+    "piece": "M04",
+    "winningPhoto": "M04-ref-0",
+    "score": 0.9334953451310162,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M04-crop",
+    "piece": "M04",
+    "winningPhoto": "M04-ref-2",
+    "score": 0.8736115653864421,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M04-orientation",
+    "piece": "M04",
+    "winningPhoto": "M04-ref-0",
+    "score": 0.859375,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M05-duplicate",
+    "piece": "M05",
+    "winningPhoto": "M05-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M05-independent",
+    "piece": "M05",
+    "winningPhoto": "M05-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M05-angle",
+    "piece": "M05",
+    "winningPhoto": "M05-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M05-lighting",
+    "piece": "M05",
+    "winningPhoto": "M05-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M05-cast",
+    "piece": "M05",
+    "winningPhoto": null,
+    "score": null,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": null,
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M05-background",
+    "piece": "M05",
+    "winningPhoto": "M05-ref-0",
+    "score": 0.9249999999999999,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M05-crop",
+    "piece": "M05",
+    "winningPhoto": "M05-ref-2",
+    "score": 0.8412351476269604,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M05-orientation",
+    "piece": "M05",
+    "winningPhoto": "M05-ref-2",
+    "score": 0.8819659097282823,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M06-duplicate",
+    "piece": "M06",
+    "winningPhoto": "M06-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M06-independent",
+    "piece": "M06",
+    "winningPhoto": "M06-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M06-angle",
+    "piece": "M06",
+    "winningPhoto": "M06-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M06-lighting",
+    "piece": "M06",
+    "winningPhoto": "M06-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M06-cast",
+    "piece": "M06",
+    "winningPhoto": null,
+    "score": null,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": null,
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M06-background",
+    "piece": "M06",
+    "winningPhoto": "M06-ref-0",
+    "score": 0.9249999999999999,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M06-crop",
+    "piece": "M06",
+    "winningPhoto": "M06-ref-2",
+    "score": 0.8368680016460204,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M06-orientation",
+    "piece": "M06",
+    "winningPhoto": "M06-ref-2",
+    "score": 0.8637187779063754,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M07-duplicate",
+    "piece": "M07",
+    "winningPhoto": "M07-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M07-independent",
+    "piece": "M07",
+    "winningPhoto": "M07-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M07-angle",
+    "piece": "M07",
+    "winningPhoto": "M07-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M07-lighting",
+    "piece": "M07",
+    "winningPhoto": "M07-ref-0",
+    "score": 0.9798466123157761,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M07-cast",
+    "piece": "M07",
+    "winningPhoto": null,
+    "score": null,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": null,
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M07-background",
+    "piece": "M07",
+    "winningPhoto": "M07-ref-0",
+    "score": 0.9917867564625511,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M07-crop",
+    "piece": "M07",
+    "winningPhoto": "M07-ref-0",
+    "score": 0.8779019632941928,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M07-orientation",
+    "piece": "M07",
+    "winningPhoto": "M07-ref-0",
+    "score": 0.8687499999999999,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M08-duplicate",
+    "piece": "M08",
+    "winningPhoto": "M08-ref-2",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M08-independent",
+    "piece": "M08",
+    "winningPhoto": "M08-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M08-angle",
+    "piece": "M08",
+    "winningPhoto": "M08-ref-2",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M08-lighting",
+    "piece": "M08",
+    "winningPhoto": "M08-ref-0",
+    "score": 0.9126067443808146,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M08-cast",
+    "piece": "M08",
+    "winningPhoto": "M08-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M08-background",
+    "piece": "M08",
+    "winningPhoto": "M08-ref-0",
+    "score": 0.9906377105502826,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M08-crop",
+    "piece": "M08",
+    "winningPhoto": "M08-ref-1",
+    "score": 0.8732055759361133,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "M08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "M08-orientation",
+    "piece": "M08",
+    "winningPhoto": "M08-ref-0",
+    "score": 0.8767599228686422,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "M08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B01-ambiguous",
+    "piece": "B01",
+    "winningPhoto": "B01-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B01-ambiguous",
+    "piece": "B02",
+    "winningPhoto": "B02-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B02-ambiguous",
+    "piece": "B01",
+    "winningPhoto": "B01-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B02-ambiguous",
+    "piece": "B02",
+    "winningPhoto": "B02-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B03-ambiguous",
+    "piece": "B03",
+    "winningPhoto": "B03-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B03-ambiguous",
+    "piece": "B04",
+    "winningPhoto": "B04-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B04-ambiguous",
+    "piece": "B03",
+    "winningPhoto": "B03-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B04-ambiguous",
+    "piece": "B04",
+    "winningPhoto": "B04-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B05-ambiguous",
+    "piece": "B05",
+    "winningPhoto": "B05-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B05-ambiguous",
+    "piece": "B06",
+    "winningPhoto": "B06-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B06-ambiguous",
+    "piece": "B05",
+    "winningPhoto": "B05-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B06-ambiguous",
+    "piece": "B06",
+    "winningPhoto": "B06-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B07-ambiguous",
+    "piece": "B07",
+    "winningPhoto": "B07-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B07-ambiguous",
+    "piece": "B08",
+    "winningPhoto": "B08-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B08-ambiguous",
+    "piece": "B07",
+    "winningPhoto": "B07-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B08-ambiguous",
+    "piece": "B08",
+    "winningPhoto": "B08-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B09-ambiguous",
+    "piece": "B09",
+    "winningPhoto": "B09-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B09-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B09-ambiguous",
+    "piece": "B10",
+    "winningPhoto": "B10-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B10-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B10-ambiguous",
+    "piece": "B09",
+    "winningPhoto": "B09-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B09-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B10-ambiguous",
+    "piece": "B10",
+    "winningPhoto": "B10-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B10-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B11-ambiguous",
+    "piece": "B11",
+    "winningPhoto": "B11-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B11-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B11-ambiguous",
+    "piece": "B12",
+    "winningPhoto": "B12-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B12-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B12-ambiguous",
+    "piece": "B11",
+    "winningPhoto": "B11-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B11-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B12-ambiguous",
+    "piece": "B12",
+    "winningPhoto": "B12-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B12-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B13-ambiguous",
+    "piece": "B13",
+    "winningPhoto": "B13-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B13-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B13-ambiguous",
+    "piece": "B14",
+    "winningPhoto": "B14-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B14-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B14-ambiguous",
+    "piece": "B13",
+    "winningPhoto": "B13-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B13-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B14-ambiguous",
+    "piece": "B14",
+    "winningPhoto": "B14-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B14-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B15-ambiguous",
+    "piece": "B15",
+    "winningPhoto": "B15-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B15-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B15-ambiguous",
+    "piece": "B16",
+    "winningPhoto": "B16-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B16-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B16-ambiguous",
+    "piece": "B15",
+    "winningPhoto": "B15-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "B15-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "B16-ambiguous",
+    "piece": "B16",
+    "winningPhoto": "B16-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "B16-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L01-ambiguous",
+    "piece": "L01",
+    "winningPhoto": "L01-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L01-ambiguous",
+    "piece": "L02",
+    "winningPhoto": "L02-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L02-ambiguous",
+    "piece": "L01",
+    "winningPhoto": "L01-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L01-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L02-ambiguous",
+    "piece": "L02",
+    "winningPhoto": "L02-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L02-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L03-ambiguous",
+    "piece": "L03",
+    "winningPhoto": "L03-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L03-ambiguous",
+    "piece": "L04",
+    "winningPhoto": "L04-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L04-ambiguous",
+    "piece": "L03",
+    "winningPhoto": "L03-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L03-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L04-ambiguous",
+    "piece": "L04",
+    "winningPhoto": "L04-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L04-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L05-ambiguous",
+    "piece": "L05",
+    "winningPhoto": "L05-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L05-ambiguous",
+    "piece": "L06",
+    "winningPhoto": "L06-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L06-ambiguous",
+    "piece": "L05",
+    "winningPhoto": "L05-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L05-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L06-ambiguous",
+    "piece": "L06",
+    "winningPhoto": "L06-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L06-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L07-ambiguous",
+    "piece": "L07",
+    "winningPhoto": "L07-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L07-ambiguous",
+    "piece": "L08",
+    "winningPhoto": "L08-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L08-ambiguous",
+    "piece": "L07",
+    "winningPhoto": "L07-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L07-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L08-ambiguous",
+    "piece": "L08",
+    "winningPhoto": "L08-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L08-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L09-ambiguous",
+    "piece": "L09",
+    "winningPhoto": "L09-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L09-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L09-ambiguous",
+    "piece": "L10",
+    "winningPhoto": "L10-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L10-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L10-ambiguous",
+    "piece": "L09",
+    "winningPhoto": "L09-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L09-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L10-ambiguous",
+    "piece": "L10",
+    "winningPhoto": "L10-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L10-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L11-ambiguous",
+    "piece": "L11",
+    "winningPhoto": "L11-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L11-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L11-ambiguous",
+    "piece": "L12",
+    "winningPhoto": "L12-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L12-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L12-ambiguous",
+    "piece": "L11",
+    "winningPhoto": "L11-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L11-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L12-ambiguous",
+    "piece": "L12",
+    "winningPhoto": "L12-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L12-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L13-ambiguous",
+    "piece": "L13",
+    "winningPhoto": "L13-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L13-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L13-ambiguous",
+    "piece": "L14",
+    "winningPhoto": "L14-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L14-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L14-ambiguous",
+    "piece": "L13",
+    "winningPhoto": "L13-ref-0",
+    "score": 1,
+    "correctPieceTop1": true,
+    "firstDisplayedPhoto": "L13-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L14-ambiguous",
+    "piece": "L14",
+    "winningPhoto": "L14-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L14-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L15-ambiguous",
+    "piece": "L15",
+    "winningPhoto": "L15-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L15-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L15-ambiguous",
+    "piece": "L16",
+    "winningPhoto": "L16-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L16-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L16-ambiguous",
+    "piece": "L15",
+    "winningPhoto": "L15-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L15-ref-0",
+    "matchingPhotoExposed": false
+  },
+  {
+    "query": "L16-ambiguous",
+    "piece": "L16",
+    "winningPhoto": "L16-ref-0",
+    "score": 1,
+    "correctPieceTop1": false,
+    "firstDisplayedPhoto": "L16-ref-0",
+    "matchingPhotoExposed": false
+  }
+]

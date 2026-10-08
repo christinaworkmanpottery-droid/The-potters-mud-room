@@ -1,0 +1,10 @@
+{
+  "accuracy": {
+    "pass": true,
+    "failures": [],
+    "mode": "future-release",
+    "improvementClaimed": false,
+    "tolerance": "Same runtime/hardware, warmed HTTP, sequential concurrency=1: p50 and p95 <=110% baseline; rerun matched samples to investigate environmental variance, never silently relax."
+  },
+  "latency": "Paired same-machine comparison is required separately."
+}

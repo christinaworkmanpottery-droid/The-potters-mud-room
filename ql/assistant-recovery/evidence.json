@@ -1,0 +1,68 @@
+{
+  "baseline": "ac35a23fb3610afab6c85782e86fe59ecdd5243a",
+  "previousStaging": "d97b0a83d459a7015c5c763bae676bcfb9dfa168",
+  "assistantSearch": {
+    "pass": 662,
+    "fail": 0
+  },
+  "strictFoundation": {
+    "pass": 37,
+    "fail": 0
+  },
+  "speech": "simulated recognition callbacks; no real acoustic proof",
+  "comparison": [
+    {
+      "sha": "ac35a23",
+      "continuation": {
+        "tool": "studio.note",
+        "status": "draft",
+        "draftText": "fire at cone 04"
+      },
+      "save": {
+        "tool": "studio.note",
+        "status": "saved"
+      },
+      "rows": [
+        {
+          "body": "fire at cone 04"
+        }
+      ]
+    },
+    {
+      "sha": "3aab946",
+      "continuation": {
+        "tool": "studio.note",
+        "status": "draft",
+        "draftText": "Make 40 soy sauce dishes in terra-cotta clay"
+      },
+      "save": {
+        "tool": "studio.note",
+        "status": "draft",
+        "draftText": "Make 40 soy sauce dishes in terra-cotta clay"
+      },
+      "rows": []
+    },
+    {
+      "sha": "61f059b",
+      "continuation": {
+        "tool": "studio.note",
+        "status": "draft",
+        "draftText": "Make 40 soy sauce dishes in terra-cotta clay fire at cone 04"
+      },
+      "save": {
+        "tool": "studio.note",
+        "status": "saved"
+      },
+      "rows": [
+        {
+          "body": "Make 40 soy sauce dishes in terra-cotta clay fire at cone 04"
+        }
+      ]
+    }
+  ],
+  "logSha256": {
+    "mudroom-final-recovery.log": "269cd9c0558a1ef4f25206242d595f5e90379af3ef99121d85f75860c06f7047",
+    "mudroom-strict-recovery.log": "eb1162f2414066c12311d56ef51bc2eb348044e54a8e4684ec0fb7e81196fcf9",
+    "mudroom-proven-client-regressions.log": "5f0c08e833fc8f0f93904a9cf859806a979a0f9dacea8d95247bb2c8af1c5fe9"
+  }
+}

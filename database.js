@@ -9,6 +9,43 @@ function initDB() {
   if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
   const db = new Database(DB_PATH);
+  // Reject unsupported startup order before any schema/backfill changes. The QL
+  // manifest and cross-table triggers require legacy rebuilds BEFORE QL install.
+  if (db.prepare("SELECT 1 FROM sqlite_master WHERE name GLOB 'ql_*' LIMIT 1").get()) {
+    const schema = name => db.prepare('SELECT sql FROM sqlite_master WHERE name=?').get(name)?.sql || '';
+    if ((schema('firing_logs').includes('firing_type') && !schema('firing_logs').includes("'lustre'")) ||
+        (schema('test_tiles') && !/surface_result[^)]*underglaze/i.test(schema('test_tiles'))) ||
+        /glaze_id\s+TEXT\s+NOT\s+NULL/i.test(schema('piece_glazes')) ||
+        /CHECK\s*\(venue_type\s+IN/i.test(schema('sales'))) {
+      db.close();
+      throw new Error('Historical schema requires legacy migration before QL installation; startup rejected without mutation');
+    }
+  }
+  // Preserve every existing column, index, trigger and incoming child row. FK
+  // enforcement is suspended only for this synchronous transactional rebuild,
+  // restored even on failure; a pre-existing integrity issue rejects the rebuild.
+  function rebuildLegacyTable(table, transform) {
+    if (db.inTransaction) throw new Error('Legacy rebuild requires its own transaction');
+    if (db.prepare("SELECT 1 FROM sqlite_master WHERE name GLOB 'ql_*' LIMIT 1").get()) throw new Error('Legacy rebuild prohibited after QL');
+    const original = db.prepare('SELECT sql FROM sqlite_master WHERE name=?').get(table).sql;
+    const next = transform(original);
+    const temporary = table + '_new';
+    if (db.prepare('SELECT 1 FROM sqlite_master WHERE name=?').get(temporary)) throw new Error('Refusing to overwrite recovery table ' + temporary);
+    const objects = db.prepare("SELECT sql FROM sqlite_master WHERE tbl_name=? AND type IN ('index','trigger') AND sql IS NOT NULL").all(table);
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all().map(c => '"' + c.name.replace(/"/g,'""') + '"').join(',');
+    db.pragma('foreign_keys=OFF');
+    try {
+      db.transaction(() => {
+        if (db.pragma('foreign_key_check').length) throw new Error('Legacy rebuild requires clean foreign keys');
+        db.exec(next.replace(/(CREATE TABLE\s+(?:IF NOT EXISTS\s+)?)["`\[]?\w+["`\]]?/i, '$1' + temporary));
+        db.exec(`INSERT INTO ${temporary} (${columns}) SELECT ${columns} FROM ${table}`);
+        db.exec(`DROP TABLE ${table}; ALTER TABLE ${temporary} RENAME TO ${table}`);
+        for (const object of objects) db.exec(object.sql);
+        if (db.pragma('foreign_key_check').length) throw new Error('Legacy rebuild failed foreign key verification');
+      }).immediate();
+    } finally { db.pragma('foreign_keys=ON'); }
+  }
+
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
 
@@ -30,6 +67,7 @@ function initDB() {
       stripe_customer_id TEXT,
       stripe_subscription_id TEXT,
       billing_period TEXT DEFAULT 'monthly' CHECK(billing_period IN ('monthly', 'yearly', 'promo')),
+      admin_granted_access INTEGER NOT NULL DEFAULT 0 CHECK(admin_granted_access IN (0,1)),
       plan_expires_at TEXT,
       referral_code TEXT UNIQUE,
       referred_by TEXT,
@@ -458,6 +496,7 @@ function initDB() {
   safeAdd('users', 'profile_photo', 'TEXT');
   safeAdd('users', 'username', 'TEXT');
   safeAdd('users', 'billing_period', "TEXT DEFAULT 'monthly'");
+  safeAdd('users', 'admin_granted_access', 'INTEGER NOT NULL DEFAULT 0 CHECK(admin_granted_access IN (0,1))');
   safeAdd('users', 'plan_expires_at', 'TEXT');
   safeAdd('firing_logs', 'custom_speed_detail', 'TEXT');
   safeAdd('glaze_combos', 'photo_filename2', 'TEXT');
@@ -523,47 +562,13 @@ function initDB() {
   safeAdd('sales', 'image_filename', 'TEXT');
 
   // Contact linking (items 29-31)
-  safeAdd('contacts', 'role', 'TEXT'); // buyer, gallery, potter, venue, supplier, other
-  safeAdd('contacts', 'address', 'TEXT');
-  safeAdd('contacts', 'instagram', 'TEXT');
-  safeAdd('contacts', 'website', 'TEXT');
   safeAdd('sales', 'contact_id', 'TEXT');
-  safeAdd('events', 'contact_id', 'TEXT');
 
   // Remove venue_type CHECK constraint (allow 'website' and future values)
-  try {
-    const hasOldCheck = db.prepare("SELECT sql FROM sqlite_master WHERE name='sales'").get();
-    if (hasOldCheck && hasOldCheck.sql && hasOldCheck.sql.includes("CHECK(venue_type IN")) {
-      db.exec(`
-        CREATE TABLE IF NOT EXISTS sales_new (
-          id TEXT PRIMARY KEY,
-          user_id TEXT NOT NULL,
-          piece_id TEXT,
-          date TEXT,
-          price REAL,
-          venue TEXT,
-          venue_type TEXT,
-          buyer_name TEXT,
-          notes TEXT,
-          created_at TEXT DEFAULT (datetime('now')),
-          quantity INTEGER DEFAULT 1,
-          item_description TEXT,
-          event_name TEXT,
-          buyer_email TEXT,
-          buyer_phone TEXT,
-          image_filename TEXT,
-          FOREIGN KEY (user_id) REFERENCES users(id),
-          FOREIGN KEY (piece_id) REFERENCES pieces(id) ON DELETE SET NULL
-        );
-        INSERT INTO sales_new SELECT id,user_id,piece_id,date,price,venue,venue_type,buyer_name,notes,created_at,quantity,item_description,event_name,buyer_email,buyer_phone,image_filename FROM sales;
-        DROP TABLE sales;
-        ALTER TABLE sales_new RENAME TO sales;
-        CREATE INDEX IF NOT EXISTS idx_sales_user ON sales(user_id);
-      `);
-    }
-  } catch(e) { /* migration already done or no data */ }
-  // The legacy sales table rebuild above must retain the contact link column.
-  safeAdd('sales', 'contact_id', 'TEXT');
+  const saleSchema = db.prepare("SELECT sql FROM sqlite_master WHERE name='sales'").get()?.sql;
+  if (/CHECK\s*\(venue_type\s+IN/i.test(saleSchema || '')) {
+    rebuildLegacyTable('sales', sql => sql.replace(/CHECK\s*\(venue_type\s+IN\s*\([^)]*\)\s*\)/i, ''));
+  }
 
 
   // Fix: piece_glazes.glaze_id was left NOT NULL after custom-named glaze support
@@ -675,6 +680,8 @@ function initDB() {
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_events_user ON events(user_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_events_date ON events(event_date)`);
+  // Contact linking must follow table creation on the first startup.
+  safeAdd('events', 'contact_id', 'TEXT');
   safeAdd('events', 'image_filename', 'TEXT');
 
   // Contacts table (item 40)
@@ -692,6 +699,11 @@ function initDB() {
     )
   `);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_contacts_user ON contacts(user_id)`);
+  // Keep additive compatibility for existing databases after fresh creation.
+  safeAdd('contacts', 'role', 'TEXT'); // buyer, gallery, potter, venue, supplier, other
+  safeAdd('contacts', 'address', 'TEXT');
+  safeAdd('contacts', 'instagram', 'TEXT');
+  safeAdd('contacts', 'website', 'TEXT');
 
   // Part 1 revamp — new fields for glazes
   safeAdd('glazes', 'opacity', 'TEXT');
@@ -1058,45 +1070,11 @@ function initDB() {
   safeAdd('projects', 'budget', 'TEXT');
   safeAdd('projects', 'notes', 'TEXT');
 
-  // Migration: update firing_logs CHECK constraint to include 'lustre'
-  try {
-    const flSchema = db.prepare("SELECT sql FROM sqlite_master WHERE name='firing_logs'").get();
-    if (flSchema && flSchema.sql && flSchema.sql.includes("firing_type") && !flSchema.sql.includes("'lustre'")) {
-      db.exec(`
-        CREATE TABLE IF NOT EXISTS firing_logs_new (
-          id TEXT PRIMARY KEY,
-          user_id TEXT NOT NULL,
-          piece_id TEXT,
-          firing_type TEXT CHECK(firing_type IN ('bisque', 'glaze', 'lustre', 'raku', 'pit', 'wood', 'soda', 'salt', 'maintenance', 'element-change', 'thermocouple', 'preheat', 'soak', 'other')),
-          cone TEXT,
-          temperature TEXT,
-          atmosphere TEXT CHECK(atmosphere IN ('oxidation', 'reduction', 'neutral', NULL)),
-          kiln_name TEXT,
-          schedule TEXT,
-          duration TEXT,
-          firing_speed TEXT CHECK(firing_speed IN ('slow', 'medium', 'fast', 'custom', NULL)),
-          custom_speed_detail TEXT,
-          hold_used INTEGER DEFAULT 0,
-          hold_duration TEXT,
-          date TEXT,
-          results TEXT,
-          notes TEXT,
-          firing_time TEXT,
-          firing_mode TEXT DEFAULT 'kiln-load',
-          load_description TEXT,
-          firing_mode_notes TEXT,
-          created_at TEXT DEFAULT (datetime('now')),
-          FOREIGN KEY (user_id) REFERENCES users(id),
-          FOREIGN KEY (piece_id) REFERENCES pieces(id) ON DELETE SET NULL
-        );
-        INSERT INTO firing_logs_new SELECT id, user_id, piece_id, firing_type, cone, temperature, atmosphere, kiln_name, schedule, duration, firing_speed, custom_speed_detail, hold_used, hold_duration, date, results, notes, firing_time, firing_mode, load_description, firing_mode_notes, created_at FROM firing_logs;
-        DROP TABLE firing_logs;
-        ALTER TABLE firing_logs_new RENAME TO firing_logs;
-        CREATE INDEX IF NOT EXISTS idx_firing_user ON firing_logs(user_id);
-      `);
-      console.log('[migration] Updated firing_logs CHECK constraint to include lustre');
-    }
-  } catch(e) { console.warn('[migration] firing_logs lustre migration:', e.message); }
+  // Update the CHECK while retaining later time columns and incoming photos.
+  const firingSchema = db.prepare("SELECT sql FROM sqlite_master WHERE name='firing_logs'").get()?.sql;
+  if (firingSchema?.includes('firing_type') && !firingSchema.includes("'lustre'")) {
+    rebuildLegacyTable('firing_logs', sql => sql.replace(/(firing_type\s+IN\s*\()/i, "$1'lustre', "));
+  }
 
   // Backfill: retroactive announcement from 2026-05-08
   try {

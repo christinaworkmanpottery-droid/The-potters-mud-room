@@ -1,0 +1,24 @@
+{
+  "baseCommit": "fffdf32b4d9085dd16782b4157bfc8cf2edcf6d8",
+  "repository": "christinaworkmanpottery-droid/potters-mudroom-app",
+  "baseBlobs": {
+    "src/screens/PhotoSearchScreen.js": "3c02c0d45e88e1232b27621ca348cd75c1a9f9f2",
+    "src/services/api.js": "2ad546abe43380f6d66fdc02414bf2b5732d15b7",
+    ".github/workflows/ql-phase2e-mobile.yml": "698a53c6c60bec0bed6c23cf82ef6cc6f9db858e"
+  },
+  "files": [
+    "src/services/api.js",
+    "src/screens/PhotoSearchScreen.js",
+    ".github/workflows/ql-phase2e-mobile.yml",
+    "tests/ql-photo-results.cjs",
+    "tests/ql-photo-client.cjs"
+  ],
+  "verification": "897/897 mobile tests pass. Combined patch independently applied to original Search-3 blobs; every postimage matches tested source.",
+  "postBlobs": {
+    "src/services/api.js": "41f022baea63e18d0a370d68dcccfb370b7e33fa",
+    "src/screens/PhotoSearchScreen.js": "7eb775c88377da4ce61d04f729500cf4391b19ff",
+    ".github/workflows/ql-phase2e-mobile.yml": "b9c4a8d4d3d024060887750a9ab393ce96b9d730",
+    "tests/ql-photo-results.cjs": "e4b80d3d1d2b05c19dc9d30815d65e7bcbf2f6da",
+    "tests/ql-photo-client.cjs": "42d4dd870dea76c786fda51f253f2980f14bc250"
+  }
+}

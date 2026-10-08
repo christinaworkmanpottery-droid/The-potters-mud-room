@@ -1,0 +1,10 @@
+Attempted browser runtimes; NO successful page validation:
+1. Playwright WebKit 26.5, build 2336: missing libgtk-4, libgstreamer,
+   libgraphene, libevent, GStreamer component libraries, libavif16, libharfbuzz-icu,
+   libwayland-server, libmanette, libhyphen, libsecret, libGLESv2.
+   Official install-deps could not perform UID/GID operations (see webkit-deps.log).
+2. Chromium 151.0.7922.34: socket() Operation not permitted at process singleton.
+   Same failure with reduced-process launch (see chromium-launch.log).
+3. Provided CUA Chrome cloud surface: localhost fixture URL blocked by client.
+   net::ERR_BLOCKED_BY_CLIENT for http://127.0.0.1:41887 .
+No microphone, native permission UI, real recognition callbacks or Safari result.

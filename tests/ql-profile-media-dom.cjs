@@ -1,0 +1,20 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),{JSDOM}=require('jsdom');
+const app=fs.readFileSync(require('node:path').join(__dirname,'../public/app.js'),'utf8');
+function fixture(fetchImpl=async()=>({ok:true,blob:async()=>({})})){
+ const dom=new JSDOM('<div id="root"></div>'),requests=[],revoked=[];let n=0;
+ const ctx=vm.createContext({document:dom.window.document,MutationObserver:class{observe(){}},AbortController,API:'',token:'A',esc:String,URL:{createObjectURL:()=>`blob:${++n}`,revokeObjectURL:u=>revoked.push(u)},fetch:async(...args)=>{requests.push(args);return fetchImpl(...args)}});
+ vm.runInContext(app.slice(app.indexOf('const profileMedia ='),app.indexOf('// ---- Profile ----')),ctx);
+ const run=s=>vm.runInContext(s,ctx);
+ return{dom,requests,revoked,run,render:(context='owner')=>{ctx.context=context;run(`document.getElementById('root').innerHTML='<img '+profileAvatarAttributes('a.jpg',context,'A')+'>'`)},hydrate:()=>run('hydrateProfileMedia(document)')};
+}
+test('owner markup has no static URL and fetches authenticated bytes',async()=>{const f=fixture();f.render();await f.hydrate();assert.equal(f.requests[0][0],'/api/ql/profiles/A/photos/a.jpg');assert.equal(f.requests[0][1].headers.Authorization,'Bearer A');assert.equal(f.requests[0][1].cache,'no-store');assert.equal(f.dom.window.document.querySelector('img').src,'blob:1');});
+test('directory public markup requires no authenticated loader',async()=>{const f=fixture();f.render('directory');await f.hydrate();assert.equal(f.requests.length,0);assert.equal(f.dom.window.document.querySelector('img').getAttribute('src'),'/api/ql/avatars/public/directory/a.jpg');});
+test('community markup uses authenticated presentation route',async()=>{const f=fixture();f.render('community');await f.hydrate();assert.equal(f.requests[0][0],'/api/ql/avatars/community/a.jpg');});
+test('clear removes displayed private pixels and revokes blobs',async()=>{const f=fixture();f.render();await f.hydrate();f.run('clearProfileMedia()');assert.deepEqual(f.revoked,['blob:1']);assert.equal(f.requests[0][1].signal.aborted,true);assert.equal(f.dom.window.document.querySelector('img').getAttribute('src'),null);});
+test('late Account A download never populates Account B',async()=>{let resolve;const f=fixture(()=>new Promise(r=>resolve=r));f.render();const p=f.hydrate();f.run("clearProfileMedia();token='B'");f.render();resolve({ok:true,blob:async()=>({})});await p;assert.equal(f.dom.window.document.querySelector('img').getAttribute('src'),null);assert.deepEqual(f.revoked,['blob:1']);});
+test('private 404 leaves a local image failure without static fallback',async()=>{const f=fixture(async()=>({ok:false,status:404}));f.render();await f.hydrate();assert.equal(f.requests.length,1);assert.equal(f.dom.window.document.querySelector('img').getAttribute('src'),null);});
+test('401 clears existing private images',async()=>{const f=fixture(async()=>({ok:false,status:401}));f.render();await f.hydrate();assert.equal(f.run('profileMedia.size'),0);});
+test('removed images release blobs on next DOM hydration',async()=>{const f=fixture();f.render();await f.hydrate();f.run("document.getElementById('root').innerHTML=''");await f.hydrate();assert.deepEqual(f.revoked,['blob:1']);});
+test('legacy ambiguous explicit path is unchanged',()=>{const f=fixture();f.render('legacy');assert.equal(f.dom.window.document.querySelector('img').getAttribute('src'),'/uploads/a.jpg');});
+test('all website avatar consumers use context-aware attributes',()=>{assert.doesNotMatch(app,/src="\/uploads\/' \+ (?:\w+\.)?(?:avatar_filename|author_avatar|partner_avatar)/);assert.match(app,/profileAvatarAttributes\(p.avatarFilename, 'directory'\)/);assert.match(app,/profileAvatarAttributes\(data.avatar_filename, 'featured'\)/);assert.match(app,/profileAvatarAttributes\(d.user.avatar_filename, 'owner', d.user.id\)/);});
+test('logout login and account replacement clean Profile images',()=>assert.ok((app.match(/clearProfileMedia\(\); clearProjectMedia/g)||[]).length===3));

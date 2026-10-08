@@ -8,7 +8,9 @@ const Database = require('better-sqlite3');
 const jwt = require('jsonwebtoken');
 const root=path.resolve(__dirname,'..');
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'mudroom-master-test-'));
-for(const file of ['server.js','database.js','iap.js','directory-search.js','calendar-export.js'])fs.copyFileSync(path.join(root,file),path.join(tmp,file));
+for(const file of ['server.js','database.js','iap.js','directory-search.js','calendar-export.js','deletion-lifecycle.cjs'])fs.copyFileSync(path.join(root,file),path.join(tmp,file));
+  fs.mkdirSync(path.join(tmp,'ql'), {recursive:true}); fs.copyFileSync(path.join(root,'ql/relationships.cjs'),path.join(tmp,'ql/relationships.cjs'));fs.copyFileSync(path.join(root,'ql/piece-editor.cjs'),path.join(tmp,'ql/piece-editor.cjs'));fs.copyFileSync(path.join(root,'ql/photo-query-safety.cjs'),path.join(tmp,'ql/photo-query-safety.cjs'));
+  fs.copyFileSync(path.join(root,'ql/photo-result-confidence.cjs'),path.join(tmp,'ql/photo-result-confidence.cjs'));
 fs.cpSync(path.join(root,'geodata'),path.join(tmp,'geodata'),{recursive:true});
 fs.symlinkSync(path.join(root,'node_modules'),path.join(tmp,'node_modules'),'dir');
 fs.symlinkSync(path.join(root,'public'),path.join(tmp,'public'),'dir');
@@ -37,6 +39,7 @@ async function test(name,fn){await fn();console.log('PASS',name);}
  for(let i=0;i<100&&!output.includes('running on');i++){if(server.exitCode!==null)throw new Error(output);await new Promise(r=>setTimeout(r,100));}
  assert.ok(output.includes('running on'),'local server starts');
  db=new Database(path.join(tmp,'data/pottery.db'));
+ if(process.env.QL_TEST_MIGRATION==='1')require('../ql/relationships.cjs').migrate(db);
  db.prepare('INSERT INTO users(id,email,password_hash,tier,display_name,is_private,findable,country) VALUES(?,?,?,?,?,?,?,?)').run(fixture,'fixture@example.com','local-only','starter','Fixture',1,0,'United State');
  db.prepare('INSERT INTO users(id,email,password_hash,tier) VALUES(?,?,?,?)').run('other-user','other@example.com','local-only','starter');
  db.prepare('INSERT INTO pieces(id,user_id,title,status) VALUES(?,?,?,?)').run('fixture-piece',fixture,'Photo piece','done');
@@ -122,7 +125,27 @@ async function test(name,fn){await fn();console.log('PASS',name);}
  });
  await test('sample PDF is a real PDF; styles/scripts resolve from nested URLs',async()=>{
   const r=await fetch(base+'/shop/mud-log-preview.pdf');assert.match(r.headers.get('content-type'),/application\/pdf/);assert.equal((await r.text()).slice(0,5),'%PDF-');
-  const html=await (await fetch(base+'/nested/preview')).text();assert.match(html,/src="\/app.js\?v=20260925b"/);assert.match(html,/href="\/style.css/);
+  const html=await (await fetch(base+'/nested/preview')).text();assert.match(html,/src="\/app.js\?v=4c"/);assert.match(html,/href="\/style.css/);
+ });
+ if(process.env.QL_TEST_MIGRATION==='1')await test('old Piece API create/read/edit/delete remains compatible with QL links',async()=>{
+  const ql=require('../ql/relationships.cjs');
+  const first=await request('/api/pieces','POST',{title:'QL compatibility A'});
+  const second=await request('/api/pieces','POST',{title:'QL compatibility B'});
+  db.prepare('INSERT INTO firing_logs(id,user_id,notes) VALUES(?,?,?)').run('ql-firing',fixture,'Shared firing');
+  db.prepare('INSERT INTO test_tiles(id,user_id,clay_name) VALUES(?,?,?)').run('ql-tile',fixture,'Typed clay');
+  db.prepare('INSERT INTO pricing_calculations(id,user_id,inputs_json,result_json) VALUES(?,?,?,?)').run('ql-pricing',fixture,'{}','{}');
+  for(const pieceId of [first.id,second.id])for(const [kind,targetId]of [['firing','ql-firing'],['testTile','ql-tile'],['pricing','ql-pricing']]){
+   ql.link(db,{userId:fixture,pieceId,kind,targetId});
+  }
+  const before=await request('/api/pieces/'+first.id);
+  assert.equal(before.title,'QL compatibility A');assert.equal(before.testTiles,undefined);
+  await request('/api/pieces/'+first.id,'PUT',{title:'Edited through old API'});
+  const context=ql.readPiece(db,fixture,first.id);
+  assert.equal(context.piece.title,'Edited through old API');
+  assert.equal(context.firings.length,1);assert.equal(context.testTiles.length,1);assert.equal(context.pricing.length,1);
+  await request('/api/pieces/'+first.id,'DELETE');
+  assert.equal(db.prepare('SELECT count(*) n FROM ql_piece_firings WHERE piece_id=?').get(first.id).n,0);
+  assert.equal(ql.readPiece(db,fixture,second.id).firings[0].id,'ql-firing');
  });
  await test('server restart retains records and every saved photo',async()=>{
   const photos=fs.readdirSync(path.join(tmp,'data/uploads')).sort();
@@ -136,5 +159,13 @@ async function test(name,fn){await fn();console.log('PASS',name);}
   assert.deepEqual(fs.readdirSync(path.join(tmp,'data/uploads')).sort(),photos);
   const sales=await request('/api/sales');assert.equal(sales.find(s=>s.id===sale).quantity,2);
   const entries=await request('/api/community/combos?filter=all-my');assert.equal(entries.filter(c=>c.id===combo.id).length,1);
+  if(process.env.QL_TEST_MIGRATION==='1'){
+   const reopened=new Database(path.join(tmp,'data/pottery.db'));
+   try{
+    assert.equal(require('../ql/relationships.cjs').migrate(reopened).applied,false);
+    assert.equal(reopened.prepare('SELECT count(*) n FROM ql_piece_firings').get().n,1);
+    assert.deepEqual(reopened.pragma('foreign_key_check'),[]);
+   }finally{reopened.close();}
+  }
  });
 })().catch(e=>{console.error(e);process.exitCode=1;}).finally(async()=>{if(db)db.close();if(server && server.exitCode===null){const exited=new Promise(resolve=>server.once('exit',resolve));server.kill();await exited;}fs.rmSync(tmp,{recursive:true,force:true});});

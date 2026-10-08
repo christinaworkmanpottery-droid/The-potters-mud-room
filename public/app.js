@@ -2,6 +2,15 @@
 const API = '';
 let token = localStorage.getItem('mudlog_token');
 let currentUser = null;
+// QL proof observes every application-owned credential/account replacement synchronously.
+function setAuthToken(value) {
+  if (value !== token) window.QLAssistant?.invalidate();
+  token = value;
+}
+function setAuthUser(value) {
+  if (value?.id !== currentUser?.id) window.QLAssistant?.invalidate();
+  currentUser = value;
+}
 let guestMode = false;
 let clayBodies = [];
 let glazes = [];
@@ -118,6 +127,8 @@ function renderBulkCheckbox(section, id) {
 
 // ---- Helpers ----
 async function api(path, opts = {}) {
+  const requestToken = token;
+  const requestForumGeneration = /^\/api\/forum(?:[/?]|$)/.test(path) ? forumMediaGeneration : null;
   const h = {};
   if (token) h['Authorization'] = 'Bearer ' + token;
   if (opts.body && !(opts.body instanceof FormData)) {
@@ -128,8 +139,22 @@ async function api(path, opts = {}) {
     opts.body = JSON.stringify(opts.body);
   }
   const res = await fetch(API + path, { ...opts, headers: opts.body instanceof FormData ? { Authorization: 'Bearer ' + token } : h });
+  if (res.status === 401 && /^\/api\/projects(?:[/?]|$)/.test(path) && requestToken === token) clearProjectMedia();
+  if (res.status === 401 && /^\/api\/sales(?:[/?]|$)/.test(path) && requestToken === token) clearSaleMedia();
+  if (res.status === 401 && /^\/api\/(?:ql\/)?events(?:[/?]|$)/.test(path) && requestToken === token) clearEventMedia();
+  if (res.status === 401 && requestToken === token) { window.StudioSearch?.invalidate(); window.QLAssistant?.sessionInvalid(); }
   const d = await res.json();
-  if (!res.ok) throw new Error(d.error || 'Something went wrong');
+  if (/^\/api\/shop(?:[/?]|$)/.test(path) && requestToken !== token) throw Error('Session changed');
+  if (/^\/api\/shop(?:[/?]|$)/.test(path) && res.status === 401 && requestToken === token) clearShopMedia();
+  if (/^\/api\/forum(?:[/?]|$)/.test(path) && requestForumGeneration !== forumMediaGeneration) throw new Error('Session changed');
+  if (/^\/api\/(?:auth\/me|profile|user\/profile|users|forum|community|messages|potters)(?:[/?]|$)/.test(path)) {
+    if (requestToken !== token) throw new Error('Session changed');
+    if (res.status === 401) { clearProfileMedia(); clearForumMedia(); }
+  }
+  if (!res.ok) {
+    if (res.status === 403 && d.code === 'TEST_TILE_ENTITLEMENT_REQUIRED' && requestToken === token) invalidateTestTileAccess();
+    throw Object.assign(new Error(d.error || 'Something went wrong'), { status: res.status, code: d.code });
+  }
   return d;
 }
 function requireSignup(feature) {
@@ -201,7 +226,27 @@ const STATUS_LABELS = { 'in-progress':'In Progress','leather-hard':'Leather Hard
 const CASUALTY_LABELS = { 'cracked':'Cracked','exploded':'Exploded / Blowout','warped':'Warped','s-crack':'S-Crack','glaze-crawl':'Glaze Crawl','glaze-pinhole':'Glaze Pinholing','glaze-shiver':'Glaze Shivering','glaze-crazing':'Glaze Crazing','glaze-runoff':'Glaze Ran Off','thermal-shock':'Thermal Shock','broke-trimming':'Broke While Trimming','broke-handling':'Broke While Handling','collapsed':'Collapsed','dunting':'Dunting','wrong-color':'Unexpected Color Result','other':'Other' };
 function fmtStatus(s) { return s ? '<span class="status-badge status-' + s + '">' + (STATUS_LABELS[s]||s) + '</span>' : ''; }
 function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+// Controls must remain inert even when author CSS overrides the hidden attribute.
+function viewerControl(id, enabled, handler = null) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.hidden = !enabled; el.disabled = !enabled; el.tabIndex = enabled ? 0 : -1;
+  el.style.display = enabled ? '' : 'none';
+  el.onclick = enabled ? handler : null;
+}
+const pieceViewerOrigins = new Map();
+function rememberPieceViewer(id, enabled) {
+  if (!enabled) { pieceViewerOrigins.delete(id); return; }
+  if (!document.getElementById(id)?.classList.contains('open')) {
+    pieceViewerOrigins.set(id, { control: document.activeElement, token, account: currentUser?.id });
+  }
+}
+function returnPieceViewerFocus(id) {
+  const origin = pieceViewerOrigins.get(id); pieceViewerOrigins.delete(id);
+  if (origin?.control?.isConnected && origin.token === token && origin.account === currentUser?.id) origin.control.focus();
+}
+let firingPieceReturn = null;
+function closeModal(id) { if (window.StudioSearch?.closeViewer(id)) return; if (id === 'glazeViewModal') { glazeViewSerial++; glazeViewReadOnly = false; glazeViewControls(false); clearGlazeClayTestMedia(); document.getElementById('glazeViewBody')?.replaceChildren(); } if (id === 'clayViewModal') { clayViewSerial++; clayViewReadOnly = false; clayViewControls(false); document.getElementById('clayViewBody')?.replaceChildren(); } if (id === 'firingModal') firingPieceReturn = null; if (id === 'firingViewModal') { viewerControl('firingViewEditBtn', false); viewerControl('firingViewDeleteBtn', false); document.getElementById('firingViewBody')?.replaceChildren(); } returnPieceViewerFocus(id); if (id === 'testTileViewModal' || id === 'testTileModal') clearTestTileMedia(); if (id === 'projectModal' || id === 'projectPhotoModal') closeProjectMediaScope(id); const saleScope = {saleModal:'salePhotoPreview',saleDetailsModal:'saleDetailsContent',bulkSaleModal:'bulkSale'}[id]; if (saleScope) closeSaleMediaScope(saleScope); const firingScope = { firingModal:'firingPhotosContainer', firingViewModal:'firingViewBody', firingPhotoReorderModal:'firingPhotoReorderContent' }[id]; if (firingScope) closeFiringMediaScope(firingScope); if (id === 'glazeViewModal') clearGlazeMedia('glazeViewBody'); if (id === 'clayViewModal') clearClayMedia('clayViewBody'); document.getElementById(id).classList.remove('open'); }
 
 // iOS decimal keyboards have no native Done key. Give every numeric field a
 // consistent way to dismiss the keyboard so form buttons remain reachable.
@@ -420,9 +465,17 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
     });
     dbg('Got response, saving token...');
     if (isSignUp && referredBy) sessionStorage.removeItem('referral_code');
-    token = data.token;
+    window.StudioSearch?.invalidate();
+    // A successful auth response may replace an existing session without an explicit logout.
+    // Clear any private History DOM/blob URLs before installing the new account token.
+    clearClayMedia();
+    clearGlazeMedia();
+    clearTestTileMedia();
+    clearShopMedia(); clearForumMedia(); clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
+    clearPieceHistory();
+    setAuthToken(data.token);
     localStorage.setItem('mudlog_token', token);
-    currentUser = data.user;
+    setAuthUser(data.user);
     _loggedInThisSession = true;
     dbg('Token saved. Loading app...');
   } catch (err) { errEl.textContent = 'Login error: ' + err.message; errEl.classList.remove('hidden'); errEl.style.color = 'red'; return; }
@@ -435,7 +488,14 @@ document.getElementById('authForm').addEventListener('submit', async (e) => {
   }
 });
 function logout() {
-  token = null; currentUser = null;
+  window.QLAssistant?.invalidate();
+  window.StudioSearch?.invalidate();
+  clearClayMedia();
+  clearGlazeMedia();
+  clearTestTileMedia();
+  clearShopMedia(); clearForumMedia(); clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
+  clearPieceHistory();
+  setAuthToken(null); setAuthUser(null);
   localStorage.removeItem('mudlog_token');
   document.getElementById('landingPage').style.display = '';
   document.getElementById('authScreen').style.display = 'none';
@@ -443,6 +503,7 @@ function logout() {
 }
 
 async function checkAuth() {
+  const requestToken = token;
   // Don't override reset-password view
   if (window.location.hash.startsWith('#reset-password')) return;
   if (!token && window.location.hash === '#preview') { showGuestPreview('community', true); return; }
@@ -450,13 +511,16 @@ async function checkAuth() {
   try {
     document.getElementById('landingPage').style.display = 'none';
     const d = await api('/api/auth/me');
-    currentUser = d.user;
+    if (requestToken !== token) return;
+    setAuthUser(d.user);
     showApp();
   } catch(e) {
     const msg = (e.message || '').toLowerCase();
     if (msg.includes('invalid token') || msg.includes('unauthorized') || msg.includes('no token') || msg.includes('invalid') || msg.includes('expired')) {
+      window.StudioSearch?.invalidate();
       // Token is bad — clear it and show auth screen (not landing page)
-      token = null;
+      clearShopMedia(); clearForumMedia(); clearProfileMedia(); clearProjectMedia(); clearSaleMedia(); clearEventMedia(); clearPricingMedia(); clearFiringMedia(); clearComboMedia();
+      setAuthToken(null);
       localStorage.removeItem('mudlog_token');
       document.getElementById('landingPage').style.display = 'none';
       document.getElementById('authScreen').style.display = 'flex';
@@ -468,6 +532,8 @@ async function checkAuth() {
   }
 }
 function showApp() {
+  window.QLAssistant?.syncSession();
+  window.StudioSearch?.syncSession();
   try {
     guestMode = false;
     document.getElementById('landingPage').style.display = 'none';
@@ -482,8 +548,8 @@ function showApp() {
     });
     checkUrlParams();
     const hashPage = window.location.hash.replace('#', '').split('?')[0];
-    const validPages = ['dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','myStore','projects','events','contacts','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog','studioNotes','visualSearch','testTiles','findPotter'];
-    if (hashPage === 'preview') { showGuestPreview('community', true); } else if (hashPage === 'profile/find-potter') { navigate('profile', { fromHistory: true }); document.getElementById('findPotterSettings').scrollIntoView(); } else if (hashPage && hashPage.startsWith('blog/')) {
+    const validPages = ['qlAssistant','studioSearch','dashboard','pieces','clayBodies','glazes','firings','casualties','sales','goals','myStore','projects','events','contacts','community','forum','profile','shop','upgrade','help','admin','shoppingList','chemicals','communityMembers','notifications','messages','blog','studioNotes','visualSearch','testTiles','findPotter'];
+    if (hashPage.startsWith('studioSearch/')) { window.StudioSearch?.restore(hashPage); } else if (hashPage === 'preview') { showGuestPreview('community', true); } else if (hashPage === 'profile/find-potter') { navigate('profile', { fromHistory: true }); document.getElementById('findPotterSettings').scrollIntoView(); } else if (hashPage && hashPage.startsWith('blog/')) {
       const slug = hashPage.replace('blog/', '');
       if (slug) viewBlogPost(slug);
       else navigate('blog');
@@ -509,6 +575,19 @@ function showApp() {
 let currentPage = 'dashboard';
 let restoredUrl = '';
 function navigate(page, options = {}) {
+  if (page === 'qlAssistant' && !window.QLAssistant?.available()) return;
+  window.QLAssistant?.onNavigate(page, options);
+  window.StudioSearch?.onNavigate(page, options);
+  if (page !== 'glazes') { clearGlazeMedia('glazeList'); clearGlazeMedia('glazeViewBody'); }
+  if (page !== 'clayBodies') { clearClayMedia('clayList'); clearClayMedia('clayViewBody'); }
+  if (page !== 'testTiles') clearTestTileMedia();
+  if (page !== 'community') clearComboMedia();
+  if (page !== 'firings') clearFiringMedia();
+  if (page !== 'projects') clearProjectMedia();
+  if (page !== 'sales') clearSaleMedia();
+  if (page !== 'events') clearEventMedia();
+  if (page !== 'pricingCalculator') clearPricingMedia();
+  if (page !== 'pieceDetail') clearPieceHistory();
   try {
     if (!token && !guestMode) {
       if (isGuestPreviewPage(page)) {
@@ -532,6 +611,7 @@ function navigate(page, options = {}) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
     const map = {
+      qlAssistant:'pageQLAssistant', studioSearch:'pageStudioSearch', searchRecord:'pageSearchRecord',
       dashboard:'pageDashboard', pieces:'pagePieces', pieceDetail:'pagePieceDetail',
       clayBodies:'pageClayBodies', glazes:'pageGlazes', firings:'pageFirings',
       casualties:'pageCasualties',
@@ -551,6 +631,8 @@ function navigate(page, options = {}) {
     const el = document.getElementById(map[page]); if (el) el.classList.add('active');
     try { const nb = document.querySelector('.nav-link[data-page="' + page + '"]'); if (nb) nb.classList.add('active'); } catch(e) {}
   const loaders = {
+    qlAssistant:() => window.QLAssistant?.enter(),
+    studioSearch:() => window.StudioSearch?.enter(),
     dashboard:loadDashboard, pieces:loadPieces, clayBodies:loadClayBodies,
     glazes:loadGlazes, firings:loadFirings, casualties:loadCasualties, sales:loadSales, pricingCalculator:loadPricingCalculator, testTiles:loadTestTiles, findPotter:loadFindPotter,
     goals:loadGoals, myStore:loadMyStores, projects:loadProjects, events:loadEvents, contacts:loadContacts, studioNotes:loadStudioNotes,
@@ -587,8 +669,10 @@ function closeNav() {
 
 // ---- Dashboard ----
 async function loadDashboard() {
+  const edgeGeneration = pieceEdgeGeneration, edgeToken = token;
   try {
     const d = await api('/api/dashboard');
+    if (edgeGeneration !== pieceEdgeGeneration || edgeToken !== token) return;
     document.getElementById('statPieces').textContent = d.totalPieces;
     document.getElementById('statClays').textContent = d.totalClays;
     document.getElementById('statGlazes').textContent = d.totalGlazes;
@@ -604,7 +688,7 @@ async function loadDashboard() {
     if (d.tier === 'free') { ban.classList.remove('hidden'); document.getElementById('pieceCountText').textContent = d.totalPieces + '/10 pieces used'; } else { ban.classList.add('hidden'); }
     const c = document.getElementById('recentPieces'), em = document.getElementById('dashboardEmpty');
     if (!d.recentPieces.length) { c.innerHTML = ''; em.classList.remove('hidden'); }
-    else { em.classList.add('hidden'); c.innerHTML = d.recentPieces.map(pieceCard).join(''); }
+    else { em.classList.add('hidden'); c.innerHTML = d.recentPieces.map(pieceCard).join(''); void loadPieceEdgeMedia(c); }
     // Build 47 parity: Load notification bell indicator
     loadNotificationIndicator();
   } catch (err) { toast(err.message, 'error'); }
@@ -628,10 +712,73 @@ async function loadNotificationIndicator() {
   }
 }
 
+// Phase 2U Piece edge media. A request is bound to the session and originating DOM node.
+let pieceEdgeGeneration = 0;
+const pieceEdgeUrls = new Set();
+const pieceEdgeControllers = new Set();
+const pieceEdgeNodes = new Map();
+function clearPieceEdgeMediaScope(root) {
+  if (!root) return;
+  for (const [img, view] of pieceEdgeNodes) {
+    if (!root.contains(img)) continue;
+    view.controller.abort(); pieceEdgeControllers.delete(view.controller);
+    if (view.url) { URL.revokeObjectURL(view.url); pieceEdgeUrls.delete(view.url); }
+    img.removeAttribute('src'); pieceEdgeNodes.delete(img);
+  }
+}
+let pieceSearchPreviewUrl = null;
+let pieceSearchController = null;
+let pieceSearchRetry = null;
+let pieceSearchQuerySerial = 0;
+function clearPieceEdgeMedia() {
+  pieceSearchRetry = null;
+  const retry = document.getElementById('visualSearchRetry');
+  if (retry) { retry.hidden = true; retry.disabled = false; retry.onclick = null; }
+  pieceSearchController?.abort(); pieceSearchController = null;
+  const searchStatus = document.getElementById('visualSearchStatus');
+  if (searchStatus) searchStatus.textContent = '';
+  pieceEdgeGeneration++;
+  pieceEdgeControllers.forEach(c => c.abort()); pieceEdgeControllers.clear();
+  pieceEdgeNodes.clear();
+  pieceEdgeUrls.forEach(url => URL.revokeObjectURL(url)); pieceEdgeUrls.clear();
+  document.querySelectorAll('[data-piece-edge]').forEach(img => img.removeAttribute('src'));
+  for (const id of ['recentPieces','piecesList','casualtyList','visualSearchResults']) document.getElementById(id)?.replaceChildren();
+  if (pieceSearchPreviewUrl) URL.revokeObjectURL(pieceSearchPreviewUrl);
+  pieceSearchPreviewUrl = null;
+  document.getElementById('visualSearchImg')?.removeAttribute('src');
+}
+function pieceEdgePhotoAttrs(piece, photo) {
+  const visibility = piece.is_public === 0 || piece.is_public === '0' ? 'private' : piece.is_public === 1 || piece.is_public === '1' ? 'public' : piece.photoVisibility || 'legacy-ambiguous';
+  if (visibility === 'legacy-ambiguous') return 'src="/uploads/' + encodeURIComponent(photo.filename) + '"';
+  if (!piece.id || !photo.id) return 'data-piece-edge';
+  const base = '/api/ql/pieces/' + encodeURIComponent(piece.id);
+  const status = String(piece.status || '').trim().toLowerCase().replaceAll(' ', '-').replaceAll('_', '-').replaceAll('final-fired','glaze-fired');
+  if (visibility === 'public' && ['glaze-fired','done','complete','sold'].includes(status)) return 'data-piece-edge src="' + base + '/photos/' + encodeURIComponent(photo.id) + '/public"';
+  const route = base + (visibility === 'private' ? '/photos/' : '/history/photos/') + encodeURIComponent(photo.id);
+  return 'data-piece-edge data-piece-edge-route="' + route + '"';
+}
+async function loadPieceEdgeMedia(root=document) {
+  if (!root) return;
+  const generation = pieceEdgeGeneration, sessionToken = token;
+  await Promise.all([...root.querySelectorAll('[data-piece-edge-route]')].map(async img => {
+    const controller = new AbortController(); pieceEdgeControllers.add(controller);
+    const view = { controller, url: null }; pieceEdgeNodes.set(img, view);
+    const active = () => !controller.signal.aborted && token === sessionToken && generation === pieceEdgeGeneration && img.isConnected;
+    try {
+      const response = await fetch(API + img.dataset.pieceEdgeRoute, {headers:{Authorization:'Bearer ' + sessionToken}, cache:'no-store', signal:controller.signal});
+      if (!response.ok) throw new Error('unavailable');
+      const blob = await response.blob();
+      if (!active()) return;
+      const url = URL.createObjectURL(blob); view.url = url; pieceEdgeUrls.add(url); img.src = url;
+    } catch (_) { if (active()) { img.removeAttribute('src'); img.alt = 'Photo unavailable'; } }
+    finally { pieceEdgeControllers.delete(controller); }
+  }));
+}
+
 // ---- Piece Card ----
 function pieceCard(p) {
   const ph = p.primaryPhoto || (p.photos && p.photos[0]);
-  const img = ph ? '<img class="piece-photo" src="/uploads/' + ph.filename + '" loading="lazy">' : '<div class="piece-photo-placeholder">🏺</div>';
+  const img = ph ? '<img class="piece-photo" ' + pieceEdgePhotoAttrs(p, ph) + ' loading="lazy">' : '<div class="piece-photo-placeholder">🏺</div>';
   const gl = (p.glazes||[]).map(g => '<span class="glaze-tag">' + esc(g.glaze_name) + '</span>').join('');
   const checkbox = renderBulkCheckbox('pieces', p.id);
   return '<div class="card piece-card" style="position:relative" onclick="' + (isBulkSelectionActive('pieces') ? 'toggleBulkSelect(\'pieces\',\''+p.id+'\',event)' : 'viewPiece(\''+p.id+'\')') + '">' + checkbox + img +
@@ -648,6 +795,7 @@ function pieceCard(p) {
 
 // ---- Pieces ----
 async function loadPieces() {
+  const edgeGeneration = pieceEdgeGeneration, edgeToken = token;
   try {
     const s = document.getElementById('pieceSearch')?.value||'';
     const st = document.getElementById('pieceStatusFilter')?.value||'';
@@ -659,6 +807,7 @@ async function loadPieces() {
     // Exclude casualties from main pieces list (they have their own view)
     if (!st) u += 'excludeCasualties=1&';
     const pieces = await api(u);
+    if (edgeGeneration !== pieceEdgeGeneration || edgeToken !== token) return;
     const c = document.getElementById('piecesList'), em = document.getElementById('piecesEmpty');
     
     // Render bulk controls
@@ -671,6 +820,7 @@ async function loadPieces() {
       const mode = getViewMode('pieces');
       c.className = mode === 'list' ? '' : 'card-grid';
       c.innerHTML = pieces.map(p => mode === 'list' ? pieceListRow(p) : pieceCard(p)).join('');
+      void loadPieceEdgeMedia(c);
       updateBulkSelectionUI('pieces');
     }
   } catch (err) { toast(err.message, 'error'); }
@@ -689,24 +839,228 @@ function pieceListRow(p) {
 function debounceLoadPieces() { clearTimeout(debounceTimer); debounceTimer = setTimeout(loadPieces, 300); }
 
 // ---- Piece Detail ----
-async function viewPiece(id) {
+// Connected History renders only the authenticated service response. No relationship assembly.
+let pieceViewGeneration = 0;
+let pieceHistoryUrls = [];
+let pieceDetailPrivatePhotoUrls = [];
+function disposeHistoryPhotos() {
+  pieceHistoryUrls.forEach(url => URL.revokeObjectURL(url));
+  pieceHistoryUrls = [];
+}
+
+function clearPieceHistory() {
+  currentPieceGlazes = null;
+  if (glazeViewReadOnly) closeModal('glazeViewModal');
+  currentPieceClay = null;
+  if (clayViewReadOnly) closeModal('clayViewModal');
+  pieceViewerOrigins.clear(); firingPieceReturn = null;
+  if (document.getElementById('saleDetailsModal')?.dataset.pieceOrigin === 'true') closeModal('saleDetailsModal');
+  clearPieceEdgeMedia();
+  clearPricingMedia('linkedPricingViewer');
+  document.getElementById('linkedPricing')?.remove();
+  if (document.getElementById('linkedTestTiles')) { closeModal('testTileViewModal'); document.getElementById('linkedTestTiles').remove(); }
+  if (document.getElementById('linkedFirings')) { closeModal('firingViewModal'); document.getElementById('firingViewBody').replaceChildren(); }
+  document.getElementById('linkedFirings')?.remove();
+  pieceViewGeneration++;
+  pieceHistoryUrls.forEach(url => URL.revokeObjectURL(url));
+  pieceHistoryUrls = [];
+  pieceDetailPrivatePhotoUrls.forEach(url => URL.revokeObjectURL(url));
+  pieceDetailPrivatePhotoUrls = [];
+  document.getElementById('pieceHistory')?.remove();
+}
+function openPieceDetailPrivatePhoto(img) {
+  if (!window._reorderMode && !window._blockLightbox && img?.dataset?.protectedReady === '1' && img.src) openLightbox(img.src);
+}
+async function loadPrivatePieceDetailPhotos(pieceId, generation, sessionToken) {
+  const active = () => generation === pieceViewGeneration && token === sessionToken &&
+    currentPage === 'pieceDetail' && window._currentPieceId === pieceId;
+  const root = document.getElementById('photoReorderContainer');
+  if (!root) return;
+  await Promise.all(Array.from(root.querySelectorAll('[data-private-piece-photo]')).map(async img => {
+    const status = img.parentElement?.querySelector('[data-private-piece-photo-status]');
+    try {
+      const response = await fetch(API + '/api/ql/pieces/' + encodeURIComponent(pieceId) + '/photos/' + encodeURIComponent(img.dataset.privatePiecePhoto), {
+        headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store'
+      });
+      if (!response.ok) throw new Error('unavailable');
+      const blob = await response.blob();
+      if (!active()) return;
+      const url = URL.createObjectURL(blob);
+      pieceDetailPrivatePhotoUrls.push(url);
+      img.src = url;
+      img.dataset.protectedReady = '1';
+      if (status) status.hidden = true;
+    } catch (_) {
+      if (!active()) return;
+      img.removeAttribute('src');
+      img.dataset.protectedReady = '0';
+      if (status) { status.hidden = false; status.textContent = 'Photo unavailable'; }
+    }
+  }));
+}
+function historyElement(tag, text, className) {
+  const el = document.createElement(tag);
+  if (text != null) el.textContent = String(text);
+  if (className) el.className = className;
+  return el;
+}
+function renderPieceHistory(container, data) {
+  const pieceId = window._currentPieceId, generation = pieceViewGeneration, sessionToken = token, account = currentUser?.id;
+  const active = () => container.isConnected && generation === pieceViewGeneration && sessionToken === token && account === currentUser?.id && currentPage === 'pieceDetail' && window._currentPieceId === pieceId;
+  container.replaceChildren(historyElement('h2', 'Connected History'));
+  container.append(historyElement('p', 'Saved records connected to this piece. Edit them in their usual sections.', 'text-sm'));
+  const groups = [
+    ['Clay', data.clay ? [data.clay] : []],
+    ['Glaze layers', data.glazeLayers],
+    // Filter the server timeline, retaining its established chronology within each group.
+    ['Firings', data.history?.filter(e => e?.recordType === 'firing')],
+    ['Test Tiles', data.history?.filter(e => e?.recordType === 'test-tile')],
+    ['Pricing', data.history?.filter(e => e?.recordType === 'pricing')],
+    ['Sales', data.history?.filter(e => e?.recordType === 'sale')],
+    ['Piece photos', data.photos]
+  ];
+  let count = 0;
+  for (const [label, entries] of groups) {
+    const rows = Array.isArray(entries) ? entries.filter(e => e && e.values) : [];
+    if (!rows.length) continue;
+    count += rows.length;
+    const section = historyElement('section', null, 'piece-history-group');
+    section.append(historyElement('h3', label));
+    const list = historyElement(label === 'Glaze layers' ? 'ol' : 'ul');
+    for (const e of rows) {
+      const v = e.values;
+      const layer = v.layer || {};
+      const item = historyElement('li');
+      item.dataset.recordId = e.sourceRecordId;
+      let name;
+      switch (e.recordType) {
+        case 'glaze-layer': name = e.manualLabel || v.glaze?.name || 'Unnamed glaze layer'; break;
+        case 'firing': name = v.name || [v.firing_type || 'Firing', v.kiln_name].filter(Boolean).join(' — '); break;
+        case 'sale': name = v.item_description || v.venue || 'Sale'; break;
+        case 'piece-photo': name = e.manualLabel || 'Piece photo'; break;
+        default: name = v.name || e.manualLabel || label;
+      }
+      item.append(historyElement('strong', name));
+      const details = [];
+      if (e.recordType === 'glaze-layer') {
+        if (!v.glaze) details.push('Manual glaze');
+        if (layer.coats != null) details.push(layer.coats + (Number(layer.coats) === 1 ? ' coat' : ' coats'));
+        if (layer.application_method) details.push(layer.application_method);
+        if (layer.notes) details.push(layer.notes);
+      }
+      if (e.recordType === 'clay' && v.brand) details.push(v.brand);
+      if (e.recordType === 'firing') {
+        if (v.cone != null && v.cone !== '') details.push('Cone ' + v.cone);
+        if (v.atmosphere) details.push(v.atmosphere);
+        if (v.results) details.push(v.results);
+      }
+      if (['test-tile', 'pricing'].includes(e.recordType)) details.push('Linked to this piece');
+      if (e.recordType === 'sale' && v.price != null && Number.isFinite(Number(v.price))) details.push('$' + Number(v.price).toFixed(2));
+      if (details.length) item.append(historyElement('div', details.join(' · '), 'text-sm'));
+      // Show the actual supplied date verbatim: no timezone shift or invented date.
+      let dateLabel = 'Undated';
+      if (e.recordedAt) {
+        const eventDate = ['firing', 'sale'].includes(e.recordType) && v.date;
+        dateLabel = (eventDate ? 'Date: ' : 'Record added: ') + e.recordedAt;
+      }
+      if (e.relationshipDate) dateLabel += ' · Linked: ' + e.relationshipDate;
+      item.append(historyElement('div', dateLabel, 'text-sm piece-history-date'));
+      if (e.recordType === 'piece-photo') {
+        const placeholder = historyElement('div', 'Loading photo…', 'text-sm');
+        placeholder.setAttribute('role', 'status');
+        placeholder.setAttribute('aria-live', 'polite');
+        placeholder.dataset.historyPhoto = e.sourceRecordId;
+        item.append(placeholder);
+      }
+      if (e.recordType === 'sale') {
+        const view = historyElement('button', 'View', 'btn btn-secondary btn-sm');
+        view.type = 'button'; view.setAttribute('aria-label', 'View Sale ' + name);
+        view.onclick = () => { view.focus(); if (active()) void viewSale(e.sourceRecordId, { pieceId, active }); };
+        item.append(view);
+      }
+      list.append(item);
+    }
+    section.append(list);
+    container.append(section);
+  }
+  if (!count) container.append(historyElement('p', 'No connected history recorded yet.'));
+  container.setAttribute('aria-busy', 'false');
+}
+async function loadPieceHistory(id, container, generation, sessionToken) {
+  const account = currentUser?.id;
+  const active = () => container.isConnected && generation === pieceViewGeneration && token === sessionToken && currentUser?.id === account;
   try {
-    const p = await api('/api/pieces/' + id);
-    navigate('pieceDetail');
+    const data = await api('/api/ql/pieces/' + encodeURIComponent(id) + '/history');
+    if (!active()) return;
+    if (data.testTilesAccess === 'locked') invalidateTestTileAccess(false);
+    renderPieceHistory(container, data);
+    // Photo bytes are authenticated too; never load the public filename from metadata.
+    await Promise.all(Array.from(container.querySelectorAll('[data-history-photo]')).map(async placeholder => {
+      try {
+        const response = await fetch(API + '/api/ql/pieces/' + encodeURIComponent(id) + '/history/photos/' + encodeURIComponent(placeholder.dataset.historyPhoto), {
+          headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store'
+        });
+        if (!response.ok) throw new Error('unavailable');
+        const blob = await response.blob();
+        if (!active()) return;
+        const url = URL.createObjectURL(blob);
+        pieceHistoryUrls.push(url);
+        const img = historyElement('img', null, 'piece-history-photo');
+        const photoLabel = placeholder.parentElement.querySelector('strong')?.textContent || '';
+        img.alt = photoLabel && photoLabel !== 'Piece photo' ? 'Piece photo — ' + photoLabel : 'Piece photo';
+        img.onerror = () => { if (active()) placeholder.textContent = 'Photo unavailable'; };
+        img.src = url;
+        placeholder.replaceChildren(img);
+      } catch (_) { if (active()) placeholder.textContent = 'Photo unavailable'; }
+    }));
+    return true;
+  } catch (_) {
+    if (!active()) return;
+    const failure = historyElement('p', 'History could not be loaded. Your piece details are still available.');
+    failure.setAttribute('role', 'alert');
+    container.replaceChildren(historyElement('h2', 'Connected History'), failure);
+    container.setAttribute('aria-busy', 'false');
+    const retry = historyElement('button', 'Try again', 'btn btn-secondary btn-sm');
+    retry.type = 'button';
+    retry.onclick = () => {
+      const loading = historyElement('p', 'Loading connected history…');
+      loading.setAttribute('role', 'status');
+      container.replaceChildren(historyElement('h2', 'Connected History'), loading);
+      container.setAttribute('aria-busy', 'true');
+      loadPieceHistory(id, container, generation, sessionToken);
+    };
+    container.append(retry);
+    return false;
+  }
+}
+
+async function viewPiece(id, options = {}) {
+  clearPieceHistory();
+  const generation = pieceViewGeneration, sessionToken = token;
+  try {
+    const p = await api('/api/pieces/' + encodeURIComponent(id), { cache: 'no-store' });
+    if (generation !== pieceViewGeneration || token !== sessionToken || (options.active && !options.active())) return;
+    if (options.active && (String(p.id) !== String(id) || String(p.user_id) !== String(currentUser?.id))) throw Object.assign(Error('Piece unavailable'), {status:404});
+    navigate('pieceDetail', options.active ? {fromHistory:true, searchDetail:true} : {});
     window._currentPieceId = p.id;
     window._currentPiecePhotos = p.photos || [];
     window._reorderMode = false;
-    const photos = (p.photos||[]).map((ph, idx) =>
-      '<div class="detail-photo-wrap" draggable="false" data-photo-id="' + ph.id + '" data-index="' + idx + '" style="position:relative">' +
-      '<img class="detail-photo" draggable="false" src="/uploads/' + ph.filename + '" title="' + esc(ph.stage||'') + '" onclick="if(!window._reorderMode&&!window._blockLightbox)openLightbox(\'/uploads/' + ph.filename + '\')" style="cursor:zoom-in;transform:rotate(' + (ph.rotation||0) + 'deg)">' +
+    const privatePiecePhotos = p.photoVisibility === 'private';
+    const photos = (p.photos||[]).map((ph, idx) => {
+      const image = privatePiecePhotos
+        ? '<img class="detail-photo" draggable="false" data-private-piece-photo="' + ph.id + '" data-protected-ready="0" alt="Piece photo' + (ph.stage ? ' — ' + esc(ph.stage) : '') + '" title="' + esc(ph.stage||'') + '" onclick="openPieceDetailPrivatePhoto(this)" style="cursor:zoom-in;transform:rotate(' + (ph.rotation||0) + 'deg)">' +
+          '<span class="text-sm" data-private-piece-photo-status role="status">Loading photo…</span>'
+        : '<img class="detail-photo" draggable="false" ' + pieceEdgePhotoAttrs(p, ph) + ' alt="Piece photo" title="' + esc(ph.stage||'') + '" onclick="if(!window._reorderMode&&!window._blockLightbox&&this.src)openLightbox(this.src)" style="cursor:zoom-in;transform:rotate(' + (ph.rotation||0) + 'deg)">';
+      return '<div class="detail-photo-wrap" draggable="false" data-photo-id="' + ph.id + '" data-index="' + idx + '" style="position:relative">' +
+      image +
       '<span class="photo-stage-label">' + esc(ph.stage||'') + '</span>' +
       '<div class="photo-controls" style="position:absolute;top:4px;right:4px;display:flex;gap:2px">' +
       '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();rotatePhoto(\'' + ph.id + '\',\'' + p.id + '\',false)" title="Rotate left">↶</button>' +
       '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();rotatePhoto(\'' + ph.id + '\',\'' + p.id + '\',true)" title="Rotate right">↷</button>' +
       '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();editPhotoStage(\'' + ph.id + '\',\'' + esc(ph.stage||'') + '\',\'' + p.id + '\')" title="Edit stage">✏️</button>' +
       '<button class="btn-ghost btn-sm" onclick="event.stopPropagation();deletePhoto(\'' + ph.id + '\',\'' + p.id + '\')" title="Delete photo">🗑️</button>' +
-      '</div></div>'
-    ).join('');
+      '</div></div>';
+    }).join('');
     const glist = (p.glazes||[]).map(g =>
       '<div style="margin-bottom:6px"><span class="glaze-tag' + (g.glaze_type==='recipe'?' recipe':'') + '">' + esc(g.glaze_name) + '</span>' +
       (g.brand ? ' <span class="text-sm" style="color:var(--text-light)">— ' + esc(g.brand) + '</span>' : '') +
@@ -714,14 +1068,7 @@ async function viewPiece(id) {
       (g.application_method ? ' <span class="text-sm" style="color:var(--text-light)">— ' + esc(g.application_method) + '</span>' : '') +
       '</div>'
     ).join('') || '<span style="color:var(--text-muted)">No glazes recorded</span>';
-    const firings = (p.firings||[]).map(f =>
-      '<div class="card" style="padding:14px;margin-bottom:8px"><strong>' + esc(f.firing_type||'Firing') + '</strong> — Cone ' + esc(f.cone||'?') +
-      (f.atmosphere ? ' (' + esc(f.atmosphere) + ')' : '') + (f.kiln_name ? ' — ' + esc(f.kiln_name) : '') +
-      (f.firing_speed ? '<br><span class="text-sm"><strong>Speed:</strong> ' + esc(f.firing_speed) + (f.custom_speed_detail ? ' — ' + esc(f.custom_speed_detail) : '') + '</span>' : '') +
-      (f.hold_used ? '<br><span class="text-sm"><strong>Hold:</strong> Yes' + (f.hold_duration ? ' — ' + esc(f.hold_duration) : '') + '</span>' : '') +
-      (f.date ? '<br><span class="text-sm" style="color:var(--text-light)">' + fmtDate(f.date) + '</span>' : '') +
-      (f.results ? '<br><span class="text-sm">' + esc(f.results) + '</span>' : '') + '</div>'
-    ).join('');
+    const firings = savedPieceFiringsMarkup(p.firings);
 
     const maxPhotos = (currentUser?.tier || 'free') === 'free' ? 1 : 3;
     const canAddPhoto = (p.photos||[]).length < maxPhotos;
@@ -741,12 +1088,12 @@ async function viewPiece(id) {
         (hasMultiplePhotos ? '<button id="reorderPhotosBtn" class="btn btn-secondary btn-sm" onclick="togglePhotoReorderMode()">↕️ Reorder Photos</button>' : '') +
         '</div><div class="detail-photos mb-16" id="photoReorderContainer">' + photos + '</div>' : '') +
       '<div class="detail-grid"><div class="card"><h3 style="margin-bottom:16px">Details</h3>' +
-      df('Clay Body', p.clay_body_name||p.clay||p.studio) + '<div class="detail-field"><div class="detail-label">Glaze</div><div class="detail-value">' + ((p.glazes&&p.glazes.length) ? p.glazes.map(g => {
-        let parts = [esc(g.glaze_name)];
+      '<div id="pieceClayDisplay" style="display:flex;align-items:center;gap:8px">' + df('Clay Body', p.clay_body_name||p.clay||p.studio) + '</div>' + '<div class="detail-field"><div class="detail-label">Glaze</div><div class="detail-value">' + ((p.glazes&&p.glazes.length) ? p.glazes.map((g, index) => {
+        let parts = [esc(g.glaze_name ?? 'Unnamed glaze layer')];
         if (g.coats && g.coats > 0) parts.push((g.coats === 1 ? '1 coat' : g.coats + ' coats'));
         if (g.application_method) parts.push(esc(g.application_method));
-        return parts.join(' — ');
-      }).join('<br>') : (p.glaze ? esc(p.glaze) : '—')) + '</div></div>' + df('Firing Temp', p.firingTemp) + df('Technique', p.technique) + df('Form', p.form) +
+        return '<div data-piece-glaze-index="' + index + '">' + parts.join(' — ') + '</div>';
+      }).join('') : (p.glaze ? esc(p.glaze) : '—')) + '</div></div>' + df('Firing Temp', p.firingTemp) + df('Technique', p.technique) + df('Form', p.form) +
       df('Dimensions', p.dimensions) + df('Weight', p.weight) +
       df('Date', fmtDate(p.date_started)) +
       (p.date_completed ? df('Completed', fmtDate(p.date_completed)) : '') +
@@ -758,20 +1105,42 @@ async function viewPiece(id) {
       (p.sale_price ? df('Sale Price', '$' + parseFloat(p.sale_price).toFixed(2)) : '') +
       (p.cleanNotes ? df('Notes', p.cleanNotes) : (p.description ? df('Notes', p.description) : '')) + '</div>' +
       '<div>' +
-      (firings ? '<div class="card mb-16"><h3 style="margin-bottom:12px">Firings</h3>' + firings + '</div>' : '') +
+      '<div id="pieceSavedFirings">' + (firings ? '<div class="card mb-16"><h3 style="margin-bottom:12px">Firings</h3>' + firings + '</div>' : '') + '</div>' +
       ((p.status === 'broken' || p.status === 'recycled') ? '<div class="card" style="border:2px solid var(--danger);background:rgba(220,53,69,0.05)"><h3 style="margin-bottom:12px;color:var(--danger)">' + (p.status === 'recycled' ? 'Recycle Report' : 'Casualty Report') + '</h3>' +
         df('What Happened', p.casualty_type ? CASUALTY_LABELS[p.casualty_type] || p.casualty_type : 'Not specified') +
         (p.casualty_notes ? df('What Went Wrong', p.casualty_notes) : '') +
         (p.casualty_lesson ? '<div class="detail-field" style="background:rgba(40,167,69,0.08);padding:10px;border-radius:var(--radius-sm);margin-top:8px"><div class="detail-label" style="color:var(--success)">🎓 Lesson Learned</div><div class="detail-value">' + esc(p.casualty_lesson) + '</div></div>' : '') +
         '</div>' : '') +
       '</div></div>';
-  } catch (err) { toast(err.message, 'error'); }
+    const history = historyElement('section', null, 'card piece-history');
+    history.id = 'pieceHistory';
+    history.setAttribute('aria-label', 'Connected History');
+    history.setAttribute('aria-busy', 'true');
+    const loading = historyElement('p', 'Loading connected history…');
+    loading.setAttribute('role', 'status');
+    history.append(historyElement('h2', 'Connected History'), loading);
+    document.getElementById('pieceDetailContent').append(history);
+    mountPieceClay(p, generation, sessionToken);
+    mountPieceGlazes(p, generation, sessionToken);
+    mountLinkedPricing(p.id, generation, sessionToken);
+    mountLinkedFirings(p.id, generation, sessionToken);
+    mountLinkedTestTiles(p.id, generation, sessionToken);
+    if (privatePiecePhotos) void loadPrivatePieceDetailPhotos(p.id, generation, sessionToken);
+    else void loadPieceEdgeMedia(document.getElementById('photoReorderContainer'));
+    void loadPieceHistory(p.id, history, generation, sessionToken);
+  } catch (err) { if (options.active) { if (options.active()) throw err; } else toast(err.message, 'error'); }
 }
 function df(label, val) {
   return '<div class="detail-field"><div class="detail-label">' + label + '</div><div class="detail-value">' + (val ? esc(String(val)) : '—') + '</div></div>';
 }
 
 // ---- Piece CRUD ----
+let pieceClayIntent = null, pieceStudioChanged = false, pieceLayersChanged = false, pieceHydrating = false;
+function editPieceClayManually() {
+  pieceClayIntent = 'manual';
+  document.getElementById('pieceClayId').value = '';
+  document.getElementById('pieceClayPicker').value = '';
+}
 function populateClaySelect(selId, selVal) {
   const s = document.getElementById(selId);
   s.innerHTML = '<option value="">Select clay...</option>' + clayBodies.map(c => '<option value="' + c.id + '"' + (c.id===selVal?' selected':'') + '>' + esc(c.name) + (c.brand?' ('+esc(c.brand)+')':'') + '</option>').join('');
@@ -786,6 +1155,7 @@ function pickClayFromLibrary(id, name) {
   if (!id) return;
   document.getElementById('pieceClayText').value = name;
   document.getElementById('pieceClayId').value = id;
+  pieceClayIntent = 'saved';
 }
 function glazeOpts() {
   return '<option value="">Select glaze...</option>' + glazes.map(g => '<option value="' + g.id + '">' + esc(g.name) + (g.brand?' ('+esc(g.brand)+')':'') + '</option>').join('');
@@ -797,7 +1167,8 @@ function populateGlazePicker(row, selectedId) {
   sel.innerHTML = '<option value="">— Pick from Glaze library —</option>' + glazes.map(g => '<option value="' + g.id + '"' + (g.id===selectedId?' selected':'') + '>' + esc(g.name) + (g.brand?' ('+esc(g.brand)+')':'') + '</option>').join('');
   wrap.style.display = glazes.length > 0 ? 'block' : 'none';
 }
-function addGlazeSelector(gId, coats, method, glazeName) {
+function addGlazeSelector(gId, coats, method, glazeName, original) {
+  if (!pieceHydrating) pieceLayersChanged = true;
   const c = document.getElementById('pieceGlazeSelectors');
   const r = document.createElement('div'); r.className = 'glaze-selector-row'; r.style.cssText = 'display:block;margin-bottom:16px';
   r.innerHTML =
@@ -807,10 +1178,24 @@ function addGlazeSelector(gId, coats, method, glazeName) {
       '<select class="form-select gpick" onchange="pickGlazeFromLibrary(this)" style="font-size:0.85rem"><option value="">— Pick from Glaze library —</option></select>' +
     '</div>' +
     '<div style="display:flex;gap:8px;margin-top:8px;align-items:center">' +
-      '<input type="number" class="form-input gc" placeholder="Coats" min="1" value="' + (coats||1) + '" style="width:80px">' +
-      '<select class="form-select gm" style="flex:1"><option value="">Method (optional)</option><option value="dip"' + (method==='dip'?' selected':'') + '>Dip</option><option value="brush"' + (method==='brush'?' selected':'') + '>Brush</option><option value="spray"' + (method==='spray'?' selected':'') + '>Spray</option><option value="pour"' + (method==='pour'?' selected':'') + '>Pour</option><option value="wax-resist"' + (method==='wax-resist'?' selected':'') + '>Wax Resist</option></select>' +
-      '<button type="button" class="btn btn-sm btn-danger" onclick="this.closest(\'.glaze-selector-row\').remove()" style="flex:none">×</button>' +
+      '<input type="number" class="form-input gc" placeholder="Coats" min="0" value="' + (coats ?? 1) + '" style="width:80px">' +
+      '<select class="form-select gm" style="flex:1"><option value="">Method (optional)</option><option value="dip"' + (method==='dip'?' selected':'') + '>Dip</option><option value="brush"' + (method==='brush'?' selected':'') + '>Brush</option><option value="spray"' + (method==='spray'?' selected':'') + '>Spray</option><option value="pour"' + (method==='pour'?' selected':'') + '>Pour</option><option value="wax-resist"' + (method==='wax-resist'?' selected':'') + '>Wax Resist</option><option value="other"' + (method==='other'?' selected':'') + '>Other</option></select>' +
+      '<button type="button" class="btn btn-sm btn-danger" onclick="pieceLayersChanged=true;this.closest(\'.glaze-selector-row\').remove()" style="flex:none">×</button>' +
     '</div>';
+  const maxOrder = Math.max(-1, ...Array.from(c.children, row => row._layer?.layerOrder ?? -1));
+  r._layer = original ? {
+    id: original.id, glazeId: original.glaze_id, customName: original.custom_name,
+    coats: original.coats, method: original.application_method, notes: original.notes, layerOrder: original.layer_order
+  } : {glazeId:gId || null, customName:gId ? null : glazeName || null, coats:coats ?? 1, method:method ?? null, notes:null, layerOrder:maxOrder+1};
+  r._manualChanged = !original && !gId;
+  const notesInput = document.createElement('textarea'); notesInput.className='form-input gn';
+  notesInput.placeholder='Layer notes'; notesInput.value=r._layer.notes ?? ''; r.appendChild(notesInput);
+  const change = () => { pieceLayersChanged=true; };
+  r.querySelector('.btn-danger').onclick = () => { change(); r.remove(); };
+  r.querySelector('.gtext').oninput = e => { change(); r._layer.glazeId=null; r._layer.customName=e.target.value; r.querySelector('.gid').value=''; r.querySelector('.gpick').value=''; r._manualChanged=true; };
+  r.querySelector('.gc').oninput = e => { change(); r._layer.coats=e.target.value === '' ? null : Number(e.target.value); };
+  r.querySelector('.gm').onchange = e => { change(); r._layer.method=e.target.value || null; };
+  notesInput.oninput = e => { change(); r._layer.notes=e.target.value; };
   populateGlazePicker(r, gId || null);
   if (gId) r.querySelector('.gid').value = gId;
   c.appendChild(r);
@@ -822,6 +1207,7 @@ function pickGlazeFromLibrary(sel) {
   if (!id) return;
   row.querySelector('.gtext').value = name;
   row.querySelector('.gid').value = id;
+  row._layer.glazeId=id; row._layer.customName=null; row._manualChanged=false; pieceLayersChanged=true;
 }
 function toggleCasualtyFields() {
   const status = document.getElementById('pieceStatus').value;
@@ -831,6 +1217,9 @@ function toggleCasualtyFields() {
   if (title) title.textContent = status === 'recycled' ? 'Recycle Report' : 'Casualty Report';
 }
 function openPieceModal(p) {
+  pieceClayIntent=null; pieceStudioChanged=false; pieceLayersChanged=false; pieceHydrating=true;
+  document.getElementById('pieceClayText').oninput=editPieceClayManually;
+  document.getElementById('pieceStudio').oninput=()=>{pieceStudioChanged=true;};
   document.getElementById('pieceId').value = p?.id||'';
   document.getElementById('pieceModalTitle').textContent = p ? 'Edit Piece' : 'Add New Piece';
   document.getElementById('pieceTitle').value = p?.title||'';
@@ -843,12 +1232,12 @@ function openPieceModal(p) {
   document.getElementById('pieceDimensions').value = p?.dimensions||'';
   document.getElementById('pieceWeight').value = p?.weight||'';
   document.getElementById('pieceNotes').value = p?.notes||'';
-  document.getElementById('pieceClayText').value = p?.clay_body_name || p?.clay || '';
+  document.getElementById('pieceClayText').value = p?.clay_body_name || p?.clay || p?.studio || '';
   document.getElementById('pieceClayId').value = p?.clay_body_id || '';
   populateClayPicker(p?.clay_body_id);
   document.getElementById('pieceGlazeSelectors').innerHTML = '';
   if (p?.glazes?.length) {
-    p.glazes.forEach(g => addGlazeSelector(g.glaze_id, g.coats, g.application_method, g.glaze_name || g.name || ''));
+    p.glazes.forEach(g => addGlazeSelector(g.glaze_id, g.coats, g.application_method, g.glaze_name || g.custom_name || g.name || '', g));
   } else if (p?.glaze) {
     addGlazeSelector(null, 1, null, p.glaze);
   }
@@ -867,6 +1256,7 @@ function openPieceModal(p) {
   document.getElementById('pricingCalcPanel').style.display = 'none';
   updatePricingCalc();
   const ppf = document.getElementById('pieceInlinePhotoFile'); if (ppf) ppf.value = '';
+  pieceHydrating=false;
   openModal('pieceModal');
 }
 async function editPiece(id) { try { openPieceModal(await api('/api/pieces/'+id)); } catch(e) { toast(e.message,'error'); } }
@@ -877,29 +1267,21 @@ async function savePiece(e) {
   const gIds = [];
   const glazeNames = [];
   gRows.forEach(r => {
-    const gtext = r.querySelector('.gtext').value.trim();
-    const gid = r.querySelector('.gid').value;
-    if (gtext) {
-      glazeNames.push(gtext);
-      gIds.push({
-        glazeId: gid || null,
-        customName: gid ? null : gtext,
-        coats: parseInt(r.querySelector('.gc').value)||1,
-        method: r.querySelector('.gm').value||null
-      });
-    }
+    const gtext=r.querySelector('.gtext').value;
+    if (r._manualChanged && !gtext.trim()) return; // deliberate blank removes only this layer
+    glazeNames.push(gtext);
+    gIds.push({...r._layer});
   });
   const clayText = document.getElementById('pieceClayText').value.trim();
   const clayId = document.getElementById('pieceClayId').value;
   const body = {
     title: document.getElementById('pieceTitle').value,
-    clay: clayText || null,
-    clayBodyId: clayId || null,
+    ...(pieceClayIntent ? {clayIntent:pieceClayIntent, clayBodyId:clayId || null, ...(pieceClayIntent==='manual' ? {clay:clayText} : {})} : !id && clayId ? {clayIntent:'saved',clayBodyId:clayId} : !id && clayText ? {clayIntent:'manual',clay:clayText} : {}),
     glaze: glazeNames.length > 0 ? glazeNames.join(', ') : null,
     status: document.getElementById('pieceStatus').value,
     technique: document.getElementById('pieceTechnique').value||null,
     form: document.getElementById('pieceForm_').value||null,
-    studio: document.getElementById('pieceStudio').value||null,
+    ...((pieceStudioChanged || !id) && {studio:document.getElementById('pieceStudio').value || null}),
     dateStarted: document.getElementById('pieceDateStarted').value||null,
     firingTemp: document.getElementById('pieceFiringTemp').value||null,
     dimensions: document.getElementById('pieceDimensions').value||null,
@@ -910,7 +1292,7 @@ async function savePiece(e) {
     laborHours: document.getElementById('pieceLaborHours').value||null,
     laborRate: document.getElementById('pieceLaborRate').value||null,
     salePrice: document.getElementById('pieceSalePrice').value||null,
-    glazeIds: gIds,
+    ...((pieceLayersChanged || !id) && {glazeIds:gIds}),
     casualtyType: document.getElementById('pieceCasualtyType').value||null,
     casualtyNotes: document.getElementById('pieceCasualtyNotes').value||null,
     casualtyLesson: document.getElementById('pieceCasualtyLesson').value||null
@@ -1039,10 +1421,68 @@ async function uploadPhoto(e) {
 }
 
 // ---- Clay Bodies ----
+let clayMediaGeneration = 0;
+let clayViewSerial = 0, clayViewReadOnly = false, currentPieceClay = null;
+function clayViewControls(enabled, cl) {
+  viewerControl('clayViewDuplicateBtn', enabled, () => { closeModal('clayViewModal'); duplicateClay(cl.id); });
+  viewerControl('clayViewEditBtn', enabled, () => { closeModal('clayViewModal'); editClayById(cl.id); });
+  viewerControl('clayViewPhotoBtn', enabled, () => { closeModal('clayViewModal'); openClayPhotoUpload(cl.id); });
+}
+const clayMediaViews = new Map();
+function clearClayMedia(scope) {
+  if (!scope) { clayMediaGeneration++; clayViewSerial++; clayViewReadOnly = false; clayViewControls(false); currentPieceClay = null; }
+  for (const [key, view] of clayMediaViews) {
+    if (scope && key !== scope) continue;
+    view.active = false;
+    view.controller.abort();
+    view.urls.forEach(url => URL.revokeObjectURL(url));
+    view.images.forEach(img => { img.removeAttribute('src'); img.dataset.protectedReady = '0'; });
+    clayMediaViews.delete(key);
+  }
+  const lightbox = document.getElementById('lightboxImg');
+  if (lightbox?.src?.startsWith('blob:')) { lightbox.removeAttribute('src'); closeLightbox(); }
+  if (!scope) {
+    clayBodies = [];
+    ['clayList', 'clayViewBody'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+    document.getElementById('clayViewModal')?.classList.remove('open');
+  }
+}
+function clayPhotoMarkup(clay, photo, style = '') {
+  const protectedPhoto = clay.photoDelivery === 'owner-protected';
+  const attrs = protectedPhoto
+    ? 'data-private-clay-photo="' + esc(photo.id) + '" data-clay-id="' + esc(clay.id) + '" data-protected-ready="0"'
+    : 'src="/uploads/' + encodeURIComponent(photo.filename) + '"';
+  return '<img ' + attrs + ' class="glaze-thumb" alt="Clay photo" style="' + style + '" onclick="event.stopPropagation();if(this.src)openLightbox(this.src)">';
+}
+async function loadClayMedia(scope) {
+  clearClayMedia(scope);
+  const root = document.getElementById(scope);
+  if (!root) return;
+  const generation = clayMediaGeneration, sessionToken = token;
+  const view = { active: true, controller: new AbortController(), urls: [], images: [...root.querySelectorAll('[data-private-clay-photo]')] };
+  clayMediaViews.set(scope, view);
+  const active = img => view.active && generation === clayMediaGeneration && token === sessionToken && img.isConnected;
+  await Promise.all(view.images.map(async img => {
+    try {
+      const response = await fetch(API + '/api/ql/clay-bodies/' + encodeURIComponent(img.dataset.clayId) + '/photos/' + encodeURIComponent(img.dataset.privateClayPhoto), {
+        headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store', signal: view.controller.signal
+      });
+      if (!response.ok) throw new Error('Photo unavailable');
+      const blob = await response.blob();
+      if (!active(img)) return;
+      const url = URL.createObjectURL(blob);
+      view.urls.push(url);
+      img.src = url;
+      img.dataset.protectedReady = '1';
+      img.onerror = () => { img.removeAttribute('src'); img.alt = 'Photo unavailable'; };
+    } catch (_) { if (active(img)) { img.removeAttribute('src'); img.alt = 'Photo unavailable'; } }
+  }));
+}
+
 function clayCardView(cl) {
   const stockBadge = cl.in_stock ? '' : '<span class="piece-meta-tag" style="background:rgba(220,53,69,0.1);color:var(--danger)">Out of Stock</span>';
   const photos = (cl.photos||[]).map(p =>
-    '<div style="position:relative;display:inline-block"><img src="/uploads/' + p.filename + '" class="glaze-thumb" loading="lazy" onclick="openLightbox(\'/uploads/' + p.filename + '\')" style="cursor:zoom-in">' +
+    '<div style="position:relative;display:inline-block">' + clayPhotoMarkup(cl, p, 'cursor:zoom-in') +
     '<div style="font-size:0.7rem;color:var(--text-muted);text-align:center">' + esc(p.photo_label||'') + '</div>' +
     (p.notes ? '<div style="font-size:0.65rem;color:var(--text-light)">' + esc(p.notes) + '</div>' : '') +
     '<button class="btn-ghost btn-sm" style="position:absolute;top:0;right:0;font-size:0.7rem" onclick="event.stopPropagation();deleteClayPhoto(\'' + p.id + '\')">×</button></div>'
@@ -1089,7 +1529,10 @@ function clayListView(cl) {
 }
 async function loadClayBodies() {
   try {
-    clayBodies = await api('/api/clay-bodies');
+    const generation = clayMediaGeneration, sessionToken = token;
+    const result = await api('/api/clay-bodies');
+    if (generation !== clayMediaGeneration || sessionToken !== token) return;
+    clayBodies = result;
     if (currentPage !== 'clayBodies') return;
     const c = document.getElementById('clayList'), em = document.getElementById('clayEmpty');
     
@@ -1102,15 +1545,70 @@ async function loadClayBodies() {
     const mode = getViewMode('clay');
     c.className = mode === 'list' ? '' : 'card-grid';
     c.innerHTML = clayBodies.map(cl => mode === 'list' ? clayListView(cl) : clayCardView(cl)).join('');
+    void loadClayMedia('clayList');
     updateBulkSelectionUI('clayBodies');
   } catch(e) { toast(e.message,'error'); }
 }
 function editClayById(id) { const c = clayBodies.find(x=>x.id===id); if(c) openClayModal(c); }
+// A descriptive name is never evidence of a saved Clay relationship.
+function mountPieceClay(piece, generation, sessionToken) {
+  const root = document.getElementById('pieceClayDisplay');
+  const account = currentUser?.id, clayId = piece.clay_body_id;
+  const context = { pieceId: piece.id, clayId };
+  currentPieceClay = context;
+  const active = () => currentPieceClay === context && root?.isConnected && generation === pieceViewGeneration &&
+    token === sessionToken && currentUser?.id === account && currentPage === 'pieceDetail' && window._currentPieceId === piece.id;
+  if (!root || !clayId || !account || String(piece.user_id) !== String(account)) return;
+  // Preflight independently authorizes Clay; only then expose View.
+  void api('/api/clay-bodies/' + encodeURIComponent(clayId), { cache: 'no-store' }).then(data => {
+    const clay = data.clay || data;
+    if (!active() || String(clay?.id) !== String(clayId) || String(clay?.user_id) !== String(account)) return;
+    const button = historyElement('button', 'View', 'btn btn-secondary btn-sm');
+    button.id = 'pieceClayView'; button.type = 'button'; button.setAttribute('aria-label', 'View saved Clay');
+    button.onclick = () => { button.focus(); if (active()) void viewPieceClay(context, active); };
+    root.append(button);
+  }).catch(() => {});
+}
+async function viewPieceClay(context, originActive) {
+  if (!originActive()) return;
+  rememberPieceViewer('clayViewModal', true);
+  const serial = ++clayViewSerial, sessionToken = token, account = currentUser?.id;
+  clayViewReadOnly = true; clayViewControls(false); clearClayMedia('clayViewBody');
+  const body = document.getElementById('clayViewBody');
+  document.getElementById('clayViewTitle').textContent = 'Clay';
+  body.replaceChildren(historyElement('p', 'Loading Clay…')); openModal('clayViewModal');
+  const active = () => serial === clayViewSerial && clayViewReadOnly && originActive() &&
+    token === sessionToken && currentUser?.id === account;
+  const unavailable = () => { const error = Error('Clay unavailable'); error.status = 404; throw error; };
+  const request = async path => {
+    const response = await fetch(API + path, { headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store' });
+    if (!response.ok) { const error = Error('Clay unavailable'); error.status = response.status; throw error; }
+    return response.json();
+  };
+  try {
+    const data = await request('/api/clay-bodies/' + encodeURIComponent(context.clayId));
+    const clay = data.clay || data;
+    if (!active()) return;
+    if (String(clay?.id) !== String(context.clayId) || String(clay?.user_id) !== String(account)) unavailable();
+    const piece = await request('/api/pieces/' + encodeURIComponent(context.pieceId));
+    if (!active()) return;
+    if (String(piece?.id) !== String(context.pieceId) || String(piece?.user_id) !== String(account) ||
+        String(piece?.clay_body_id) !== String(context.clayId)) unavailable();
+    openClayViewModal(clay, { readOnly: true });
+  } catch (error) {
+    if (!active()) return;
+    body.replaceChildren(historyElement('p', [401,403,404].includes(error.status) ? 'Clay unavailable.' : 'Unable to load Clay.'));
+    const retry = historyElement('button', 'Retry', 'btn btn-secondary btn-sm'); retry.type = 'button';
+    retry.onclick = () => { if (active()) void viewPieceClay(context, originActive); }; body.append(retry);
+  }
+}
 function viewClayById(id) { const c = clayBodies.find(x=>x.id===id); if(c) openClayViewModal(c); }
-function openClayViewModal(cl) {
+function openClayViewModal(cl, options = {}) {
+  if (!options.readOnly) { clayViewSerial++; clayViewReadOnly = false; rememberPieceViewer('clayViewModal', false); }
+  clearClayMedia('clayViewBody');
   const photos = (cl.photos||[]).map(p =>
     '<div style="display:inline-block;margin-right:8px;text-align:center">' +
-    '<img src="/uploads/' + p.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')"><br>' +
+    clayPhotoMarkup(cl, p, 'width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in') + '<br>' +
     (p.photo_label ? '<span style="font-size:0.7rem;color:var(--text-muted)">' + esc(p.photo_label) + '</span>' : '') +
     '</div>'
   ).join('');
@@ -1130,10 +1628,9 @@ function openClayViewModal(cl) {
   html += '<div style="margin-top:4px"><span class="piece-meta-tag" style="background:' + (cl.in_stock ? 'rgba(40,167,69,0.1);color:var(--success)' : 'rgba(220,53,69,0.1);color:var(--danger)') + '">' + (cl.in_stock ? 'In Stock' : 'Out of Stock') + '</span></div>';
   document.getElementById('clayViewTitle').textContent = cl.name;
   document.getElementById('clayViewBody').innerHTML = html;
-  document.getElementById('clayViewDuplicateBtn').onclick = () => { closeModal('clayViewModal'); duplicateClay(cl.id); };
-  document.getElementById('clayViewEditBtn').onclick = () => { closeModal('clayViewModal'); editClayById(cl.id); };
-  document.getElementById('clayViewPhotoBtn').onclick = () => { closeModal('clayViewModal'); openClayPhotoUpload(cl.id); };
+  clayViewControls(!options.readOnly, cl);
   openModal('clayViewModal');
+  void loadClayMedia('clayViewBody');
 }
 function openClayModal(c) {
   document.getElementById('clayId').value = c?.id||'';
@@ -1180,13 +1677,139 @@ async function deleteClay(id) {
 }
 
 // ---- Glazes ----
+let glazeMediaGeneration = 0;
+let glazeViewSerial = 0, glazeViewReadOnly = false, currentPieceGlazes = null;
+function glazeViewControls(enabled, g) {
+  viewerControl('glazeViewDuplicateBtn', enabled, () => { closeModal('glazeViewModal'); duplicateGlaze(g.id); });
+  viewerControl('glazeViewEditBtn', enabled, () => { closeModal('glazeViewModal'); editGlazeById(g.id); });
+  viewerControl('glazeViewPhotoBtn', enabled, () => { closeModal('glazeViewModal'); openGlazePhotoUpload(g.id); });
+}
+function matchesPieceGlaze(piece, context, account) {
+  const layer = piece?.glazes?.[context.index];
+  return String(piece?.id) === String(context.pieceId) && String(piece?.user_id) === String(account) &&
+    !!layer?.id && String(layer.id) === String(context.layerId) && !!layer.glaze_id &&
+    String(layer.glaze_id) === String(context.glazeId) && layer.layer_order === context.layerOrder;
+}
+async function authorizePieceGlaze(context, account, request, active) {
+  const unavailable = () => { const e = Error('Glaze unavailable'); e.status = 404; throw e; };
+  const items = await request('/api/glazes');
+  if (!active()) return null;
+  const glaze = Array.isArray(items) && items.find(g => String(g.id) === String(context.glazeId) && String(g.user_id) === String(account));
+  if (!glaze) unavailable();
+  const piece = await request('/api/pieces/' + encodeURIComponent(context.pieceId));
+  if (!active()) return null;
+  if (!matchesPieceGlaze(piece, context, account)) unavailable();
+  return glaze;
+}
+function mountPieceGlazes(piece, generation, sessionToken) {
+  const account = currentUser?.id, identity = {};
+  currentPieceGlazes = identity;
+  const originActive = () => currentPieceGlazes === identity && generation === pieceViewGeneration &&
+    token === sessionToken && currentUser?.id === account && currentPage === 'pieceDetail' && window._currentPieceId === piece.id;
+  if (!account || String(piece.user_id) !== String(account)) return;
+  (piece.glazes || []).forEach((layer, index) => {
+    const root = document.querySelector('[data-piece-glaze-index="' + index + '"]');
+    if (!root || !layer.id || !layer.glaze_id) return;
+    const context = { pieceId: piece.id, layerId: layer.id, glazeId: layer.glaze_id, layerOrder: layer.layer_order, index };
+    const active = () => originActive() && root.isConnected;
+    void authorizePieceGlaze(context, account, path => api(path, { cache: 'no-store' }), active).then(glaze => {
+      if (!glaze || !active()) return;
+      const button = historyElement('button', 'View', 'btn btn-secondary btn-sm');
+      button.type = 'button'; button.style.marginLeft = '8px'; button.setAttribute('aria-label', 'View saved Glaze layer ' + (index + 1));
+      button.onclick = () => { button.focus(); if (active()) void viewPieceGlaze(context, active, button); };
+      root.append(button);
+    }).catch(() => {});
+  });
+}
+async function viewPieceGlaze(context, originActive, launcher) {
+  if (!originActive()) return;
+  rememberPieceViewer('glazeViewModal', true);
+  if (launcher?.isConnected) pieceViewerOrigins.set('glazeViewModal', { control: launcher, token, account: currentUser?.id });
+  const serial = ++glazeViewSerial, sessionToken = token, account = currentUser?.id;
+  glazeViewReadOnly = true; glazeViewControls(false); clearGlazeMedia('glazeViewBody'); clearGlazeClayTestMedia();
+  const body = document.getElementById('glazeViewBody');
+  document.getElementById('glazeViewTitle').textContent = 'Glaze';
+  body.replaceChildren(historyElement('p', 'Loading Glaze…')); openModal('glazeViewModal');
+  const active = () => serial === glazeViewSerial && glazeViewReadOnly && originActive() && token === sessionToken && currentUser?.id === account;
+  const request = async path => {
+    const response = await fetch(API + path, { headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store' });
+    if (!response.ok) { const e = Error('Glaze unavailable'); e.status = response.status; throw e; }
+    return response.json();
+  };
+  try {
+    const glaze = await authorizePieceGlaze(context, account, request, active);
+    if (glaze && active()) openGlazeViewModal(glaze, { readOnly: true });
+  } catch (error) {
+    if (!active()) return;
+    const unavailable = [401,403,404].includes(error.status);
+    if (unavailable && launcher) { launcher.disabled = true; launcher.onclick = null; launcher.remove(); }
+    clearGlazeMedia('glazeViewBody'); clearGlazeClayTestMedia();
+    body.replaceChildren(historyElement('p', unavailable ? 'Glaze unavailable.' : 'Unable to load Glaze.'));
+    const retry = historyElement('button', 'Retry', 'btn btn-secondary btn-sm'); retry.type = 'button';
+    retry.onclick = () => { if (active()) void viewPieceGlaze(context, originActive, launcher); }; body.append(retry);
+  }
+}
+
+const glazeMediaViews = new Map();
+function clearGlazeMedia(scope) {
+  if (!scope) { glazeMediaGeneration++; glazeViewSerial++; glazeViewReadOnly = false; currentPieceGlazes = null; glazeViewControls(false); }
+  const lightbox = document.getElementById('lightboxImg');
+  for (const [key, view] of glazeMediaViews) {
+    if (scope && key !== scope) continue;
+    view.active = false;
+    view.controller.abort();
+    if (view.urls.includes(lightbox?.src)) { lightbox.removeAttribute('src'); closeLightbox(); }
+    view.urls.forEach(url => URL.revokeObjectURL(url));
+    view.images.forEach(img => { img.removeAttribute('src'); img.dataset.protectedReady = '0'; });
+    glazeMediaViews.delete(key);
+  }
+  if (!scope) {
+    if (typeof clearGlazeClayTestMedia === 'function') clearGlazeClayTestMedia();
+    glazes = [];
+    ['glazeList', 'glazeViewBody'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+    document.getElementById('glazeViewModal')?.classList.remove('open');
+  }
+}
+function glazePhotoMarkup(glaze, photo, style = '') {
+  const protectedPhoto = glaze.photoDelivery === 'owner-protected';
+  const attrs = protectedPhoto
+    ? 'data-private-glaze-photo="' + esc(photo.id) + '" data-glaze-id="' + esc(glaze.id) + '" data-protected-ready="0"'
+    : 'src="/uploads/' + encodeURIComponent(photo.filename) + '"';
+  return '<img ' + attrs + ' class="glaze-thumb" alt="Glaze photo" style="' + style + '" onclick="event.stopPropagation();if(this.src)openLightbox(this.src)">';
+}
+async function loadGlazeMedia(scope) {
+  clearGlazeMedia(scope);
+  const root = document.getElementById(scope);
+  if (!root) return;
+  const generation = glazeMediaGeneration, sessionToken = token;
+  const view = { active: true, controller: new AbortController(), urls: [], images: [...root.querySelectorAll('[data-private-glaze-photo]')] };
+  glazeMediaViews.set(scope, view);
+  const active = img => view.active && generation === glazeMediaGeneration && token === sessionToken && img.isConnected;
+  await Promise.all(view.images.map(async img => {
+    try {
+      const response = await fetch(API + '/api/ql/glazes/' + encodeURIComponent(img.dataset.glazeId) + '/photos/' + encodeURIComponent(img.dataset.privateGlazePhoto), {
+        headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store', signal: view.controller.signal
+      });
+      if (!response.ok) throw new Error('Photo unavailable');
+      const blob = await response.blob();
+      if (!active(img)) return;
+      const url = URL.createObjectURL(blob);
+      view.urls.push(url);
+      img.src = url;
+      img.dataset.protectedReady = '1';
+      img.onerror = () => { img.removeAttribute('src'); img.alt = 'Photo unavailable'; };
+    } catch (_) { if (active(img)) { img.removeAttribute('src'); img.alt = 'Photo unavailable'; } }
+  }));
+}
+
+
 const RECIPE_STATUS_LABELS = {'not-tested':'Not Tested','testing':'Testing','production':'Production','retired':'Retired','archived':'Archived'};
 const STOCK_STATUS_LABELS = {'in-stock':'In Stock','need-to-buy':'Need to Buy','low-stock':'Low Stock','discontinued':'Discontinued'};
 
 function glazeCardView(g) {
   const photos = (g.photos||[]).map(p =>
     '<div style="position:relative;display:inline-block">' +
-    '<img src="/uploads/' + p.filename + '" class="glaze-thumb" loading="lazy" onclick="openLightbox(\'/uploads/' + p.filename + '\')" style="cursor:zoom-in">' +
+    glazePhotoMarkup(g, p, 'cursor:zoom-in') +
     (p.photo_label ? '<div style="font-size:0.65rem;color:var(--text-muted);text-align:center">' + esc(p.photo_label) + '</div>' : '') +
     (p.notes ? '<div style="font-size:0.6rem;color:var(--text-light)">' + esc(p.notes) + '</div>' : '') +
     '<button class="btn-ghost btn-sm" style="position:absolute;top:0;right:0;font-size:0.7rem" onclick="event.stopPropagation();deleteGlazePhoto(\'' + p.id + '\')">×</button></div>'
@@ -1234,7 +1857,7 @@ function glazeCardView(g) {
     '<button class="btn-ghost btn-sm" onclick="toggleClayTestForm(\'' + g.id + '\')" style="font-size:0.8rem">+ Add</button></div>' +
     ((g.clay_tests||[]).length ? (g.clay_tests||[]).map(t =>
       '<div style="background:var(--bg-light);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start">' +
-      (t.photo_filename ? '<img src="/uploads/' + t.photo_filename + '" style="width:48px;height:48px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in;flex-shrink:0" onclick="openLightbox(\'/uploads/' + t.photo_filename + '\')">' : '') +
+      (t.photo_filename ? glazeClayTestPhotoMarkup(g.id,t,'width:48px;height:48px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in;flex-shrink:0') : '') +
       '<div style="flex:1;min-width:0">' +
       '<div style="font-weight:600;font-size:0.85rem;color:var(--text)">' +
       (t.clay_body_id ? '<a href="#" onclick="event.preventDefault();navigate(\'clays\')" style="color:var(--primary);text-decoration:none">' + esc(t.clay_name) + '</a>' : esc(t.clay_name)) +
@@ -1275,7 +1898,11 @@ function glazeListView(g) {
 }
 async function loadGlazes() {
   try {
-    glazes = await api('/api/glazes');
+    clearGlazeClayTestMedia();
+    const generation = glazeMediaGeneration, sessionToken = token;
+    const records = await api('/api/glazes');
+    if (generation !== glazeMediaGeneration || sessionToken !== token) return;
+    glazes = records;
     if (currentPage !== 'glazes') return;
     const c = document.getElementById('glazeList'), em = document.getElementById('glazeEmpty');
     
@@ -1283,21 +1910,26 @@ async function loadGlazes() {
     const bulkControls = document.getElementById('bulkControlsGlazes');
     if (bulkControls) bulkControls.innerHTML = renderBulkSelectionControls('glazes', 'glaze');
     
+    clearGlazeMedia('glazeList');
     if (!glazes.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
     const mode = getViewMode('glazes');
     c.className = mode === 'list' ? '' : 'card-grid';
     c.innerHTML = glazes.map(g => mode === 'list' ? glazeListView(g) : glazeCardView(g)).join('');
+    loadGlazeMedia('glazeList');
+    loadGlazeClayTestMedia(c);
     updateBulkSelectionUI('glazes');
   } catch(e) { toast(e.message,'error'); }
 }
 
 function editGlazeById(id) { const g = glazes.find(x=>x.id===id); if(g) openGlazeModal(g); }
 function viewGlazeById(id) { const g = glazes.find(x=>x.id===id); if(g) openGlazeViewModal(g); }
-function openGlazeViewModal(g) {
+function openGlazeViewModal(g, options = {}) {
+  if (!options.readOnly) { glazeViewSerial++; glazeViewReadOnly = false; rememberPieceViewer('glazeViewModal', false); }
+  clearGlazeMedia('glazeViewBody'); clearGlazeClayTestMedia();
   const photos = (g.photos||[]).map(p =>
     '<div style="display:inline-block;margin-right:8px;text-align:center">' +
-    '<img src="/uploads/' + p.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')"><br>' +
+    glazePhotoMarkup(g, p, 'width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in') + '<br>' +
     (p.photo_label ? '<span style="font-size:0.7rem;color:var(--text-muted)">' + esc(p.photo_label) + '</span>' : '') +
     (p.notes ? '<br><span style="font-size:0.65rem;color:var(--text-light)">' + esc(p.notes) + '</span>' : '') +
     '</div>'
@@ -1325,7 +1957,7 @@ function openGlazeViewModal(g) {
     html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"><div class="detail-label" style="margin-bottom:8px">🪨 Clay Bodies Tested</div>' +
       g.clay_tests.map(t =>
         '<div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;background:var(--bg-light);padding:8px;border-radius:var(--radius-sm)">' +
-        (t.photo_filename ? '<img src="/uploads/' + t.photo_filename + '" style="width:48px;height:48px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in;flex-shrink:0" onclick="openLightbox(\'/uploads/' + t.photo_filename + '\')">': '') +
+        (t.photo_filename ? glazeClayTestPhotoMarkup(g.id,t,'width:48px;height:48px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in;flex-shrink:0') : '') +
         '<div><div style="font-weight:600;font-size:0.85rem">' + esc(t.clay_name) + '</div>' +
         (t.result_notes ? '<div class="text-sm" style="color:var(--text-light)">' + esc(t.result_notes) + '</div>' : '') +
         '</div></div>'
@@ -1333,10 +1965,10 @@ function openGlazeViewModal(g) {
   }
   document.getElementById('glazeViewTitle').textContent = g.name;
   document.getElementById('glazeViewBody').innerHTML = html;
-  document.getElementById('glazeViewDuplicateBtn').onclick = () => { closeModal('glazeViewModal'); duplicateGlaze(g.id); };
-  document.getElementById('glazeViewEditBtn').onclick = () => { closeModal('glazeViewModal'); editGlazeById(g.id); };
-  document.getElementById('glazeViewPhotoBtn').onclick = () => { closeModal('glazeViewModal'); openGlazePhotoUpload(g.id); };
+  glazeViewControls(!options.readOnly, g);
   openModal('glazeViewModal');
+  loadGlazeMedia('glazeViewBody');
+  loadGlazeClayTestMedia(document.getElementById('glazeViewBody'));
 }
 function openGlazeModal(g) {
   document.getElementById('glazeId').value = g?.id||'';
@@ -1419,13 +2051,77 @@ async function deleteGlaze(id) {
 
 // ---- Test Tiles ----
 let testTiles = [];
+let testTileMediaGeneration = 0;
+let testTileDetailController = null;
+const testTileMediaViews = new Map();
+function clearTestTileMedia() {
+  testTileMediaGeneration++;
+  testTileDetailController?.abort(); testTileDetailController = null;
+  document.getElementById('testTileViewBody')?.replaceChildren();
+  const edit = document.getElementById('testTileViewEditBtn');
+  if (edit) viewerControl('testTileViewEditBtn', false);
+  const title = document.getElementById('testTileViewTitle'); if (title) title.textContent = 'Test Tile';
+  for (const view of testTileMediaViews.values()) {
+    view.active = false;
+    view.controller.abort();
+    view.urls.forEach(url => URL.revokeObjectURL(url));
+    view.images.forEach(img => img.removeAttribute('src'));
+  }
+  testTileMediaViews.clear();
+  const lightbox = document.getElementById('lightboxImg');
+  if (lightbox?.src?.startsWith('blob:')) { lightbox.removeAttribute('src'); closeLightbox(); }
+}
+function invalidateTestTileAccess(refreshHistory = true) {
+  clearTestTileMedia(); testTiles = [];
+  document.getElementById('testTileList')?.replaceChildren();
+  document.getElementById('linkedTestTiles')?._locked?.();
+  const history = document.getElementById('pieceHistory');
+  if (history && refreshHistory) {
+    disposeHistoryPhotos();
+    const next = history.cloneNode(false); history.replaceWith(next);
+    next.append(historyElement('h2', 'Connected History'));
+    void loadPieceHistory(window._currentPieceId, next, pieceViewGeneration, token);
+  }
+  const body = document.getElementById('testTileViewBody');
+  if (body) body.textContent = 'Test Tiles locked. Upgrade to Unlimited to use this feature.';
+  window.StudioSearch?.lockTiles();
+}
+function testTileSlotFilename(tile, slot) { return tile?.[slot === 1 ? 'photo_filename' : 'photo_filename' + slot] || null; }
+function testTileSlotDelivery(tile, slot) { return tile?.[slot === 1 ? 'photoDelivery' : 'photoDelivery' + slot] || 'legacy-ambiguous'; }
+function testTilePhotoMarkup(tile, slot, style, extra = '') {
+  const filename = testTileSlotFilename(tile, slot); if (!filename) return '';
+  const protectedPhoto = testTileSlotDelivery(tile, slot) === 'owner-protected';
+  const attrs = protectedPhoto ? 'data-private-test-tile-photo="' + slot + '" data-test-tile-id="' + esc(tile.id) + '" data-photo-filename="' + esc(filename) + '"' : 'src="/uploads/' + encodeURIComponent(filename) + '"';
+  return '<img ' + attrs + ' alt="Test tile photo ' + slot + '" style="' + style + '" ' + extra + ' onclick="event.stopPropagation();if(this.src)openLightbox(this.src)">';
+}
+async function loadTestTileMedia(root) {
+  if (!root) return;
+  const generation = testTileMediaGeneration, sessionToken = token;
+  const view = { active:true, controller:new AbortController(), urls:[], images:[...root.querySelectorAll('[data-private-test-tile-photo]')] };
+  const key = 'view-' + generation + '-' + Math.random(); testTileMediaViews.set(key, view);
+  const active = img => view.active && generation === testTileMediaGeneration && sessionToken === token && img.isConnected;
+  await Promise.all(view.images.map(async img => {
+    try {
+      const response = await fetch('/api/ql/test-tiles/' + encodeURIComponent(img.dataset.testTileId) + '/photos/' + encodeURIComponent(img.dataset.privateTestTilePhoto), { headers:{Authorization:'Bearer '+sessionToken}, cache:'no-store', signal:view.controller.signal });
+      if (response.status === 403 && active(img)) invalidateTestTileAccess();
+      if (!response.ok) throw new Error('Photo unavailable');
+      const blob = await response.blob(); if (!active(img)) return;
+      const url = URL.createObjectURL(blob); view.urls.push(url); img.src=url;
+      img.onerror=()=>{img.removeAttribute('src');img.alt='Photo unavailable';};
+    } catch (_) { if (active(img)) { img.removeAttribute('src'); img.alt='Photo unavailable'; } }
+  }));
+}
 
 async function loadTestTiles() {
   if (currentPage !== 'testTiles') return;
   const c = document.getElementById('testTileList');
   const em = document.getElementById('testTileEmpty');
   try {
-    testTiles = await api('/api/test-tiles');
+    clearTestTileMedia();
+    const generation = testTileMediaGeneration, sessionToken = token;
+    const records = await api('/api/test-tiles');
+    if (generation !== testTileMediaGeneration || sessionToken !== token) return;
+    testTiles = records;
     
     // Render bulk controls
     const bulkControls = document.getElementById('bulkControlsTestTiles');
@@ -1440,9 +2136,10 @@ async function loadTestTiles() {
     if (filterSurface) filtered = filtered.filter(t => t.surface_result === filterSurface);
     if (!filtered.length) { c.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-title">No matches</div><p>Try a different search.</p></div>'; em.classList.add('hidden'); return; }
     c.innerHTML = filtered.map(t => testTileCard(t)).join('');
+    loadTestTileMedia(c);
     updateBulkSelectionUI('testTiles');
   } catch(e) {
-    if (e.message && e.message.includes('403')) {
+    if (e.status === 403) {
       c.innerHTML = '';
       em.classList.remove('hidden');
       document.getElementById('testTileEmpty').innerHTML = '<div class="empty-state-icon">🧪</div><div class="empty-state-title">Test Tile Library</div><p>Track every glaze test — clay body, cone, surface result, photos, and ratings. Available on the Unlimited plan.</p><button class="btn btn-primary" onclick="navigate(\'upgrade\')">Upgrade to Unlimited</button>';
@@ -1454,7 +2151,7 @@ function testTileCard(t) {
   const stars = t.rating ? '★'.repeat(t.rating) + '☆'.repeat(5 - t.rating) : '';
   const surface = t.surface_result ? '<span style="font-size:0.7rem;background:var(--bg-light);padding:2px 7px;border-radius:10px;border:1px solid var(--border)">' + esc(t.surface_result) + '</span>' : '';
   const atm = t.atmosphere ? '<span style="font-size:0.7rem;background:var(--bg-light);padding:2px 7px;border-radius:10px;border:1px solid var(--border)">' + esc(t.atmosphere) + '</span>' : '';
-  const photo = t.photo_filename ? '<img src="/uploads/' + esc(t.photo_filename) + '" style="width:100%;height:140px;object-fit:cover;border-radius:var(--radius-sm) var(--radius-sm) 0 0;display:block" onclick="event.stopPropagation();openLightbox(\'/uploads/' + esc(t.photo_filename) + '\')">' : '<div style="width:100%;height:80px;background:var(--bg-light);border-radius:var(--radius-sm) var(--radius-sm) 0 0;display:flex;align-items:center;justify-content:center;font-size:2rem">🧪</div>';
+  const photo = t.photo_filename ? testTilePhotoMarkup(t, 1, 'width:100%;height:140px;object-fit:cover;border-radius:var(--radius-sm) var(--radius-sm) 0 0;display:block') : '<div style="width:100%;height:80px;background:var(--bg-light);border-radius:var(--radius-sm) var(--radius-sm) 0 0;display:flex;align-items:center;justify-content:center;font-size:2rem">🧪</div>';
   const checkbox = renderBulkCheckbox('testTiles', t.id);
   const actions = isBulkSelectionActive('testTiles') ? '' :
     '<div style="display:flex;gap:4px;margin-top:8px;justify-content:flex-end">'+
@@ -1475,19 +2172,42 @@ function testTileCard(t) {
     '</div></div>';
 }
 
-function viewTestTileById(id) {
-  const t = testTiles.find(x => x.id === id);
-  if (!t) return;
+async function viewTestTileById(id, options = {}) {
+  rememberPieceViewer('testTileViewModal', options.readOnly === true);
+  clearTestTileMedia();
+  const generation = testTileMediaGeneration, sessionToken = token, account = currentUser?.id;
+  const controller = new AbortController(); testTileDetailController = controller;
+  const active = () => generation === testTileMediaGeneration && sessionToken === token && account === currentUser?.id && (!options.active || options.active());
+  const body = document.getElementById('testTileViewBody');
+  body.textContent = 'Loading Test Tile…'; openModal('testTileViewModal');
+  try {
+    const response = await fetch(API + '/api/test-tiles/' + encodeURIComponent(id), { cache: 'no-store', signal: controller.signal, headers: { Authorization: 'Bearer ' + sessionToken } });
+    const t = await response.json();
+    if (!active()) return;
+    if (!response.ok) {
+      if (response.status === 403) { invalidateTestTileAccess(); return; }
+      throw Object.assign(Error('Test Tile unavailable'), { status: response.status });
+    }
+    if (String(t.id) !== String(id) || (options.searchOrigin && String(t.user_id) !== String(account))) throw Object.assign(Error('Test Tile unavailable'), {status:404});
+    renderTestTile(t, options, active);
+  } catch (error) {
+    if (!active()) return;
+    body.replaceChildren(historyElement('p', error.status === 404 ? 'Test Tile unavailable.' : 'Unable to load Test Tile.'));
+    const retry = historyElement('button', 'Retry', 'btn btn-secondary');
+    retry.onclick = () => { if (active()) void viewTestTileById(id, options); }; body.append(retry);
+  }
+}
+function renderTestTile(t, options = {}, active = () => true) {
   const stars = t.rating ? '★'.repeat(t.rating) + '☆'.repeat(5 - t.rating) : null;
   let html = '';
-  const photos = [t.photo_filename, t.photo_filename2, t.photo_filename3].filter(Boolean);
+  const photos = [1,2,3].filter(slot => testTileSlotFilename(t, slot));
   if (photos.length) {
     html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">';
-    photos.forEach(f => { html += '<img src="/uploads/' + esc(f) + '" style="width:90px;height:90px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + esc(f) + '\')">'; });
+    photos.forEach(slot => { html += testTilePhotoMarkup(t, slot, 'width:90px;height:90px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in'); });
     html += '</div>';
   }
-  if (t.glaze_name) html += '<div class="view-row"><span class="detail-label">Glaze</span><span>' + esc(t.glaze_name) + '</span></div>';
-  if (t.clay_name) html += '<div class="view-row"><span class="detail-label">Clay Body</span><span>' + esc(t.clay_name) + '</span></div>';
+  if (t.glaze_name || t.glaze_library_name) html += '<div class="view-row"><span class="detail-label">Glaze</span><span>' + esc(t.glaze_name || t.glaze_library_name) + '</span></div>';
+  if (t.clay_name || t.clay_library_name) html += '<div class="view-row"><span class="detail-label">Clay Body</span><span>' + esc(t.clay_name || t.clay_library_name) + '</span></div>';
   if (t.cone) html += '<div class="view-row"><span class="detail-label">Cone</span><span>' + esc(t.cone) + '</span></div>';
   if (t.atmosphere) html += '<div class="view-row"><span class="detail-label">Atmosphere</span><span>' + esc(t.atmosphere) + '</span></div>';
   if (t.application_method) html += '<div class="view-row"><span class="detail-label">Application</span><span>' + esc(t.application_method) + (t.coats > 1 ? ' · ' + t.coats + ' coats' : '') + '</span></div>';
@@ -1503,8 +2223,9 @@ function viewTestTileById(id) {
   if (t.notes) html += '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);color:var(--text-light);font-size:0.9rem">' + esc(t.notes) + '</div>';
   document.getElementById('testTileViewTitle').textContent = t.name || 'Test Tile';
   document.getElementById('testTileViewBody').innerHTML = html;
-  document.getElementById('testTileViewEditBtn').onclick = () => { closeModal('testTileViewModal'); openTestTileModal(t); };
+  viewerControl('testTileViewEditBtn', !options.readOnly, () => { if (!active()) return; closeModal('testTileViewModal'); openTestTileModal(t); });
   openModal('testTileViewModal');
+  loadTestTileMedia(document.getElementById('testTileViewBody'));
 }
 
 function openTestTileModal(t) {
@@ -1532,14 +2253,16 @@ function openTestTileModal(t) {
   document.getElementById('testTilePhoto3').value = '';
   // Show existing photos
   const existingDiv = document.getElementById('testTileExistingPhotos');
-  const photos = t ? [t.photo_filename, t.photo_filename2, t.photo_filename3].filter(Boolean) : [];
-  existingDiv.innerHTML = photos.map((f, i) =>
-    '<div style="display:inline-block;margin-right:8px;position:relative">'+
-    '<img src="/uploads/' + esc(f) + '" style="width:60px;height:60px;object-fit:cover;border-radius:6px">'+
-    '<button type="button" onclick="removeTestTilePhoto(this,\''+esc(f)+'\','+i+')" style="position:absolute;top:-6px;right:-6px;background:var(--danger);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:0.7rem;cursor:pointer;line-height:1">×</button>'+
-    '</div>'
-  ).join('');
+  const photos = t ? [1,2,3].filter(slot => testTileSlotFilename(t, slot)) : [];
+  existingDiv.innerHTML = photos.map(slot => {
+    const f = testTileSlotFilename(t, slot);
+    return '<div style="display:inline-block;margin-right:8px;position:relative">'+
+      testTilePhotoMarkup(t, slot, 'width:60px;height:60px;object-fit:cover;border-radius:6px')+
+      '<button type="button" onclick="removeTestTilePhoto(this,\''+esc(f)+'\','+(slot-1)+')" style="position:absolute;top:-6px;right:-6px;background:var(--danger);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:0.7rem;cursor:pointer;line-height:1">×</button>'+
+      '</div>';
+  }).join('');
   openModal('testTileModal');
+  loadTestTileMedia(existingDiv);
 }
 
 function removeTestTilePhoto(btn, filename, idx) {
@@ -1564,6 +2287,10 @@ async function saveTestTile(e) {
   const keys = ['name','glaze_name','clay_name','cone','atmosphere','application_method','coats','thickness',
     'surface_result','color_result','layered_over','layered_under','kiln_position','firing_schedule','rating','tags','notes'];
   fields.forEach((fid, i) => { const v = document.getElementById(fid).value; if (v) fd.append(keys[i], v); });
+  if (id) {
+    const removals = ['testTileRemovePhoto1','testTileRemovePhoto2','testTileRemovePhoto3'];
+    removals.forEach((fid,i) => { if (document.getElementById(fid)?.value) fd.append('remove_photo' + (i ? i+1 : ''), 'true'); });
+  }
   // Photos
   ['testTilePhoto1','testTilePhoto2','testTilePhoto3'].forEach(fid => {
     const f = document.getElementById(fid)?.files[0]; if (f) fd.append('photos', f);
@@ -1584,15 +2311,98 @@ async function deleteTestTile(id) {
 }
 
 // ---- Firings ----
-function printFiringLog() {
+let firingMediaGeneration = 0;
+const firingMediaViews = new Map();
+function clearFiringMedia(scope) {
+  if (!scope) firingMediaGeneration++;
+  const lightbox = document.getElementById('lightboxImg');
+  for (const [key, view] of firingMediaViews) {
+    if (scope && key !== scope) continue;
+    view.active = false;
+    view.controller.abort();
+    if (view.urls.includes(lightbox?.src)) { lightbox.removeAttribute('src'); closeLightbox(); }
+    view.urls.forEach(url => URL.revokeObjectURL(url));
+    view.images.forEach(img => { img.removeAttribute('src'); img.dataset.protectedReady = '0'; });
+    firingMediaViews.delete(key);
+  }
+  if (!scope) {
+    firingRequests.clear();
+    pendingFiringPhotos = [];
+    if (pendingFiringUrls.has(lightbox?.src)) { lightbox.removeAttribute('src'); closeLightbox(); }
+    if (typeof firingPhotoReorderState !== 'undefined') firingPhotoReorderState = { firingId: null, photos: [] };
+    pendingFiringUrls.forEach(url => URL.revokeObjectURL(url)); pendingFiringUrls.clear();
+    firingPrintWindows.forEach(w => { try { w.close(); } catch (_) {} }); firingPrintWindows.clear();
+    ['firingList', 'firingViewBody', 'firingPhotosContainer', 'firingPhotoReorderContent'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+    ['firingViewModal','firingModal','firingPhotoReorderModal'].forEach(id => document.getElementById(id)?.classList.remove('open'));
+  }
+}
+function firingPhotoMarkup(firing, photo, style = '') {
+  const protectedPhoto = photo.photoDelivery === 'owner-protected' || firing.photoDelivery === 'owner-protected';
+  const attrs = protectedPhoto
+    ? 'data-private-firing-photo="' + esc(photo.id) + '" data-firing-id="' + esc(firing.id) + '" data-protected-ready="0"'
+    : 'src="/uploads/' + encodeURIComponent(photo.filename) + '"';
+  return '<img ' + attrs + ' class="firing-thumb" alt="Firing photo" style="' + style + '" onclick="event.stopPropagation();if(this.src)openLightbox(this.src)">';
+}
+async function loadFiringMedia(scope) {
+  clearFiringMedia(scope);
+  const root = document.getElementById(scope);
+  if (!root) return;
+  const generation = firingMediaGeneration, sessionToken = token;
+  const view = { active: true, controller: new AbortController(), urls: [], images: [...root.querySelectorAll('[data-private-firing-photo]')] };
+  firingMediaViews.set(scope, view);
+  const active = img => view.active && generation === firingMediaGeneration && token === sessionToken && img.isConnected;
+  await Promise.all(view.images.map(async img => {
+    try {
+      const response = await fetch(API + '/api/ql/firing-logs/' + encodeURIComponent(img.dataset.firingId) + '/photos/' + encodeURIComponent(img.dataset.privateFiringPhoto), {
+        headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store', signal: view.controller.signal
+      });
+      if (!response.ok) throw new Error('Photo unavailable');
+      const blob = await response.blob();
+      if (!active(img)) return;
+      const url = URL.createObjectURL(blob);
+      view.urls.push(url);
+      img.src = url;
+      img.dataset.protectedReady = '1';
+      img.onerror = () => { img.removeAttribute('src'); img.alt = 'Photo unavailable'; };
+    } catch (_) { if (active(img)) { img.removeAttribute('src'); img.alt = 'Photo unavailable'; } }
+  }));
+}
+
+
+const firingRequests = new Map();
+const pendingFiringUrls = new Set();
+const firingPrintWindows = new Set();
+function beginFiringRequest(scope) {
+  const marker = {}, generation = firingMediaGeneration, sessionToken = token;
+  firingRequests.set(scope, marker);
+  return () => firingRequests.get(scope) === marker && generation === firingMediaGeneration && sessionToken === token;
+}
+function closeFiringMediaScope(scope) {
+  firingRequests.delete(scope); clearFiringMedia(scope);
+  if (scope === 'firingPhotosContainer') {
+    const lightbox = document.getElementById('lightboxImg');
+    if (pendingFiringUrls.has(lightbox?.src)) { lightbox.removeAttribute('src'); closeLightbox(); }
+    pendingFiringUrls.forEach(url => URL.revokeObjectURL(url)); pendingFiringUrls.clear();
+    pendingFiringPhotos = [];
+  }
+}
+
+
+async function printFiringLog() {
+  const generation = firingMediaGeneration, sessionToken = token;
   const el = document.getElementById('firingList');
   const w = window.open('', '_blank');
-  w.document.write('<html><head><title>Kiln Journal</title><style>body{font-family:Georgia,serif;padding:20px;max-width:800px;margin:0 auto}h1{font-size:1.4rem}.card{border:1px solid #ddd;padding:12px;margin-bottom:8px;border-radius:6px;page-break-inside:avoid}strong{color:#333}.text-sm{font-size:0.85rem;color:#666}@media print{body{padding:0}}</style></head><body>');
-  w.document.write('<h1>🔥 Kiln Journal — The Potter\'s Mud Room</h1>');
-  w.document.write(el ? el.innerHTML : '<p>No firing records</p>');
-  w.document.write('</body></html>');
+  if (!w) return;
+  firingPrintWindows.add(w);
+  await loadFiringMedia('firingList');
+  if (generation !== firingMediaGeneration || token !== sessionToken || w.closed) return;
+  w.document.open();
+  w.document.write('<html><head><title>Kiln Journal</title><style>body{font-family:Georgia,serif;padding:20px;max-width:800px;margin:0 auto}h1{font-size:1.4rem}.card{border:1px solid #ddd;padding:12px;margin-bottom:8px;border-radius:6px;page-break-inside:avoid}strong{color:#333}.text-sm{font-size:0.85rem;color:#666}@media print{body{padding:0}}</style></head><body>' +
+    '<h1>🔥 Kiln Journal — The Potter\'s Mud Room</h1>' +
+    (el ? el.innerHTML : '<p>No firing records</p>') + '</body></html>');
   w.document.close();
-  w.print();
+  await Promise.all([...w.document.images].map(img => img.decode ? img.decode().catch(() => {}) : Promise.resolve()));
+  if (generation === firingMediaGeneration && token === sessionToken && !w.closed) w.print();
 }
 function firingListView(f) {
   const checkbox = isBulkSelectionActive('firings') ? '<input type="checkbox" id="bulkCheck_'+f.id+'" style="width:20px;height:20px;cursor:pointer;margin-right:8px;accent-color:var(--primary)" '+(bulkSelectionMode.firings.selected.has(f.id)?'checked ':'')+' onchange="toggleBulkSelect(\'firings\',\''+f.id+'\', event)">' : '';
@@ -1612,7 +2422,7 @@ function firingListView(f) {
 }
 
 function firingCardView(f) {
-  const photosHtml = (f.photos && f.photos.length > 0) ? '<div style="display:flex;gap:6px;margin:8px 0">' + f.photos.map(p => '<img src="/uploads/' + p.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')">').join('') + '</div>' : '';
+  const photosHtml = (f.photos && f.photos.length > 0) ? '<div style="display:flex;gap:6px;margin:8px 0">' + f.photos.map(p => firingPhotoMarkup(f, p, 'width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in')).join('') + '</div>' : '';
   const checkbox = renderBulkCheckbox('firings', f.id);
   const actions = isBulkSelectionActive('firings') ? '' :
     '<div style="display:flex;gap:4px;flex-shrink:0"><button onclick="event.stopPropagation();editFiring(\'' + f.id + '\')" class="btn-small" title="Edit">✎</button><button onclick="event.stopPropagation();deleteFiring(\'' + f.id + '\')" class="btn-small" title="Delete">✕</button></div>';
@@ -1637,9 +2447,12 @@ function firingCardView(f) {
 }
 
 async function loadFirings() {
+  const active = beginFiringRequest('firingList');
   try {
     const sort = document.getElementById('firingSort')?.value || 'firing_date';
     const firings = await api('/api/firing-logs?sort=' + encodeURIComponent(sort));
+    if (!active()) return;
+    clearFiringMedia('firingList');
     const c = document.getElementById('firingList'), em = document.getElementById('firingEmpty');
     
     // Render bulk controls
@@ -1655,12 +2468,16 @@ async function loadFirings() {
     } else {
       c.innerHTML = firings.map(f => firingCardView(f)).join('');
     }
+    loadFiringMedia('firingList');
     updateBulkSelectionUI('firings');
   } catch(e) { toast(e.message,'error'); }
 }
 let pendingFiringPhotos = [];
 
 function openFiringModal(f = null) {
+  firingPieceReturn = null;
+  closeFiringMediaScope('firingPhotosContainer');
+  pendingFiringUrls.forEach(url => URL.revokeObjectURL(url)); pendingFiringUrls.clear();
   document.getElementById('firingId').value = f?.id || '';
   document.getElementById('firingType').value = f?.firing_type || 'bisque';
   document.getElementById('firingDate').value = f?.date || new Date().toISOString().split('T')[0];
@@ -1683,7 +2500,9 @@ function openFiringModal(f = null) {
   document.getElementById('firingNotes').value = f?.notes || '';
   const csd = document.getElementById('firingCustomSpeedDetail');
   if (csd) { csd.value = f?.custom_speed_detail || ''; csd.parentElement.classList.toggle('hidden', f?.firing_speed !== 'custom'); }
+  const pickerGeneration = firingMediaGeneration, pickerToken = token;
   api('/api/pieces').then(pieces => {
+    if (pickerGeneration !== firingMediaGeneration || pickerToken !== token) return;
     const s = document.getElementById('firingPiece');
     s.innerHTML = '<option value="">Select piece (optional)...</option>' + pieces.map(p => '<option value="' + p.id + '"' + (f?.piece_id === p.id ? ' selected' : '') + '>' + esc(p.title||'Untitled') + '</option>').join('');
   });
@@ -1698,8 +2517,11 @@ function openFiringModal(f = null) {
 }
 
 async function loadFiringPhotos(firingId) {
+  const active = beginFiringRequest('firingPhotosContainer');
   try {
     const photos = await api('/api/firing-logs/' + firingId + '/photos');
+    if (!active()) return;
+    clearFiringMedia('firingPhotosContainer');
     const cont = document.getElementById('firingPhotosContainer');
     if (!photos || photos.length === 0) {
       cont.innerHTML = '';
@@ -1707,10 +2529,11 @@ async function loadFiringPhotos(firingId) {
     }
     cont.innerHTML = photos.map(p => 
       '<div style="position:relative;display:inline-block;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">' +
-      '<img src="/uploads/' + p.filename + '" style="width:100px;height:100px;object-fit:cover;cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')">' +
-      '<button class="btn-ghost btn-sm" style="position:absolute;top:0;right:0;font-size:0.8rem;background:rgba(0,0,0,0.5);color:white" onclick="deleteFiringPhoto(\'' + p.id + '\');loadFiringPhotos(\'' + firingId + '\')">×</button>' +
+      firingPhotoMarkup({id:firingId}, p, 'width:100px;height:100px;object-fit:cover;cursor:zoom-in') +
+      '<button class="btn-ghost btn-sm" style="position:absolute;top:0;right:0;font-size:0.8rem;background:rgba(0,0,0,0.5);color:white" onclick="deleteFiringPhoto(\'' + p.id + '\').then(()=>loadFiringPhotos(\'' + firingId + '\'))">×</button>' +
       '</div>'
     ).join('');
+    loadFiringMedia('firingPhotosContainer');
   } catch(e) { console.error('Error loading firing photos:', e); }
 }
 
@@ -1736,7 +2559,7 @@ async function uploadFiringPhotos(event) {
       pendingFiringPhotos.push(file);
       const idx = pendingFiringPhotos.length - 1;
       console.log('[uploadFiringPhotos] Added file to pending:', file.name, 'idx:', idx);
-      const url = URL.createObjectURL(file);
+      const url = URL.createObjectURL(file); pendingFiringUrls.add(url);
       const wrap = document.createElement('div');
       wrap.style.cssText = 'position:relative;display:inline-block;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden';
       wrap.dataset.pendingIdx = idx;
@@ -1749,7 +2572,7 @@ async function uploadFiringPhotos(event) {
       btn.className = 'btn-ghost btn-sm';
       btn.style.cssText = 'position:absolute;top:0;right:0;font-size:0.8rem;background:rgba(0,0,0,0.5);color:white';
       btn.textContent = '×';
-      btn.onclick = () => { pendingFiringPhotos[idx] = null; wrap.remove(); };
+      btn.onclick = () => { pendingFiringPhotos[idx] = null; URL.revokeObjectURL(url); pendingFiringUrls.delete(url); wrap.remove(); };
       wrap.appendChild(img);
       wrap.appendChild(btn);
       cont.appendChild(wrap);
@@ -1770,17 +2593,31 @@ async function deleteFiringPhoto(photoId) {
   } catch(e) { toast(e.message, 'error'); }
 }
 
-function editFiring(id) {
+function editFiring(id, origin = null, viewerActive = () => true) {
+  const active = beginFiringRequest('firingPhotosContainer');
   api('/api/firing-logs').then(firings => {
     const f = firings.find(f => f.id === id);
-    if (f) { closeModal('firingViewModal'); openFiringModal(f); }
+    if (active() && viewerActive() && f && (!origin || origin.active())) { closeModal('firingViewModal'); openFiringModal(f); firingPieceReturn = origin; }
   });
 }
 
-function viewFiring(id) {
-  api('/api/firing-logs').then(async firings => {
+function viewFiring(id, options = {}) {
+  rememberPieceViewer('firingViewModal', options.readOnly === true);
+  const requestActive = beginFiringRequest('firingViewBody');
+  const account = currentUser?.id;
+  const active = () => requestActive() && account === currentUser?.id && (!options.active || options.active());
+  const readOnly = options.readOnly === true;
+  const body = document.getElementById('firingViewBody');
+  clearFiringMedia('firingViewBody');
+  body.textContent = 'Loading Firing…';
+  viewerControl('firingViewEditBtn', false);
+  viewerControl('firingViewDeleteBtn', false);
+  openModal('firingViewModal');
+  const details = readOnly ? api('/api/firing-logs/' + encodeURIComponent(id), {cache:'no-store'}).then(f => [f]) : api('/api/firing-logs');
+  return details.then(async firings => {
     const f = firings.find(f => f.id === id);
-    if (!f) return;
+    if (active() && (!f || (options.searchOrigin && String(f.user_id) !== String(account)))) throw Error('unavailable');
+    if (!active() || !f) return;
     const df = (label, val) => val ? '<div class="detail-row"><span class="detail-label">' + esc(label) + '</span><span class="detail-value">' + esc(String(val)) + '</span></div>' : '';
     let photosHtml = '';
     let photos = [];
@@ -1788,14 +2625,16 @@ function viewFiring(id) {
       photos = await api('/api/firing-logs/' + f.id + '/photos');
       if (photos && photos.length) {
         photosHtml = '<div style="margin-top:12px">';
-        if (photos.length > 1) {
+        if (!readOnly && photos.length > 1) {
           photosHtml += '<button class="btn btn-sm btn-secondary" onclick="openFiringPhotoReorder(\'' + f.id + '\')" style="margin-bottom:8px"><span style="font-size:1rem">⇅</span> Rearrange Photos</button>';
         }
         photosHtml += '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-          photos.map(p => '<img src="/uploads/' + p.filename + '" style="width:90px;height:90px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')">').join('') +
+          photos.map(p => firingPhotoMarkup(f, p, 'width:90px;height:90px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in')).join('') +
           '</div></div>';
       }
     } catch(e) {}
+    if (!active()) return;
+    clearFiringMedia('firingViewBody');
     document.getElementById('firingViewBody').innerHTML =
       df('Type', f.firing_type) +
       df('Date', fmtDate(f.date)) +
@@ -1812,9 +2651,16 @@ function viewFiring(id) {
       df('Notes', f.notes) +
       (f.piece_title ? df('Piece', f.piece_title) : '') +
       photosHtml;
-    document.getElementById('firingViewEditBtn').onclick = () => editFiring(f.id);
-    document.getElementById('firingViewDeleteBtn').onclick = () => { closeModal('firingViewModal'); deleteFiring(f.id); };
+    viewerControl('firingViewEditBtn', true, () => { if (active()) editFiring(f.id, options.onSaved ? { active: options.active, refresh: options.onSaved } : null, active); });
+    viewerControl('firingViewDeleteBtn', !readOnly, () => { if (!active() || readOnly) return; closeModal('firingViewModal'); deleteFiring(f.id); });
     openModal('firingViewModal');
+    loadFiringMedia('firingViewBody');
+  }).catch(() => {
+    if (!active()) return;
+    body.replaceChildren(historyElement('p', 'Firing unavailable. Try again when connected.'));
+    const retry = historyElement('button', 'Retry', 'btn btn-secondary');
+    retry.onclick = () => { if (active()) void viewFiring(id, options); };
+    body.append(retry);
   });
 }
 
@@ -1834,8 +2680,10 @@ let firingPhotoReorderState = {
 };
 
 async function openFiringPhotoReorder(firingId) {
+  const active = beginFiringRequest('firingPhotoReorderContent');
   try {
     const photos = await api('/api/firing-logs/' + firingId + '/photos');
+    if (!active()) return;
     if (!photos || photos.length < 2) {
       toast('Need at least 2 photos to rearrange', 'error');
       return;
@@ -1857,7 +2705,7 @@ function renderFiringPhotoReorder() {
     photos.map((p, index) => 
       '<div class="photo-reorder-item" style="display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--bg-card)">' +
         '<div style="font-weight:600;color:var(--text-light);min-width:30px">' + (index + 1) + '</div>' +
-        '<img src="/uploads/' + p.filename + '" style="width:60px;height:60px;object-fit:cover;border-radius:4px">' +
+        firingPhotoMarkup({id:firingPhotoReorderState.firingId}, p, 'width:60px;height:60px;object-fit:cover;border-radius:4px') +
         '<div style="flex:1">' +
           '<div style="font-size:0.9rem;color:var(--text-light)">' + (index === 0 ? 'Main Photo' : 'Photo ' + (index + 1)) + '</div>' +
           (index === 0 ? '<div style="font-size:0.75rem;color:var(--text-muted)">Shows on firing detail</div>' : '') +
@@ -1870,7 +2718,9 @@ function renderFiringPhotoReorder() {
     ).join('') +
     '</div>';
   
+  clearFiringMedia('firingPhotoReorderContent');
   document.getElementById('firingPhotoReorderContent').innerHTML = html;
+  loadFiringMedia('firingPhotoReorderContent');
 }
 
 function moveFiringPhoto(index, direction) {
@@ -1910,6 +2760,9 @@ async function saveFiringPhotoOrder() {
 }
 
 async function saveFiring(e) {
+  const origin = firingPieceReturn;
+  const saveToken = token, saveAccount = currentUser?.id;
+  const saveActive = () => saveToken === token && saveAccount === currentUser?.id && (!origin || origin.active());
   e.preventDefault();
   const saveBtn = document.getElementById('saveFiringBtn');
   if (saveBtn.disabled) return; // prevent double-tap
@@ -1943,6 +2796,7 @@ async function saveFiring(e) {
     const method = firingId ? 'PUT' : 'POST';
     const url = firingId ? '/api/firing-logs/' + firingId : '/api/firing-logs';
     const result = await api(url, { method, body });
+    if (!saveActive()) return;
     const savedId = firingId || result.id;
     // Lock the hidden id immediately so any late tap cannot re-POST
     document.getElementById('firingId').value = savedId;
@@ -1961,13 +2815,16 @@ async function saveFiring(e) {
         toast('Firing saved, but photo upload failed: ' + photoErr.message, 'warning');
       }
     }
+    if (!saveActive()) return;
     toast(firingId ? 'Firing updated!' : 'Firing logged!', 'success');
     trackActivity(firingId ? 'edit_firing' : 'log_firing', 'firings');
     pendingFiringPhotos = [];
     closeModal('firingModal');
     document.getElementById('firingId').value = '';
     loadFirings();
+    if (origin && origin.active()) await origin.refresh();
   } catch(e) {
+    if (!saveActive()) return;
     toast(e.message, 'error');
     saveBtn.disabled = false;
     saveBtn.textContent = 'Save Firing';
@@ -1977,7 +2834,7 @@ async function saveFiring(e) {
 // ---- Sales ----
 function casualtyCard(p) {
   const ph = p.primaryPhoto;
-  const img = ph ? '<img class="piece-photo" src="/uploads/' + ph.filename + '" loading="lazy">' : '<div class="piece-photo-placeholder">🏺</div>';
+  const img = ph ? '<img class="piece-photo" ' + pieceEdgePhotoAttrs(p, ph) + ' loading="lazy">' : '<div class="piece-photo-placeholder">🏺</div>';
   const gl = (p.glazes||[]).map(g => '<span class="glaze-tag">' + esc(g.glaze_name) + '</span>').join('');
   const typeLabel = p.casualty_type ? '<span class="piece-meta-tag" style="background:rgba(220,53,69,0.1);color:var(--danger)">⚠️ ' + esc(CASUALTY_LABELS[p.casualty_type]||p.casualty_type) + '</span>' : '';
   const checkbox = renderBulkCheckbox('casualties', p.id);
@@ -2006,8 +2863,10 @@ function clearCasualtiesFilter() {
 }
 
 async function loadCasualties() {
+  const edgeGeneration = pieceEdgeGeneration, edgeToken = token;
   try {
     const allCasualties = await api('/api/casualties');
+    if (edgeGeneration !== pieceEdgeGeneration || edgeToken !== token) return;
     const c = document.getElementById('casualtyList'), em = document.getElementById('casualtyEmpty');
     const stats = document.getElementById('casualtyStats');
     
@@ -2046,6 +2905,7 @@ async function loadCasualties() {
       c.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔍</div><div class="empty-state-title">No casualties match this filter</div></div>';
     } else {
       c.innerHTML = casualties.map(p => casualtyCard(p)).join('');
+      void loadPieceEdgeMedia(c);
     }
     updateBulkSelectionUI('casualties');
   } catch(e) { toast(e.message,'error'); }
@@ -2060,7 +2920,87 @@ function showSalesSummaryRecords() {
 document.addEventListener('keydown',event=>{
   if ((event.key==='Enter'||event.key===' ') && event.target.matches('.stat-box[role="button"]')) {event.preventDefault();event.target.click();}
 });
+let saleMediaGeneration = 0;
+const saleMediaViews = new Map();
+function clearSaleMedia(scope) {
+  if (!scope || scope === 'salePhotoPreview') clearPieceEdgeMediaScope(document.getElementById('salePhotoPreview'));
+  if (!scope) saleMediaGeneration++;
+  const lightbox = document.getElementById('lightboxImg');
+  for (const [key, view] of saleMediaViews) {
+    if (scope && key !== scope) continue;
+    view.active = false;
+    view.controller.abort();
+    if (view.urls.includes(lightbox?.src)) { lightbox.removeAttribute('src'); closeLightbox(); }
+    view.urls.forEach(url => URL.revokeObjectURL(url));
+    view.images.forEach(img => { img.removeAttribute('src'); img.dataset.protectedReady = '0'; });
+    saleMediaViews.delete(key);
+  }
+  if (!scope) {
+    saleRequestSerials.clear();
+    _salePieces = []; saleSavePending = false;
+    document.getElementById('salePiece')?.replaceChildren();
+    for (const id of ['salesList', 'salesSummary', 'saleDetailsContent', 'salePhotoPreview']) {
+      const el = document.getElementById(id); if (el) el.innerHTML = '';
+    }
+    for (const id of ['saleModal','saleDetailsModal','bulkSaleModal']) {
+      const modal = document.getElementById(id); modal?.classList.remove('open');
+      modal?.querySelectorAll('input,textarea').forEach(el => { el.value = ''; });
+    }
+  }
+}
+function salePhotoMarkup(calc, style = '') {
+  const attrs = calc.photoDelivery === 'owner-protected'
+    ? 'data-private-sale-photo="' + esc(calc.image_filename) + '" data-sale-id="' + esc(calc.id) + '" data-protected-ready="0"'
+    : 'src="/uploads/' + encodeURIComponent(calc.image_filename) + '"';
+  return '<img ' + attrs + ' alt="Sale photo" style="' + style + '">';
+}
+async function loadSaleMedia(scope) {
+  clearSaleMedia(scope);
+  const root = document.getElementById(scope);
+  if (!root) return;
+  const generation = saleMediaGeneration, sessionToken = token;
+  const view = { active: true, controller: new AbortController(), urls: [], images: [...root.querySelectorAll('[data-private-sale-photo]')] };
+  saleMediaViews.set(scope, view);
+  const active = img => view.active && generation === saleMediaGeneration && token === sessionToken && img.isConnected;
+  await Promise.all(view.images.map(async img => {
+    try {
+      const response = await fetch(API + '/api/ql/sales/' + encodeURIComponent(img.dataset.saleId) + '/photos/' + encodeURIComponent(img.dataset.privateSalePhoto), {
+        headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store', signal: view.controller.signal
+      });
+      if (response.status === 401 && active(img)) { clearSaleMedia(); return; }
+      if (!response.ok) throw new Error('Photo unavailable');
+      const blob = await response.blob();
+      if (!active(img)) return;
+      const url = URL.createObjectURL(blob);
+      view.urls.push(url);
+      img.src = url;
+      img.dataset.protectedReady = '1';
+      img.onerror = () => { img.removeAttribute('src'); img.alt = 'Photo unavailable'; };
+    } catch (_) { if (active(img)) { img.removeAttribute('src'); img.alt = 'Photo unavailable'; } }
+  }));
+}
+
+const saleRequestSerials = new Map();
+function beginSaleRequest(scope) {
+  const serial = (saleRequestSerials.get(scope) || 0) + 1;
+  saleRequestSerials.set(scope, serial);
+  const generation = saleMediaGeneration, sessionToken = token;
+  return () => serial === saleRequestSerials.get(scope) && generation === saleMediaGeneration && sessionToken === token;
+}
+function closeSaleMediaScope(scope) {
+  if (scope === 'saleDetailsContent') {
+    document.getElementById(scope)?.replaceChildren();
+    const edit = document.getElementById('saleDetailsEdit');
+    if (edit) { edit.hidden = true; edit.disabled = true; edit.style.display = 'none'; edit.onclick = null; }
+  }
+  saleRequestSerials.set(scope, (saleRequestSerials.get(scope) || 0) + 1);
+  clearSaleMedia(scope);
+  if (scope === 'salePhotoPreview') { document.getElementById('salePhotoPreview').innerHTML = ''; document.getElementById('salePhotoInput').value = ''; }
+}
+
 async function loadSales() {
+  const active = beginSaleRequest('salesList');
+  clearSaleMedia('salesList');
   try {
     const dateFrom = document.getElementById('salesDateFrom')?.value || '';
     const dateTo = document.getElementById('salesDateTo')?.value || '';
@@ -2068,6 +3008,7 @@ async function loadSales() {
     if (dateFrom) url += 'dateFrom=' + encodeURIComponent(dateFrom) + '&';
     if (dateTo) url += 'dateTo=' + encodeURIComponent(dateTo) + '&';
     const sales = await api(url);
+    if (!active()) return;
     const c = document.getElementById('salesList'), em = document.getElementById('salesEmpty');
     const sum = document.getElementById('salesSummary');
     if (!sales.length) { c.innerHTML=''; sum.innerHTML=''; em.classList.remove('hidden'); return; }
@@ -2081,7 +3022,7 @@ async function loadSales() {
     if (mode === 'list') {
       c.innerHTML = sales.map(s =>
         '<div class="card" style="padding:8px 14px;margin-bottom:4px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="viewSale(\'' + s.id + '\')">' +
-        (s.image_filename ? '<img alt="Sale photo" src="/uploads/' + encodeURIComponent(s.image_filename) + '" style="width:48px;height:48px;object-fit:cover;border-radius:8px">' : '') +
+        (s.image_filename ? salePhotoMarkup(s, 'width:48px;height:48px;object-fit:cover;border-radius:8px') : '') +
         '<strong style="min-width:150px">' + esc(s.item_description || s.piece_title || 'Unknown piece') + '</strong>' +
         (s.quantity && s.quantity > 1 ? '<span class="text-sm">Qty: ' + s.quantity + '</span>' : '') +
         '<span style="font-weight:700;color:var(--accent);min-width:60px">$' + ((s.price||0) * (s.quantity||1)).toFixed(2) + '</span>' +
@@ -2097,7 +3038,7 @@ async function loadSales() {
         '<div class="card" style="cursor:pointer" onclick="viewSale(\'' + s.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(s.item_description || s.piece_title || 'Unknown piece') + '</div>' +
         '<div class="text-sm" style="color:var(--text-light)">' + fmtDate(s.date) + (s.venue ? ' \u00b7 ' + esc(s.venue) : '') + (s.event_name ? ' \u00b7 ' + esc(s.event_name) : '') + '</div></div>' +
         '<div style="font-family:var(--font-display);font-size:1.2rem;font-weight:700;color:var(--accent)">$' + ((s.price||0) * (s.quantity||1)).toFixed(2) + (s.quantity && s.quantity > 1 ? ' (Qty: ' + s.quantity + ')' : '') + '</div></div>' +
-        (s.image_filename ? '<img alt="Sale photo" src="/uploads/' + encodeURIComponent(s.image_filename) + '" style="width:100%;max-height:180px;object-fit:contain;margin-bottom:10px">' : '') +
+        (s.image_filename ? salePhotoMarkup(s, 'width:100%;max-height:180px;object-fit:contain;margin-bottom:10px') : '') +
         (s.venue_type ? '<span class="piece-meta-tag">' + esc(s.venue_type) + '</span>' : '') +
         (s.buyer_name ? '<span class="piece-meta-tag">\uD83D\uDC64 ' + esc(s.buyer_name) + '</span>' : '') +
         '<div style="margin-top:8px;display:flex;gap:6px">' +
@@ -2105,27 +3046,54 @@ async function loadSales() {
         '<button onclick="event.stopPropagation();deleteSale(\'' + s.id + '\')" class="btn-small" style="color:var(--danger)">🗑️ Delete</button></div></div>'
       ).join('');
     }
-  } catch(e) { toast(e.message,'error'); }
+    await loadSaleMedia('salesList');
+  } catch(e) { if (active()) toast(e.message,'error'); }
 }
 let _salePieces = [];
 let saleSavePending = false;
-async function viewSale(id) {
+async function viewSale(id, options = {}) {
+  rememberPieceViewer('saleDetailsModal', Boolean(options.pieceId) || options.readOnly === true);
+  const requestActive = beginSaleRequest('saleDetailsContent');
+  const pieceOrigin = options.pieceId != null;
+  const pieceId = options.pieceId, generation = pieceViewGeneration, account = currentUser?.id;
+  const active = () => requestActive() && account === currentUser?.id && (!options.active || options.active()) && (!pieceOrigin ||
+    (token && account && generation === pieceViewGeneration && currentPage === 'pieceDetail' &&
+      String(window._currentPieceId) === String(pieceId) && (!options.active || options.active())));
+  clearSaleMedia('saleDetailsContent');
+  const body = document.getElementById('saleDetailsContent'), edit = document.getElementById('saleDetailsEdit');
+  edit.hidden = true; edit.disabled = true; edit.style.display = 'none'; edit.onclick = null;
+  body.textContent = 'Loading Sale…'; body.setAttribute('aria-busy', 'true');
+  document.getElementById('saleDetailsModal').dataset.pieceOrigin = String(pieceOrigin);
+  openModal('saleDetailsModal');
   try {
-    const sales = await api('/api/sales');
-    const sale = sales.find(s => s.id === id);
-    if (!sale) throw new Error('Sale not found');
-    document.getElementById('saleDetailsContent').innerHTML =
-      (sale.image_filename ? '<img alt="Sale photo" src="/uploads/' + encodeURIComponent(sale.image_filename) + '" style="width:100%;max-height:300px;object-fit:contain;margin-bottom:16px">' : '') +
+    const sales = await api('/api/sales', { cache: 'no-store' });
+    if (!active()) return;
+    const sale = sales.find(s => String(s.id) === String(id));
+    if (!sale || (options.searchOrigin && String(sale.user_id) !== String(account)) || (pieceOrigin && (String(sale.user_id) !== String(account) || sale.piece_id == null || String(sale.piece_id) !== String(pieceId))))
+      throw Object.assign(new Error('Sale unavailable'), { status: 404 });
+    body.innerHTML =
+      (sale.image_filename ? salePhotoMarkup(sale, 'width:100%;max-height:300px;object-fit:contain;margin-bottom:16px') : '') +
       df('Item', sale.item_description || sale.piece_title) + df('Date', fmtDate(sale.date)) +
       df('Quantity', sale.quantity ?? 1) + df('Price each', '$' + Number(sale.price || 0).toFixed(2)) +
       df('Total', '$' + (WebsiteUtils.moneyCents(sale.price || 0) * (sale.quantity || 1) / 100).toFixed(2)) +
       df('Event', sale.event_name) + df('Venue', sale.venue) + df('Buyer', sale.buyer_name) + df('Notes', sale.notes);
-    document.getElementById('saleDetailsEdit').onclick = () => { closeModal('saleDetailsModal'); editSale(id); };
-    openModal('saleDetailsModal');
-  } catch(e) { toast(e.message, 'error'); }
+    body.setAttribute('aria-busy', 'false');
+    const readOnly = pieceOrigin || options.readOnly === true;
+    edit.hidden = readOnly; edit.disabled = readOnly; edit.style.display = readOnly ? 'none' : '';
+    edit.onclick = readOnly ? null : () => { if (!active()) return; closeModal('saleDetailsModal'); editSale(id); };
+    await loadSaleMedia('saleDetailsContent');
+  } catch(e) {
+    if (!active()) return;
+    body.setAttribute('aria-busy', 'false');
+    body.replaceChildren(historyElement('p', [401,403,404].includes(e.status) ? 'Sale unavailable.' : 'Unable to load Sale.'));
+    const retry = historyElement('button', 'Retry', 'btn btn-secondary'); retry.type = 'button';
+    retry.onclick = () => { if (active()) void viewSale(id, options); }; body.append(retry);
+  }
 }
 
 function openSaleModal() {
+  const active = beginSaleRequest('salePhotoPreview');
+  clearSaleMedia('salePhotoPreview');
   document.getElementById('salePhotoInput').value = '';
   document.getElementById('saleModalTitle').textContent = 'Log Sale';
   document.getElementById('saleId').value = '';
@@ -2140,6 +3108,7 @@ function openSaleModal() {
   const buyerEl = document.getElementById('saleBuyerName');
   if (buyerEl) buyerEl.value = '';
   api('/api/pieces').then(pieces => {
+    if (!active()) return;
     _salePieces = pieces;
     const s = document.getElementById('salePiece');
     s.innerHTML = '<option value="">Select piece...</option>' + pieces.map(p => '<option value="' + p.id + '">' + esc(p.title||'Untitled') + '</option>').join('');
@@ -2147,6 +3116,10 @@ function openSaleModal() {
   openModal('saleModal');
 }
 function onSalePieceSelect(id) {
+  clearSaleMedia('salePhotoPreview');
+  const preview = document.getElementById('salePhotoPreview');
+  const hasLocalPhoto = document.getElementById('salePhotoInput').files.length > 0;
+  if (!hasLocalPhoto) preview.innerHTML = '';
   if (!id) return;
   const p = _salePieces.find(x => x.id === id);
   if (!p) return;
@@ -2157,11 +3130,10 @@ function onSalePieceSelect(id) {
   const priceEl = document.getElementById('salePrice');
   if (!priceEl.value && p.price) priceEl.value = p.price;
   // Show piece photo if available
-  const preview = document.getElementById('salePhotoPreview');
   const photo = p.primaryPhoto || (p.photos && p.photos[0]);
   if (document.getElementById('salePhotoInput').files.length) return;
   if (photo) {
-    preview.innerHTML = '<div style="margin-bottom:8px"><img src="/uploads/' + photo.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);border:2px solid var(--border)" />' +
+    preview.innerHTML = '<div style="margin-bottom:8px"><img ' + pieceEdgePhotoAttrs(p, photo) + ' style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);border:2px solid var(--border)" />' +
       (p.clay_body_name ? '<div class="text-sm" style="color:var(--text-light);margin-top:4px">🪨 ' + esc(p.clay_body_name) + '</div>' : '') +
       (p.glaze ? '<div class="text-sm" style="color:var(--text-light)">🎨 ' + esc(p.glaze) + '</div>' : '') +
       '</div>';
@@ -2172,6 +3144,7 @@ function onSalePieceSelect(id) {
       (p.glaze ? '<div class="text-sm" style="color:var(--text-light)">🎨 ' + esc(p.glaze) + '</div>' : '') +
       '</div>' : '';
   }
+  void loadPieceEdgeMedia(preview);
 }
 
 function openBulkSaleModal() {
@@ -2195,6 +3168,7 @@ function removeBulkLineItem(btn) {
 }
 
 async function saveBulkSale(e) {
+  const active = beginSaleRequest('bulkSale');
   e.preventDefault();
   const submit = e.target.querySelector('button[type=submit]');
   if (submit.disabled) return;
@@ -2213,16 +3187,18 @@ async function saveBulkSale(e) {
   try {
     submit.disabled = true;
     await api('/api/sales/bulk', { method: 'POST', body: { eventName, date, venueType, lineItems } });
+    if (!active()) return;
     toast('Bulk sale recorded!', 'success');
     trackActivity('create_bulk_sale', 'sales');
     closeModal('bulkSaleModal');
     loadSales();
-  } catch(e) { toast(e.message, 'error'); } finally { submit.disabled = false; }
+  } catch(e) { if (active()) toast(e.message, 'error'); } finally { submit.disabled = false; }
 }
 
 async function saveSale(e) {
   e.preventDefault();
   if (saleSavePending) return;
+  const active = beginSaleRequest('salePhotoPreview');
   const btn = e.target.querySelector('button[type="submit"]');
   saleSavePending = true; btn.disabled = true;
   const saleId = document.getElementById('saleId').value;
@@ -2235,24 +3211,29 @@ async function saveSale(e) {
     const photo = document.getElementById('salePhotoInput').files[0];
     if (photo) fd.append('photo', photo);
     const result = await api(saleId ? '/api/sales/' + saleId : '/api/sales', { method: saleId ? 'PUT' : 'POST', body: fd });
+    if (!active()) return;
     document.getElementById('saleId').value = result.id || saleId;
     toast(saleId ? 'Sale updated!' : 'Sale logged!', 'success');
     closeModal('saleModal');
     await loadSales();
-  } catch(err) { toast(err.message, 'error'); }
+  } catch(err) { if (active()) toast(err.message, 'error'); }
   finally { saleSavePending = false; btn.disabled = false; }
 }
 
 async function editSale(id) {
+  const active = beginSaleRequest('salePhotoPreview');
+  clearSaleMedia('salePhotoPreview');
   try {
     const sales = await api('/api/sales');
+    if (!active()) return;
     const s = sales.find(x => x.id === id);
     if (!s) return toast('Sale not found', 'error');
     const pieces = await api('/api/pieces');
+    if (!active()) return;
     _salePieces = pieces;
     document.getElementById('salePhotoInput').value = '';
     document.getElementById('saleModalTitle').textContent = 'Edit Sale';
-    document.getElementById('salePhotoPreview').innerHTML = s.image_filename ? '<img alt="Sale photo" src="/uploads/' + encodeURIComponent(s.image_filename) + '" style="max-width:120px;max-height:120px;object-fit:contain">' : '';
+    document.getElementById('salePhotoPreview').innerHTML = s.image_filename ? salePhotoMarkup(s, 'max-width:120px;max-height:120px;object-fit:contain') : '';
     const sel = document.getElementById('salePiece');
     sel.innerHTML = '<option value="">No linked piece</option>' + pieces.map(p => '<option value="' + p.id + '">' + esc(p.title||'Untitled') + '</option>').join('');
     document.getElementById('saleId').value = s.id;
@@ -2267,19 +3248,80 @@ async function editSale(id) {
     const buyerNameEl = document.getElementById('saleBuyerName');
     if (buyerNameEl) buyerNameEl.value = s.buyer_name || '';
     openModal('saleModal');
-  } catch(e) { toast(e.message, 'error'); }
+    await loadSaleMedia('salePhotoPreview');
+  } catch(e) { if (active()) toast(e.message, 'error'); }
 }
 
 async function deleteSale(id) {
+  const active = beginSaleRequest('delete');
   if (!confirm('Delete this sale? This cannot be undone.')) return;
   try {
     await api('/api/sales/' + id, { method: 'DELETE' });
+    if (!active()) return;
     toast('Sale deleted', 'success');
     loadSales();
-  } catch(e) { toast(e.message, 'error'); }
+  } catch(e) { if (active()) toast(e.message, 'error'); }
 }
 
 // ---- Pricing Calculator ----
+let pricingMediaGeneration = 0;
+const pricingMediaViews = new Map();
+function clearPricingMedia(scope) {
+  if (!scope) pricingMediaGeneration++;
+  const lightbox = document.getElementById('lightboxImg');
+  for (const [key, view] of pricingMediaViews) {
+    if (scope && key !== scope) continue;
+    view.active = false;
+    view.controller.abort();
+    if (view.urls.includes(lightbox?.src)) { lightbox.removeAttribute('src'); closeLightbox(); }
+    view.urls.forEach(url => URL.revokeObjectURL(url));
+    view.images.forEach(img => { img.removeAttribute('src'); img.dataset.protectedReady = '0'; });
+    pricingMediaViews.delete(key);
+  }
+  if (!scope) {
+    pricingRequestSerial++;
+    pricingCalcState = { savedRates: null, savedCalculations: [], result: null, selectedCalculationId: null, calculationPhoto: null, savedPhotoFilename: null };
+    const page = document.getElementById('pagePricingCalculator'); if (page) page.innerHTML = '';
+  }
+}
+function pricingPhotoMarkup(calc, style = '') {
+  const attrs = calc.photoDelivery === 'owner-protected'
+    ? 'data-private-pricing-photo="' + esc(calc.photo_filename) + '" data-pricing-id="' + esc(calc.id) + '" data-protected-ready="0"'
+    : 'src="/uploads/' + encodeURIComponent(calc.photo_filename) + '"';
+  return '<img ' + attrs + ' alt="Pricing photo" style="' + style + '">';
+}
+async function loadPricingMedia(scope) {
+  clearPricingMedia(scope);
+  const root = document.getElementById(scope);
+  if (!root) return;
+  const generation = pricingMediaGeneration, sessionToken = token;
+  const view = { active: true, controller: new AbortController(), urls: [], images: [...root.querySelectorAll('[data-private-pricing-photo]')] };
+  pricingMediaViews.set(scope, view);
+  const active = img => view.active && generation === pricingMediaGeneration && token === sessionToken && img.isConnected;
+  await Promise.all(view.images.map(async img => {
+    try {
+      const response = await fetch(API + '/api/ql/pricing-calculations/' + encodeURIComponent(img.dataset.pricingId) + '/photos/' + encodeURIComponent(img.dataset.privatePricingPhoto), {
+        headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store', signal: view.controller.signal
+      });
+      if (!response.ok) throw new Error('Photo unavailable');
+      const blob = await response.blob();
+      if (!active(img)) return;
+      const url = URL.createObjectURL(blob);
+      view.urls.push(url);
+      img.src = url;
+      img.dataset.protectedReady = '1';
+      img.onerror = () => { img.removeAttribute('src'); img.alt = 'Photo unavailable'; };
+    } catch (_) { if (active(img)) { img.removeAttribute('src'); img.alt = 'Photo unavailable'; } }
+  }));
+}
+
+
+let pricingRequestSerial = 0;
+function beginPricingRequest() {
+  const serial = ++pricingRequestSerial, generation = pricingMediaGeneration, sessionToken = token;
+  return () => serial === pricingRequestSerial && generation === pricingMediaGeneration && sessionToken === token;
+}
+
 let pricingCalcState = {
   savedRates: null,
   result: null,
@@ -2290,6 +3332,7 @@ let pricingCalcState = {
 };
 
 async function loadPricingCalculator() {
+  const active = beginPricingRequest();
   const page = document.getElementById('pagePricingCalculator');
   const isPaid = currentUser?.tier && currentUser.tier !== 'free';
   
@@ -2303,8 +3346,11 @@ async function loadPricingCalculator() {
   
   // Load saved calculations history
   try {
-    pricingCalcState.savedCalculations = await api('/api/pricing-calculations');
+    const calculations = await api('/api/pricing-calculations');
+    if (!active()) return;
+    pricingCalcState.savedCalculations = calculations;
   } catch(e) {
+    if (!active()) return;
     console.warn('Could not load pricing calculations:', e.message);
   }
   
@@ -2477,42 +3523,15 @@ function updateMarkupButtons() {
   });
 }
 
-function calculatePrice() {
-  const clay = parseFloat(document.getElementById('calcClayCost').value) || 0;
-  const glaze = parseFloat(document.getElementById('calcGlazeCost').value) || 0;
-  const supplies = parseFloat(document.getElementById('calcSuppliesCost').value) || 0;
-  const firing = parseFloat(document.getElementById('calcFiringCost').value) || 0;
-  const monthlyStudio = parseFloat(document.getElementById('calcStudioCost').value) || 0;
-  const piecesPerMonth = parseFloat(document.getElementById('calcMonthlyPieces').value) || 0;
-  const rate = parseFloat(document.getElementById('calcHourlyRate').value) || 0;
-  const hours = parseFloat(document.getElementById('calcHoursSpent').value) || 0;
-  const monthlyOverhead = parseFloat(document.getElementById('calcOverheadCost').value) || 0;
-  const mult = parseFloat(document.getElementById('calcMarkup').value) || 2.5;
-  
-  if ((monthlyStudio > 0 || monthlyOverhead > 0) && piecesPerMonth <= 0) {
-    toast('Enter how many pieces you make per month so the app can divide your monthly costs', 'error');
-    return;
-  }
-  
-  const materialsCost = clay + glaze + supplies;
-  const laborCost = rate * hours;
-  const studioPerPiece = piecesPerMonth > 0 ? monthlyStudio / piecesPerMonth : 0;
-  const overheadPerPiece = piecesPerMonth > 0 ? monthlyOverhead / piecesPerMonth : 0;
-  const totalCost = materialsCost + firing + studioPerPiece + laborCost + overheadPerPiece;
-  const suggestedPrice = totalCost * mult;
-  
-  pricingCalcState.result = {
-    materialsCost, laborCost, firing, studioPerPiece, overheadPerPiece,
-    monthlyStudio, monthlyOverhead, piecesPerMonth,
-    totalCost, markup: mult, suggestedPrice,
-    profit: suggestedPrice - totalCost
-  };
-  
-  const results = document.getElementById('pricingResults');
-  results.style.display = 'block';
-  results.innerHTML = `
-    <div class="card" style="background:var(--bg-light);border:2px solid var(--primary)">
-      <h3 style="margin-bottom:16px">Price Breakdown</h3>
+function pricingBreakdownMarkup(result = {}, inputs = {}) {
+  result = result || {}; inputs = inputs || {};
+  const number = value => Number.isFinite(Number(value)) ? Number(value) : 0;
+  const [materialsCost, laborCost, firing, studioPerPiece, overheadPerPiece,
+    monthlyStudio, monthlyOverhead, piecesPerMonth, totalCost, suggestedPrice, profit] =
+    ['materialsCost','laborCost','firing','studioPerPiece','overheadPerPiece','monthlyStudio',
+     'monthlyOverhead','piecesPerMonth','totalCost','suggestedPrice','profit'].map(key => number(result[key]));
+  const mult = number(result.markup), hours = number(inputs.hoursSpent), rate = number(inputs.hourlyRate);
+  return `      <h3 style="margin-bottom:16px">Price Breakdown</h3>
       <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
         <span>Materials</span>
         <span style="font-weight:600">$${materialsCost.toFixed(2)}</span>
@@ -2535,29 +3554,69 @@ function calculatePrice() {
         <span style="font-weight:600">$${overheadPerPiece.toFixed(2)}</span>
       </div>
       ${piecesPerMonth > 0 ? `<div style="font-size:0.8rem;color:var(--text-muted);padding:4px 0 8px 0;border-bottom:1px solid var(--border)">$${monthlyOverhead.toFixed(2)} monthly overhead / ${piecesPerMonth.toFixed(0)} pieces</div>` : ''}
-      
+
       <div style="display:flex;justify-content:space-between;padding:12px 0;font-weight:700;font-size:1.1rem;border-bottom:2px solid var(--border)">
         <span>Total Cost</span>
         <span>$${totalCost.toFixed(2)}</span>
       </div>
-      
+
       <div style="display:flex;justify-content:space-between;padding:12px 0;font-weight:700;font-size:1.2rem;color:var(--primary)">
         <span>Suggested Price (${mult}×)</span>
         <span style="font-size:1.4rem">$${suggestedPrice.toFixed(2)}</span>
       </div>
-      
+
       <div style="display:flex;justify-content:space-between;padding:8px 0;color:var(--success)">
         <span>Your Profit</span>
-        <span style="font-weight:600">$${pricingCalcState.result.profit.toFixed(2)}</span>
+        <span style="font-weight:600">$${profit.toFixed(2)}</span>
       </div>
-      
+
       <div style="background:#fffbf0;border-left:3px solid var(--warning);padding:12px;margin-top:16px;border-radius:4px">
         <div style="display:flex;gap:8px;align-items:start">
           <span style="font-size:1.2rem">💡</span>
           <p style="margin:0;font-size:0.9rem;color:var(--text-light)">Monthly costs are now divided across the number of pieces you make, so one plate does not get charged your full monthly rent.</p>
         </div>
       </div>
-      
+
+`;
+}
+
+function calculatePrice() {
+  clearPricingMedia('calcPhotoPreview');
+  const clay = parseFloat(document.getElementById('calcClayCost').value) || 0;
+  const glaze = parseFloat(document.getElementById('calcGlazeCost').value) || 0;
+  const supplies = parseFloat(document.getElementById('calcSuppliesCost').value) || 0;
+  const firing = parseFloat(document.getElementById('calcFiringCost').value) || 0;
+  const monthlyStudio = parseFloat(document.getElementById('calcStudioCost').value) || 0;
+  const piecesPerMonth = parseFloat(document.getElementById('calcMonthlyPieces').value) || 0;
+  const rate = parseFloat(document.getElementById('calcHourlyRate').value) || 0;
+  const hours = parseFloat(document.getElementById('calcHoursSpent').value) || 0;
+  const monthlyOverhead = parseFloat(document.getElementById('calcOverheadCost').value) || 0;
+  const mult = parseFloat(document.getElementById('calcMarkup').value) || 2.5;
+
+  if ((monthlyStudio > 0 || monthlyOverhead > 0) && piecesPerMonth <= 0) {
+    toast('Enter how many pieces you make per month so the app can divide your monthly costs', 'error');
+    return;
+  }
+
+  const materialsCost = clay + glaze + supplies;
+  const laborCost = rate * hours;
+  const studioPerPiece = piecesPerMonth > 0 ? monthlyStudio / piecesPerMonth : 0;
+  const overheadPerPiece = piecesPerMonth > 0 ? monthlyOverhead / piecesPerMonth : 0;
+  const totalCost = materialsCost + firing + studioPerPiece + laborCost + overheadPerPiece;
+  const suggestedPrice = totalCost * mult;
+
+  pricingCalcState.result = {
+    materialsCost, laborCost, firing, studioPerPiece, overheadPerPiece,
+    monthlyStudio, monthlyOverhead, piecesPerMonth,
+    totalCost, markup: mult, suggestedPrice,
+    profit: suggestedPrice - totalCost
+  };
+
+  const results = document.getElementById('pricingResults');
+  results.style.display = 'block';
+  results.innerHTML = `
+    <div class="card" style="background:var(--bg-light);border:2px solid var(--primary)">
+${pricingBreakdownMarkup(pricingCalcState.result, { hoursSpent: hours, hourlyRate: rate })}
       <!-- Save calculation -->
       <div style="margin-top:20px;padding-top:20px;border-top:2px solid var(--border)">
         <h4 style="margin-bottom:12px">Save this calculation</h4>
@@ -2583,14 +3642,18 @@ function calculatePrice() {
 }
 
 function handleCalculationPhoto(event) {
+  const active = beginPricingRequest();
+  clearPricingMedia('calcPhotoPreview');
   const file = event.target.files[0];
   if (!file) return;
-  
+
   const reader = new FileReader();
   reader.onload = (e) => {
+    if (!active()) return;
     pricingCalcState.calculationPhoto = e.target.result;
     pricingCalcState.savedPhotoFilename = null;
     document.getElementById('calcPhotoPreview').style.display = 'block';
+    document.getElementById('calcPhotoImg').removeAttribute('data-private-pricing-photo');
     document.getElementById('calcPhotoImg').src = e.target.result;
     document.getElementById('calcPhotoLabel').textContent = 'Change Photo';
   };
@@ -2598,11 +3661,13 @@ function handleCalculationPhoto(event) {
 }
 
 async function saveCalculation() {
+  const active = beginPricingRequest();
+  const sessionToken = token;
   if (!pricingCalcState.result) {
     toast('Calculate a price first', 'error');
     return;
   }
-  
+
   try {
     const formData = new FormData();
     formData.append('name', document.getElementById('calcName').value.trim() || `Pricing calculation ${new Date().toLocaleDateString()}`);
@@ -2626,14 +3691,16 @@ async function saveCalculation() {
       formData.append('photo', blob, 'calculation-photo.jpg');
     }
     
+    if (!active()) return;
     let saved;
     if (pricingCalcState.selectedCalculationId) {
       const res = await fetch('/api/pricing-calculations/' + pricingCalcState.selectedCalculationId, {
         method: 'PUT',
-        headers: { Authorization: 'Bearer ' + token },
+        headers: { Authorization: 'Bearer ' + sessionToken },
         body: formData
       });
       const data = await res.json();
+      if (!active()) return;
       if (!res.ok) throw new Error(data.error || 'Could not update');
       saved = data;
       pricingCalcState.savedCalculations = pricingCalcState.savedCalculations.map(c => c.id === saved.id ? saved : c);
@@ -2641,10 +3708,11 @@ async function saveCalculation() {
     } else {
       const res = await fetch('/api/pricing-calculations', {
         method: 'POST',
-        headers: { Authorization: 'Bearer ' + token },
+        headers: { Authorization: 'Bearer ' + sessionToken },
         body: formData
       });
       const data = await res.json();
+      if (!active()) return;
       if (!res.ok) throw new Error(data.error || 'Could not save');
       saved = data;
       pricingCalcState.selectedCalculationId = saved.id;
@@ -2654,11 +3722,12 @@ async function saveCalculation() {
     
     renderSavedCalculations();
   } catch(e) {
-    toast(e.message, 'error');
+    if (active()) toast(e.message, 'error');
   }
 }
 
 function renderSavedCalculations() {
+  clearPricingMedia('savedCalculationsList');
   const list = document.getElementById('savedCalculationsList');
   if (!list) return;
   
@@ -2669,7 +3738,7 @@ function renderSavedCalculations() {
   
   list.innerHTML = pricingCalcState.savedCalculations.map(calc => `
     <div class="card" style="margin-bottom:12px;padding:12px;display:flex;gap:12px;align-items:center;cursor:pointer" onclick="reopenCalculation('${calc.id}')">
-      ${calc.photo_filename ? `<img src="/uploads/${calc.photo_filename}" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:2px solid var(--border)">` : `<div style="width:60px;height:60px;background:var(--bg-light);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.5rem">🧮</div>`}
+      ${calc.photo_filename ? pricingPhotoMarkup(calc, 'width:60px;height:60px;object-fit:cover;border-radius:8px;border:2px solid var(--border)') : `<div style="width:60px;height:60px;background:var(--bg-light);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.5rem">🧮</div>`}
       <div style="flex:1">
         <div style="font-weight:600;margin-bottom:4px">${calc.name || 'Saved calculation'}</div>
         <div style="font-size:0.85rem;color:var(--text-light)">${calc.created_at ? new Date(calc.created_at.replace(' ', 'T') + 'Z').toLocaleDateString() : ''}</div>
@@ -2678,9 +3747,12 @@ function renderSavedCalculations() {
       <button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteCalculation('${calc.id}')" title="Delete">🗑️</button>
     </div>
   `).join('');
+  loadPricingMedia('savedCalculationsList');
 }
 
 async function reopenCalculation(id) {
+  pricingRequestSerial++;
+  clearPricingMedia('calcPhotoPreview');
   const calc = pricingCalcState.savedCalculations.find(c => c.id === id);
   if (!calc) return;
   
@@ -2709,7 +3781,8 @@ async function reopenCalculation(id) {
     if (calc.description) document.getElementById('calcDescription').value = calc.description;
     if (calc.photo_filename) {
       document.getElementById('calcPhotoPreview').style.display = 'block';
-      document.getElementById('calcPhotoImg').src = '/uploads/' + calc.photo_filename;
+      document.getElementById('calcPhotoImg').outerHTML = pricingPhotoMarkup(calc, 'max-width:100%;max-height:200px;border-radius:8px').replace('<img ', '<img id="calcPhotoImg" ');
+      loadPricingMedia('calcPhotoPreview');
       document.getElementById('calcPhotoLabel').textContent = 'Change Photo';
     }
   }
@@ -2718,10 +3791,13 @@ async function reopenCalculation(id) {
 }
 
 async function deleteCalculation(id) {
+  const active = beginPricingRequest();
   if (!confirm('Delete this saved calculation? This cannot be undone.')) return;
   
   try {
     await api('/api/pricing-calculations/' + id, { method: 'DELETE' });
+    if (!active()) return;
+    if (pricingCalcState.selectedCalculationId === id) clearPricingCalculator();
     pricingCalcState.savedCalculations = pricingCalcState.savedCalculations.filter(c => c.id !== id);
     toast('Calculation deleted', 'success');
     renderSavedCalculations();
@@ -2731,6 +3807,8 @@ async function deleteCalculation(id) {
 }
 
 function clearPricingCalculator() {
+  pricingRequestSerial++;
+  clearPricingMedia('calcPhotoPreview');
   const savedRates = pricingCalcState.savedRates;
   document.getElementById('calcClayCost').value = '';
   document.getElementById('calcGlazeCost').value = '';
@@ -2779,8 +3857,64 @@ function savePricingRates() {
 }
 
 // ---- Community Combos ----
+let comboMediaGeneration = 0;
+const comboMediaControllers = new Set();
+const comboMediaBlobUrls = new Set();
+function clearComboMedia() {
+  comboMediaGeneration++;
+  comboMediaControllers.forEach(controller => controller.abort());
+  comboMediaControllers.clear();
+  comboMediaBlobUrls.forEach(url => URL.revokeObjectURL(url));
+  comboMediaBlobUrls.clear();
+  document.querySelectorAll('[data-private-combo-photo]').forEach(img => {
+    img.removeAttribute('src');
+    img.alt = 'Photo unavailable';
+  });
+}
+function comboPhotoMeta(combo, slot) {
+  const suffix = slot === 1 ? '' : '2';
+  return {
+    filename: combo?.[slot === 1 ? 'photo_filename' : 'photo_filename2'],
+    delivery: combo?.['photoDelivery' + suffix],
+  };
+}
+function comboPhotoUrl(combo, slot) {
+  const meta = comboPhotoMeta(combo, slot);
+  if (!meta.filename) return '';
+  if (meta.delivery === 'public-explicit') return '/api/ql/community/combos/' + encodeURIComponent(combo.id) + '/photos/' + slot + '/public';
+  if (meta.delivery === 'legacy-static') return '/uploads/' + encodeURIComponent(meta.filename);
+  return '';
+}
+async function loadComboPrivateMedia(root=document) {
+  const generation = comboMediaGeneration, sessionToken = token;
+  const nodes = [...root.querySelectorAll('[data-private-combo-photo]')];
+  await Promise.all(nodes.map(async img => {
+    const comboId = img.dataset.comboId, slot = img.dataset.comboSlot;
+    if (!comboId || !slot || !sessionToken) return;
+    const controller = new AbortController(); comboMediaControllers.add(controller);
+    try {
+      const response = await fetch('/api/ql/community/combos/' + encodeURIComponent(comboId) + '/photos/' + slot, {
+        headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store', signal: controller.signal
+      });
+      if (!response.ok) throw new Error('Photo unavailable');
+      const url = URL.createObjectURL(await response.blob());
+      if (generation !== comboMediaGeneration || sessionToken !== token || !img.isConnected) { URL.revokeObjectURL(url); return; }
+      comboMediaBlobUrls.add(url); img.src = url;
+    } catch (_) {
+      if (generation === comboMediaGeneration && sessionToken === token && img.isConnected) { img.removeAttribute('src'); img.alt='Photo unavailable'; }
+    } finally { comboMediaControllers.delete(controller); }
+  }));
+}
+function comboPhotoMarkup(combo, slot, style) {
+  const meta = comboPhotoMeta(combo, slot);
+  if (!meta.filename) return '';
+  if (meta.delivery === 'owner-protected') return '<img data-private-combo-photo data-combo-id="' + esc(combo.id) + '" data-combo-slot="' + slot + '" alt="Combo photo ' + slot + '" style="' + style + '">';
+  const src = comboPhotoUrl(combo, slot);
+  return src ? '<img src="' + src + '" alt="Combo photo ' + slot + '" style="' + style + '" loading="lazy" onclick="openLightbox(this.src)">' : '';
+}
 function debounceLoadCombos() { clearTimeout(debounceTimer); debounceTimer = setTimeout(loadCombos, 300); }
 async function loadCombos() {
+  const requestedToken = token, requestedGeneration = comboMediaGeneration;
   try {
     const search = document.getElementById('comboSearch')?.value||'';
     const cone = document.getElementById('comboConeFilter')?.value||'';
@@ -2790,6 +3924,8 @@ async function loadCombos() {
     if (cone) u += 'cone=' + encodeURIComponent(cone) + '&';
     if (filter) u += 'filter=' + encodeURIComponent(filter) + '&';
     const combos = await api(u);
+    if (requestedToken !== token || requestedGeneration !== comboMediaGeneration) return;
+    clearComboMedia();
     const c = document.getElementById('comboList'), em = document.getElementById('communityEmpty');
     const guestBanner = guestMode ? previewHero('See real glaze combos before you join.', 'This preview is here to show you the kind of pottery knowledge and inspiration waiting inside The Potter’s Mud Room — layered glazes, cone notes, clay pairings, and shared results from other potters.', ['Save your own glaze tests and combo results', 'Track clay bodies, firings, and finished pieces together', 'Comment, like, and message other potters'], 'Start Free', "requireSignup('save combos, track firings, and join the community')") : '';
     if (!combos.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
@@ -2802,7 +3938,7 @@ async function loadCombos() {
       (cb.atmosphere ? '<span class="piece-meta-tag">' + esc(cb.atmosphere) + '</span>' : '') +
       '</div></div>' +
       (cb.clay_body_name ? '<div class="text-sm mb-16"><strong>Clay:</strong> ' + esc(cb.clay_body_name) + '</div>' : '') +
-      (cb.photo_filename || cb.photo_filename2 ? '<div style="display:flex;gap:8px;margin-bottom:12px">' + (cb.photo_filename ? '<img src="/uploads/' + cb.photo_filename + '" style="max-width:300px;max-height:300px;border-radius:var(--radius-sm);object-fit:cover;cursor:zoom-in" loading="lazy" onclick="openLightbox(\'/uploads/' + cb.photo_filename + '\')">' : '') + (cb.photo_filename2 ? '<img src="/uploads/' + cb.photo_filename2 + '" style="max-width:300px;max-height:300px;border-radius:var(--radius-sm);object-fit:cover;cursor:zoom-in" loading="lazy" onclick="openLightbox(\'/uploads/' + cb.photo_filename2 + '\')">' : '') + '</div>' : '') +
+      (cb.photo_filename || cb.photo_filename2 ? '<div style="display:flex;gap:8px;margin-bottom:12px">' + comboPhotoMarkup(cb, 1, 'max-width:300px;max-height:300px;border-radius:var(--radius-sm);object-fit:cover;cursor:zoom-in') + comboPhotoMarkup(cb, 2, 'max-width:300px;max-height:300px;border-radius:var(--radius-sm);object-fit:cover;cursor:zoom-in') + '</div>' : '') +
       '<div>' + (cb.layers||[]).map((l,i) => '<div style="margin-bottom:4px"><span style="color:var(--text-muted);font-size:0.8rem">Layer ' + (i+1) + ':</span> <span class="glaze-tag">' + esc(l.glaze_name) + '</span>' + (l.brand ? ' <span class="text-sm">(' + esc(l.brand) + ')</span>' : '') + (l.coats > 1 ? ' · ' + l.coats + ' coats' : '') + '</div>').join('') + '</div>' +
       (cb.description ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(cb.description) + '</div>' : '') +
       '<div style="display:flex;gap:12px;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">' +
@@ -2817,6 +3953,7 @@ async function loadCombos() {
       '<div id="comboComments_' + cb.id + '" class="hidden" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"></div>' +
       '</div>'
     ).join('');
+    await loadComboPrivateMedia(c);
   } catch(e) { toast(e.message,'error'); }
 }
 
@@ -2828,7 +3965,7 @@ function editCombo(id) {
     if (combo) {
       populateComboDataLists();
       document.getElementById('comboModalTitle').textContent = 'Edit Community Library Entry';
-      comboPhotoSlots = [combo.photo_filename || null, combo.photo_filename2 || null];
+      comboPhotoSlots = [combo.photo_filename ? { filename: combo.photo_filename, combo, slot: 1 } : null, combo.photo_filename2 ? { filename: combo.photo_filename2, combo, slot: 2 } : null];
       document.getElementById('comboPhotos').value = '';
       renderComboPhotos();
       document.getElementById('comboId').value = combo.id;
@@ -2916,7 +4053,7 @@ async function saveCombo(e) {
   let photoIndex = 0;
   const slots = comboPhotoSlots.map(photo => {
     if (photo instanceof File) { fd.append('photos', photo); return photoIndex++; }
-    return photo;
+    return photo?.filename || photo;
   });
   fd.append('photoSlots', JSON.stringify(slots));
   try {
@@ -2930,6 +4067,65 @@ async function saveCombo(e) {
     document.getElementById('comboId').value = d.id || comboId;
     await loadCombos();
   } catch(e) { toast(e.message,'error'); } finally { comboSavePending = false; btn.disabled = false; }
+}
+
+// Phase 2R Forum media: blobs for images, cookie-authenticated streams for video.
+const forumMedia = new Map();
+let forumMediaGeneration = 0, forumMediaObserver, forumPlayback;
+function clearForumMedia() {
+  forumMediaGeneration++;
+  if(forumPlayback) {
+    fetch(API+'/api/ql/forum/sessions/'+forumPlayback.nonce,{method:'DELETE',headers:{Authorization:'Bearer '+forumPlayback.token},keepalive:true}).catch(()=>{});
+    forumPlayback=null;
+  }
+  for(const [node,e] of forumMedia) { e.controller.abort(); if(e.url) URL.revokeObjectURL(e.url); if(node.tagName==='VIDEO'){node.pause();} node.removeAttribute('src');if(node.tagName==='VIDEO')node.load(); }
+  forumMedia.clear();
+  document.querySelectorAll('[data-forum-media]').forEach(node=>{node.removeAttribute('src');node.style.visibility='hidden';});
+}
+function forumMediaRoute(photo,postId,replyId) {
+  return '/api/ql/forum/posts/'+encodeURIComponent(postId)+(replyId?'/replies/'+encodeURIComponent(replyId):'')+'/media/'+encodeURIComponent(photo.id);
+}
+function forumMediaAttributes(photo,postId,replyId) {
+  if(photo.mediaAccess==='legacy-ambiguous') return 'src="/uploads/'+encodeURIComponent(photo.filename)+'"';
+  if(!forumMediaObserver) {forumMediaObserver=new MutationObserver(()=>hydrateForumMedia(document));forumMediaObserver.observe(document.documentElement,{childList:true,subtree:true});}
+  return 'data-forum-media="'+esc(forumMediaRoute(photo,postId,replyId))+'" data-forum-generation="'+forumMediaGeneration+'" onerror="this.style.visibility=\'hidden\'"';
+}
+async function forumPlaybackSession(requestToken,generation) {
+  if(!forumPlayback) {
+    const nonce=crypto.randomUUID();
+    const entry={nonce,token:requestToken};forumPlayback=entry;
+    entry.promise=fetch(API+'/api/ql/forum/sessions/'+nonce,{method:'POST',headers:{Authorization:'Bearer '+requestToken},credentials:'same-origin',cache:'no-store'}).then(r=>{
+      if(r.status===401 && generation===forumMediaGeneration && requestToken===token) clearForumMedia();
+      if(!r.ok) throw Error('Playback unavailable');return nonce;
+    });
+  }
+  return forumPlayback.promise;
+}
+async function hydrateForumMedia(root) {
+  const generation=forumMediaGeneration,requestToken=token;
+  if(!requestToken)return;
+  for(const [node,e] of forumMedia) if(!node.isConnected){e.controller.abort();if(e.url)URL.revokeObjectURL(e.url);if(node.tagName==='VIDEO'){node.pause();node.removeAttribute('src');node.load();}forumMedia.delete(node);}
+  await Promise.all([...root.querySelectorAll('[data-forum-media]')].map(async node=>{
+    if(forumMedia.has(node) || Number(node.dataset.forumGeneration)!==generation)return;
+    const e={controller:new AbortController()};forumMedia.set(node,e);
+    const current=()=>node.isConnected && forumMedia.get(node)===e && generation===forumMediaGeneration && requestToken===token;
+    try {
+      if(node.tagName==='VIDEO') {
+        const nonce=await forumPlaybackSession(requestToken,generation);
+        if(current())node.src=API+node.dataset.forumMedia.replace('/api/ql/forum/','/api/ql/forum/streams/'+nonce+'/');
+      }else {
+        const response=await fetch(API+node.dataset.forumMedia,{headers:{Authorization:'Bearer '+requestToken},cache:'no-store',signal:e.controller.signal});
+        if(response.status===401 && current()){clearForumMedia();return;}
+        if(!response.ok)throw Error('Media unavailable');
+        const url=URL.createObjectURL(await response.blob());if(!current()){URL.revokeObjectURL(url);return;}e.url=url;node.src=url;
+      }
+    }catch(_){if(current())node.style.visibility='hidden';}
+  }));
+}
+function renderForumMedia(photo,postId,replyId,small=false) {
+  const attrs=forumMediaAttributes(photo,postId,replyId),video=photo.mediaType==='video'||/\.(mp4|mov|webm|m4v)$/i.test(photo.filename||'');
+  const style=small?'width:80px;height:80px;object-fit:cover;border-radius:8px':'max-width:100%;max-height:400px;border-radius:var(--radius-sm)';
+  return video?'<video '+attrs+' controls playsinline preload="metadata" class="forum-photo" style="'+style+'"></video>':'<img '+attrs+' alt="Forum photo" class="forum-photo" style="'+style+'">';
 }
 
 // ---- Forum ----
@@ -3010,7 +4206,7 @@ async function loadForumPosts() {
     }
     em.classList.add('hidden');
     c.innerHTML = posts.map(p => {
-      const avatar = p.author_avatar ? '<img src="/uploads/' + p.author_avatar + '" class="forum-avatar">' : '<div class="forum-avatar-placeholder">' + (p.author_name||'?')[0].toUpperCase() + '</div>';
+      const avatar = p.author_avatar ? '<img ' + profileAvatarAttributes(p.author_avatar, 'community') + ' class="forum-avatar">' : '<div class="forum-avatar-placeholder">' + (p.author_name||'?')[0].toUpperCase() + '</div>';
       const photos = (p.photos||[]).length ? '<span class="piece-meta-tag">📷 ' + p.photos.length + '</span>' : '';
       return '<div class="card forum-post-card" onclick="viewForumPost(\'' + p.id + '\')">' +
         '<div style="display:flex;gap:12px;align-items:flex-start">' + avatar +
@@ -3032,19 +4228,11 @@ async function viewForumPost(id) {
   try {
     const post = await api('/api/forum/posts/' + id);
     navigate('forumPost');
-    const avatar = post.author_avatar ? '<img src="/uploads/' + post.author_avatar + '" class="forum-avatar-lg">' : '<div class="forum-avatar-placeholder forum-avatar-lg">' + (post.author_name||'?')[0].toUpperCase() + '</div>';
-    const photos = (post.photos||[]).map(p => {
-      const ext = (p.filename||'').split('.').pop().toLowerCase();
-      if (['mp4','mov','webm'].includes(ext)) return '<video src="/uploads/' + p.filename + '" class="forum-photo" controls style="max-width:100%;max-height:400px;border-radius:var(--radius-sm)"></video>';
-      return '<img src="/uploads/' + p.filename + '" class="forum-photo" style="max-width:100%;max-height:400px" onclick="window.open(\'/uploads/' + p.filename + '\',\'_blank\')">';
-    }).join('');
+    const avatar = post.author_avatar ? '<img ' + profileAvatarAttributes(post.author_avatar, 'community') + ' class="forum-avatar-lg">' : '<div class="forum-avatar-placeholder forum-avatar-lg">' + (post.author_name||'?')[0].toUpperCase() + '</div>';
+    const photos = (post.photos||[]).map(p => renderForumMedia(p,post.id)).join('');
     const replies = (post.replies||[]).map(r => {
-      const ra = r.author_avatar ? '<img src="/uploads/' + r.author_avatar + '" class="forum-avatar">' : '<div class="forum-avatar-placeholder">' + (r.author_name||'?')[0].toUpperCase() + '</div>';
-      const rPhotos = (r.photos||[]).map(p => {
-        const ext = (p.filename||'').split('.').pop().toLowerCase();
-        if (['mp4','mov','webm'].includes(ext)) return '<video src="/uploads/' + p.filename + '" class="forum-photo" controls style="max-width:300px;max-height:200px"></video>';
-        return '<img src="/uploads/' + p.filename + '" class="forum-photo-sm">';
-      }).join('');
+      const ra = r.author_avatar ? '<img ' + profileAvatarAttributes(r.author_avatar, 'community') + ' class="forum-avatar">' : '<div class="forum-avatar-placeholder">' + (r.author_name||'?')[0].toUpperCase() + '</div>';
+      const rPhotos = (r.photos||[]).map(p => renderForumMedia(p,post.id,r.id)).join('');
       const deleteBtn = (r.user_id === currentUser?.id || currentUser?.email === 'christinaworkmanpottery@gmail.com') ? '<button class="btn-ghost btn-sm" onclick="deleteReply(\'' + r.id + '\',\'' + post.id + '\')" title="Delete reply">🗑️</button>' : '';
       return '<div class="forum-reply">' +
         '<div style="display:flex;gap:10px">' + ra +
@@ -3082,10 +4270,10 @@ async function editForumPost(id) {
     const photos = p.photos || [];
     const existingMedia = photos.map(ph => {
       const isVideo = /\.(mp4|mov|webm|m4v)$/i.test(ph.filename || '');
-      const src = '/uploads/' + ph.filename;
+
       const xBtn = '<button onclick="deletePostPhoto(\'' + ph.id + '\',\'' + id + '\')" style="position:absolute;top:-6px;right:-6px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:12px;padding:0">&times;</button>';
       return '<div style="position:relative;display:inline-block;margin:4px">' +
-        (isVideo ? '<video src="' + src + '" style="width:80px;height:80px;object-fit:cover;border-radius:8px" muted></video>' : '<img src="' + src + '" style="width:80px;height:80px;object-fit:cover;border-radius:8px">') +
+        renderForumMedia(ph,id,null,true) +
         xBtn + '</div>';
     }).join('');
     document.getElementById('forumPostContent').querySelector('.card').innerHTML =
@@ -3101,6 +4289,8 @@ async function editForumPost(id) {
 }
 
 async function saveForumPost(id) {
+  const forumRequestToken = token;
+
   const title = document.getElementById('editPostTitle').value.trim();
   const body = document.getElementById('editPostBody').value.trim();
   if (!title || !body) { toast('Title and content cannot be empty', 'error'); return; }
@@ -3114,7 +4304,8 @@ async function saveForumPost(id) {
         try {
           const ffd = new FormData();
           ffd.append('photos', newFiles[i]);
-          const r = await fetch('/api/forum/posts/' + id + '/photos', { method:'POST', headers:{Authorization:'Bearer '+token}, body:ffd });
+          if(forumRequestToken!==token) throw Error('Session changed');
+          const r = await fetch('/api/forum/posts/' + id + '/photos', { method:'POST', headers:{Authorization:'Bearer '+forumRequestToken}, body:ffd });
           if (!r.ok) { const d = await r.json(); throw new Error(d.error); }
         } catch(err) { toast('Media upload failed: ' + err.message, 'error'); }
       }
@@ -3131,7 +4322,7 @@ async function deletePostPhoto(photoId, postId) {
     // Remove from DOM
     const wrapper = document.getElementById('editPostExistingMedia');
     if (wrapper) { wrapper.querySelectorAll('div').forEach(div => { const btn = div.querySelector('button'); if (btn && btn.getAttribute('onclick') && btn.getAttribute('onclick').indexOf(photoId) !== -1) div.remove(); }); }
-    if (el) el.closest('div[style*="position:relative"]').remove();
+
   } catch(e) { toast(e.message || 'Could not remove photo', 'error'); }
 }
 async function deleteForumPost(id) {
@@ -3145,13 +4336,17 @@ async function deleteReply(id, postId) {
 }
 
 async function submitReply(postId) {
+  const forumRequestToken = token;
+
   const body = document.getElementById('replyBody').value;
   if (!body.trim()) { toast('Write something first!','error'); return; }
   const fd = new FormData();
   fd.append('body', body);
   try {
-    const r = await fetch('/api/forum/posts/' + postId + '/reply', { method:'POST', headers:{Authorization:'Bearer '+token}, body:fd });
-    const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Could not post reply');
+    const r = await fetch('/api/forum/posts/' + postId + '/reply', { method:'POST', headers:{Authorization:'Bearer '+forumRequestToken}, body:fd });
+    const d = await r.json();
+    if(forumRequestToken!==token) return;
+    if(r.status===401)clearForumMedia(); if (!r.ok) throw new Error(d.error || 'Could not post reply');
     toast('Reply posted!','success'); trackActivity('create_reply', 'forum'); viewForumPost(postId);
   } catch(e) { toast(e.message || 'Could not post reply','error'); }
 }
@@ -3167,6 +4362,8 @@ function openForumPostModal() {
 }
 
 async function createForumPost(e) {
+  const forumRequestToken = token;
+
   e.preventDefault();
   const title = document.getElementById('forumPostTitle').value.trim();
   const body = document.getElementById('forumPostBody').value.trim();
@@ -3182,8 +4379,10 @@ async function createForumPost(e) {
     fd.append('title', title);
     fd.append('body', body);
     fd.append('categoryId', categoryId);
-    const r = await fetch('/api/forum/posts', { method:'POST', headers:{Authorization:'Bearer '+token}, body:fd });
-    const d = await r.json(); if (!r.ok) throw new Error(d.error);
+    const r = await fetch('/api/forum/posts', { method:'POST', headers:{Authorization:'Bearer '+forumRequestToken}, body:fd });
+    const d = await r.json();
+    if(forumRequestToken!==token) return;
+    if(r.status===401)clearForumMedia(); if (!r.ok) throw new Error(d.error);
     postId = d.id;
   } catch(err) { toast(err.message,'error'); return; }
 
@@ -3198,7 +4397,8 @@ async function createForumPost(e) {
       try {
         const ffd = new FormData();
         ffd.append('photos', files[i]);
-        const r2 = await fetch('/api/forum/posts/' + postId + '/photos', { method:'POST', headers:{Authorization:'Bearer '+token}, body:ffd });
+        if(forumRequestToken!==token) throw Error('Session changed');
+        const r2 = await fetch('/api/forum/posts/' + postId + '/photos', { method:'POST', headers:{Authorization:'Bearer '+forumRequestToken}, body:ffd });
         if (!r2.ok) failed++;
       } catch(err) { failed++; }
     }
@@ -3223,7 +4423,7 @@ async function loadShop() {
       return;
     }
     c.innerHTML = products.map(p => {
-      const img = p.image_filename ? '<img src="/uploads/' + p.image_filename + '" class="shop-product-img">' : '<div class="shop-product-placeholder">' + (p.product_type === 'sticker' ? '🏷️' : p.product_type === 'journal' ? '📓' : p.product_type === 'pdf' ? '📄' : '🎁') + '</div>';
+      const img = p.image_filename ? '<img '+shopMediaAttributes(p)+' class="shop-product-img">' : '<div class="shop-product-placeholder">' + (p.product_type === 'sticker' ? '🏷️' : p.product_type === 'journal' ? '📓' : p.product_type === 'pdf' ? '📄' : '🎁') + '</div>';
       const typeLabel = p.is_digital ? '<span class="piece-meta-tag">Digital Download</span>' : '<span class="piece-meta-tag">Physical</span>';
       const previewLink = p.product_type === 'pdf' ? '<a href="/shop/mud-log-preview.pdf" target="_blank" rel="noopener" class="btn btn-secondary btn-sm mt-8" style="width:100%">📖 Preview Sample Pages</a>' : '';
       return '<div class="card shop-product-card">' + img +
@@ -3246,11 +4446,134 @@ async function buyProduct(id) {
   } catch(e) { toast(e.message,'error'); }
 }
 
+
+// Phase 2S Shop media loading.
+const shopMedia = new Map();
+let shopMediaGeneration = 0;
+let shopMediaObserver;
+function clearShopMedia() {
+  shopMediaGeneration++;
+  for (const e of shopMedia.values()) { e.controller.abort(); if (e.url) URL.revokeObjectURL(e.url); }
+  shopMedia.clear();
+  document.querySelectorAll('img[data-shop-media]').forEach(img => { img.removeAttribute('src'); img.style.display = 'none'; });
+}
+function shopMediaAttributes(product, privateView=false) {
+  const route='/api/ql/shop/products/'+encodeURIComponent(product.id)+'/image';
+  if(!privateView)return `src="${esc(route)}/public" onerror="this.style.visibility='hidden'"`;
+  if(!shopMediaObserver){shopMediaObserver=new MutationObserver(()=>hydrateShopMedia(document));shopMediaObserver.observe(document.documentElement,{childList:true,subtree:true});}
+  return `data-shop-media="${esc(route)}" data-shop-generation="${shopMediaGeneration}" onerror="this.style.visibility='hidden'"`;
+}
+async function hydrateShopMedia(root) {
+  const generation = shopMediaGeneration, requestToken = token;
+  if (!requestToken) return;
+  // Removed/replaced images release their blobs and outstanding work.
+  for (const [route, entry] of shopMedia) {
+    if (![...document.querySelectorAll('img[data-shop-media]')].some(img => img.dataset.shopMedia === route)) {
+      entry.controller.abort(); if (entry.url) URL.revokeObjectURL(entry.url); shopMedia.delete(route);
+    }
+  }
+  for (const img of root.querySelectorAll('img[data-shop-media]')) {
+    if (generation !== shopMediaGeneration || requestToken !== token) return;
+    if (Number(img.dataset.shopGeneration) !== generation) continue;
+    const route = img.dataset.shopMedia;
+    let entry = shopMedia.get(route);
+    if (!entry) {
+      entry = { controller: new AbortController(), url: null };
+      shopMedia.set(route, entry);
+      try {
+        const response = await fetch(API + route, { headers: { Authorization: 'Bearer ' + requestToken }, cache: 'no-store', signal: entry.controller.signal });
+        if (response.status === 401 && generation === shopMediaGeneration && requestToken === token) { clearShopMedia(); return; }
+        if (!response.ok) throw Error('Image unavailable');
+        const url = URL.createObjectURL(await response.blob());
+        if (generation !== shopMediaGeneration || requestToken !== token || shopMedia.get(route) !== entry) { URL.revokeObjectURL(url); return; }
+        entry.url = url;
+        document.querySelectorAll('img[data-shop-media]').forEach(node => {
+          if (node.dataset.shopMedia === route && Number(node.dataset.shopGeneration) === generation) node.src = url;
+        });
+      } catch (_) { /* Local failure: no legacy/static retry for authenticated media. */ }
+    }
+    if (entry.url && img.isConnected && generation === shopMediaGeneration && requestToken === token) img.src = entry.url;
+  }
+}
+
+async function downloadShopPurchase(orderId) {
+  const generation=shopMediaGeneration,requestToken=token;
+  if(!requestToken)throw Error('Sign in required');
+  const response=await fetch(API+'/api/shop/download/'+encodeURIComponent(orderId),{headers:{Authorization:'Bearer '+requestToken},cache:'no-store'});
+  const current=()=>generation===shopMediaGeneration && requestToken===token;
+  if(!current())return;
+  if(response.status===401){clearShopMedia();throw Error('Sign in required');}
+  if(!response.ok)throw Error('Download unavailable');
+  const blob=await response.blob();if(!current())return;
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  try {a.href=url;a.download='purchased-download';document.body.appendChild(a);a.click();}
+  finally {a.remove();URL.revokeObjectURL(url);}
+}
+// End Phase 2S Shop media loading.
+
+// Phase 2Q Profile/avatar loading. Public contexts never carry an owner token.
+const profileMedia = new Map();
+let profileMediaGeneration = 0;
+let profileMediaObserver;
+function clearProfileMedia() {
+  profileMediaGeneration++;
+  for (const e of profileMedia.values()) { e.controller.abort(); if (e.url) URL.revokeObjectURL(e.url); }
+  profileMedia.clear();
+  document.querySelectorAll('img[data-profile-media]').forEach(img => { img.removeAttribute('src'); img.style.display = 'none'; });
+}
+function profileAvatarAttributes(filename, context = 'community', ownerId = '') {
+  if (!filename) return '';
+  const encoded = encodeURIComponent(filename);
+  if (['directory','featured','review','piece','combo'].includes(context))
+    return `src="/api/ql/avatars/public/${context}/${encoded}" onerror="this.style.visibility='hidden'"`;
+  if (context === 'legacy') return `src="/uploads/${encoded}" onerror="this.style.visibility='hidden'"`;
+  const route = context === 'owner' ? '/api/ql/profiles/' + encodeURIComponent(ownerId) + '/photos/' + encoded : '/api/ql/avatars/community/' + encoded;
+  if (!profileMediaObserver) {
+    profileMediaObserver = new MutationObserver(() => hydrateProfileMedia(document));
+    profileMediaObserver.observe(document.documentElement, { childList: true, subtree: true });
+  }
+  return `data-profile-media="${esc(route)}" data-profile-generation="${profileMediaGeneration}" onerror="this.style.visibility='hidden'"`;
+}
+async function hydrateProfileMedia(root) {
+  const generation = profileMediaGeneration, requestToken = token;
+  if (!requestToken) return;
+  // Removed/replaced images release their blobs and outstanding work.
+  for (const [route, entry] of profileMedia) {
+    if (![...document.querySelectorAll('img[data-profile-media]')].some(img => img.dataset.profileMedia === route)) {
+      entry.controller.abort(); if (entry.url) URL.revokeObjectURL(entry.url); profileMedia.delete(route);
+    }
+  }
+  for (const img of root.querySelectorAll('img[data-profile-media]')) {
+    if (generation !== profileMediaGeneration || requestToken !== token) return;
+    if (Number(img.dataset.profileGeneration) !== generation) continue;
+    const route = img.dataset.profileMedia;
+    let entry = profileMedia.get(route);
+    if (!entry) {
+      entry = { controller: new AbortController(), url: null };
+      profileMedia.set(route, entry);
+      try {
+        const response = await fetch(API + route, { headers: { Authorization: 'Bearer ' + requestToken }, cache: 'no-store', signal: entry.controller.signal });
+        if (response.status === 401 && generation === profileMediaGeneration && requestToken === token) { clearProfileMedia(); return; }
+        if (!response.ok) throw Error('Avatar unavailable');
+        const url = URL.createObjectURL(await response.blob());
+        if (generation !== profileMediaGeneration || requestToken !== token || profileMedia.get(route) !== entry) { URL.revokeObjectURL(url); return; }
+        entry.url = url;
+        document.querySelectorAll('img[data-profile-media]').forEach(node => {
+          if (node.dataset.profileMedia === route && Number(node.dataset.profileGeneration) === generation) node.src = url;
+        });
+      } catch (_) { /* Local failure: no legacy/static retry for authenticated media. */ }
+    }
+    if (entry.url && img.isConnected && generation === profileMediaGeneration && requestToken === token) img.src = entry.url;
+  }
+}
+
 // ---- Profile ----
 async function loadProfile() {
+  const requestToken = token;
   try {
     const d = await api('/api/auth/me');
-    currentUser = d.user;
+    if (requestToken !== token) return;
+    setAuthUser(d.user);
     refreshAccountStatus();
     document.getElementById('profileName').value = d.user.display_name || '';
     document.getElementById('profileUsername').value = d.user.username || '';
@@ -3274,7 +4597,7 @@ async function loadProfile() {
     const preview = document.getElementById('profilePhotoPreview');
     if (preview) {
       if (d.user.avatar_filename) {
-        preview.innerHTML = '<img src="/uploads/' + d.user.avatar_filename + '" style="width:100%;height:100%;object-fit:cover">';
+        preview.innerHTML = '<img ' + profileAvatarAttributes(d.user.avatar_filename, 'owner', d.user.id) + ' style="width:100%;height:100%;object-fit:cover">';
       } else {
         preview.innerHTML = '🏺';
       }
@@ -3423,7 +4746,7 @@ async function loadFindPotter() {
     em.classList.add('hidden');
     c.innerHTML = potters.map(p => {
       const avatar = p.avatarFilename
-        ? '<img src="/uploads/' + esc(p.avatarFilename) + '" style="width:48px;height:48px;object-fit:cover;border-radius:50%;flex-shrink:0">'
+        ? '<img ' + profileAvatarAttributes(p.avatarFilename, 'directory') + ' style="width:48px;height:48px;object-fit:cover;border-radius:50%;flex-shrink:0">'
         : '<div style="width:48px;height:48px;border-radius:50%;background:var(--bg-light);display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0">🏺</div>';
       const loc = [p.city, p.stateRegion, p.country].filter(Boolean).join(', ') + (p.distanceMiles !== undefined ? ' · about ' + p.distanceMiles + ' miles between city centres' : '');
       const shops = [p.shopUrl, p.shopUrl2, p.shopUrl3].filter(Boolean);
@@ -3519,8 +4842,10 @@ async function redeemPromo() {
   try {
     const d = await api('/api/promo/redeem', { method:'POST', body: { code } });
     toast(d.message, 'success');
-    if (d.token) { token = d.token; localStorage.setItem('mudlog_token', d.token); }
-    const me = await api('/api/auth/me'); currentUser = me.user; showApp(); navigate('upgrade');
+    if (d.token) { clearFiringMedia(); clearPricingMedia(); }
+    if (d.token) window.StudioSearch?.invalidate();
+    if (d.token) { clearPieceHistory(); clearComboMedia(); setAuthToken(d.token); localStorage.setItem('mudlog_token', d.token); }
+    const me = await api('/api/auth/me'); setAuthUser(me.user); showApp(); navigate('upgrade');
   } catch(e) { toast(e.message,'error'); }
 }
 
@@ -3580,7 +4905,7 @@ async function cancelSubscription() {
   try {
     const result = await api('/api/billing/cancel', { method:'POST' });
     toast(result.message || 'Subscription cancelled successfully.', 'success');
-    const me = await api('/api/auth/me'); currentUser = me.user; loadProfile();
+    const me = await api('/api/auth/me'); setAuthUser(me.user); loadProfile();
   } catch(e) { toast(e.message,'error'); }
 }
 
@@ -3636,16 +4961,18 @@ function trackActivity(action, page) {
 function loadProfilePhoto() {
   const preview = document.getElementById('profilePhotoPreview');
   if (preview && currentUser?.avatar_filename) {
-    preview.innerHTML = '<img src="/uploads/' + currentUser.avatar_filename + '" style="width:100%;height:100%;object-fit:cover">';
+    preview.innerHTML = '<img ' + profileAvatarAttributes(currentUser.avatar_filename, 'owner', currentUser.id) + ' style="width:100%;height:100%;object-fit:cover">';
   }
 }
 async function uploadProfilePhoto(input) {
+  const requestToken = token, generation = profileMediaGeneration;
   if (!input.files?.[0]) return;
   const fd = new FormData();
   fd.append('photo', input.files[0]);
   try {
     const r = await fetch('/api/profile/photo', { method:'POST', headers:{Authorization:'Bearer '+token}, body:fd });
-    const d = await r.json(); if (!r.ok) throw new Error(d.error);
+    const d = await r.json(); if (requestToken !== token || generation !== profileMediaGeneration) return;
+    if (!r.ok) { if (r.status === 401) { clearProfileMedia(); clearForumMedia(); } throw new Error(d.error); }
     toast('Profile photo updated!','success');
     currentUser.avatar_filename = d.filename;
     loadProfilePhoto();
@@ -4876,6 +6203,7 @@ function showPhotoPreview(input, previewId, nameId) {
   if (!f) { preview.innerHTML = ''; return; }
   const reader = new FileReader();
   reader.onload = e => {
+    if (!active()) return;
     preview.innerHTML = '<img src="' + e.target.result + '" style="max-width:100%;max-height:160px;border-radius:var(--radius-sm);object-fit:contain">';
   };
   reader.readAsDataURL(f);
@@ -5249,6 +6577,44 @@ async function deleteClayTest(glazeId, testId) {
   } catch(e) { toast(e.message, 'error'); }
 }
 
+const glazeClayTestMediaViews = new Map();
+let glazeClayTestMediaGeneration = 0;
+function clearGlazeClayTestMedia() {
+  glazeClayTestMediaGeneration++;
+  const lightbox = document.getElementById('lightboxImg');
+  if ([...glazeClayTestMediaViews.values()].includes(lightbox?.src)) { lightbox.removeAttribute('src'); closeLightbox(); }
+  document.querySelectorAll('img[data-glaze-clay-test-id][data-photo-delivery="owner-protected"]').forEach(img => {
+    img.removeAttribute('src'); img.onclick = null; img.onerror = null;
+  });
+  for (const uri of glazeClayTestMediaViews.values()) if (uri.startsWith('blob:')) URL.revokeObjectURL(uri);
+  glazeClayTestMediaViews.clear();
+}
+function glazeClayTestPhotoMarkup(glazeId,test,style) {
+  const legacy=test.photoDelivery!=='owner-protected';
+  return '<img data-glaze-clay-test-id="'+esc(test.id)+'" data-glaze-id="'+esc(glazeId)+'" data-photo-delivery="'+esc(test.photoDelivery||'legacy-ambiguous')+'" data-photo-filename="'+esc(test.photo_filename)+'" '+(legacy?'src="/uploads/'+encodeURIComponent(test.photo_filename)+'" ':'')+'style="'+style+'">';
+}
+async function loadGlazeClayTestMedia(root) {
+  if (!root) return;
+  const generation=glazeClayTestMediaGeneration, sessionToken=token;
+  await Promise.all(Array.from(root.querySelectorAll('img[data-glaze-clay-test-id]')).map(async img => {
+    const {glazeId,glazeClayTestId:testId,photoFilename:filename,photoDelivery}=img.dataset;
+    if(photoDelivery!=='owner-protected'){img.onclick=()=>openLightbox(img.src);img.onerror=()=>{img.style.display='none'};return;}
+    const key=[currentUser?.id||'',glazeId,testId,filename].join(':');
+    try{
+      let uri=glazeClayTestMediaViews.get(key);
+      if(!uri){
+        const response=await fetch('/api/ql/glazes/'+encodeURIComponent(glazeId)+'/clay-tests/'+encodeURIComponent(testId)+'/photo',{headers:{Authorization:'Bearer '+sessionToken},cache:'no-store'});
+        if(!response.ok)throw new Error('Photo unavailable');
+        uri=URL.createObjectURL(await response.blob());
+        if(generation!==glazeClayTestMediaGeneration||sessionToken!==token){URL.revokeObjectURL(uri);return;}
+        glazeClayTestMediaViews.set(key,uri);
+      }
+      if(generation!==glazeClayTestMediaGeneration||sessionToken!==token||!img.isConnected)return;
+      img.src=uri;img.onclick=()=>openLightbox(uri);img.onerror=()=>{img.style.display='none'};
+    }catch(_){if(generation===glazeClayTestMediaGeneration&&sessionToken===token&&img.isConnected)img.style.display='none';}
+  }));
+}
+
 // ---- Modal clay test functions ----
 function renderModalClayTests(tests) {
   const el = document.getElementById('glazeClayTestsList');
@@ -5259,7 +6625,7 @@ function renderModalClayTests(tests) {
   }
   el.innerHTML = tests.map(t =>
     '<div style="background:var(--bg-light);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:6px;display:flex;gap:10px;align-items:flex-start">' +
-    (t.photo_filename ? '<img src="/uploads/' + t.photo_filename + '" style="width:40px;height:40px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in;flex-shrink:0" onclick="openLightbox(\'/uploads/' + t.photo_filename + '\')">' : '') +
+    (t.photo_filename ? glazeClayTestPhotoMarkup(document.getElementById('glazeId')?.value||'',t,'width:40px;height:40px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in;flex-shrink:0') : '') +
     '<div style="flex:1;min-width:0">' +
     '<div style="font-weight:600;font-size:0.85rem">' + esc(t.clay_name) + '</div>' +
     (t.result_notes ? '<div class="text-sm" style="color:var(--text-light)">' + esc(t.result_notes) + '</div>' : '') +
@@ -5267,6 +6633,7 @@ function renderModalClayTests(tests) {
     '<button type="button" class="btn-ghost btn-sm" onclick="deleteModalClayTest(\'' + t.id + '\')" style="color:var(--text-muted);flex-shrink:0" title="Remove">×</button>' +
     '</div>'
   ).join('');
+  loadGlazeClayTestMedia(el);
 }
 
 async function populateModalClayTestDropdown() {
@@ -5372,7 +6739,7 @@ async function toggleComboComments(comboId) {
   try {
     const comments = await api('/api/community/combos/' + comboId + '/comments');
     let html = comments.map(c => {
-      const avatar = c.author_avatar ? '<img src="/uploads/' + c.author_avatar + '" style="width:28px;height:28px;border-radius:50%;object-fit:cover">' : '<div style="width:28px;height:28px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:0.8rem">' + (c.author_name||'?')[0].toUpperCase() + '</div>';
+      const avatar = c.author_avatar ? '<img ' + profileAvatarAttributes(c.author_avatar, 'community') + ' style="width:28px;height:28px;border-radius:50%;object-fit:cover">' : '<div style="width:28px;height:28px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:0.8rem">' + (c.author_name||'?')[0].toUpperCase() + '</div>';
       const deleteBtn = (c.user_id === currentUser?.id || currentUser?.email === 'christinaworkmanpottery@gmail.com') ? '<button class="btn-ghost btn-sm" onclick="deleteComboComment(\'' + c.id + '\',\'' + comboId + '\')" style="font-size:0.7rem">🗑️</button>' : '';
       return '<div style="display:flex;gap:8px;margin-bottom:10px">' + avatar +
         '<div style="flex:1"><div style="display:flex;justify-content:space-between"><strong class="text-sm">' + esc(c.author_name||'Anonymous') + '</strong><div>' + deleteBtn + '<span class="text-sm" style="color:var(--text-muted)">' + timeAgo(c.created_at) + '</span></div></div>' +
@@ -5463,7 +6830,7 @@ async function loadMessages() {
     if (!d.conversations.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
     c.innerHTML = d.conversations.map(m => {
-      const avatar = m.partner_avatar ? '<img src="/uploads/' + m.partner_avatar + '" style="width:40px;height:40px;border-radius:50%;object-fit:cover">' : '<div style="width:40px;height:40px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700">' + (m.partner_name||'?')[0].toUpperCase() + '</div>';
+      const avatar = m.partner_avatar ? '<img ' + profileAvatarAttributes(m.partner_avatar, 'community') + ' style="width:40px;height:40px;border-radius:50%;object-fit:cover">' : '<div style="width:40px;height:40px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700">' + (m.partner_name||'?')[0].toUpperCase() + '</div>';
       const isUnread = !m.is_read && m.to_user_id === currentUser?.id;
       return '<div class="notif-item' + (isUnread ? ' unread' : '') + '" onclick="navigate(\'messageThread\');loadMessageThread(\'' + m.partner_id + '\')">' +
         '<div style="display:flex;gap:12px;align-items:center">' + avatar +
@@ -5479,7 +6846,7 @@ async function loadMessageThread(userId) {
     const d = await api('/api/messages/' + userId);
     const el = document.getElementById('messageThreadContent');
     const partner = d.partner || {};
-    const avatar = partner.avatar_filename ? '<img src="/uploads/' + partner.avatar_filename + '" style="width:36px;height:36px;border-radius:50%;object-fit:cover">' : '<div style="width:36px;height:36px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700">' + (partner.display_name||'?')[0].toUpperCase() + '</div>';
+    const avatar = partner.avatar_filename ? '<img ' + profileAvatarAttributes(partner.avatar_filename, 'community') + ' style="width:36px;height:36px;border-radius:50%;object-fit:cover">' : '<div style="width:36px;height:36px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700">' + (partner.display_name||'?')[0].toUpperCase() + '</div>';
     let html = '<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px">' + avatar + '<h2>' + esc(partner.display_name||'Unknown') + '</h2></div>';
     html += '<div style="max-height:400px;overflow-y:auto;padding:12px;background:var(--bg);border-radius:var(--radius-sm);margin-bottom:16px" id="msgThreadScroll">';
     if (!d.messages.length) html += '<div class="text-sm" style="color:var(--text-muted);text-align:center;padding:20px">No messages yet. Start the conversation!</div>';
@@ -5738,9 +7105,87 @@ async function deleteStore(storeId) {
 }
 
 // ============ PROJECTS ============
+let projectMediaGeneration = 0;
+const projectMediaViews = new Map();
+function clearProjectMedia(scope) {
+  if (!scope) projectMediaGeneration++;
+  const lightbox = document.getElementById('lightboxImg');
+  for (const [key, view] of projectMediaViews) {
+    if (scope && key !== scope) continue;
+    view.active = false;
+    view.controller.abort();
+    if (view.urls.includes(lightbox?.src)) { lightbox.removeAttribute('src'); closeLightbox(); }
+    view.urls.forEach(url => URL.revokeObjectURL(url));
+    view.images.forEach(img => { img.removeAttribute('src'); img.dataset.protectedReady = '0'; });
+    projectMediaViews.delete(key);
+  }
+  if (!scope) {
+    projectRequestSerials.clear();
+    for (const id of ['projectsList', 'projectPhotoPreviewContainer']) {
+      const el = document.getElementById(id); if (el) el.innerHTML = '';
+    }
+    for (const id of ['projectModal','projectPhotoModal']) {
+      const modal = document.getElementById(id); modal?.classList.remove('open');
+      modal?.querySelectorAll('input,textarea').forEach(el => { el.value = ''; });
+    }
+  }
+}
+function projectPhotoMarkup(project, photo) {
+  const attrs = (photo.photoDelivery || project.photoDelivery) === 'owner-protected'
+    ? 'data-private-project-photo="' + esc(photo.id) + '" data-project-id="' + esc(project.id) + '" data-protected-ready="0"'
+    : 'src="/uploads/' + encodeURIComponent(photo.filename) + '"';
+  return '<img ' + attrs + ' alt="Project photo" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="event.stopPropagation();if(this.getAttribute(\'src\'))openLightbox(this.src)">';
+}
+async function loadProjectMedia(scope) {
+  clearProjectMedia(scope);
+  const root = document.getElementById(scope);
+  if (!root) return;
+  const generation = projectMediaGeneration, sessionToken = token;
+  const view = { active: true, controller: new AbortController(), urls: [], images: [...root.querySelectorAll('[data-private-project-photo]')] };
+  projectMediaViews.set(scope, view);
+  const active = img => view.active && generation === projectMediaGeneration && token === sessionToken && img.isConnected;
+  await Promise.all(view.images.map(async img => {
+    try {
+      const response = await fetch(API + '/api/ql/projects/' + encodeURIComponent(img.dataset.projectId) + '/photos/' + encodeURIComponent(img.dataset.privateProjectPhoto), {
+        headers: { Authorization: 'Bearer ' + sessionToken }, cache: 'no-store', signal: view.controller.signal
+      });
+      if (response.status === 401 && active(img)) { clearProjectMedia(); return; }
+      if (!response.ok) throw new Error('Photo unavailable');
+      const blob = await response.blob();
+      if (!active(img)) return;
+      const url = URL.createObjectURL(blob);
+      view.urls.push(url);
+      img.src = url;
+      img.dataset.protectedReady = '1';
+      img.onerror = () => { img.removeAttribute('src'); img.alt = 'Photo unavailable'; };
+    } catch (_) { if (active(img)) { img.removeAttribute('src'); img.alt = 'Photo unavailable'; } }
+  }));
+}
+
+const projectRequestSerials = new Map();
+function beginProjectRequest(scope) {
+  const serial = (projectRequestSerials.get(scope) || 0) + 1;
+  projectRequestSerials.set(scope, serial);
+  const generation = projectMediaGeneration, sessionToken = token;
+  return () => serial === projectRequestSerials.get(scope) && generation === projectMediaGeneration && sessionToken === token;
+}
+function closeProjectMediaScope(scope) {
+  projectRequestSerials.set(scope, (projectRequestSerials.get(scope) || 0) + 1);
+  clearProjectMedia(scope);
+  if (scope === 'projectModal') {
+    projectRequestSerials.set('projectPreview', (projectRequestSerials.get('projectPreview') || 0) + 1);
+    const preview = document.getElementById('projectPhotoPreviewContainer'); if (preview) preview.innerHTML = '';
+    const input = document.getElementById('projectPhotoInput'); if (input) input.value = '';
+  }
+}
+
+
 async function loadProjects() {
+  const active = beginProjectRequest('projectsList');
+  clearProjectMedia('projectsList');
   try {
     let projects = await api('/api/projects');
+    if (!active()) return;
     const c = document.getElementById('projectsList'), em = document.getElementById('projectsEmpty');
     if (!projects.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
@@ -5762,19 +7207,20 @@ async function loadProjects() {
       projects = [...projects].sort((a, b) => new Date(b.created_at||0) - new Date(a.created_at||0));
     }
     const priorityColors = { high: 'var(--danger)', medium: '#F4A623', low: 'var(--success)' };
-    const photosHtml = (photos) => photos && photos.length > 0 ? '<div style="display:flex;gap:6px;margin:8px 0;flex-wrap:wrap">' + photos.map(p => '<img src="/uploads/' + p.filename + '" style="width:80px;height:80px;object-fit:cover;border-radius:var(--radius-sm);cursor:zoom-in" onclick="openLightbox(\'/uploads/' + p.filename + '\')">').join('') + '</div>' : '';
+    const photosHtml = (project) => project.photos?.length ? '<div style="display:flex;gap:6px;margin:8px 0;flex-wrap:wrap">' + project.photos.map(photo => projectPhotoMarkup(project, photo)).join('') + '</div>' : '';
     c.innerHTML = projects.map(p =>
       '<div class="card" style="cursor:pointer" onclick="editProject(\'' + p.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(p.title) + '</div>' +
       '<div class="text-sm" style="color:var(--text-light)">' + (p.due_date ? 'Due: ' + fmtDate(p.due_date) : '') + '</div></div>' +
       '<div style="display:flex;gap:6px;align-items:center">' +
       (p.priority && p.priority !== 'medium' ? '<span class="piece-meta-tag" style="color:' + priorityColors[p.priority] + ';background:' + priorityColors[p.priority] + '22">' + p.priority + '</span>' : '<span class="piece-meta-tag" style="color:' + priorityColors['medium'] + ';background:' + priorityColors['medium'] + '22">medium</span>') +
       '<span class="piece-meta-tag">' + (p.status||'active') + '</span></div></div>' +
-      photosHtml(p.photos) +
+      photosHtml(p) +
       (p.description ? '<div class="text-sm mt-8">' + esc(p.description) + '</div>' : '') +
       '<div style="display:flex;gap:4px;margin-top:10px"><button onclick="event.stopPropagation();openProjectPhotoUpload(\'' + p.id + '\')" class="btn-small" title="Add photos">📸</button><button onclick="event.stopPropagation();editProject(\'' + p.id + '\')" class="btn-small">✎</button><button onclick="event.stopPropagation();deleteProject(\'' + p.id + '\')" class="btn-small">✕</button></div>' +
       '</div>'
     ).join('');
-  } catch(e) { toast(e.message,'error'); }
+    await loadProjectMedia('projectsList');
+  } catch(e) { if (active()) toast(e.message,'error'); }
 }
 
 function openProjectModal(p = null) {
@@ -5796,7 +7242,9 @@ function openProjectModal(p = null) {
 }
 
 function editProject(id) {
-  api('/api/projects').then(projects => {
+  const active = beginProjectRequest('projectModal');
+  return api('/api/projects').then(projects => {
+    if (!active()) return;
     const p = projects.find(x => x.id === id);
     if (p) openProjectModal(p);
   });
@@ -5804,6 +7252,7 @@ function editProject(id) {
 
 async function saveProject(e) {
   e.preventDefault();
+  const active = beginProjectRequest('projectSave');
   const id = document.getElementById('projectId').value;
   const body = {
     title: document.getElementById('projectTitle').value,
@@ -5819,6 +7268,7 @@ async function saveProject(e) {
       trackActivity('edit_project', 'projects');
     } else {
       const created = await api('/api/projects', {method:'POST',body});
+      if (!active()) return;
       trackActivity('create_project', 'projects');
       // Upload photo if one was selected
       const photoInput = document.getElementById('projectPhotoInput');
@@ -5835,6 +7285,7 @@ async function saveProject(e) {
         toast('Project added!','success');
       }
     }
+    if (!active()) return;
     closeModal('projectModal');
     document.getElementById('projectId').value = '';
     loadProjects();
@@ -5847,12 +7298,14 @@ async function deleteProject(id) {
 }
 
 function previewProjectPhoto(event) {
+  const active = beginProjectRequest('projectPreview');
   const file = event.target.files[0];
   const container = document.getElementById('projectPhotoPreviewContainer');
   if (!container) return;
   if (file) {
     const reader = new FileReader();
     reader.onload = function(e) {
+      if (!active()) return;
       container.innerHTML = '<img src="' + e.target.result + '" style="max-width:200px; max-height:200px; border-radius:8px; margin:8px 0;" alt="Project photo preview">';
     };
     reader.readAsDataURL(file);
@@ -5869,6 +7322,7 @@ function openProjectPhotoUpload(projectId) {
 
 async function uploadProjectPhotos(event) {
   event.preventDefault();
+  const active = beginProjectRequest('projectUpload');
   const projectId = document.getElementById('projectPhotoProjectId').value;
   const files = document.getElementById('projectPhotoFile').files;
   if (!files.length) return;
@@ -5876,6 +7330,7 @@ async function uploadProjectPhotos(event) {
   for (let f of files) formData.append('photos', f);
   try {
     await api('/api/projects/' + projectId + '/photos', { method: 'POST', body: formData });
+    if (!active()) return;
     toast('Photos uploaded', 'success');
     closeModal('projectPhotoModal');
     loadProjects();
@@ -5890,10 +7345,64 @@ async function deleteProjectPhoto(photoId) {
   } catch(e) { toast(e.message, 'error'); }
 }
 
+const eventMedia = new Map();
+let eventMediaGeneration = 0;
+function clearEventMedia() {
+  eventMediaGeneration++;
+  for (const entry of eventMedia.values()) {
+    if (entry?.controller) entry.controller.abort();
+    if (entry?.url) URL.revokeObjectURL(entry.url);
+  }
+  eventMedia.clear();
+  document.querySelectorAll('img[data-event-media]').forEach(img => { img.removeAttribute('src'); img.style.display = 'none'; });
+  const list = document.getElementById('eventsList');
+  if (list) list.innerHTML = '';
+}
+function eventMediaVisibility(event) {
+  return event?.photoDelivery === 'owner-protected' ? 'private' : 'legacy-ambiguous';
+}
+function eventImageMarkup(event, className = 'photo-thumb', alt = '') {
+  if (!event?.image_filename) return '';
+  if (eventMediaVisibility(event) !== 'private') return `<img src="/uploads/${encodeURIComponent(event.image_filename)}" class="${className}" alt="${esc(alt)}" onerror="this.style.display='none'">`;
+  const key = String(event.id) + ':' + String(event.image_filename);
+  return `<img data-event-media="${esc(key)}" class="${className}" alt="${esc(alt)}" style="display:none" onerror="this.style.display='none'">`;
+}
+async function hydrateEventMedia(root, events) {
+  const generation = eventMediaGeneration;
+  const requestToken = token;
+  const byKey = new Map(events.filter(e => e?.image_filename).map(e => [String(e.id)+':'+String(e.image_filename), e]));
+  for (const img of root.querySelectorAll('img[data-event-media]')) {
+    if (generation !== eventMediaGeneration || requestToken !== token) return;
+    const key = img.dataset.eventMedia;
+    const event = byKey.get(key);
+    if (!event || eventMediaVisibility(event) !== 'private') continue;
+    let entry = eventMedia.get(key);
+    if (!entry) {
+      const controller = new AbortController();
+      entry = { controller, url: null };
+      eventMedia.set(key, entry);
+      try {
+        const response = await fetch(API + '/api/ql/events/' + encodeURIComponent(event.id) + '/photos/' + encodeURIComponent(event.image_filename), {
+          headers: { Authorization: 'Bearer ' + requestToken }, cache: 'no-store', signal: controller.signal
+        });
+        if (response.status === 401 && generation === eventMediaGeneration && requestToken === token) { clearEventMedia(); return; }
+        if (!response.ok) throw new Error('Event photo unavailable');
+        const url = URL.createObjectURL(await response.blob());
+        if (generation !== eventMediaGeneration || requestToken !== token || eventMedia.get(key) !== entry) { URL.revokeObjectURL(url); return; }
+        entry.url = url;
+      } catch (_) { if (eventMedia.get(key) === entry) eventMedia.delete(key); continue; }
+    }
+    if (generation === eventMediaGeneration && entry.url && img.isConnected) { img.src = entry.url; img.style.display = ''; }
+  }
+}
+
 // ============ EVENTS ============
 async function loadEvents() {
+  clearEventMedia();
+  const generation = eventMediaGeneration, requestToken = token;
   try {
     const events = await api('/api/events');
+    if (generation !== eventMediaGeneration || requestToken !== token) return;
     const c = document.getElementById('eventsList'), em = document.getElementById('eventsEmpty');
     if (!events.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
@@ -5911,6 +7420,7 @@ async function loadEvents() {
       const mapsUrl = isIOS ? appleMapsUrl : googleMapsUrl;
       const isPast = e.event_date < today;
       return '<div class="card" style="' + (isPast ? 'opacity:0.75;' : '') + '">' +
+      eventImageMarkup(e, 'photo-thumb', e.title) +
       '<div style="cursor:pointer" onclick="editEvent(\'' + e.id + '\')"><div class="card-header"><div><div class="card-title">' + esc(e.title) + '</div>' +
       '<div class="text-sm" style="color:var(--text-light)">' + fmtDate(e.event_date) + (e.start_time ? ' at ' + e.start_time : '') + (e.end_time ? ' – ' + e.end_time : '') + '</div></div></div>' +
       (e.location ? '<div class="text-sm mt-4">📍 ' + esc(e.location) + '</div>' : '') +
@@ -5937,11 +7447,14 @@ async function loadEvents() {
       html += past.map(renderEvent).join('');
     }
     c.innerHTML = html;
+    await hydrateEventMedia(c, events);
   } catch(e) { toast(e.message,'error'); }
 }
 
 function shareEvent(id) {
+  const generation = eventMediaGeneration, requestToken = token;
   api('/api/events').then(events => {
+    if (generation !== eventMediaGeneration || requestToken !== token) return;
     const e = events.find(x => x.id === id);
     if (!e) return;
     const text = e.title + ' — ' + fmtDate(e.event_date) + (e.start_time ? ' at ' + e.start_time : '') + (e.location ? ' · ' + e.location : '') + (e.address ? ' · ' + e.address : '') + (e.website ? '\n' + e.website : '');
@@ -5967,7 +7480,9 @@ function openEventModal(e = null) {
 }
 
 function editEvent(id) {
+  const generation = eventMediaGeneration, requestToken = token;
   api('/api/events').then(events => {
+    if (generation !== eventMediaGeneration || requestToken !== token) return;
     const e = events.find(x => x.id === id);
     if (e) openEventModal(e);
   });
@@ -6098,42 +7613,82 @@ async function deleteStudioNote(id) {
 async function runVisualSearch(input) {
   const file = input.files[0];
   if (!file) return;
+  input.value = ''; // Selecting the same file again must dispatch change.
+  const querySerial = ++pieceSearchQuerySerial;
   const preview = document.getElementById('visualSearchPreview');
   const img = document.getElementById('visualSearchImg');
   const status = document.getElementById('visualSearchStatus');
   const results = document.getElementById('visualSearchResults');
+  clearPieceEdgeMedia();
+  const retry = document.getElementById('visualSearchRetry');
+  const edgeGeneration = pieceEdgeGeneration, sessionToken = token;
+  const controller = new AbortController(); pieceSearchController = controller;
+  const active = () => !controller.signal.aborted && edgeGeneration === pieceEdgeGeneration && token === sessionToken;
   // Show preview
-  img.src = URL.createObjectURL(file);
+  pieceSearchPreviewUrl = URL.createObjectURL(file);
+  img.src = pieceSearchPreviewUrl;
   preview.style.display = 'block';
   status.textContent = 'Searching your library...';
   results.innerHTML = '';
   try {
     const formData = new FormData();
     formData.append('photo', file);
-    const token = localStorage.getItem('mudlog_token');
     const res = await fetch('/api/pieces/photo-search', {
       method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + token },
-      body: formData
+      headers: { 'Authorization': 'Bearer ' + sessionToken },
+      body: formData,
+      signal: controller.signal
     });
     const data = await res.json();
+    if (!active()) return;
     if (!res.ok) throw new Error(data.error || 'Search failed');
     if (!data.matches || !data.matches.length) {
-      status.textContent = 'No matches found in your library.';
+      status.textContent = 'No confident match. Try another photo of your piece.';
       return;
     }
-    status.textContent = data.matches.length + ' match' + (data.matches.length > 1 ? 'es' : '') + ' found:';
+    status.textContent = (data.confidence?.label || 'Possible matches') + '. ' + (data.confidence?.message || 'Compare the photos and piece details before choosing.');
     results.innerHTML = data.matches.map(m => {
-      const photo = m.photos && m.photos[0];
-      return '<div class="card" style="cursor:pointer;display:flex;gap:12px;align-items:center" onclick="openPieceDetail(\'' + m.id + '\')">' +
-        (photo ? '<img src="/uploads/' + photo.filename + '" style="width:64px;height:64px;object-fit:cover;border-radius:var(--radius-sm);flex-shrink:0">' : '<div style="width:64px;height:64px;background:var(--bg-dark);border-radius:var(--radius-sm);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.5rem">🏺</div>') +
+      const photo = m.matchedPhotoId ? m.photos?.find(p => p.id === m.matchedPhotoId) : m.photos?.[0];
+      return '<button type="button" class="card" style="width:100%;text-align:left;cursor:pointer;display:flex;gap:12px;align-items:center">' +
+        (photo ? '<img ' + pieceEdgePhotoAttrs(m, photo) + ' style="width:64px;height:64px;object-fit:cover;border-radius:var(--radius-sm);flex-shrink:0">' : '<div style="width:64px;height:64px;background:var(--bg-dark);border-radius:var(--radius-sm);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.5rem">🏺</div>') +
         '<div><div class="card-title">' + esc(m.title || 'Untitled') + '</div>' +
         (m.clay_body_name ? '<div class="text-sm" style="color:var(--text-light)">🪨 ' + esc(m.clay_body_name) + '</div>' : '') +
         (m.status ? '<div class="text-sm" style="color:var(--text-light)">' + esc(m.status) + '</div>' : '') +
-        '<div class="text-sm" style="color:var(--accent);font-weight:600">' + Math.round((m.matchScore||0)*100) + '% match</div>' +
-        '</div></div>';
+        '<div class="text-sm" style="color:var(--accent);font-weight:600">' + esc(m.confidence?.label || 'Possible match') + '</div>' +
+        '</div></button>';
     }).join('');
-  } catch(err) { status.textContent = 'Error: ' + err.message; }
+    results.querySelectorAll('button.card').forEach((button, index) => {
+      const id = data.matches[index].id;
+      button.onclick = async () => {
+        if (!active() || !button.isConnected || button.disabled) return;
+        button.disabled = true;
+        const viewerActive = () => querySerial === pieceSearchQuerySerial && token === sessionToken;
+        try {
+          // The canonical viewer clears edge media on entry. Bind its fresh
+          // detail fetch to the query separately so that cleanup cannot cancel
+          // this handoff; viewPiece also guards navigation/session generations.
+          await viewPiece(id, { active: viewerActive });
+        }
+        catch (err) { if (viewerActive()) status.textContent = 'Error: ' + err.message; }
+        finally { if (viewerActive()) button.disabled = false; }
+      };
+    });
+    void loadPieceEdgeMedia(results);
+  } catch(err) {
+    if (active()) {
+      status.textContent = 'Error: ' + err.message;
+      pieceSearchRetry = { file, active };
+      if (retry) {
+        retry.hidden = false;
+        retry.onclick = () => {
+          const target = pieceSearchRetry;
+          if (!target || !target.active() || retry.disabled) return;
+          retry.disabled = true;
+          void runVisualSearch({ files: [target.file] });
+        };
+      }
+    }
+  }
 }
 
 async function loadContacts() {
@@ -6229,7 +7784,7 @@ function renderMembers(members) {
   c.innerHTML = ribbon + members.map(u =>
     '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg-card)">' +
     '<div style="cursor:pointer;flex-shrink:0" onclick="viewMemberProfile(\'' + u.id + '\')">' +
-    (u.avatar_filename ? '<img src="/uploads/' + u.avatar_filename + '" style="width:44px;height:44px;border-radius:50%;object-fit:cover">' : '<div style="width:44px;height:44px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;color:var(--primary)">' + (u.display_name||'?')[0].toUpperCase() + '</div>') +
+    (u.avatar_filename ? '<img ' + profileAvatarAttributes(u.avatar_filename, 'community') + ' style="width:44px;height:44px;border-radius:50%;object-fit:cover">' : '<div style="width:44px;height:44px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;color:var(--primary)">' + (u.display_name||'?')[0].toUpperCase() + '</div>') +
     '</div>' +
     '<div style="flex:1;min-width:0;cursor:pointer" onclick="viewMemberProfile(\'' + u.id + '\')">' +
     '<div style="font-weight:600;font-size:0.95rem;color:var(--primary)">' + esc(u.display_name||'Member') +
@@ -6257,7 +7812,7 @@ async function viewMemberProfile(userId) {
     } else {
       c.innerHTML = '<div class="card" style="max-width:500px">' +
         '<div style="display:flex;gap:16px;align-items:center;margin-bottom:16px">' +
-        (u.avatar_filename ? '<img src="/uploads/' + u.avatar_filename + '" style="width:80px;height:80px;border-radius:50%;object-fit:cover">' : '<div style="width:80px;height:80px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:2rem;color:var(--primary)">' + (u.displayName||u.display_name||'?')[0].toUpperCase() + '</div>') +
+        (u.avatar_filename ? '<img ' + profileAvatarAttributes(u.avatar_filename, 'community') + ' style="width:80px;height:80px;border-radius:50%;object-fit:cover">' : '<div style="width:80px;height:80px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:2rem;color:var(--primary)">' + (u.displayName||u.display_name||'?')[0].toUpperCase() + '</div>') +
         '<div><h2 style="margin:0">' + esc(u.displayName || u.display_name || 'Member') + '</h2>' +
         (u.location ? '<div class="text-sm" style="color:var(--text-light);margin-top:4px">📍 ' + esc(u.location) + '</div>' : '') +
         '</div></div>' +
@@ -6532,7 +8087,7 @@ async function loadFeaturedPotter() {
     if (!data || !section || !card) return;
     section.style.display = '';
     const avatar = data.avatar_filename
-      ? '<img src="/uploads/' + data.avatar_filename + '" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--primary)">'
+      ? '<img ' + profileAvatarAttributes(data.avatar_filename, 'featured') + ' style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:3px solid var(--primary)">'
       : '<div style="width:80px;height:80px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:2rem;color:#fff">' + ((data.display_name||'?')[0]).toUpperCase() + '</div>';
     card.innerHTML = '<div class="card" style="max-width:500px;margin:0 auto;text-align:center;padding:24px">' +
       '<div style="margin-bottom:16px">' + avatar + '</div>' +
@@ -6569,8 +8124,9 @@ async function loadPublicCombo(shareId) {
     if (res.status === 404) { document.getElementById('publicComboContent').innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔒</div><div class="empty-state-title">Combo not found</div><p>This combo may be private or doesn\'t exist.</p></div>'; return; }
     navigate('publicCombo');
     const el = document.getElementById('publicComboContent');
+    const publicImage = combo.photoDelivery === 'public-explicit' ? comboPhotoUrl(combo, 1) : '';
     let html = '<div class="card" style="max-width:600px;margin:0 auto">';
-    if (combo.photo_filename) html += '<img src="/uploads/' + combo.photo_filename + '" style="width:100%;max-height:400px;object-fit:cover;border-radius:var(--radius-sm);margin-bottom:16px">';
+    if (publicImage) html += '<img src="' + publicImage + '" style="width:100%;max-height:400px;object-fit:cover;border-radius:var(--radius-sm);margin-bottom:16px">';
     html += '<h2 style="color:var(--primary);margin-bottom:8px">' + esc(combo.name) + '</h2>';
     html += '<div class="text-sm" style="color:var(--text-muted);margin-bottom:16px">By ' + esc(combo.author || 'A Potter') + '</div>';
     if (combo.clay_body_name) html += '<div style="margin-bottom:8px"><strong>Clay:</strong> ' + esc(combo.clay_body_name) + '</div>';
@@ -6596,7 +8152,7 @@ async function loadPublicCombo(shareId) {
       '<p style="color:var(--text-light);margin-bottom:10px;font-weight:600;font-size:0.9rem">📤 Share This Combo</p>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">' +
       '<button class="btn btn-sm" onclick="window.open(\'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(comboUrl) + '\',\'_blank\',\'width=600,height=400\')" style="background:#1877F2;color:#fff;border:none">📘 Facebook</button>' +
-      '<button class="btn btn-sm" onclick="window.open(\'https://pinterest.com/pin/create/button/?url=' + encodeURIComponent(comboUrl) + '&description=' + encodeURIComponent(comboTitle) + (combo.photo_filename ? '&media=' + encodeURIComponent('https://thepottersmudroom.com/uploads/' + combo.photo_filename) : '') + '\',\'_blank\',\'width=600,height=400\')" style="background:#E60023;color:#fff;border:none">📌 Pinterest</button>' +
+      '<button class="btn btn-sm" onclick="window.open(\'https://pinterest.com/pin/create/button/?url=' + encodeURIComponent(comboUrl) + '&description=' + encodeURIComponent(comboTitle) + (publicImage ? '&media=' + encodeURIComponent('https://thepottersmudroom.com' + publicImage) : '') + '\',\'_blank\',\'width=600,height=400\')" style="background:#E60023;color:#fff;border:none">📌 Pinterest</button>' +
       '<button class="btn btn-sm" onclick="window.open(\'https://twitter.com/intent/tweet?url=' + encodeURIComponent(comboUrl) + '&text=' + encodeURIComponent(comboTitle) + '\',\'_blank\',\'width=600,height=400\')" style="background:#000;color:#fff;border:none">𝕏 Post</button>' +
       '<button class="btn btn-sm" onclick="shareBlog(\'' + esc(comboUrl) + '\',\'' + esc(combo.name) + '\')" style="background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);color:#fff;border:none">📲 Share</button>' +
       '</div></div>';
@@ -6638,6 +8194,7 @@ function restoreRoute() {
   if (restoredUrl === location.href) return;
   restoredUrl = location.href;
   const route = location.hash.slice(1).split('?')[0];
+  if (route.startsWith('studioSearch/') && token) return window.StudioSearch?.restore(route);
   if (route.startsWith('reset-password')) return checkResetPasswordHash();
   if (route === 'preview') return showGuestPreview('community', true);
   document.getElementById('previewPage').style.display = 'none';
@@ -6758,11 +8315,14 @@ function escapeHtml(str) {
 
 // ─── Sale Photo Preview ─────────────────────────────────────────────────────
 function previewSalePhoto(event) {
+  const active = beginSaleRequest('salePhotoPreview');
+  clearSaleMedia('salePhotoPreview');
   const file = event.target.files[0];
   const preview = document.getElementById('salePhotoPreview');
   if (!file) { preview.innerHTML = ''; return; }
   const reader = new FileReader();
   reader.onload = e => {
+    if (!active()) return;
     preview.innerHTML = '<img src="' + e.target.result + '" style="max-width:120px;max-height:120px;border-radius:8px;object-fit:cover">';
   };
   reader.readAsDataURL(file);
@@ -7090,12 +8650,16 @@ function renderComboPhotos() {
   document.getElementById('comboPhotoSlots').innerHTML = comboPhotoSlots.map((photo, i) => {
     let src = '';
     if (photo instanceof File) { src = URL.createObjectURL(photo); comboPhotoObjectUrls.push(src); }
+    else if (photo?.filename) src = comboPhotoUrl(photo.combo, photo.slot);
     else if (photo) src = '/uploads/' + encodeURIComponent(photo);
+    const protectedAttrs = photo?.combo && comboPhotoMeta(photo.combo, photo.slot).delivery === 'owner-protected'
+      ? ' data-private-combo-photo data-combo-id="' + esc(photo.combo.id) + '" data-combo-slot="' + photo.slot + '"' : '';
     return '<div style="flex:1;min-width:120px">' +
-      (src ? '<img alt="Photo ' + (i+1) + '" src="' + src + '" style="width:100%;height:110px;object-fit:contain">' : '<p class="text-sm">Photo ' + (i+1) + '</p>') +
+      (photo ? '<img alt="Photo ' + (i+1) + '"' + protectedAttrs + (src ? ' src="' + src + '"' : '') + ' style="width:100%;height:110px;object-fit:contain">' : '<p class="text-sm">Photo ' + (i+1) + '</p>') +
       '<label class="btn btn-secondary btn-sm">' + (photo ? 'Replace' : 'Add photo') + '<input type="file" accept="image/*" hidden onchange="setComboPhoto(' + i + ', this)"></label>' +
       (photo ? '<button type="button" class="btn btn-secondary btn-sm" onclick="comboPhotoSlots[' + i + ']=null;renderComboPhotos()">Remove</button>' : '') + '</div>';
   }).join('');
+  loadComboPrivateMedia(document.getElementById('comboPhotoSlots'));
 }
 function setComboPhoto(index, input) {
   if (input.files[0]) comboPhotoSlots[index] = input.files[0];
@@ -7108,4 +8672,336 @@ function addComboPhotos(input) {
   files.forEach(file => { comboPhotoSlots[comboPhotoSlots.indexOf(null)] = file; });
   input.value = '';
   renderComboPhotos();
+}
+// Manual associations only. Each mount belongs to one Piece and login generation.
+function mountLinkedPricing(pieceId, generation, sessionToken) {
+  const root = historyElement('section', null, 'card mb-16');
+  root.id = 'linkedPricing';
+  root.setAttribute('aria-label', 'Linked Pricing');
+  document.getElementById('pieceDetailContent').append(root);
+  const account = currentUser?.id;
+  let busy = false, serial = 0, needsReconcile = false;
+  const active = () => root.isConnected && generation === pieceViewGeneration &&
+    sessionToken === token && account === currentUser?.id && currentPage === 'pieceDetail' && window._currentPieceId === pieceId;
+  const button = (label, action) => {
+    const el = historyElement('button', label, 'btn btn-secondary btn-sm');
+    el.type = 'button'; el.onclick = event => { el.focus(); action(event); }; return el;
+  };
+  const request = async (path, options = {}) => {
+    if (!active()) throw Error('stale');
+    const response = await fetch(API + path, { ...options, cache: 'no-store',
+      headers: { Authorization: 'Bearer ' + sessionToken, 'Content-Type': 'application/json' } });
+    const data = await response.json();
+    if (!active() || !response.ok) throw Error('unavailable');
+    return { data, available: response.headers.get('X-QL-Relationships-Available') === 'true' };
+  };
+  const base = '/api/ql/pieces/' + encodeURIComponent(pieceId) + '/pricing';
+  const reset = text => {
+    clearPricingMedia('linkedPricingViewer');
+    root.replaceChildren(historyElement('h2', 'Linked Pricing'));
+    root.setAttribute('aria-busy', String(busy));
+    if (text) { const status = historyElement('p', text); status.setAttribute('role', 'status'); root.append(status); }
+  };
+  const failure = () => {
+    reset('Linked Pricing is unavailable. Try again when connected.');
+    root.append(button('Retry', () => load()));
+  };
+  async function load(afterMutation = false) {
+    if (!active() || busy) return;
+    afterMutation = afterMutation || needsReconcile;
+    busy = true; const run = ++serial; reset('Loading linked calculations…');
+    let historyRecovery = Promise.resolve();
+    // Invalidate earlier History work by replacing its container after mutation.
+    if (afterMutation) {
+      const old = document.getElementById('pieceHistory');
+      if (old) {
+        disposeHistoryPhotos();
+        const next = old.cloneNode(false); old.replaceWith(next);
+        next.append(historyElement('h2', 'Connected History'), historyElement('p', 'Loading connected history…'));
+        historyRecovery = loadPieceHistory(pieceId, next, generation, sessionToken);
+      }
+    }
+    try {
+      if (await historyRecovery === false) throw Error('History recovery incomplete');
+      if (!active() || serial !== run) return;
+      const result = await request(base);
+      if (!active() || serial !== run) return;
+      if (!result.available) {
+        busy = false; reset('Linked Pricing is not available for this database.');
+        root.append(button('Retry', () => load())); return;
+      }
+      const saved = (await request('/api/pricing-calculations')).data;
+      const linked = await Promise.all(result.data.map(row => request('/api/pricing-calculations/' + encodeURIComponent(row.id)).then(r => r.data)));
+      if (!active() || serial !== run) return;
+      needsReconcile = false; busy = false; reset(linked.length ? '' : 'No saved calculations linked.');
+      for (const calc of linked) {
+        const row = historyElement('div', null, 'mb-16');
+        row.append(historyElement('strong', calc.name || 'Saved calculation'),
+          historyElement('p', [calc.description, calc.created_at, 'ID: ' + calc.id].filter(Boolean).join(' · ')),
+          button('View', () => view(calc.id)), button('Unlink', () => mutate(calc.id, 'DELETE')));
+        root.append(row);
+      }
+      const ids = new Set(linked.map(row => row.id));
+      const eligible = saved.filter(row => !ids.has(row.id));
+      if (eligible.length) {
+        const picker = historyElement('select', null, 'form-select'); picker.setAttribute('aria-label', 'Saved calculation to link');
+        const placeholder = historyElement('option', 'Select a saved calculation'); placeholder.value = ''; picker.append(placeholder);
+        for (const calc of eligible) { const option = historyElement('option', (calc.name || 'Saved calculation') + ' · ' + (calc.created_at || calc.id)); option.value = calc.id; picker.append(option); }
+        const link = button('Link', () => { if (picker.value) void mutate(picker.value, 'POST'); });
+        link.disabled = true; picker.onchange = () => { link.disabled = !picker.value; };
+        root.append(picker, link);
+      } else root.append(historyElement('p', 'No additional saved calculations available to link.'));
+    } catch (_) { if (active() && serial === run) { busy = false; failure(); } }
+  }
+  async function mutate(id, method) {
+    if (!active() || busy) return;
+    needsReconcile = true;
+    busy = true; reset('Updating link…');
+    try {
+      await request(base + (method === 'DELETE' ? '/' + encodeURIComponent(id) : ''),
+        { method, ...(method === 'POST' ? { body: JSON.stringify({ pricingId: id }) } : {}) });
+      if (!active()) return;
+      busy = false; await load(true);
+    } catch (_) { if (active()) { busy = false; failure(); } }
+  }
+  async function view(id) {
+    if (!active() || busy) return;
+    busy = true; reset('Loading saved calculation…');
+    try {
+      const calc = (await request('/api/pricing-calculations/' + encodeURIComponent(id))).data;
+      if (!active()) return;
+      busy = false; reset();
+      const viewer = historyElement('div'); viewer.id = 'linkedPricingViewer';
+      viewer.append(historyElement('h3', calc.name || 'Saved calculation'), historyElement('p', calc.description || ''), historyElement('p', 'Saved: ' + (calc.created_at || 'date unavailable')));
+      const breakdown = historyElement('div'); breakdown.innerHTML = pricingBreakdownMarkup(calc.result, calc.inputs); viewer.append(breakdown);
+      if (calc.photo_filename) { const photo = historyElement('div'); photo.innerHTML = pricingPhotoMarkup(calc, 'max-width:100%;max-height:200px;border-radius:8px'); viewer.append(photo); }
+      root.append(viewer, button('Back to linked calculations', async () => { await load(); if (active()) { root.tabIndex = -1; (root.querySelector('button,select') || root).focus(); } }));
+      void loadPricingMedia('linkedPricingViewer');
+    } catch (_) { if (active()) { busy = false; failure(); } }
+  }
+  void load();
+}
+
+function savedPieceFiringsMarkup(firings) {
+  return (firings || []).map(f =>
+      '<div class="card" style="padding:14px;margin-bottom:8px"><strong>' + esc(f.firing_type||'Firing') + '</strong> — Cone ' + esc(f.cone||'?') +
+      (f.atmosphere ? ' (' + esc(f.atmosphere) + ')' : '') + (f.kiln_name ? ' — ' + esc(f.kiln_name) : '') +
+      (f.firing_speed ? '<br><span class="text-sm"><strong>Speed:</strong> ' + esc(f.firing_speed) + (f.custom_speed_detail ? ' — ' + esc(f.custom_speed_detail) : '') + '</span>' : '') +
+      (f.hold_used ? '<br><span class="text-sm"><strong>Hold:</strong> Yes' + (f.hold_duration ? ' — ' + esc(f.hold_duration) : '') + '</span>' : '') +
+      (f.date ? '<br><span class="text-sm" style="color:var(--text-light)">' + fmtDate(f.date) + '</span>' : '') +
+      (f.results ? '<br><span class="text-sm">' + esc(f.results) + '</span>' : '') + '</div>'
+    ).join('');
+}
+function firingLinkLabel(f) {
+  return [f.kiln_name, f.date, f.firing_type, f.cone && 'Cone ' + f.cone].filter(Boolean).join(' · ') || 'Firing ' + f.id;
+}
+// Manual associations only. Each mount belongs to one Piece and login generation.
+function mountLinkedFirings(pieceId, generation, sessionToken) {
+  const root = historyElement('section', null, 'card mb-16');
+  root.id = 'linkedFirings';
+  root.setAttribute('aria-label', 'Linked Firings');
+  document.getElementById('pieceDetailContent').append(root);
+  const account = currentUser?.id;
+  let busy = false, serial = 0, needsReconcile = false;
+  const active = () => root.isConnected && generation === pieceViewGeneration &&
+    sessionToken === token && account === currentUser?.id && currentPage === 'pieceDetail' && window._currentPieceId === pieceId;
+  const button = (label, action) => {
+    const el = historyElement('button', label, 'btn btn-secondary btn-sm');
+    el.type = 'button'; el.onclick = event => { el.focus(); action(event); }; return el;
+  };
+  const request = async (path, options = {}) => {
+    if (!active()) throw Error('stale');
+    const response = await fetch(API + path, { ...options, cache: 'no-store',
+      headers: { Authorization: 'Bearer ' + sessionToken, 'Content-Type': 'application/json' } });
+    const data = await response.json();
+    if (!active() || !response.ok) throw Error('unavailable');
+    return { data, available: response.headers.get('X-QL-Relationships-Available') === 'true' };
+  };
+  const base = '/api/ql/pieces/' + encodeURIComponent(pieceId) + '/firings';
+  const reset = text => {
+    root.replaceChildren(historyElement('h2', 'Linked Firings'));
+    root.setAttribute('aria-busy', String(busy));
+    if (text) { const status = historyElement('p', text); status.setAttribute('role', 'status'); root.append(status); }
+  };
+  const failure = () => {
+    reset('Linked Firings is unavailable. Try again when connected.');
+    root.append(button('Retry', () => load()));
+  };
+  async function load(afterMutation = false) {
+    if (!active() || busy) return;
+    afterMutation = afterMutation || needsReconcile;
+    busy = true; const run = ++serial; reset('Loading linked Firings…');
+    let historyRecovery = Promise.resolve();
+    // Invalidate earlier History work by replacing its container after mutation.
+    if (afterMutation) {
+      const old = document.getElementById('pieceHistory');
+      if (old) {
+        disposeHistoryPhotos();
+        const next = old.cloneNode(false); old.replaceWith(next);
+        next.append(historyElement('h2', 'Connected History'), historyElement('p', 'Loading connected history…'));
+        historyRecovery = loadPieceHistory(pieceId, next, generation, sessionToken);
+      }
+    }
+    try {
+      if (afterMutation) {
+        const oldLegacy = document.getElementById('pieceSavedFirings');
+        if (oldLegacy) oldLegacy.textContent = 'Loading saved Firings…';
+        if (await historyRecovery === false) throw Error('History recovery incomplete');
+        if (!active() || serial !== run) return;
+        const piece = (await request('/api/pieces/' + encodeURIComponent(pieceId))).data;
+        if (!active()) return;
+        const legacy = document.getElementById('pieceSavedFirings');
+        if (legacy) legacy.innerHTML = savedPieceFiringsMarkup(piece.firings);
+      }
+      const result = await request(base);
+      if (!active() || serial !== run) return;
+      if (!result.available) {
+        busy = false; reset('Linked Firings is not available for this database.');
+        root.append(button('Retry', () => load())); return;
+      }
+      const saved = (await request('/api/firing-logs')).data;
+      const linked = await Promise.all(result.data.map(row => request('/api/firing-logs/' + encodeURIComponent(row.id)).then(r => r.data)));
+      if (!active() || serial !== run) return;
+      needsReconcile = false; busy = false; reset(linked.length ? '' : 'No saved Firings linked.');
+      for (const calc of linked) {
+        const row = historyElement('div', null, 'mb-16');
+        row.append(historyElement('strong', firingLinkLabel(calc)),
+          historyElement('p', [calc.date, calc.firing_type, calc.cone && 'Cone ' + calc.cone, 'ID: ' + calc.id].filter(Boolean).join(' · ')),
+          button('View', () => view(calc.id)), button('Unlink', () => mutate(calc.id, 'DELETE')));
+        root.append(row);
+      }
+      const ids = new Set(linked.map(row => row.id));
+      const eligible = saved.filter(row => !ids.has(row.id));
+      if (eligible.length) {
+        const picker = historyElement('select', null, 'form-select'); picker.setAttribute('aria-label', 'Saved Firing to link');
+        const placeholder = historyElement('option', 'Select a saved Firing'); placeholder.value = ''; picker.append(placeholder);
+        for (const calc of eligible) { const option = historyElement('option', (firingLinkLabel(calc)) + ' · ' + calc.id); option.value = calc.id; picker.append(option); }
+        const link = button('Link', () => { if (picker.value) void mutate(picker.value, 'POST'); });
+        link.disabled = true; picker.onchange = () => { link.disabled = !picker.value; };
+        root.append(picker, link);
+      } else root.append(historyElement('p', 'No additional saved Firings available to link.'));
+    } catch (_) { if (active() && serial === run) { busy = false; failure(); } }
+  }
+  async function mutate(id, method) {
+    if (!active() || busy) return;
+    needsReconcile = true;
+    busy = true; reset('Updating link…');
+    try {
+      await request(base + (method === 'DELETE' ? '/' + encodeURIComponent(id) : ''),
+        { method, ...(method === 'POST' ? { body: JSON.stringify({ firingId: id }) } : {}) });
+      if (!active()) return;
+      busy = false; await load(true);
+    } catch (_) { if (active()) { busy = false; failure(); } }
+  }
+  async function view(id) {
+    if (!active() || busy) return;
+    busy = true;
+    try { await viewFiring(id, { readOnly: true, active, onSaved: async () => { await load(true); if (active()) { root.tabIndex = -1; (root.querySelector('button,select') || root).focus(); } } }); }
+    finally { if (active()) busy = false; }
+  }
+  void load();
+}
+
+function testTileLinkLabel(t) {
+  return [t.name, t.clay_name || t.clay_library_name, t.glaze_name || t.glaze_library_name, t.cone && 'Cone ' + t.cone, t.created_at, t.id].filter(Boolean).join(' · ');
+}
+function mountLinkedTestTiles(pieceId, generation, sessionToken) {
+  const root = historyElement('section', null, 'card mb-16');
+  root.id = 'linkedTestTiles';
+  root.setAttribute('aria-label', 'Linked Test Tiles');
+  document.getElementById('pieceDetailContent').append(root);
+  const account = currentUser?.id;
+  let busy = false, serial = 0, needsReconcile = false;
+  const active = () => root.isConnected && generation === pieceViewGeneration &&
+    sessionToken === token && account === currentUser?.id && currentPage === 'pieceDetail' && window._currentPieceId === pieceId;
+  const button = (label, action) => {
+    const el = historyElement('button', label, 'btn btn-secondary btn-sm');
+    el.type = 'button'; el.onclick = event => { el.focus(); action(event); }; return el;
+  };
+  const request = async (path, options = {}) => {
+    if (!active()) throw Error('stale');
+    const response = await fetch(API + path, { ...options, cache: 'no-store',
+      headers: { Authorization: 'Bearer ' + sessionToken, 'Content-Type': 'application/json' } });
+    const data = await response.json();
+    if (!active()) throw Error('stale');
+    if (!response.ok) throw Object.assign(Error('unavailable'), { status: response.status });
+    return { data, available: response.headers.get('X-QL-Relationships-Available') === 'true' };
+  };
+  const base = '/api/ql/pieces/' + encodeURIComponent(pieceId) + '/test-tiles';
+  const reset = text => {
+    root.replaceChildren(historyElement('h2', 'Linked Test Tiles'));
+    root.setAttribute('aria-busy', String(busy));
+    if (text) { const status = historyElement('p', text); status.setAttribute('role', 'status'); root.append(status); }
+  };
+  root._locked = () => { if (active()) { ++serial; busy = false; reset('Test Tiles locked. Upgrade to Unlimited to use this feature.'); root.append(button('Retry', () => load())); } };
+  const failure = error => {
+    if (error?.status === 403) { invalidateTestTileAccess(); return; }
+    reset('Linked Test Tiles is unavailable. Try again when connected.');
+    root.append(button('Retry', () => load()));
+  };
+  async function load(afterMutation = false) {
+    if (!active() || busy) return;
+    afterMutation = afterMutation || needsReconcile;
+    busy = true; const run = ++serial; reset('Loading linked Test Tiles…');
+    let historyRecovery = Promise.resolve();
+    // Invalidate earlier History work by replacing its container after mutation.
+    if (afterMutation) {
+      const old = document.getElementById('pieceHistory');
+      if (old) {
+        disposeHistoryPhotos();
+        const next = old.cloneNode(false); old.replaceWith(next);
+        next.append(historyElement('h2', 'Connected History'), historyElement('p', 'Loading connected history…'));
+        historyRecovery = loadPieceHistory(pieceId, next, generation, sessionToken);
+      }
+    }
+    try {
+      if (await historyRecovery === false) throw Error('History recovery incomplete');
+      if (!active() || serial !== run) return;
+      const result = await request(base);
+      if (!active() || serial !== run) return;
+      if (!result.available) {
+        busy = false; reset('Linked Test Tiles is not available for this database.');
+        root.append(button('Retry', () => load())); return;
+      }
+      const saved = (await request('/api/test-tiles')).data;
+      const linked = await Promise.all(result.data.map(row => request('/api/test-tiles/' + encodeURIComponent(row.id)).then(r => r.data)));
+      if (!active() || serial !== run) return;
+      needsReconcile = false; busy = false; reset(linked.length ? '' : 'No saved Test Tiles linked.');
+      for (const calc of linked) {
+        const row = historyElement('div', null, 'mb-16');
+        row.append(historyElement('strong', testTileLinkLabel(calc)),
+          historyElement('p', [calc.cone && 'Cone ' + calc.cone, calc.created_at, 'ID: ' + calc.id].filter(Boolean).join(' · ')),
+          button('View', () => view(calc.id)), button('Unlink', () => mutate(calc.id, 'DELETE')));
+        root.append(row);
+      }
+      const ids = new Set(linked.map(row => row.id));
+      const eligible = saved.filter(row => !ids.has(row.id));
+      if (eligible.length) {
+        const picker = historyElement('select', null, 'form-select'); picker.setAttribute('aria-label', 'Saved Test Tile to link');
+        const placeholder = historyElement('option', 'Select a saved Test Tile'); placeholder.value = ''; picker.append(placeholder);
+        for (const calc of eligible) { const option = historyElement('option', (testTileLinkLabel(calc)) + ' · ' + calc.id); option.value = calc.id; picker.append(option); }
+        const link = button('Link', () => { if (picker.value) void mutate(picker.value, 'POST'); });
+        link.disabled = true; picker.onchange = () => { link.disabled = !picker.value; };
+        root.append(picker, link);
+      } else root.append(historyElement('p', 'No additional saved Test Tiles available to link.'));
+    } catch (_) { if (active() && serial === run) { busy = false; failure(_); } }
+  }
+  async function mutate(id, method) {
+    if (!active() || busy) return;
+    needsReconcile = true;
+    busy = true; reset('Updating link…');
+    try {
+      await request(base + (method === 'DELETE' ? '/' + encodeURIComponent(id) : ''),
+        { method, ...(method === 'POST' ? { body: JSON.stringify({ testTileId: id }) } : {}) });
+      if (!active()) return;
+      busy = false; await load(true);
+    } catch (_) { if (active()) { busy = false; failure(_); } }
+  }
+  async function view(id) {
+    if (!active() || busy) return;
+    busy = true;
+    try { await viewTestTileById(id, { readOnly: true, active }); }
+    finally { if (active()) busy = false; }
+  }
+  void load();
 }

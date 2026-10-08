@@ -1,0 +1,1601 @@
+(node:5) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+(Use `node --trace-warnings ...` to show where the warning was created)
+TAP version 13
+# (node:12) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: click opens exact Piece through canonical viewer
+ok 1 - click opens exact Piece through canonical viewer
+  ---
+  duration_ms: 70.837393
+  type: 'test'
+  ...
+# Subtest: tap opens exact Piece through canonical viewer
+ok 2 - tap opens exact Piece through canonical viewer
+  ---
+  duration_ms: 14.249796
+  type: 'test'
+  ...
+# Subtest: query replacement prevents stale card activation and pending viewer completion
+ok 3 - query replacement prevents stale card activation and pending viewer completion
+  ---
+  duration_ms: 9.707009
+  type: 'test'
+  ...
+# Subtest: session replacement prevents stale card activation and pending viewer completion
+ok 4 - session replacement prevents stale card activation and pending viewer completion
+  ---
+  duration_ms: 8.967595
+  type: 'test'
+  ...
+# Subtest: retry sends identical current failed file and cannot submit twice
+ok 5 - retry sends identical current failed file and cannot submit twice
+  ---
+  duration_ms: 16.780019
+  type: 'test'
+  ...
+# Subtest: replacement invalidates captured retry even if invoked after new query
+ok 6 - replacement invalidates captured retry even if invoked after new query
+  ---
+  duration_ms: 7.548055
+  type: 'test'
+  ...
+# Subtest: session reset invalidates retry target
+ok 7 - session reset invalidates retry target
+  ---
+  duration_ms: 7.810521
+  type: 'test'
+  ...
+# Subtest: same-file input is reset for subsequent selection
+ok 8 - same-file input is reset for subsequent selection
+  ---
+  duration_ms: 7.981368
+  type: 'test'
+  ...
+# Subtest: picker and retry use native keyboard buttons and status announcement
+ok 9 - picker and retry use native keyboard buttons and status announcement
+  ---
+  duration_ms: 385.869209
+  type: 'test'
+  ...
+# Subtest: viewer errors are caught and permit another activation
+ok 10 - viewer errors are caught and permit another activation
+  ---
+  duration_ms: 14.309045
+  type: 'test'
+  ...
+# (node:13) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: native upload metadata crosses actual Safety-1 HTTP boundary
+    # Subtest: ios jpg undefined 200
+    ok 1 - ios jpg undefined 200
+      ---
+      duration_ms: 2816.18799
+      type: 'test'
+      ...
+    # Subtest: ios JPG image/jpg 200
+    ok 2 - ios JPG image/jpg 200
+      ---
+      duration_ms: 39.584366
+      type: 'test'
+      ...
+    # Subtest: ios jpeg image/jpeg 200
+    ok 3 - ios jpeg image/jpeg 200
+      ---
+      duration_ms: 48.346074
+      type: 'test'
+      ...
+    # Subtest: ios png image/png 200
+    ok 4 - ios png image/png 200
+      ---
+      duration_ms: 43.515622
+      type: 'test'
+      ...
+    # Subtest: ios svg image/svg+xml 415
+    ok 5 - ios svg image/svg+xml 415
+      ---
+      duration_ms: 16.287617
+      type: 'test'
+      ...
+    # Subtest: ios jpg image/jpeg 400
+    ok 6 - ios jpg image/jpeg 400
+      ---
+      duration_ms: 9.830121
+      type: 'test'
+      ...
+    # Subtest: android jpg undefined 200
+    ok 7 - android jpg undefined 200
+      ---
+      duration_ms: 30.157508
+      type: 'test'
+      ...
+    # Subtest: android JPG image/jpg 200
+    ok 8 - android JPG image/jpg 200
+      ---
+      duration_ms: 36.839963
+      type: 'test'
+      ...
+    # Subtest: android jpeg image/jpeg 200
+    ok 9 - android jpeg image/jpeg 200
+      ---
+      duration_ms: 42.923084
+      type: 'test'
+      ...
+    # Subtest: android png image/png 200
+    ok 10 - android png image/png 200
+      ---
+      duration_ms: 52.287573
+      type: 'test'
+      ...
+    # Subtest: android svg image/svg+xml 415
+    ok 11 - android svg image/svg+xml 415
+      ---
+      duration_ms: 5.788918
+      type: 'test'
+      ...
+    # Subtest: android jpg image/jpeg 400
+    ok 12 - android jpg image/jpeg 400
+      ---
+      duration_ms: 6.808415
+      type: 'test'
+      ...
+    1..12
+ok 11 - native upload metadata crosses actual Safety-1 HTTP boundary
+  ---
+  duration_ms: 3810.860309
+  type: 'test'
+  ...
+# (node:14) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: Photo Lookup opens fresh canonical Piece and preserves Back to Pieces contract
+ok 12 - Photo Lookup opens fresh canonical Piece and preserves Back to Pieces contract
+  ---
+  duration_ms: 741.369007
+  type: 'test'
+  ...
+# Subtest: canonical Photo Lookup viewer guards deleted
+ok 13 - canonical Photo Lookup viewer guards deleted
+  ---
+  duration_ms: 334.882936
+  type: 'test'
+  ...
+# Subtest: canonical Photo Lookup viewer guards foreign
+ok 14 - canonical Photo Lookup viewer guards foreign
+  ---
+  duration_ms: 307.293652
+  type: 'test'
+  ...
+# Subtest: canonical Photo Lookup viewer guards replaced
+ok 15 - canonical Photo Lookup viewer guards replaced
+  ---
+  duration_ms: 282.462691
+  type: 'test'
+  ...
+# Subtest: canonical Photo Lookup viewer guards session
+ok 16 - canonical Photo Lookup viewer guards session
+  ---
+  duration_ms: 263.893991
+  type: 'test'
+  ...
+# (node:15) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: manifest exact counts and independent labels
+ok 17 - manifest exact counts and independent labels
+  ---
+  duration_ms: 4.920729
+  type: 'test'
+  ...
+# Subtest: duplicate query IDs rejected
+ok 18 - duplicate query IDs rejected
+  ---
+  duration_ms: 1.709467
+  type: 'test'
+  ...
+# Subtest: unknown expected Piece rejected
+ok 19 - unknown expected Piece rejected
+  ---
+  duration_ms: 5.979485
+  type: 'test'
+  ...
+# Subtest: no-match cannot contain expected ID
+ok 20 - no-match cannot contain expected ID
+  ---
+  duration_ms: 2.042039
+  type: 'test'
+  ...
+# Subtest: ambiguous requires explicit set
+ok 21 - ambiguous requires explicit set
+  ---
+  duration_ms: 2.167759
+  type: 'test'
+  ...
+# Subtest: object families cannot cross splits
+ok 22 - object families cannot cross splits
+  ---
+  duration_ms: 0.802009
+  type: 'test'
+  ...
+# Subtest: fixture image hashes agree with frozen manifest
+ok 23 - fixture image hashes agree with frozen manifest
+  ---
+  duration_ms: 16.835163
+  type: 'test'
+  ...
+# Subtest: procedural image generation repeatable
+ok 24 - procedural image generation repeatable
+  ---
+  duration_ms: 48.260333
+  type: 'test'
+  ...
+# Subtest: split counts preserve strata and family isolation
+ok 25 - split counts preserve strata and family isolation
+  ---
+  duration_ms: 0.706906
+  type: 'test'
+  ...
+# Subtest: metrics do not include ambiguity/negative in exact denominator
+ok 26 - metrics do not include ambiguity/negative in exact denominator
+  ---
+  duration_ms: 1.137595
+  type: 'test'
+  ...
+# Subtest: missing correct Piece counted as miss not rank zero
+ok 27 - missing correct Piece counted as miss not rank zero
+  ---
+  duration_ms: 0.26534
+  type: 'test'
+  ...
+# Subtest: no-match accounting uses every returned candidate
+ok 28 - no-match accounting uses every returned candidate
+  ---
+  duration_ms: 0.283037
+  type: 'test'
+  ...
+# Subtest: ambiguous acceptable set evaluated separately
+ok 29 - ambiguous acceptable set evaluated separately
+  ---
+  duration_ms: 0.181624
+  type: 'test'
+  ...
+# Subtest: latency uses nearest-rank percentiles
+ok 30 - latency uses nearest-rank percentiles
+  ---
+  duration_ms: 0.087562
+  type: 'test'
+  ...
+# Subtest: score populations are not merged
+ok 31 - score populations are not merged
+  ---
+  duration_ms: 0.202686
+  type: 'test'
+  ...
+# Subtest: baseline gate passes self consistency
+ok 32 - baseline gate passes self consistency
+  ---
+  duration_ms: 0.46438
+  type: 'test'
+  ...
+# Subtest: future release rejects unchanged light/plain baseline
+ok 33 - future release rejects unchanged light/plain baseline
+  ---
+  duration_ms: 1.358588
+  type: 'test'
+  ...
+# Subtest: blue top1 case loss fails even if other cases improve
+ok 34 - blue top1 case loss fails even if other cases improve
+  ---
+  duration_ms: 0.639544
+  type: 'test'
+  ...
+# Subtest: blue top3 case loss fails
+ok 35 - blue top3 case loss fails
+  ---
+  duration_ms: 0.354414
+  type: 'test'
+  ...
+# Subtest: overall Top3 decline fails
+ok 36 - overall Top3 decline fails
+  ---
+  duration_ms: 0.299312
+  type: 'test'
+  ...
+# Subtest: negative false-positive increase fails
+ok 37 - negative false-positive increase fails
+  ---
+  duration_ms: 0.64301
+  type: 'test'
+  ...
+# Subtest: privacy leak fails
+ok 38 - privacy leak fails
+  ---
+  duration_ms: 0.53757
+  type: 'test'
+  ...
+# Subtest: latency tolerance enforced
+ok 39 - latency tolerance enforced
+  ---
+  duration_ms: 0.322135
+  type: 'test'
+  ...
+# Subtest: label manipulation cannot improve gate
+ok 40 - label manipulation cannot improve gate
+  ---
+  duration_ms: 1.229894
+  type: 'test'
+  ...
+# Subtest: missing query cannot improve gate
+ok 41 - missing query cannot improve gate
+  ---
+  duration_ms: 1.599452
+  type: 'test'
+  ...
+# Subtest: duplicate Piece result fails
+ok 42 - duplicate Piece result fails
+  ---
+  duration_ms: 0.30507
+  type: 'test'
+  ...
+# Subtest: 10 percentage points is absolute not relative
+ok 43 - 10 percentage points is absolute not relative
+  ---
+  duration_ms: 0.280593
+  type: 'test'
+  ...
+# Subtest: warm rankings/scores repeat exactly and observer matches original endpoint
+ok 44 - warm rankings/scores repeat exactly and observer matches original endpoint
+  ---
+  duration_ms: 107.716906
+  type: 'test'
+  ...
+# Subtest: cold first-request cap remains ten photos
+ok 45 - cold first-request cap remains ten photos
+  ---
+  duration_ms: 4.152631
+  type: 'test'
+  ...
+# Subtest: warm all references considered before hue gate
+ok 46 - warm all references considered before hue gate
+  ---
+  duration_ms: 55.970317
+  type: 'test'
+  ...
+# Subtest: cold repeated requests change coverage predictably
+ok 47 - cold repeated requests change coverage predictably
+  ---
+  duration_ms: 0.457099
+  type: 'test'
+  ...
+# Subtest: actual multi-photo winner equals maximum observed score per Piece
+ok 48 - actual multi-photo winner equals maximum observed score per Piece
+  ---
+  duration_ms: 81.751177
+  type: 'test'
+  ...
+# Subtest: winning-photo output limitation captured without changing API
+ok 49 - winning-photo output limitation captured without changing API
+  ---
+  duration_ms: 0.691271
+  type: 'test'
+  ...
+# Subtest: B candidates and identifying metadata never enter A output
+ok 50 - B candidates and identifying metadata never enter A output
+  ---
+  duration_ms: 190.37544
+  type: 'test'
+  ...
+# Subtest: protected media cross-account access denied
+ok 51 - protected media cross-account access denied
+  ---
+  duration_ms: 0.216166
+  type: 'test'
+  ...
+# Subtest: baseline improvement deliberately unachieved
+ok 52 - baseline improvement deliberately unachieved
+  ---
+  duration_ms: 0.139891
+  type: 'test'
+  ...
+# Subtest: foreign result ID fails gate even without leakage flag
+ok 53 - foreign result ID fails gate even without leakage flag
+  ---
+  duration_ms: 0.380864
+  type: 'test'
+  ...
+# Subtest: changed fixture bytes fail gate
+ok 54 - changed fixture bytes fail gate
+  ---
+  duration_ms: 0.242586
+  type: 'test'
+  ...
+# Subtest: invalid latency measurement fails gate
+ok 55 - invalid latency measurement fails gate
+  ---
+  duration_ms: 0.230227
+  type: 'test'
+  ...
+# Subtest: protected media positive owner control and anonymous denial
+ok 56 - protected media positive owner control and anonymous denial
+  ---
+  duration_ms: 681.39678
+  type: 'test'
+  ...
+# (node:17) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: cold request evaluates all 144 photos and all 48 eligible Pieces
+ok 57 - cold request evaluates all 144 photos and all 48 eligible Pieces
+  ---
+  duration_ms: 3439.077641
+  type: 'test'
+  ...
+# Subtest: warm request uses complete existing feature pairs without backfill
+ok 58 - warm request uses complete existing feature pairs without backfill
+  ---
+  duration_ms: 45.292798
+  type: 'test'
+  ...
+# Subtest: partial legacy feature pairs complete and do not omit tail Piece
+ok 59 - partial legacy feature pairs complete and do not omit tail Piece
+  ---
+  duration_ms: 53.374959
+  type: 'test'
+  ...
+# Subtest: hidden Pieces excluded consistently from cold and warm snapshots
+ok 60 - hidden Pieces excluded consistently from cold and warm snapshots
+  ---
+  duration_ms: 2168.97121
+  type: 'test'
+  ...
+# Subtest: missing candidate fails explicitly instead of returning a partial ranking
+ok 61 - missing candidate fails explicitly instead of returning a partial ranking
+  ---
+  duration_ms: 116.07302
+  type: 'test'
+  ...
+# Subtest: corrupt candidate fails explicitly instead of returning a partial ranking
+ok 62 - corrupt candidate fails explicitly instead of returning a partial ranking
+  ---
+  duration_ms: 68.58321
+  type: 'test'
+  ...
+# Subtest: oversized candidate fails explicitly instead of returning a partial ranking
+ok 63 - oversized candidate fails explicitly instead of returning a partial ranking
+  ---
+  duration_ms: 88.911099
+  type: 'test'
+  ...
+# Subtest: unsafe candidate fails explicitly instead of returning a partial ranking
+ok 64 - unsafe candidate fails explicitly instead of returning a partial ranking
+  ---
+  duration_ms: 70.953535
+  type: 'test'
+  ...
+# Subtest: multi-photo evidence remains MAX with an actual winning photo ID
+ok 65 - multi-photo evidence remains MAX with an actual winning photo ID
+  ---
+  duration_ms: 34.844104
+  type: 'test'
+  ...
+# Subtest: cold and warm rankings repeat exactly
+ok 66 - cold and warm rankings repeat exactly
+  ---
+  duration_ms: 1689.243649
+  type: 'test'
+  ...
+# Subtest: identical other-account images never enter candidate snapshot
+ok 67 - identical other-account images never enter candidate snapshot
+  ---
+  duration_ms: 1661.58602
+  type: 'test'
+  ...
+# Subtest: no persistent schema or index is added by search
+ok 68 - no persistent schema or index is added by search
+  ---
+  duration_ms: 35.075778
+  type: 'test'
+  ...
+# Subtest: optimized DCT retains exact legacy feature bytes for every corpus image
+ok 69 - optimized DCT retains exact legacy feature bytes for every corpus image
+  ---
+  duration_ms: 36897.569667
+  type: 'test'
+  ...
+# Subtest: color extraction and distance remain byte-identical to frozen algorithm
+ok 70 - color extraction and distance remain byte-identical to frozen algorithm
+  ---
+  duration_ms: 0.910232
+  type: 'test'
+  ...
+# Subtest: all 516-query accuracy gates pass including every protected blue case
+ok 71 - all 516-query accuracy gates pass including every protected blue case
+  ---
+  duration_ms: 42.988279
+  type: 'test'
+  ...
+# Subtest: full cold corpus has zero unevaluated positives and complete 144-photo snapshots
+ok 72 - full cold corpus has zero unevaluated positives and complete 144-photo snapshots
+  ---
+  duration_ms: 42.276597
+  type: 'test'
+  ...
+# Subtest: pale/plain improvement is at least ten absolute percentage points
+ok 73 - pale/plain improvement is at least ten absolute percentage points
+  ---
+  duration_ms: 0.439082
+  type: 'test'
+  ...
+# Subtest: crop/orientation accuracy does not regress
+ok 74 - crop/orientation accuracy does not regress
+  ---
+  duration_ms: 0.463819
+  type: 'test'
+  ...
+# Subtest: all four modes agree and every mode is account isolated
+ok 75 - all four modes agree and every mode is account isolated
+  ---
+  duration_ms: 75.646027
+  type: 'test'
+  ...
+# Subtest: paired sequential latency and accuracy gates pass without relaxation
+ok 76 - paired sequential latency and accuracy gates pass without relaxation
+  ---
+  duration_ms: 0.359381
+  type: 'test'
+  ...
+# Subtest: expired cold preparation budget fails closed and releases query
+ok 77 - expired cold preparation budget fails closed and releases query
+  ---
+  duration_ms: 1.695116
+  type: 'test'
+  ...
+# Subtest: expired warm scoring budget fails closed and releases query
+ok 78 - expired warm scoring budget fails closed and releases query
+  ---
+  duration_ms: 2.145664
+  type: 'test'
+  ...
+# Subtest: Features-1 evidence identifies frozen source; current retrieval remains byte-identical
+ok 79 - Features-1 evidence identifies frozen source; current retrieval remains byte-identical
+  ---
+  duration_ms: 3.467357
+  type: 'test'
+  ...
+# Subtest: quiet selector exactly preserves original cluster choices
+ok 80 - quiet selector exactly preserves original cluster choices
+  ---
+  duration_ms: 15.571342
+  type: 'test'
+  ...
+# Subtest: abort during cold preparation releases query memory slot and permits complete retry
+ok 81 - abort during cold preparation releases query memory slot and permits complete retry
+  ---
+  duration_ms: 1163.207
+  type: 'test'
+  ...
+# (node:32) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: replacement aborts and suppresses late success
+ok 82 - replacement aborts and suppresses late success
+  ---
+  duration_ms: 50.716505
+  type: 'test'
+  ...
+# Subtest: replacement aborts and suppresses late error
+ok 83 - replacement aborts and suppresses late error
+  ---
+  duration_ms: 8.301323
+  type: 'test'
+  ...
+# Subtest: new selection clears previously settled results
+ok 84 - new selection clears previously settled results
+  ---
+  duration_ms: 13.732505
+  type: 'test'
+  ...
+# Subtest: session invalidation clears display and ignores late response
+ok 85 - session invalidation clears display and ignores late response
+  ---
+  duration_ms: 6.354597
+  type: 'test'
+  ...
+# Subtest: render winning photo and uncertainty, never percentage
+ok 86 - render winning photo and uncertainty, never percentage
+  ---
+  duration_ms: 8.171504
+  type: 'test'
+  ...
+# Subtest: older API falls back without numeric confidence
+ok 87 - older API falls back without numeric confidence
+  ---
+  duration_ms: 24.009424
+  type: 'test'
+  ...
+# Subtest: invalid winning reference never substitutes first photo
+ok 88 - invalid winning reference never substitutes first photo
+  ---
+  duration_ms: 8.738159
+  type: 'test'
+  ...
+# Subtest: no-match candidates remain visible with rejection summary
+ok 89 - no-match candidates remain visible with rejection summary
+  ---
+  duration_ms: 9.562762
+  type: 'test'
+  ...
+# (node:38) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: uncalibrated label boundary 0.45
+ok 90 - uncalibrated label boundary 0.45
+  ---
+  duration_ms: 3406.825711
+  type: 'test'
+  ...
+# Subtest: uncalibrated label boundary 0.969999
+ok 91 - uncalibrated label boundary 0.969999
+  ---
+  duration_ms: 0.191769
+  type: 'test'
+  ...
+# Subtest: uncalibrated label boundary 0.97
+ok 92 - uncalibrated label boundary 0.97
+  ---
+  duration_ms: 0.088594
+  type: 'test'
+  ...
+# Subtest: uncalibrated label boundary 1
+ok 93 - uncalibrated label boundary 1
+  ---
+  duration_ms: 0.096866
+  type: 'test'
+  ...
+# Subtest: uncalibrated label boundary NaN
+ok 94 - uncalibrated label boundary NaN
+  ---
+  duration_ms: 0.093721
+  type: 'test'
+  ...
+# Subtest: empty candidates are explicitly uncertain
+ok 95 - empty candidates are explicitly uncertain
+  ---
+  duration_ms: 0.152911
+  type: 'test'
+  ...
+# Subtest: close candidates retain rank, raw score and all suggestions
+ok 96 - close candidates retain rank, raw score and all suggestions
+  ---
+  duration_ms: 0.776811
+  type: 'test'
+  ...
+# Subtest: low close scores reject certainty without hiding ambiguity
+ok 97 - low close scores reject certainty without hiding ambiguity
+  ---
+  duration_ms: 0.32506
+  type: 'test'
+  ...
+# Subtest: each winning photo ID is the exact maximum-score observed photo
+ok 98 - each winning photo ID is the exact maximum-score observed photo
+  ---
+  duration_ms: 0.512363
+  type: 'test'
+  ...
+# Subtest: non-first winning photo is preserved explicitly
+ok 99 - non-first winning photo is preserved explicitly
+  ---
+  duration_ms: 0.23882
+  type: 'test'
+  ...
+# Subtest: backward API fields and Piece-level deduplication remain
+ok 100 - backward API fields and Piece-level deduplication remain
+  ---
+  duration_ms: 0.203807
+  type: 'test'
+  ...
+# Subtest: no foreign media or filesystem paths in winning provenance
+ok 101 - no foreign media or filesystem paths in winning provenance
+  ---
+  duration_ms: 0.352451
+  type: 'test'
+  ...
+# Subtest: protected winning photo delivered only to owner A
+ok 102 - protected winning photo delivered only to owner A
+  ---
+  duration_ms: 13.537481
+  type: 'test'
+  ...
+# Subtest: protected winning photo delivered only to owner B
+ok 103 - protected winning photo delivered only to owner B
+  ---
+  duration_ms: 5.045574
+  type: 'test'
+  ...
+# Subtest: protected winning photo delivered only to owner null
+ok 104 - protected winning photo delivered only to owner null
+  ---
+  duration_ms: 5.204954
+  type: 'test'
+  ...
+# Subtest: winning reference cannot be used through another Piece route
+ok 105 - winning reference cannot be used through another Piece route
+  ---
+  duration_ms: 4.845082
+  type: 'test'
+  ...
+# Subtest: foreign account receives only its own matched IDs
+ok 106 - foreign account receives only its own matched IDs
+  ---
+  duration_ms: 2140.067014
+  type: 'test'
+  ...
+# Subtest: complete Results-1 corpus preserves exact Features-1 retrieval in four modes
+ok 107 - complete Results-1 corpus preserves exact Features-1 retrieval in four modes
+  ---
+  duration_ms: 194.614716
+  type: 'test'
+  ...
+# Subtest: corpus negatives never get confident identification; suggestions preserved
+ok 108 - corpus negatives never get confident identification; suggestions preserved
+  ---
+  duration_ms: 0.458452
+  type: 'test'
+  ...
+# Subtest: ambiguous corpus retains both acceptable Top-3 usefulness
+ok 109 - ambiguous corpus retains both acceptable Top-3 usefulness
+  ---
+  duration_ms: 0.296607
+  type: 'test'
+  ...
+# (node:111) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: valid search keeps API and protected candidate metadata
+ok 110 - valid search keeps API and protected candidate metadata
+  ---
+  duration_ms: 3290.957893
+  type: 'test'
+  ...
+# Subtest: reject unauthorized null
+ok 111 - reject unauthorized null
+  ---
+  duration_ms: 12.51522
+  type: 'test'
+  ...
+# Subtest: reject unauthorized invalid
+ok 112 - reject unauthorized invalid
+  ---
+  duration_ms: 14.504929
+  type: 'test'
+  ...
+# Subtest: reject unauthorized missing
+ok 113 - reject unauthorized missing
+  ---
+  duration_ms: 7.41545
+  type: 'test'
+  ...
+# Subtest: deleted account token rejected
+ok 114 - deleted account token rejected
+  ---
+  duration_ms: 6.290294
+  type: 'test'
+  ...
+# Subtest: empty
+ok 115 - empty
+  ---
+  duration_ms: 11.727231
+  type: 'test'
+  ...
+# Subtest: text disguised as PNG
+ok 116 - text disguised as PNG
+  ---
+  duration_ms: 9.153181
+  type: 'test'
+  ...
+# Subtest: truncated PNG
+ok 117 - truncated PNG
+  ---
+  duration_ms: 5.755507
+  type: 'test'
+  ...
+# Subtest: SVG
+ok 118 - SVG
+  ---
+  duration_ms: 7.999561
+  type: 'test'
+  ...
+# Subtest: nonimage MIME
+ok 119 - nonimage MIME
+  ---
+  duration_ms: 7.784937
+  type: 'test'
+  ...
+# Subtest: missing photo
+ok 120 - missing photo
+  ---
+  duration_ms: 7.362661
+  type: 'test'
+  ...
+# Subtest: multiple files rejected
+ok 121 - multiple files rejected
+  ---
+  duration_ms: 4.76196
+  type: 'test'
+  ...
+# Subtest: encoded size limit
+ok 122 - encoded size limit
+  ---
+  duration_ms: 68.454201
+  type: 'test'
+  ...
+# Subtest: dimension limit
+ok 123 - dimension limit
+  ---
+  duration_ms: 10.014328
+  type: 'test'
+  ...
+# Subtest: pixel count limit
+ok 124 - pixel count limit
+  ---
+  duration_ms: 138.800507
+  type: 'test'
+  ...
+# Subtest: actual decoder type cannot be hidden by MIME
+ok 125 - actual decoder type cannot be hidden by MIME
+  ---
+  duration_ms: 7.974152
+  type: 'test'
+  ...
+# Subtest: corrupt compressed image rejected
+ok 126 - corrupt compressed image rejected
+  ---
+  duration_ms: 7.013164
+  type: 'test'
+  ...
+# Subtest: retired debug uploader null
+ok 127 - retired debug uploader null
+  ---
+  duration_ms: 3.42226
+  type: 'test'
+  ...
+# Subtest: retired debug uploader A
+ok 128 - retired debug uploader A
+  ---
+  duration_ms: 3.288568
+  type: 'test'
+  ...
+# Subtest: retired debug uploader B
+ok 129 - retired debug uploader B
+  ---
+  duration_ms: 2.400229
+  type: 'test'
+  ...
+# Subtest: stored debug colors require a live account
+ok 130 - stored debug colors require a live account
+  ---
+  duration_ms: 6.951591
+  type: 'test'
+  ...
+# Subtest: query filename cannot be fetched by any account
+ok 131 - query filename cannot be fetched by any account
+  ---
+  duration_ms: 52.489022
+  type: 'test'
+  ...
+# Subtest: two accounts retrieve only their own pieces
+ok 132 - two accounts retrieve only their own pieces
+  ---
+  duration_ms: 1954.046512
+  type: 'test'
+  ...
+# Subtest: protected candidate media retains owner and foreign behavior
+ok 133 - protected candidate media retains owner and foreign behavior
+  ---
+  duration_ms: 9.945144
+  type: 'test'
+  ...
+# Subtest: ranking failure cleans query and releases capacity
+ok 134 - ranking failure cleans query and releases capacity
+  ---
+  duration_ms: 56.121874
+  type: 'test'
+  ...
+# Subtest: partial upload is private, same-account concurrency bounded, abort releases capacity
+ok 135 - partial upload is private, same-account concurrency bounded, abort releases capacity
+  ---
+  duration_ms: 249.059862
+  type: 'test'
+  ...
+# Subtest: malformed multipart cleans and permits retry
+ok 136 - malformed multipart cleans and permits retry
+  ---
+  duration_ms: 46.846049
+  type: 'test'
+  ...
+# Subtest: release wipes memory, is idempotent, and clears request reference
+ok 137 - release wipes memory, is idempotent, and clears request reference
+  ---
+  duration_ms: 79.289904
+  type: 'test'
+  ...
+# Subtest: frozen Eval-1 feature extraction, crops, weights and hashes
+ok 138 - frozen Eval-1 feature extraction, crops, weights and hashes
+  ---
+  duration_ms: 0.468977
+  type: 'test'
+  ...
+# Subtest: frozen Eval-1 scoring, ordering and per-Piece selection
+ok 139 - frozen Eval-1 scoring, ordering and per-Piece selection
+  ---
+  duration_ms: 0.268174
+  type: 'test'
+  ...
+# (node:153) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: entry, labels, empty state, keyboard form, safe successful results
+ok 140 - entry, labels, empty state, keyboard form, safe successful results
+  ---
+  duration_ms: 559.585364
+  type: 'test'
+  ...
+# Subtest: stored HTML remains inert plain text
+ok 141 - stored HTML remains inert plain text
+  ---
+  duration_ms: 279.952989
+  type: 'test'
+  ...
+# Subtest: piece opens fresh canonical viewer and returns to Search
+ok 142 - piece opens fresh canonical viewer and returns to Search
+  ---
+  duration_ms: 367.122522
+  type: 'test'
+  ...
+# Subtest: clay opens fresh canonical viewer and returns to Search
+ok 143 - clay opens fresh canonical viewer and returns to Search
+  ---
+  duration_ms: 347.491567
+  type: 'test'
+  ...
+# Subtest: glaze opens fresh canonical viewer and returns to Search
+ok 144 - glaze opens fresh canonical viewer and returns to Search
+  ---
+  duration_ms: 376.265947
+  type: 'test'
+  ...
+# Subtest: raw-material opens fresh canonical viewer and returns to Search
+ok 145 - raw-material opens fresh canonical viewer and returns to Search
+  ---
+  duration_ms: 345.05788
+  type: 'test'
+  ...
+# Subtest: test-tile opens fresh canonical viewer and returns to Search
+ok 146 - test-tile opens fresh canonical viewer and returns to Search
+  ---
+  duration_ms: 324.648673
+  type: 'test'
+  ...
+# Subtest: firing opens fresh canonical viewer and returns to Search
+ok 147 - firing opens fresh canonical viewer and returns to Search
+  ---
+  duration_ms: 357.07608
+  type: 'test'
+  ...
+# Subtest: pricing opens fresh canonical viewer and returns to Search
+ok 148 - pricing opens fresh canonical viewer and returns to Search
+  ---
+  duration_ms: 291.817777
+  type: 'test'
+  ...
+# Subtest: sale opens fresh canonical viewer and returns to Search
+ok 149 - sale opens fresh canonical viewer and returns to Search
+  ---
+  duration_ms: 333.454983
+  type: 'test'
+  ...
+# Subtest: project opens fresh canonical viewer and returns to Search
+ok 150 - project opens fresh canonical viewer and returns to Search
+  ---
+  duration_ms: 305.293735
+  type: 'test'
+  ...
+# Subtest: contact opens fresh canonical viewer and returns to Search
+ok 151 - contact opens fresh canonical viewer and returns to Search
+  ---
+  duration_ms: 305.454407
+  type: 'test'
+  ...
+# Subtest: event opens fresh canonical viewer and returns to Search
+ok 152 - event opens fresh canonical viewer and returns to Search
+  ---
+  duration_ms: 335.38407
+  type: 'test'
+  ...
+# Subtest: piece deleted or foreign canonical result fails closed
+ok 153 - piece deleted or foreign canonical result fails closed
+  ---
+  duration_ms: 260.561671
+  type: 'test'
+  ...
+# Subtest: clay deleted or foreign canonical result fails closed
+ok 154 - clay deleted or foreign canonical result fails closed
+  ---
+  duration_ms: 255.784602
+  type: 'test'
+  ...
+# Subtest: glaze deleted or foreign canonical result fails closed
+ok 155 - glaze deleted or foreign canonical result fails closed
+  ---
+  duration_ms: 203.505881
+  type: 'test'
+  ...
+# Subtest: raw-material deleted or foreign canonical result fails closed
+ok 156 - raw-material deleted or foreign canonical result fails closed
+  ---
+  duration_ms: 244.539111
+  type: 'test'
+  ...
+# Subtest: test-tile deleted or foreign canonical result fails closed
+ok 157 - test-tile deleted or foreign canonical result fails closed
+  ---
+  duration_ms: 196.02357
+  type: 'test'
+  ...
+# Subtest: firing deleted or foreign canonical result fails closed
+ok 158 - firing deleted or foreign canonical result fails closed
+  ---
+  duration_ms: 246.422962
+  type: 'test'
+  ...
+# Subtest: pricing deleted or foreign canonical result fails closed
+ok 159 - pricing deleted or foreign canonical result fails closed
+  ---
+  duration_ms: 214.33623
+  type: 'test'
+  ...
+# Subtest: sale deleted or foreign canonical result fails closed
+ok 160 - sale deleted or foreign canonical result fails closed
+  ---
+  duration_ms: 266.88004
+  type: 'test'
+  ...
+# Subtest: project deleted or foreign canonical result fails closed
+ok 161 - project deleted or foreign canonical result fails closed
+  ---
+  duration_ms: 229.663828
+  type: 'test'
+  ...
+# Subtest: contact deleted or foreign canonical result fails closed
+ok 162 - contact deleted or foreign canonical result fails closed
+  ---
+  duration_ms: 250.101091
+  type: 'test'
+  ...
+# Subtest: event deleted or foreign canonical result fails closed
+ok 163 - event deleted or foreign canonical result fails closed
+  ---
+  duration_ms: 230.103852
+  type: 'test'
+  ...
+# Subtest: forged successful foreign response cannot bypass ownership
+ok 164 - forged successful foreign response cannot bypass ownership
+  ---
+  duration_ms: 245.741014
+  type: 'test'
+  ...
+# Subtest: piece filter is sent to API unchanged
+ok 165 - piece filter is sent to API unchanged
+  ---
+  duration_ms: 211.423754
+  type: 'test'
+  ...
+# Subtest: clay filter is sent to API unchanged
+ok 166 - clay filter is sent to API unchanged
+  ---
+  duration_ms: 209.0758
+  type: 'test'
+  ...
+# Subtest: glaze filter is sent to API unchanged
+ok 167 - glaze filter is sent to API unchanged
+  ---
+  duration_ms: 231.598689
+  type: 'test'
+  ...
+# Subtest: raw-material filter is sent to API unchanged
+ok 168 - raw-material filter is sent to API unchanged
+  ---
+  duration_ms: 226.193585
+  type: 'test'
+  ...
+# Subtest: test-tile filter is sent to API unchanged
+ok 169 - test-tile filter is sent to API unchanged
+  ---
+  duration_ms: 274.098174
+  type: 'test'
+  ...
+# Subtest: firing filter is sent to API unchanged
+ok 170 - firing filter is sent to API unchanged
+  ---
+  duration_ms: 289.092162
+  type: 'test'
+  ...
+# Subtest: pricing filter is sent to API unchanged
+ok 171 - pricing filter is sent to API unchanged
+  ---
+  duration_ms: 269.080534
+  type: 'test'
+  ...
+# Subtest: sale filter is sent to API unchanged
+ok 172 - sale filter is sent to API unchanged
+  ---
+  duration_ms: 251.259083
+  type: 'test'
+  ...
+# Subtest: project filter is sent to API unchanged
+ok 173 - project filter is sent to API unchanged
+  ---
+  duration_ms: 238.758552
+  type: 'test'
+  ...
+# Subtest: contact filter is sent to API unchanged
+ok 174 - contact filter is sent to API unchanged
+  ---
+  duration_ms: 212.124962
+  type: 'test'
+  ...
+# Subtest: event filter is sent to API unchanged
+ok 175 - event filter is sent to API unchanged
+  ---
+  duration_ms: 227.983154
+  type: 'test'
+  ...
+# Subtest: locked Test Tiles hide all tile fields even from malformed payload; unrelated filters retain lock
+ok 176 - locked Test Tiles hide all tile fields even from malformed payload; unrelated filters retain lock
+  ---
+  duration_ms: 210.772042
+  type: 'test'
+  ...
+# Subtest: entitlement lost after search removes tiles and clears previous detail
+ok 177 - entitlement lost after search removes tiles and clears previous detail
+  ---
+  duration_ms: 252.148178
+  type: 'test'
+  ...
+# Subtest: loading, no results, error, retry, clear, and input focus
+ok 178 - loading, no results, error, retry, clear, and input focus
+  ---
+  duration_ms: 221.842777
+  type: 'test'
+  ...
+# Subtest: API validation is handled without raw server error content
+ok 179 - API validation is handled without raw server error content
+  ---
+  duration_ms: 188.678911
+  type: 'test'
+  ...
+# Subtest: pagination keeps server order, retries same offset and honors cap
+ok 180 - pagination keeps server order, retries same offset and honors cap
+  ---
+  duration_ms: 262.145073
+  type: 'test'
+  ...
+# Subtest: late search cannot render after account
+ok 181 - late search cannot render after account
+  ---
+  duration_ms: 241.676342
+  type: 'test'
+  ...
+# Subtest: late search cannot render after token
+ok 182 - late search cannot render after token
+  ---
+  duration_ms: 217.903763
+  type: 'test'
+  ...
+# Subtest: late search cannot render after logout
+ok 183 - late search cannot render after logout
+  ---
+  duration_ms: 254.045554
+  type: 'test'
+  ...
+# Subtest: late search cannot render after storage
+ok 184 - late search cannot render after storage
+  ---
+  duration_ms: 219.423819
+  type: 'test'
+  ...
+# Subtest: late search cannot render after clear
+ok 185 - late search cannot render after clear
+  ---
+  duration_ms: 225.333209
+  type: 'test'
+  ...
+# Subtest: late search cannot render after navigate
+ok 186 - late search cannot render after navigate
+  ---
+  duration_ms: 223.274044
+  type: 'test'
+  ...
+# Subtest: late search cannot render after new-query
+ok 187 - late search cannot render after new-query
+  ---
+  duration_ms: 212.796394
+  type: 'test'
+  ...
+# Subtest: late canonical read cannot render after account
+ok 188 - late canonical read cannot render after account
+  ---
+  duration_ms: 232.122363
+  type: 'test'
+  ...
+# Subtest: late canonical read cannot render after token
+ok 189 - late canonical read cannot render after token
+  ---
+  duration_ms: 246.238429
+  type: 'test'
+  ...
+# Subtest: late canonical read cannot render after logout
+ok 190 - late canonical read cannot render after logout
+  ---
+  duration_ms: 303.185604
+  type: 'test'
+  ...
+# Subtest: late canonical read cannot render after back
+ok 191 - late canonical read cannot render after back
+  ---
+  duration_ms: 311.921604
+  type: 'test'
+  ...
+# Subtest: late canonical read cannot render after different-record
+ok 192 - late canonical read cannot render after different-record
+  ---
+  duration_ms: 305.496223
+  type: 'test'
+  ...
+# Subtest: 401 invalidates results, detail and in-flight state
+ok 193 - 401 invalidates results, detail and in-flight state
+  ---
+  duration_ms: 215.009425
+  type: 'test'
+  ...
+# Subtest: canonical route refresh reauthorizes without any search metadata
+ok 194 - canonical route refresh reauthorizes without any search metadata
+  ---
+  duration_ms: 200.969819
+  type: 'test'
+  ...
+# Subtest: browser Back clears detail and restores results; Forward reads fresh
+ok 195 - browser Back clears detail and restores results; Forward reads fresh
+  ---
+  duration_ms: 262.9383
+  type: 'test'
+  ...
+# Subtest: new account never reuses existing results or selected detail
+ok 196 - new account never reuses existing results or selected detail
+  ---
+  duration_ms: 200.98979
+  type: 'test'
+  ...
+# Subtest: entitlement revoked between preflight and canonical Tile fetch purges results
+ok 197 - entitlement revoked between preflight and canonical Tile fetch purges results
+  ---
+  duration_ms: 229.519687
+  type: 'test'
+  ...
+# Subtest: pricing response without owner field relies on canonical owner-scoped route
+ok 198 - pricing response without owner field relies on canonical owner-scoped route
+  ---
+  duration_ms: 206.428587
+  type: 'test'
+  ...
+# Subtest: modal close clears detail and returns to Search
+ok 199 - modal close clears detail and returns to Search
+  ---
+  duration_ms: 215.057787
+  type: 'test'
+  ...
+# (node:171) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: HTTP Search to canonical piece viewer
+ok 200 - HTTP Search to canonical piece viewer
+  ---
+  duration_ms: 792.412987
+  type: 'test'
+  ...
+# Subtest: HTTP Search to canonical clay viewer
+ok 201 - HTTP Search to canonical clay viewer
+  ---
+  duration_ms: 412.308956
+  type: 'test'
+  ...
+# Subtest: HTTP Search to canonical glaze viewer
+ok 202 - HTTP Search to canonical glaze viewer
+  ---
+  duration_ms: 334.822255
+  type: 'test'
+  ...
+# Subtest: HTTP Search to canonical raw-material viewer
+ok 203 - HTTP Search to canonical raw-material viewer
+  ---
+  duration_ms: 290.932684
+  type: 'test'
+  ...
+# Subtest: HTTP Search to canonical test-tile viewer
+ok 204 - HTTP Search to canonical test-tile viewer
+  ---
+  duration_ms: 423.033338
+  type: 'test'
+  ...
+# Subtest: HTTP Search to canonical firing viewer
+ok 205 - HTTP Search to canonical firing viewer
+  ---
+  duration_ms: 346.106857
+  type: 'test'
+  ...
+# Subtest: HTTP Search to canonical pricing viewer
+ok 206 - HTTP Search to canonical pricing viewer
+  ---
+  duration_ms: 306.75313
+  type: 'test'
+  ...
+# Subtest: HTTP Search to canonical sale viewer
+ok 207 - HTTP Search to canonical sale viewer
+  ---
+  duration_ms: 332.666224
+  type: 'test'
+  ...
+# Subtest: HTTP Search to canonical project viewer
+ok 208 - HTTP Search to canonical project viewer
+  ---
+  duration_ms: 315.2133
+  type: 'test'
+  ...
+# Subtest: HTTP Search to canonical contact viewer
+ok 209 - HTTP Search to canonical contact viewer
+  ---
+  duration_ms: 326.63521
+  type: 'test'
+  ...
+# Subtest: HTTP Search to canonical event viewer
+ok 210 - HTTP Search to canonical event viewer
+  ---
+  duration_ms: 336.583413
+  type: 'test'
+  ...
+# Subtest: HTTP piece ownership changes after search fail closed
+ok 211 - HTTP piece ownership changes after search fail closed
+  ---
+  duration_ms: 270.709053
+  type: 'test'
+  ...
+# Subtest: HTTP clay ownership changes after search fail closed
+ok 212 - HTTP clay ownership changes after search fail closed
+  ---
+  duration_ms: 262.019876
+  type: 'test'
+  ...
+# Subtest: HTTP glaze ownership changes after search fail closed
+ok 213 - HTTP glaze ownership changes after search fail closed
+  ---
+  duration_ms: 240.550378
+  type: 'test'
+  ...
+# Subtest: HTTP raw-material ownership changes after search fail closed
+ok 214 - HTTP raw-material ownership changes after search fail closed
+  ---
+  duration_ms: 268.940099
+  type: 'test'
+  ...
+# Subtest: HTTP test-tile ownership changes after search fail closed
+ok 215 - HTTP test-tile ownership changes after search fail closed
+  ---
+  duration_ms: 236.839237
+  type: 'test'
+  ...
+# Subtest: HTTP firing ownership changes after search fail closed
+ok 216 - HTTP firing ownership changes after search fail closed
+  ---
+  duration_ms: 237.950452
+  type: 'test'
+  ...
+# Subtest: HTTP pricing ownership changes after search fail closed
+ok 217 - HTTP pricing ownership changes after search fail closed
+  ---
+  duration_ms: 261.820771
+  type: 'test'
+  ...
+# Subtest: HTTP sale ownership changes after search fail closed
+ok 218 - HTTP sale ownership changes after search fail closed
+  ---
+  duration_ms: 255.238807
+  type: 'test'
+  ...
+# Subtest: HTTP project ownership changes after search fail closed
+ok 219 - HTTP project ownership changes after search fail closed
+  ---
+  duration_ms: 261.414449
+  type: 'test'
+  ...
+# Subtest: HTTP contact ownership changes after search fail closed
+ok 220 - HTTP contact ownership changes after search fail closed
+  ---
+  duration_ms: 264.84154
+  type: 'test'
+  ...
+# Subtest: HTTP event ownership changes after search fail closed
+ok 221 - HTTP event ownership changes after search fail closed
+  ---
+  duration_ms: 251.990615
+  type: 'test'
+  ...
+# Subtest: HTTP fresh rename wins over Search metadata
+ok 222 - HTTP fresh rename wins over Search metadata
+  ---
+  duration_ms: 236.895829
+  type: 'test'
+  ...
+# Subtest: HTTP lost Test Tile entitlement clears searched tile and denies canonical viewer
+ok 223 - HTTP lost Test Tile entitlement clears searched tile and denies canonical viewer
+  ---
+  duration_ms: 296.686341
+  type: 'test'
+  ...
+# Subtest: HTTP canonical deleted Contact after search fails closed
+ok 224 - HTTP canonical deleted Contact after search fails closed
+  ---
+  duration_ms: 354.062427
+  type: 'test'
+  ...
+# Subtest: HTTP new account cannot reuse prior results or open former account record
+ok 225 - HTTP new account cannot reuse prior results or open former account record
+  ---
+  duration_ms: 337.750817
+  type: 'test'
+  ...
+# (node:191) [UNDICI-EHPA] Warning: EnvHttpProxyAgent is experimental, expect them to change at any time.
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: piece searches own canonical record only
+ok 226 - piece searches own canonical record only
+  ---
+  duration_ms: 459.974991
+  type: 'test'
+  ...
+# Subtest: clay searches own canonical record only
+ok 227 - clay searches own canonical record only
+  ---
+  duration_ms: 11.213099
+  type: 'test'
+  ...
+# Subtest: glaze searches own canonical record only
+ok 228 - glaze searches own canonical record only
+  ---
+  duration_ms: 7.911552
+  type: 'test'
+  ...
+# Subtest: raw-material searches own canonical record only
+ok 229 - raw-material searches own canonical record only
+  ---
+  duration_ms: 5.796205
+  type: 'test'
+  ...
+# Subtest: test-tile searches own canonical record only
+ok 230 - test-tile searches own canonical record only
+  ---
+  duration_ms: 5.138134
+  type: 'test'
+  ...
+# Subtest: firing searches own canonical record only
+ok 231 - firing searches own canonical record only
+  ---
+  duration_ms: 5.566288
+  type: 'test'
+  ...
+# Subtest: pricing searches own canonical record only
+ok 232 - pricing searches own canonical record only
+  ---
+  duration_ms: 5.423314
+  type: 'test'
+  ...
+# Subtest: sale searches own canonical record only
+ok 233 - sale searches own canonical record only
+  ---
+  duration_ms: 6.3967
+  type: 'test'
+  ...
+# Subtest: project searches own canonical record only
+ok 234 - project searches own canonical record only
+  ---
+  duration_ms: 7.160601
+  type: 'test'
+  ...
+# Subtest: contact searches own canonical record only
+ok 235 - contact searches own canonical record only
+  ---
+  duration_ms: 7.419131
+  type: 'test'
+  ...
+# Subtest: event searches own canonical record only
+ok 236 - event searches own canonical record only
+  ---
+  duration_ms: 3.721448
+  type: 'test'
+  ...
+# Subtest: all categories are searched and foreign account has only its own results
+ok 237 - all categories are searched and foreign account has only its own results
+  ---
+  duration_ms: 12.847201
+  type: 'test'
+  ...
+# Subtest: public Piece and corrupt foreign Clay relationship do not broaden scope
+ok 238 - public Piece and corrupt foreign Clay relationship do not broaden scope
+  ---
+  duration_ms: 2.484314
+  type: 'test'
+  ...
+# Subtest: current Test Tile tier revocation overrides stale JWT without counts or snippets
+ok 239 - current Test Tile tier revocation overrides stale JWT without counts or snippets
+  ---
+  duration_ms: 13.979328
+  type: 'test'
+  ...
+# Subtest: missing, invalid and deleted-account credentials fail closed with no-store
+ok 240 - missing, invalid and deleted-account credentials fail closed with no-store
+  ---
+  duration_ms: 11.08788
+  type: 'test'
+  ...
+# Subtest: invalid and structured query parameters are rejected
+ok 241 - invalid and structured query parameters are rejected
+  ---
+  duration_ms: 45.5954
+  type: 'test'
+  ...
+# Subtest: SQL syntax, percent and underscore are literal search content
+ok 242 - SQL syntax, percent and underscore are literal search content
+  ---
+  duration_ms: 2.089689
+  type: 'test'
+  ...
+# Subtest: Unicode case and canonical accents are handled, tokens can match different fields
+ok 243 - Unicode case and canonical accents are handled, tokens can match different fields
+  ---
+  duration_ms: 0.72298
+  type: 'test'
+  ...
+# Subtest: exact title precedes title phrase and body-only hits; pagination is stable
+ok 244 - exact title precedes title phrase and body-only hits; pagination is stable
+  ---
+  duration_ms: 3.011749
+  type: 'test'
+  ...
+# Subtest: same IDs in different categories are not collapsed
+ok 245 - same IDs in different categories are not collapsed
+  ---
+  duration_ms: 1.249493
+  type: 'test'
+  ...
+# Subtest: long matched notes produce a bounded contextual excerpt without HTML generation
+ok 246 - long matched notes produce a bounded contextual excerpt without HTML generation
+  ---
+  duration_ms: 1.097444
+  type: 'test'
+  ...
+# Subtest: queries do not change schema, records, media references or entitlement state
+ok 247 - queries do not change schema, records, media references or entitlement state
+  ---
+  duration_ms: 5.627902
+  type: 'test'
+  ...
+# Subtest: fresh rename and deletion appear without an index rebuild or stale cache
+ok 248 - fresh rename and deletion appear without an index rebuild or stale cache
+  ---
+  duration_ms: 16.328533
+  type: 'test'
+  ...
+# Subtest: result-window cap is explicit and never emits an unusable next offset
+ok 249 - result-window cap is explicit and never emits an unusable next offset
+  ---
+  duration_ms: 34.625202
+  type: 'test'
+  ...
+1..249
+# tests 261
+# suites 0
+# pass 261
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 47903.962894

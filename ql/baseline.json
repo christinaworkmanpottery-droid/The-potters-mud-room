@@ -1,0 +1,32 @@
+{
+  "phase": 0,
+  "date": "2026-09-29",
+  "branch": "ql/phase-0-baseline",
+  "website": {
+    "repository": "christinaworkmanpottery-droid/The-potters-mud-room",
+    "productionBranch": "main",
+    "sourceCommit": "b818122c88b8ca037866f2fd35eaa11690759169",
+    "version": "47",
+    "renderService": "srv-d6it9vpdrdic73emsvjg",
+    "renderDeploy": "dep-darbepss728c73a2lisg",
+    "autoDeploy": true
+  },
+  "mobile": {
+    "repository": "christinaworkmanpottery-droid/potters-mudroom-app",
+    "sourceBranch": "android/v47-parity-sept25",
+    "sourceCommit": "14348287af6ad80c2ddcd1287334caa51628d265",
+    "defaultBranch": "master",
+    "defaultCommit": "193455f4323ed0597c62cee9963d91ccae5d7a24",
+    "configuredVersion": "1.0.5",
+    "configuredAndroidVersionCode": 22,
+    "configuredIosBuild": "47",
+    "appIdentity": "com.pottersmudroom.app",
+    "expoOwner": "mudroom4",
+    "expoProject": "97990f37-9ba6-406f-be0d-c2814e036e28",
+    "liveStoreCommitMapping": "unverified",
+    "note": "Source configuration is not evidence of an installed or released store binary."
+  },
+  "environment": "disposable-local-synthetic-data-only",
+  "productionMutationAuthorized": false,
+  "phase1Authorized": false
+}

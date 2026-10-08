@@ -1,0 +1,59 @@
+name: QL Phase 1 + Phase 2 Verify
+# Phase 2W Test Tile and Glaze Combo post-edit media closure
+on:
+  push:
+    branches: [ql/phase-1-relationships, ql/phase-2a-piece-history, ql/phase-2b-piece-history-web, ql/phase-2c-history-validation, ql/phase-2d-piece-media, ql/phase-2e-private-piece-mobile, ql/phase-2f-upload-audit, ql/phase-2g-clay-media, ql/phase-2h-glaze-media, ql/phase-2i-glaze-clay-test-media, ql/phase-2j-test-tile-media, ql/phase-2k-glaze-combo-media, ql/phase-2l-firing-media, ql/phase-2m-pricing-media, ql/phase-2n-sales-media, ql/phase-2o-project-media, ql/phase-2p-event-media, ql/phase-2q-profile-media, ql/phase-2r-forum-media, ql/phase-2s-shop-media, ql/phase-2t-upload-readiness, ql/phase-2u-piece-public-edges, ql/phase-2v-casualty-sale-previews, ql/phase-2w-test-tile-combo-post-edit, ql/phase-3a-piece-pricing-manual, ql/phase-3b-piece-firing-manual, ql/phase-3c-piece-test-tile-manual, ql/phase-3d-piece-sales-readonly, ql/phase-3e-workflow-hardening, ql/phase-3f-piece-clay-readonly, ql/phase-3g-piece-glaze-readonly, ql/phase-3h-lifecycle-recovery, ql/pre-release-piece-editor-preservation, ql/pre-release-events-contact-initialization, ql/pre-release-recovery-rehearsal, ql/pre-release-admin-demographics, ql/pre-release-shop-original-asset, ql/pre-release-special-account-billing, ql/pre-release-admin-granted-billing, ql/search-1-studio-search, ql/search-2-web-ui-navigation, ql/photo-lookup-eval-1, ql/photo-lookup-safety-1, ql/photo-lookup-features-1, ql/photo-lookup-results-1, ql/photo-lookup-client-integration-1, ql/phase-4b-assistant-core, ql/phase-4c-assistant-web]
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Verify clean checkout release asset before install or startup
+        run: |
+          command -v pdfinfo && command -v pdftoppm || (sudo apt-get update && sudo apt-get install -y poppler-utils)
+          node ql/check-shop-release.cjs
+      - run: npm ci
+      - name: Reproduce unchanged Photo Lookup evaluation
+        if: github.ref_name != 'ql/phase-4c-assistant-web' && github.ref_name != 'ql/phase-4b-assistant-core' && github.ref_name != 'ql/photo-lookup-features-1' && github.ref_name != 'ql/photo-lookup-results-1' && github.ref_name != 'ql/photo-lookup-client-integration-1'
+        run: node ql/photo-eval/run.cjs --verify-frozen
+      - name: Evaluate Features-1 on the frozen corpus and paired baseline
+        if: github.ref_name == 'ql/photo-lookup-features-1'
+        run: |
+          node ql/photo-features/run.cjs
+          git worktree add --detach "$RUNNER_TEMP/photo-eval-baseline" 4646f7b96454b2a1d1c4e641c58e6d2bae3b9d49
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/photo-eval-baseline/node_modules"
+          node ql/photo-features/compare-local.cjs "$RUNNER_TEMP/photo-eval-baseline"
+      - name: Evaluate Results-1 against frozen Features-1 retrieval
+        if: github.ref_name == 'ql/phase-4c-assistant-web' || github.ref_name == 'ql/phase-4b-assistant-core' || github.ref_name == 'ql/photo-lookup-results-1' || github.ref_name == 'ql/photo-lookup-client-integration-1'
+        run: node ql/photo-results/run.cjs
+      - run: node --require ./ql/rehearsal/suite-isolate.cjs ql/verify-phase1.cjs
+      - name: Phase 1 strict closure gate
+        run: QL_READINESS_STRICT=1 node --require ./ql/rehearsal/suite-isolate.cjs --test tests/ql-readiness-blockers.cjs tests/ql-safety-migrations.cjs
+
+      - name: Rehearsal runtime prerequisite
+        run: |
+          command -v ffmpeg && command -v pdftoppm || (sudo apt-get update && sudo apt-get install -y ffmpeg poppler-utils)
+          ffmpeg -version
+          pdfinfo -v
+      - name: Disposable full recovery rehearsal (non-root runner)
+        run: |
+          printf 'synthetic-only-v1\n' > .rehearsal-checkout
+          node ql/rehearsal/run.cjs
+      - name: Require all rehearsal assertions completed
+        run: node -e "const r=require('./ql/rehearsal/evidence/report.json');if(r.rehearsal!=='PASS'||r.blockers.length!==0||r.checks.some(x=>x.result!=='PASS'))process.exit(1);console.log(r.counts);console.log('Release decision remains '+r.final);"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: disposable-recovery-evidence
+          path: |
+            ql/rehearsal/evidence/
+            ql/photo-eval/evidence/
+            ql/photo-features/evidence/

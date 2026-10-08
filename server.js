@@ -1,3 +1,4 @@
+const pieceEditor = require('./ql/piece-editor.cjs');
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -33,13 +34,18 @@ db.exec(`CREATE TABLE IF NOT EXISTS ai_usage (
 )`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_ai_usage_user_month ON ai_usage(user_id, created_at)`);
 
-// Migrate all tiers to free/unlimited (starter = unlimited internally)
+// Migrate all tiers to free/unlimited (starter = unlimited internally).
+// Keep the historical CHECK bypass only around legacy tier normalization; special
+// grandfathered accounts are normalized separately to CHECK-compatible storage.
 try {
   db.pragma('ignore_check_constraints = ON');
   db.prepare("UPDATE users SET tier='starter' WHERE tier IN ('basic','mid','top')").run();
-  db.prepare("UPDATE users SET tier='starter', billing_period='stripe-monthly' WHERE LOWER(email) IN ('jgk1020@gmail.com','awhiteman96@gmail.com','christinaworkmanpottery@gmail.com')").run();
   db.pragma('ignore_check_constraints = OFF');
-} catch(e) { db.pragma('ignore_check_constraints = OFF'); }
+  iap.normalizeSpecialAccountBilling(db);
+} catch(e) {
+  db.pragma('ignore_check_constraints = OFF');
+  console.error('⚠️  Could not normalize startup membership compatibility:', e.message);
+}
 
 // AI tokens column
 try { db.exec("ALTER TABLE users ADD COLUMN ai_tokens INTEGER DEFAULT 0"); } catch(e) { /* already exists */ }
@@ -122,7 +128,43 @@ if (STRIPE_SECRET) {
 // OpenAI for Pottery AI assistant
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const UPLOADS_DIR = path.join(__dirname, 'data', 'uploads');
+const { createDeletionLifecycle } = require('./deletion-lifecycle.cjs');
+const deletionLifecycle = createDeletionLifecycle(db, UPLOADS_DIR);
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+function relationshipUnavailable() {
+  const error = new Error('Related record unavailable');
+  error.status = 400;
+  return error;
+}
+function ownedRelationship(table, userId, id) {
+  if (id === null || id === undefined || id === '') return null;
+  const row = db.prepare(`SELECT * FROM ${table} WHERE id=? AND user_id=?`).get(id, userId);
+  if (!row) throw relationshipUnavailable();
+  return row;
+}
+function validatePieceRelationships(userId, clayBodyId, glazeIds) {
+  if (clayBodyId) ownedRelationship('clay_bodies', userId, clayBodyId);
+  if (glazeIds == null) return;
+  if (!Array.isArray(glazeIds)) throw relationshipUnavailable();
+  for (const layer of glazeIds) {
+    const glazeId = layer && typeof layer === 'object' ? (layer.glazeId || layer.glaze_id || null) : null;
+    if (glazeId) ownedRelationship('glazes', userId, glazeId);
+  }
+}
+function safeStoredUpload(filename) {
+  if (typeof filename !== 'string' || !filename || filename === '.' || filename === '..' || /[/\\\0]/.test(filename)) return null;
+  const target = path.join(UPLOADS_DIR, filename);
+  try { return fs.lstatSync(target).isFile() ? target : null; } catch { return null; }
+}
+function cleanupRequestUploads(files) {
+  deletionLifecycle.cleanupFiles((files || []).filter(Boolean).map(file => file.filename));
+}
+function classifyPiecePhotoVisibility(piece) {
+  if (piece && (piece.is_public === 1 || piece.is_public === '1')) return 'public';
+  if (piece && (piece.is_public === 0 || piece.is_public === '0')) return 'private';
+  return 'legacy-ambiguous';
+}
 
 // Checkpoint through SQLite itself. Never unlink an open WAL/SHM file or
 // remove users' uploaded photos to reclaim disk space.
@@ -189,6 +231,9 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req,
         db.prepare('UPDATE users SET tier=?, stripe_customer_id=?, stripe_subscription_id=? WHERE id=?')
           .run(tier, session.customer, session.subscription, userId);
       } else if (purchaseType === 'merchant') {
+        // A completed checkout is not necessarily a completed payment.
+        if (!['paid','no_payment_required'].includes(session.payment_status)) break;
+        if (db.prepare('SELECT 1 FROM merchant_orders WHERE stripe_session_id=?').get(session.id)) break;
         // Record merchant purchase
         const productId = session.metadata.productId;
         const orderId = uuidv4();
@@ -264,7 +309,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req,
   res.json({ received: true });
 });
 
-app.use(cors());
+app.use(cors({ exposedHeaders: ['X-QL-Relationships-Available'] }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use((req, res, next) => {
@@ -281,6 +326,18 @@ app.use((req, res, next) => {
   next();
 });
 app.use('/uploads', express.static(UPLOADS_DIR));
+// The generated paid original is not a public preview. Keep its disk path unchanged.
+app.use((req,res,next)=>{
+  try { if(path.posix.normalize(decodeURIComponent(req.path)).toLowerCase()==='/shop/the-potters-mud-log.pdf')return shopUnavailable(res); }
+  catch { return next(); }
+  next();
+});
+app.get('/shop/mud-log-preview.pdf', (req, res) => {
+  const file = safeShopAsset('mud-log-preview.pdf');
+  if (!file) return shopUnavailable(res);
+  res.set({'Cache-Control':'public, max-age=0, must-revalidate','X-Content-Type-Options':'nosniff'});
+  res.sendFile(file, e => { if (e && !res.headersSent) shopUnavailable(res); });
+});
 
 // Version check endpoint — verify which code is actually deployed
 app.get('/api/version', (req, res) => {
@@ -432,7 +489,183 @@ function requireTier(min) {
     res.status(403).json({ error: min === 'starter' ? 'Upgrade to Unlimited to use this feature.' : 'Upgrade required.' });
   };
 }
+// Test Tile access is always established from the current database account.
+function hasTestTileEntitlement(userId) {
+  try { return ['starter', 'basic', 'mid', 'top'].includes(db.prepare('SELECT tier FROM users WHERE id=?').get(userId)?.tier); }
+  catch (_) { return false; }
+}
+function testTileLocked(res) {
+  return res.status(403).json({ error: 'Upgrade to Unlimited to use this feature.', code: 'TEST_TILE_ENTITLEMENT_REQUIRED' });
+}
+function requireTestTileEntitlement(req, res, next) {
+  res.set('Cache-Control', 'private, no-store');
+  if (!hasTestTileEntitlement(req.userId)) return testTileLocked(res);
+  next();
+}
+// Auth and owned Piece precede infrastructure, which precedes entitlement.
+function testTileRelationshipAccess(req, res) {
+  res.set('Cache-Control', 'private, no-store');
+  if (!db.prepare('SELECT 1 FROM pieces WHERE id=? AND user_id=?').get(req.params.pieceId, req.userId)) {
+    res.status(404).json({ error: 'Relationship unavailable' }); return false;
+  }
+  const available = getQlRelationshipService().available();
+  if (req.method === 'GET') res.set('X-QL-Relationships-Available', String(available));
+  if (!available) {
+    if (req.method === 'GET') res.json([]);
+    else res.status(409).json({ error: 'QL relationships unavailable' });
+    return false;
+  }
+  if (!hasTestTileEntitlement(req.userId)) { testTileLocked(res); return false; }
+  return true;
+}
 function getPieceCount(uid) { return db.prepare('SELECT COUNT(*) as c FROM pieces WHERE user_id=?').get(uid).c; }
+
+let qlRelationshipService;
+function getQlRelationshipService() {
+  if (!qlRelationshipService) qlRelationshipService = require('./ql/relationships.cjs').createRelationshipService(db);
+  return qlRelationshipService;
+}
+function qlRelationshipError(res, error) {
+  if (error?.status === 409) return res.status(409).json({ error: 'QL relationships unavailable' });
+  if (error?.status === 404) return res.status(404).json({ error: 'Relationship unavailable' });
+  console.error('[QL relationship]', error?.message || error);
+  return res.status(500).json({ error: 'Relationship update failed' });
+}
+app.use(['/api/test-tiles', '/api/ql/test-tiles', '/api/ql/pieces/:pieceId/test-tiles'], (req, res, next) => { res.set('Cache-Control', 'private, no-store'); next(); });
+for (const [pathName, kind, bodyKey] of [
+  ['firings', 'firing', 'firingId'],
+  ['test-tiles', 'testTile', 'testTileId'],
+  ['pricing', 'pricing', 'pricingId']
+]) {
+  app.get(`/api/ql/pieces/:pieceId/${pathName}`, auth, (req, res) => {
+    if (kind === 'testTile' && !testTileRelationshipAccess(req, res)) return;
+    try {
+      const service = getQlRelationshipService();
+      const records = service.list({ userId: req.userId, pieceId: req.params.pieceId, kind });
+      res.set('Cache-Control', 'private, no-store');
+      res.set('X-QL-Relationships-Available', service.available() ? 'true' : 'false');
+      // Retain all old fields while adding the canonical saved-Pricing detail
+      // fields through the existing serializer. No alternate JSON contract.
+      res.json(kind === 'pricing' ? records.map(row => ({ ...row, ...parsePricingCalculation(row) }))
+        : kind === 'firing' ? records.map(serializeFiring) : records.map(serializeTestTile));
+    } catch (error) { qlRelationshipError(res, error); }
+  });
+  app.post(`/api/ql/pieces/:pieceId/${pathName}`, auth, (req, res) => {
+    if (kind === 'testTile' && !testTileRelationshipAccess(req, res)) return;
+    try {
+      const targetId = req.body?.[bodyKey];
+      const relationship = getQlRelationshipService().create({ userId: req.userId, pieceId: req.params.pieceId, kind, targetId });
+      res.status(201).json({ relationship });
+    } catch (error) { qlRelationshipError(res, error); }
+  });
+  app.delete(`/api/ql/pieces/:pieceId/${pathName}/:targetId`, auth, (req, res) => {
+    if (kind === 'testTile' && !testTileRelationshipAccess(req, res)) return;
+    try {
+      const removed = getQlRelationshipService().remove({ userId: req.userId, pieceId: req.params.pieceId, kind, targetId: req.params.targetId });
+      res.json({ removed: removed > 0 });
+    } catch (error) { qlRelationshipError(res, error); }
+  });
+}
+
+// QL Search-1: fresh, owner-scoped saved-record metadata. No media or AI calls.
+let qlStudioSearchService;
+app.get('/api/ql/search', (req, res, next) => {
+  res.set('Cache-Control', 'private, no-store');
+  next();
+}, auth, (req, res) => {
+  try {
+    if (!qlStudioSearchService) qlStudioSearchService = require('./ql/studio-search.cjs').createStudioSearchService(db);
+    res.json(qlStudioSearchService.search({ q:req.query.q, types:req.query.types,
+      limit:req.query.limit, offset:req.query.offset, userId:req.userId }));
+  } catch (error) {
+    const status = [400,401].includes(error?.status) ? error.status : 500;
+    res.status(status).json({error:status===400?'Invalid search options':status===401?'Not authenticated':'Search unavailable'});
+  }
+});
+
+let qlPieceHistoryService;
+function getQlPieceHistoryService() {
+  if (!qlPieceHistoryService) qlPieceHistoryService = require('./ql/piece-history.cjs').createPieceHistoryService(db);
+  return qlPieceHistoryService;
+}
+app.get('/api/ql/pieces/:pieceId/history', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  try {
+    res.json(protectPieceHistoryTestTileMedia(getQlPieceHistoryService().get({ userId: req.userId, pieceId: req.params.pieceId, testTilesAccess: !getQlRelationshipService().available() ? 'unavailable' : hasTestTileEntitlement(req.userId) ? 'available' : 'locked' })));
+  } catch (error) {
+    if (error?.status === 404) return res.status(404).json({ error: 'Piece unavailable' });
+    console.error('[QL Piece history]', error?.message || error);
+    res.status(500).json({ error: 'Piece history unavailable' });
+  }
+});
+
+function sendOwnedPiecePhoto(req, res, { privateOnly = false } = {}) {
+  res.set('Cache-Control', 'private, no-store');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const photo = db.prepare(`SELECT ph.*,p.is_public FROM piece_photos ph JOIN pieces p ON p.id=ph.piece_id
+      WHERE ph.id=? AND p.id=? AND p.user_id=?`).get(req.params.photoId, req.params.pieceId, req.userId);
+    if (!photo) return unavailable();
+    if (privateOnly && classifyPiecePhotoVisibility(photo) !== 'private') return unavailable();
+    const target = safeStoredUpload(photo.filename);
+    if (!target) return unavailable();
+    // A filename reused by any record outside this account is ambiguous; do not serve its bytes privately.
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    const owned = ownedPhotoSlots(photo.filename, req.userId);
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(photo.filename);
+        if (rows.some(row => !owned.some(slot => slot.table === table && slot.column === column && slot.id === row.id))) return unavailable();
+      }
+    }
+    // Only raster image formats used by Piece uploads; never execute stored SVG/HTML.
+    if (!/\.(?:jpe?g|png|webp|gif|avif)$/i.test(photo.filename)) return unavailable();
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+}
+
+// Private Piece-detail delivery is deliberately narrower than legacy /uploads.
+app.get('/api/ql/pieces/:pieceId/photos/:photoId', auth, (req, res) => {
+  sendOwnedPiecePhoto(req, res, { privateOnly: true });
+});
+
+// Phase 2U: record-aware public delivery, using the Gallery's stored eligibility rules.
+function pieceGalleryEligible(piece) {
+  const status = String(piece?.status || '').trim().toLowerCase().replaceAll(' ', '-').replaceAll('_', '-').replaceAll('final-fired', 'glaze-fired');
+  return classifyPiecePhotoVisibility(piece) === 'public' && ['glaze-fired','done','complete','sold'].includes(status);
+}
+app.get('/api/ql/pieces/:pieceId/photos/:photoId/public', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const piece = db.prepare('SELECT * FROM pieces WHERE id=?').get(req.params.pieceId);
+    if (!pieceGalleryEligible(piece)) return unavailable();
+    const photo = db.prepare('SELECT * FROM piece_photos WHERE id=? AND piece_id=?').get(req.params.photoId, piece.id);
+    if (!photo) return unavailable();
+    const target = safeStoredUpload(photo.filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif)$/i.test(photo.filename)) return unavailable();
+    // Filename possession never authorizes delivery. Any other stored reference fails closed.
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(photo.filename);
+        if (rows.some(row => table !== 'piece_photos' || column !== 'filename' || row.id !== photo.id)) return unavailable();
+      }
+    }
+    res.set('X-Content-Type-Options', 'nosniff');
+    // Revalidate every reuse so unpublishing takes effect without a shared-cache grace period.
+    res.set('Cache-Control', 'public, max-age=0, must-revalidate');
+    res.sendFile(target, error => { if (error && !res.headersSent) { res.set('Cache-Control','no-store'); unavailable(); } });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
+
+// Connected History keeps its existing authenticated owner-scoped behavior.
+app.get('/api/ql/pieces/:pieceId/history/photos/:photoId', auth, (req, res) => {
+  sendOwnedPiecePhoto(req, res);
+});
 
 // Helper: generate unique referral code
 function generateReferralCode() {
@@ -549,7 +782,7 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 app.get('/api/auth/me', auth, (req, res) => {
-  const u = db.prepare('SELECT id,email,display_name,username,bio,location,website,avatar_filename,is_private,tier,unit_system,temp_unit,referral_code,newsletter_subscribed,created_at,city,state_region,country,findable,billing_period,plan_expires_at FROM users WHERE id=?').get(req.userId);
+  const u = db.prepare('SELECT id,email,display_name,username,bio,location,website,avatar_filename,is_private,tier,unit_system,temp_unit,referral_code,newsletter_subscribed,created_at,city,state_region,country,findable,billing_period,admin_granted_access,plan_expires_at FROM users WHERE id=?').get(req.userId);
   if (!u) return res.status(404).json({ error: 'Not found' });
   // Ensure referral code exists
   if (!u.referral_code) {
@@ -559,12 +792,12 @@ app.get('/api/auth/me', auth, (req, res) => {
   }
   // Get referral stats
   const referralStats = db.prepare('SELECT COUNT(*) as count FROM referral_rewards WHERE referrer_id=?').get(req.userId);
-  res.json({ user: { ...u, isAdmin: isAdmin(req), displayName: u.display_name, pieceCount: getPieceCount(req.userId), referralCount: referralStats?.count || 0, freeMonthsRemaining: u.free_months_remaining || 0, newsletterSubscribed: u.newsletter_subscribed } });
+  res.json({ user: { ...u, billing_period: iap.compatibleBillingPeriod(u), isAdmin: isAdmin(req), displayName: u.display_name, pieceCount: getPieceCount(req.userId), referralCount: referralStats?.count || 0, freeMonthsRemaining: u.free_months_remaining || 0, newsletterSubscribed: u.newsletter_subscribed } });
 });
 
 // User subscription status (used by mobile app BillingScreen)
 app.get('/api/user/subscription', auth, async (req, res) => {
-  const u = db.prepare('SELECT tier, billing_period, plan_expires_at, stripe_subscription_id, stripe_customer_id, email, iap_platform, iap_expires_at FROM users WHERE id=?').get(req.userId);
+  const u = db.prepare('SELECT tier, billing_period, admin_granted_access, plan_expires_at, stripe_subscription_id, stripe_customer_id, email, iap_platform, iap_expires_at FROM users WHERE id=?').get(req.userId);
   if (!u) return res.status(404).json({ error: 'User not found' });
 
   let hasStripe = !!u.stripe_subscription_id;
@@ -597,7 +830,7 @@ app.get('/api/user/subscription', auth, async (req, res) => {
   res.json({
     plan: u.tier || 'free',
     status: hasPremium ? 'active' : 'inactive',
-    billingPeriod: u.billing_period || null,
+    billingPeriod: iap.compatibleBillingPeriod(u),
     expiresAt: u.plan_expires_at || null,
     hasStripeSubscription: hasStripe,
     hasIAPSubscription: hasIAP,
@@ -962,38 +1195,48 @@ app.delete('/api/account', auth, (req, res) => {
     // Prevent admin from accidentally deleting their own account
     const u = db.prepare('SELECT email FROM users WHERE id=?').get(uid);
     if (u?.email === ADMIN_EMAIL) return res.status(403).json({ error: 'Admin account cannot be deleted from here' });
-    // Delete all user data in order (respecting foreign keys)
-    db.prepare('DELETE FROM promo_redemptions WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM referral_rewards WHERE referrer_id=? OR referred_id=?').run(uid, uid);
-    db.prepare('DELETE FROM combo_comments WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM combo_likes WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM forum_replies WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM forum_posts WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM reviews WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM messages WHERE from_user_id=? OR to_user_id=?').run(uid, uid);
-    db.prepare('DELETE FROM notifications WHERE user_id=? OR from_user_id=?').run(uid, uid);
-    db.prepare('DELETE FROM piece_photos WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
-    db.prepare('DELETE FROM piece_glazes WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
-    db.prepare('DELETE FROM sales WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM pricing_calculations WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM glaze_clay_tests WHERE glaze_id IN (SELECT id FROM glazes WHERE user_id=?)').run(uid);
-    db.prepare('DELETE FROM pieces WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM glaze_combos WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM firing_logs WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM glazes WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM glaze_chemicals WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM clay_bodies WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM goals WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM projects WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM events WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM contacts WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM blocked_users WHERE user_id=? OR blocked_user_id=?').run(uid, uid);
-    db.prepare('DELETE FROM merchant_orders WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM featured_potter WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM page_views WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM users WHERE id=?').run(uid);
+    let accountFiles = [];
+    db.transaction(() => {
+      accountFiles = deletionLifecycle.preflightAccountDeletion(uid).concat(forumAccountFiles(uid));
+      // Delete all user data in order (respecting foreign keys)
+      db.prepare('DELETE FROM promo_redemptions WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM referral_rewards WHERE referrer_id=? OR referred_id=?').run(uid, uid);
+      db.prepare('DELETE FROM combo_comments WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM combo_likes WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM forum_replies WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM forum_posts WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM reviews WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM messages WHERE from_user_id=? OR to_user_id=?').run(uid, uid);
+      db.prepare('DELETE FROM notifications WHERE user_id=? OR from_user_id=?').run(uid, uid);
+      db.prepare('DELETE FROM firing_photos WHERE firing_id IN (SELECT id FROM firing_logs WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM clay_photos WHERE clay_id IN (SELECT id FROM clay_bodies WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM glaze_photos WHERE glaze_id IN (SELECT id FROM glazes WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM test_tiles WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM piece_photos WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM piece_glazes WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM sales WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM pricing_calculations WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM glaze_clay_tests WHERE glaze_id IN (SELECT id FROM glazes WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM glaze_ingredients WHERE glaze_id IN (SELECT id FROM glazes WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM pieces WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM glaze_combos WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM firing_logs WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM glazes WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM glaze_chemicals WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM clay_bodies WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM goals WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM projects WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM events WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM contacts WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM blocked_users WHERE user_id=? OR blocked_user_id=?').run(uid, uid);
+      db.prepare('DELETE FROM merchant_orders WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM featured_potter WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM page_views WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM users WHERE id=?').run(uid);
+    }).immediate();
+    deletionLifecycle.cleanupFiles(accountFiles);
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { res.status(err.status || 500).json({ error: err.message }); }
 });
 
 // ============ MY STORE ============
@@ -1125,8 +1368,7 @@ app.put('/api/user/demographics', auth, (req, res) => {
 
 // Admin: view all user demographics
 app.get('/api/admin/demographics', auth, (req, res) => {
-  const user = db.prepare('SELECT is_admin FROM users WHERE id=?').get(req.userId);
-  if (!user?.is_admin) return res.status(403).json({ error: 'Admin only' });
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   const users = db.prepare('SELECT id, display_name, email, potter_type, years_experience, studio_type, location, created_at FROM users ORDER BY created_at DESC').all();
   const summary = {
     total: users.length,
@@ -1159,13 +1401,69 @@ app.put('/api/profile/newsletter', auth, (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-app.post('/api/profile/avatar', auth, upload.single('avatar'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No file' });
-  const old = db.prepare('SELECT avatar_filename FROM users WHERE id=?').get(req.userId);
-  if (old?.avatar_filename) { const p = path.join(UPLOADS_DIR, old.avatar_filename); if (fs.existsSync(p)) fs.unlinkSync(p); }
-  db.prepare('UPDATE users SET avatar_filename=? WHERE id=?').run(req.file.filename, req.userId);
-  res.json({ filename: req.file.filename });
-});
+// Phase 2Q: avatars are presentation, never permission to read full profiles.
+// Community member presentation is authenticated and uses avatar_filename only.
+// profile_photo is owner-only unless the current featured-potter record publishes it.
+function profileAvatarPublic(user, filename, context) {
+  if (context === 'directory') return user.avatar_filename === filename && user.findable === 1 && user.is_private === 0;
+  if (context === 'featured') return !!db.prepare('SELECT 1 FROM (SELECT user_id FROM featured_potter ORDER BY featured_date DESC LIMIT 1) WHERE user_id=?').get(user.id);
+  if (user.avatar_filename !== filename) return false;
+  if (context === 'review') return !!db.prepare('SELECT 1 FROM reviews WHERE user_id=? AND is_approved=1').get(user.id);
+  if (context === 'piece') return !!db.prepare('SELECT 1 FROM pieces WHERE user_id=? AND is_public=1').get(user.id);
+  if (context === 'combo') return !!db.prepare('SELECT 1 FROM glaze_combos WHERE user_id=? AND is_public=1').get(user.id);
+  return false;
+}
+function deliverProfileAvatar(req, res, mode) {
+  res.set('Cache-Control', 'private, no-store');
+  res.set('X-Content-Type-Options', 'nosniff');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const filename = req.params.filename;
+    const refs = db.prepare('SELECT id,avatar_filename,profile_photo,is_private,findable FROM users WHERE avatar_filename=? OR profile_photo=?').all(filename, filename);
+    if (!refs.length) return unavailable();
+    const allowed = u => mode === 'owner' ? u.id === req.userId && u.id === req.params.userId
+      : mode === 'community' ? u.avatar_filename === filename
+      : profileAvatarPublic(u, filename, req.params.context);
+    // Any private/foreign alias blocks the whole filename; no first-match authorization.
+    if (refs.some(u => !allowed(u))) return unavailable();
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      if (table === 'users') continue;
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        if (db.prepare(`SELECT 1 FROM ${table} WHERE ${column}=? LIMIT 1`).get(filename)) return unavailable();
+      }
+    }
+    const target = safeStoredUpload(filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(filename)) return unavailable();
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+}
+app.get('/api/ql/profiles/:userId/photos/:filename', auth, (req,res) => deliverProfileAvatar(req,res,'owner'));
+app.get('/api/ql/avatars/community/:filename', auth, (req,res) => deliverProfileAvatar(req,res,'community'));
+app.get('/api/ql/avatars/public/:context/:filename', (req,res) => deliverProfileAvatar(req,res,'public'));
+function mutateProfileAvatar(req, res, both, remove = false) {
+  if (!remove && !req.file) return res.status(400).json({ error: 'No file' });
+  const discard = () => deletionLifecycle.cleanupFiles([req.file?.filename]);
+  try {
+    let old;
+    db.transaction(() => {
+      old = db.prepare('SELECT avatar_filename,profile_photo FROM users WHERE id=?').get(req.userId);
+      if (!old) return;
+      if (both || remove) db.prepare('UPDATE users SET avatar_filename=?,profile_photo=? WHERE id=?').run(remove ? null : req.file.filename, remove ? null : req.file.filename, req.userId);
+      else db.prepare('UPDATE users SET avatar_filename=? WHERE id=?').run(req.file.filename, req.userId);
+    }).immediate();
+    if (!old) { discard(); return res.status(404).json({ error: 'Photo unavailable' }); }
+    deletionLifecycle.cleanupFiles([old.avatar_filename, ...(both || remove ? [old.profile_photo] : [])]);
+    res.json(remove ? { success: true } : { filename: req.file.filename });
+  } catch (_) {
+    // Reference-aware cleanup retains a replacement even after a response failure.
+    discard();
+    if (!res.headersSent) res.status(500).json({ error: 'Could not update profile photo' });
+  }
+}
+app.post('/api/profile/avatar', auth, upload.single('avatar'), (req,res) => mutateProfileAvatar(req,res,false));
+app.delete(['/api/profile/avatar','/api/profile/photo'], auth, (req,res) => mutateProfileAvatar(req,res,true,true));
 
 app.get('/api/profile/:id', auth, (req, res) => {
   const u = db.prepare('SELECT id,display_name,bio,location,website,avatar_filename,is_private,tier,created_at,shop_url,shop_url_2,shop_url_3,city,state_region,country FROM users WHERE id=?').get(req.params.id);
@@ -1375,55 +1673,65 @@ app.delete('/api/admin/members/:id', auth, (req, res) => {
     const u = db.prepare('SELECT email FROM users WHERE id=?').get(uid);
     if (!u) return res.status(404).json({ error: 'User not found' });
     if (u.email === ADMIN_EMAIL) return res.status(403).json({ error: 'Cannot delete admin account' });
-    // Clean up all related data before deleting user
-    db.prepare('DELETE FROM push_tokens WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM password_reset_tokens WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM iap_purchases WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM token_purchases WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM promo_redemptions WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM referral_rewards WHERE referrer_id=? OR referred_id=?').run(uid, uid);
-    db.prepare('DELETE FROM studio_notes WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM user_activity WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM combo_comments WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM combo_likes WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM forum_photos WHERE post_id IN (SELECT id FROM forum_posts WHERE user_id=?)').run(uid);
-    db.prepare('DELETE FROM forum_replies WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM forum_posts WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM content_reports WHERE reporter_id=?').run(uid);
-    db.prepare('DELETE FROM reviews WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM messages WHERE from_user_id=? OR to_user_id=?').run(uid, uid);
-    db.prepare('DELETE FROM notifications WHERE user_id=? OR from_user_id=?').run(uid, uid);
-    db.prepare('DELETE FROM piece_photos WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
-    db.prepare('DELETE FROM piece_glazes WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
-    db.prepare('DELETE FROM sales WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM pricing_calculations WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM glaze_clay_tests WHERE glaze_id IN (SELECT id FROM glazes WHERE user_id=?)').run(uid);
-    db.prepare('DELETE FROM pieces WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM glaze_combos WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM firing_logs WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM glazes WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM glaze_chemicals WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM clay_bodies WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM goals WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM projects WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM events WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM contacts WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM blocked_users WHERE user_id=? OR blocked_user_id=?').run(uid, uid);
-    db.prepare('DELETE FROM merchant_orders WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM featured_potter WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM page_views WHERE user_id=?').run(uid);
-    db.prepare('DELETE FROM users WHERE id=?').run(uid);
+    let accountFiles = [];
+    db.transaction(() => {
+      accountFiles = deletionLifecycle.preflightAccountDeletion(uid).concat(forumAccountFiles(uid));
+      // Clean up all related data before deleting user
+      db.prepare('DELETE FROM push_tokens WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM password_reset_tokens WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM iap_purchases WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM token_purchases WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM promo_redemptions WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM referral_rewards WHERE referrer_id=? OR referred_id=?').run(uid, uid);
+      db.prepare('DELETE FROM studio_notes WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM user_activity WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM combo_comments WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM combo_likes WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM forum_photos WHERE post_id IN (SELECT id FROM forum_posts WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM forum_replies WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM forum_posts WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM content_reports WHERE reporter_id=?').run(uid);
+      db.prepare('DELETE FROM reviews WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM messages WHERE from_user_id=? OR to_user_id=?').run(uid, uid);
+      db.prepare('DELETE FROM notifications WHERE user_id=? OR from_user_id=?').run(uid, uid);
+      db.prepare('DELETE FROM firing_photos WHERE firing_id IN (SELECT id FROM firing_logs WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM clay_photos WHERE clay_id IN (SELECT id FROM clay_bodies WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM glaze_photos WHERE glaze_id IN (SELECT id FROM glazes WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM test_tiles WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM piece_photos WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM piece_glazes WHERE piece_id IN (SELECT id FROM pieces WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM sales WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM pricing_calculations WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM glaze_clay_tests WHERE glaze_id IN (SELECT id FROM glazes WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM glaze_ingredients WHERE glaze_id IN (SELECT id FROM glazes WHERE user_id=?)').run(uid);
+      db.prepare('DELETE FROM pieces WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM glaze_combos WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM firing_logs WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM glazes WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM glaze_chemicals WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM clay_bodies WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM goals WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM projects WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM events WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM contacts WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM blocked_users WHERE user_id=? OR blocked_user_id=?').run(uid, uid);
+      db.prepare('DELETE FROM merchant_orders WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM featured_potter WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM page_views WHERE user_id=?').run(uid);
+      db.prepare('DELETE FROM users WHERE id=?').run(uid);
+    }).immediate();
+    deletionLifecycle.cleanupFiles(accountFiles);
     res.json({ success: true, deleted: u.email });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { res.status(err.status || 500).json({ error: err.message }); }
 });
 
 // Admin dashboard — see all members, signups, cancellations, tiers
 app.get('/api/admin/members', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
-    const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, 
+    const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, admin_granted_access, plan_expires_at,
       avatar_filename, created_at, updated_at, stripe_customer_id, stripe_subscription_id 
-      FROM users ORDER BY created_at DESC`).all();
+      FROM users ORDER BY created_at DESC`).all().map(m => ({ ...m, billing_period: iap.compatibleBillingPeriod(m) }));
     const stats = {
       total: members.length,
       byTier: { free: 0, paid: 0, gifted: 0 },
@@ -1435,8 +1743,7 @@ app.get('/api/admin/members', auth, (req, res) => {
       const isUnlimited = m.tier === 'starter' || ['basic','mid','top'].includes(m.tier);
       if (isUnlimited) {
         const hasStripe = m.stripe_subscription_id && m.stripe_subscription_id !== '';
-        const isStripeMonthly = m.billing_period === 'stripe-monthly';
-        if (hasStripe || isStripeMonthly) {
+        if (hasStripe || iap.isGrandfatheredPaidUser(m) || iap.isAdminGrantedUser(m)) {
           stats.byTier.paid++;
         } else {
           stats.byTier.gifted++;
@@ -1584,13 +1891,7 @@ app.post('/api/shop/apply-discount', auth, (req, res) => {
 });
 
 // ============ PROFILE PHOTO ============
-app.post('/api/profile/photo', auth, upload.single('photo'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No file' });
-  const old = db.prepare('SELECT profile_photo FROM users WHERE id=?').get(req.userId);
-  if (old?.profile_photo) { const p = path.join(UPLOADS_DIR, old.profile_photo); if (fs.existsSync(p)) fs.unlinkSync(p); }
-  db.prepare('UPDATE users SET profile_photo=?, avatar_filename=? WHERE id=?').run(req.file.filename, req.file.filename, req.userId);
-  res.json({ filename: req.file.filename });
-});
+app.post('/api/profile/photo', auth, upload.single('photo'), (req,res) => mutateProfileAvatar(req,res,true));
 
 // ============ EXPORT (all tiers — glazes and pieces) ============
 app.get('/api/export/glazes', auth, (req, res) => {
@@ -1612,7 +1913,7 @@ app.get('/api/export/clay-bodies', auth, (req, res) => {
 });
 
 app.get('/api/export/firing-logs', auth, (req, res) => {
-  const firings = db.prepare('SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id WHERE fl.user_id=? ORDER BY fl.date DESC').all(req.userId);
+  const firings = db.prepare('SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id AND p.user_id=fl.user_id WHERE fl.user_id=? ORDER BY fl.date DESC').all(req.userId);
   let csv = 'Date,Piece,Type,Cone,Temperature,Atmosphere,Kiln,Speed,Hold,Hold Duration,Results,Notes\n';
   firings.forEach(f => { csv += `"${f.date||''}","${(f.piece_title||'').replace(/"/g,'""')}","${f.firing_type||''}","${f.cone||''}","${f.temperature||''}","${f.atmosphere||''}","${(f.kiln_name||'').replace(/"/g,'""')}","${f.firing_speed||''}","${f.hold_used?'Yes':'No'}","${f.hold_duration||''}","${(f.results||'').replace(/"/g,'""')}","${(f.notes||'').replace(/"/g,'""')}"\n`; });
   res.setHeader('Content-Type', 'text/csv');
@@ -1630,10 +1931,39 @@ app.get('/api/export/contacts', auth, (req, res) => {
 });
 
 // ============ CLAY BODIES ============
+// Delivery policy, not historical publication metadata. Clay has no public flag.
+// Verify the parent owner now; never rewrite historical rows or infer publication.
+function clayMediaContract(clay) {
+  clay.photoDelivery = clay.user_id ? 'owner-protected' : 'legacy-ambiguous';
+  clay.photoVisibility = 'legacy-ambiguous';
+  return clay;
+}
+app.get('/api/ql/clay-bodies/:clayId/photos/:photoId', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const photo = db.prepare(`SELECT ph.* FROM clay_photos ph JOIN clay_bodies c ON c.id=ph.clay_id
+      WHERE ph.id=? AND c.id=? AND c.user_id=?`).get(req.params.photoId, req.params.clayId, req.userId);
+    if (!photo) return unavailable();
+    const target = safeStoredUpload(photo.filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(photo.filename)) return unavailable();
+    const owned = ownedPhotoSlots(photo.filename, req.userId);
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(photo.filename);
+        if (rows.some(row => !owned.some(slot => slot.table === table && slot.column === column && slot.id === row.id))) return unavailable();
+      }
+    }
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
 app.get('/api/clay-bodies', auth, (req, res) => {
   const clays = db.prepare('SELECT * FROM clay_bodies WHERE user_id=? ORDER BY name').all(req.userId);
   const getPhotos = db.prepare('SELECT * FROM clay_photos WHERE clay_id=? ORDER BY sort_order');
-  clays.forEach(c => { c.photos = getPhotos.all(c.id); });
+  clays.forEach(c => { c.photos = getPhotos.all(c.id); clayMediaContract(c); });
   res.json(clays);
 });
 
@@ -1641,6 +1971,7 @@ app.get('/api/clay-bodies/:id', auth, (req, res) => {
   const clay = db.prepare('SELECT * FROM clay_bodies WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!clay) return res.status(404).json({ error: 'Not found' });
   clay.photos = db.prepare('SELECT * FROM clay_photos WHERE clay_id=? ORDER BY sort_order').all(clay.id);
+  clayMediaContract(clay);
   res.json({ clay });
 });
 
@@ -1683,44 +2014,48 @@ app.put('/api/clay-bodies/:id', auth, (req, res) => {
 });
 
 app.delete('/api/clay-bodies/:id', auth, (req, res) => {
-  // Delete clay photos files
-  const photos = db.prepare('SELECT filename FROM clay_photos WHERE clay_id=?').all(req.params.id);
-  photos.forEach(p => { const f = path.join(UPLOADS_DIR, p.filename); if (fs.existsSync(f)) fs.unlinkSync(f); });
-  db.prepare('DELETE FROM clay_photos WHERE clay_id=?').run(req.params.id);
-  const r = db.prepare('DELETE FROM clay_bodies WHERE id=? AND user_id=?').run(req.params.id, req.userId);
-  if (r.changes === 0) return res.status(404).json({ error: 'Not found' });
-  res.json({ success: true });
+  try {
+    if (!deletionLifecycle.deleteStudioRecord(req.userId, req.params.id, 'clay')) return res.status(404).json({ error: 'Not found' });
+    res.json({ success: true });
+  } catch (error) { res.status(error.status || 500).json({ error: error.message }); }
 });
 
 // Clay photo upload (replaces existing photo if at max, so edits always persist)
 app.post('/api/clay-bodies/:id/photos', auth, upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo' });
-  const maxPhotos = (req.userTier === 'free') ? 1 : 3;
-  const existing = db.prepare('SELECT * FROM clay_photos WHERE clay_id=? ORDER BY sort_order').all(req.params.id);
-  // An edit explicitly replaces the current Clay photo. New Clay photos and
-  // additional paid-tier photos retain the existing max-photo behavior.
-  if (req.body.replace === 'true' || existing.length >= maxPhotos) {
-    const photosToDelete = req.body.replace === 'true' ? existing : [existing[0]];
-    photosToDelete.forEach(photo => {
-      const oldFile = path.join(UPLOADS_DIR, photo.filename);
-      if (fs.existsSync(oldFile)) fs.unlinkSync(oldFile);
-      db.prepare('DELETE FROM clay_photos WHERE id=?').run(photo.id);
-    });
+  try {
+    const result = db.transaction(() => {
+      if (!db.prepare('SELECT 1 FROM clay_bodies WHERE id=? AND user_id=?').get(req.params.id, req.userId)) return null;
+      const maxPhotos = req.userTier === 'free' ? 1 : 3;
+      const existing = db.prepare('SELECT * FROM clay_photos WHERE clay_id=? ORDER BY sort_order').all(req.params.id);
+      const targetPhoto = req.body.replacePhotoId ? existing.find(photo => photo.id === req.body.replacePhotoId) : null;
+      if (req.body.replacePhotoId && !targetPhoto) return null;
+      const removed = targetPhoto ? [targetPhoto] : req.body.replace === 'true' ? existing : existing.length >= maxPhotos ? [existing[0]] : [];
+      for (const photo of removed) db.prepare('DELETE FROM clay_photos WHERE id=?').run(photo.id);
+      const count = db.prepare('SELECT COUNT(*) as c FROM clay_photos WHERE clay_id=?').get(req.params.id).c;
+      const id = targetPhoto ? targetPhoto.id : uuidv4();
+      db.prepare('INSERT INTO clay_photos (id,clay_id,filename,original_name,photo_label,notes,sort_order) VALUES (?,?,?,?,?,?,?)')
+        .run(id, req.params.id, req.file.filename, req.file.originalname, targetPhoto ? targetPhoto.photo_label : req.body.label||null, targetPhoto ? targetPhoto.notes : req.body.notes||null, targetPhoto ? targetPhoto.sort_order : count);
+      return { id, files: removed.map(p => p.filename) };
+    }).immediate();
+    if (!result) {
+      deletionLifecycle.cleanupFiles([req.file.filename]);
+      return res.status(404).json({ error: 'Not found' });
+    }
+    deletionLifecycle.cleanupFiles(result.files);
+    res.json({ id: result.id, filename: req.file.filename });
+  } catch (error) {
+    deletionLifecycle.cleanupFiles([req.file.filename]);
+    res.status(500).json({ error: 'Could not save clay photo. Existing photos were not changed.' });
   }
-  const count = db.prepare('SELECT COUNT(*) as c FROM clay_photos WHERE clay_id=?').get(req.params.id).c;
-  const id = uuidv4();
-  const insertResult = db.prepare('INSERT INTO clay_photos (id,clay_id,filename,original_name,photo_label,notes,sort_order) VALUES (?,?,?,?,?,?,?)')
-    .run(id, req.params.id, req.file.filename, req.file.originalname, req.body.label||null, req.body.notes||null, count);
-  res.json({ id, filename: req.file.filename });
 });
 
 // Clay photo delete
 app.delete('/api/clay-photos/:id', auth, (req, res) => {
-  const ph = db.prepare('SELECT cp.* FROM clay_photos cp JOIN clay_bodies cb ON cp.clay_id=cb.id WHERE cp.id=? AND cb.user_id=?').get(req.params.id, req.userId);
-  if (!ph) return res.status(404).json({ error: 'Not found' });
-  const f = path.join(UPLOADS_DIR, ph.filename); if (fs.existsSync(f)) fs.unlinkSync(f);
-  db.prepare('DELETE FROM clay_photos WHERE id=?').run(req.params.id);
-  res.json({ success: true });
+  try {
+    if (!deletionLifecycle.deletePhoto(req.userId, req.params.id, 'clay')) return res.status(404).json({ error: 'Not found' });
+    res.json({ success: true });
+  } catch (error) { res.status(error.status || 500).json({ error: error.message }); }
 });
 
 // Clay stock toggle
@@ -1731,12 +2066,227 @@ app.put('/api/clay-bodies/:id/stock', auth, (req, res) => {
 });
 
 // ============ GLAZES ============
+// Library photos only; glaze_clay_tests deliberately excluded. No Glaze public flag.
+function glazeMediaContract(glaze) {
+  glaze.photoDelivery = glaze.user_id ? 'owner-protected' : 'legacy-ambiguous';
+  glaze.photoVisibility = 'legacy-ambiguous';
+  return glaze;
+}
+function glazeClayTestMediaContract(test) {
+  if (!test) return test;
+  test.photoDelivery = test.photo_filename ? 'owner-protected' : 'legacy-ambiguous';
+  test.photoVisibility = 'legacy-ambiguous';
+  return test;
+}
+function testTileMediaContract(tile) {
+  if (!tile) return tile;
+  const fields = ['photo_filename', 'photo_filename2', 'photo_filename3'];
+  fields.forEach((field, index) => {
+    const suffix = index === 0 ? '' : String(index + 1);
+    tile['photoDelivery' + suffix] = tile[field] ? 'owner-protected' : 'legacy-ambiguous';
+    tile['photoVisibility' + suffix] = 'legacy-ambiguous';
+  });
+  return tile;
+}
+
+function serializeTestTile(tile) {
+  if (!tile) return tile;
+  return testTileMediaContract({ ...tile,
+    glaze_library_name: tile.glaze_id ? db.prepare('SELECT name FROM glazes WHERE id=? AND user_id=?').get(tile.glaze_id, tile.user_id)?.name || null : null,
+    clay_library_name: tile.clay_body_id ? db.prepare('SELECT name FROM clay_bodies WHERE id=? AND user_id=?').get(tile.clay_body_id, tile.user_id)?.name || null : null
+  });
+}
+
+function glazeComboMediaContract(combo) {
+  if (!combo) return combo;
+  const explicitlyPublic = combo.is_shared === 1 || combo.is_public === 1;
+  const explicitlyPrivate = combo.is_shared === 0 && combo.is_public !== 1;
+  const delivery = explicitlyPublic ? 'public-explicit' : explicitlyPrivate ? 'owner-protected' : 'legacy-static';
+  const visibility = explicitlyPublic ? 'public' : explicitlyPrivate ? 'private' : 'legacy-ambiguous';
+  for (const [field, suffix] of [['photo_filename', ''], ['photo_filename2', '2']]) {
+    combo['photoDelivery' + suffix] = combo[field] ? delivery : 'legacy-static';
+    combo['photoVisibility' + suffix] = visibility;
+  }
+  return combo;
+}
+
+function glazeComboPhotoField(slot) {
+  return Number(slot) === 1 ? 'photo_filename' : Number(slot) === 2 ? 'photo_filename2' : null;
+}
+
+function glazeComboExplicitlyPublic(combo) {
+  return !!combo && (combo.is_shared === 1 || combo.is_public === 1);
+}
+
+function publicGlazeComboFilenameSafe(filename) {
+  const { fileSlots } = require('./deletion-lifecycle.cjs');
+  let sawReference = false;
+  for (const [table, columns] of Object.entries(fileSlots)) {
+    const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+    for (const column of columns.filter(c => available.has(c))) {
+      const rows = db.prepare(`SELECT * FROM ${table} WHERE ${column}=?`).all(filename);
+      for (const row of rows) {
+        sawReference = true;
+        if (table !== 'glaze_combos' || !glazeComboExplicitlyPublic(row)) return false;
+      }
+    }
+  }
+  return sawReference;
+}
+function protectPieceHistoryTestTileMedia(history) {
+  if (!history) return history;
+  for (const entry of history.testTiles || []) if (entry?.values) entry.values = serializeTestTile(entry.values);
+  for (const entry of history.history || []) if (entry?.recordType === 'test-tile' && entry.values) entry.values = serializeTestTile(entry.values);
+  return history;
+}
+app.get('/api/ql/projects/:projectId/photos/:photoId', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  res.set('X-Content-Type-Options', 'nosniff');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const photo = db.prepare('SELECT ph.filename FROM project_photos ph JOIN projects p ON p.id=ph.project_id WHERE p.id=? AND p.user_id=? AND ph.id=?')
+      .get(req.params.projectId, req.userId, req.params.photoId);
+    if (!photo) return unavailable();
+    const target = safeStoredUpload(photo.filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(photo.filename)) return unavailable();
+    const owned = ownedPhotoSlots(photo.filename, req.userId);
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(photo.filename);
+        if (rows.some(row => !owned.some(slot => slot.table === table && slot.column === column && slot.id === row.id))) return unavailable();
+      }
+    }
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
+
+app.get('/api/ql/sales/:saleId/photos/:filename', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  res.set('X-Content-Type-Options', 'nosniff');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const photo = db.prepare('SELECT image_filename AS filename FROM sales WHERE id=? AND user_id=? AND image_filename=?')
+      .get(req.params.saleId, req.userId, req.params.filename);
+    if (!photo) return unavailable();
+    const target = safeStoredUpload(photo.filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(photo.filename)) return unavailable();
+    const owned = ownedPhotoSlots(photo.filename, req.userId);
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(photo.filename);
+        if (rows.some(row => !owned.some(slot => slot.table === table && slot.column === column && slot.id === row.id))) return unavailable();
+      }
+    }
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
+
+app.get('/api/ql/pricing-calculations/:pricingId/photos/:filename', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  res.set('X-Content-Type-Options', 'nosniff');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const photo = db.prepare('SELECT photo_filename AS filename FROM pricing_calculations WHERE id=? AND user_id=? AND photo_filename=?')
+      .get(req.params.pricingId, req.userId, req.params.filename);
+    if (!photo) return unavailable();
+    const target = safeStoredUpload(photo.filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(photo.filename)) return unavailable();
+    const owned = ownedPhotoSlots(photo.filename, req.userId);
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(photo.filename);
+        if (rows.some(row => !owned.some(slot => slot.table === table && slot.column === column && slot.id === row.id))) return unavailable();
+      }
+    }
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
+
+app.get('/api/ql/firing-logs/:firingId/photos/:photoId', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  res.set('X-Content-Type-Options', 'nosniff');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const photo = db.prepare(`SELECT ph.* FROM firing_photos ph JOIN firing_logs c ON c.id=ph.firing_id
+      WHERE ph.id=? AND c.id=? AND c.user_id=?`).get(req.params.photoId, req.params.firingId, req.userId);
+    if (!photo) return unavailable();
+    const target = safeStoredUpload(photo.filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(photo.filename)) return unavailable();
+    const owned = ownedPhotoSlots(photo.filename, req.userId);
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(photo.filename);
+        if (rows.some(row => !owned.some(slot => slot.table === table && slot.column === column && slot.id === row.id))) return unavailable();
+      }
+    }
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
+
+app.get('/api/ql/glazes/:glazeId/photos/:photoId', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const photo = db.prepare(`SELECT ph.* FROM glaze_photos ph JOIN glazes c ON c.id=ph.glaze_id
+      WHERE ph.id=? AND c.id=? AND c.user_id=?`).get(req.params.photoId, req.params.glazeId, req.userId);
+    if (!photo) return unavailable();
+    const target = safeStoredUpload(photo.filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(photo.filename)) return unavailable();
+    const owned = ownedPhotoSlots(photo.filename, req.userId);
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(photo.filename);
+        if (rows.some(row => !owned.some(slot => slot.table === table && slot.column === column && slot.id === row.id))) return unavailable();
+      }
+    }
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
+
+app.get('/api/ql/glazes/:glazeId/clay-tests/:testId/photo', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const test = db.prepare(`SELECT t.* FROM glaze_clay_tests t JOIN glazes g ON g.id=t.glaze_id
+      WHERE t.id=? AND t.glaze_id=? AND g.user_id=?`).get(req.params.testId, req.params.glazeId, req.userId);
+    if (!test?.photo_filename) return unavailable();
+    const target = safeStoredUpload(test.photo_filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(test.photo_filename)) return unavailable();
+    const owned = ownedPhotoSlots(test.photo_filename, req.userId);
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const tableColumns = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(column => column.name));
+      for (const column of columns.filter(column => tableColumns.has(column))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(test.photo_filename);
+        if (rows.some(row => !owned.some(slot => slot.table === table && slot.column === column && slot.id === row.id))) return unavailable();
+      }
+    }
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
+
 app.get('/api/glazes', auth, (req, res) => {
   const glazes = db.prepare('SELECT * FROM glazes WHERE user_id=? ORDER BY name').all(req.userId);
   const getIng = db.prepare('SELECT * FROM glaze_ingredients WHERE glaze_id=? ORDER BY sort_order');
   const getPhotos = db.prepare('SELECT * FROM glaze_photos WHERE glaze_id=? ORDER BY sort_order');
   const getClayTests = db.prepare('SELECT * FROM glaze_clay_tests WHERE glaze_id=? ORDER BY created_at DESC');
-  glazes.forEach(g => { if (g.glaze_type === 'recipe') g.ingredients = getIng.all(g.id); g.photos = getPhotos.all(g.id); g.clay_tests = getClayTests.all(g.id); });
+  glazes.forEach(g => { if (g.glaze_type === 'recipe') g.ingredients = getIng.all(g.id); g.photos = getPhotos.all(g.id); glazeMediaContract(g); g.clay_tests = getClayTests.all(g.id).map(glazeClayTestMediaContract); });
   res.json(glazes);
 });
 
@@ -1769,24 +2319,42 @@ app.put('/api/glazes/:id', auth, (req, res) => {
 });
 
 app.delete('/api/glazes/:id', auth, (req, res) => {
-  const glaze = db.prepare('SELECT id FROM glazes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
-  if (!glaze) return res.status(404).json({ error: 'Not found' });
-  db.prepare('DELETE FROM glaze_ingredients WHERE glaze_id=?').run(req.params.id);
-  db.prepare('DELETE FROM glaze_photos WHERE glaze_id=?').run(req.params.id);
-  db.prepare('DELETE FROM glazes WHERE id=? AND user_id=?').run(req.params.id, req.userId);
-  res.json({ success: true });
+  try {
+    if (!deletionLifecycle.deleteStudioRecord(req.userId, req.params.id, 'glaze')) return res.status(404).json({ error: 'Not found' });
+    res.json({ success: true });
+  } catch (error) { res.status(error.status || 500).json({ error: error.message }); }
 });
 
 app.post('/api/glazes/:id/photos', auth, upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo' });
-  const glaze = db.prepare('SELECT id FROM glazes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
-  if (!glaze) { try { fs.unlinkSync(req.file.path); } catch (e) {} return res.status(404).json({ error: 'Glaze not found' }); }
-  const maxPhotos = (req.userTier === 'free') ? 1 : 3;
-  const count = db.prepare('SELECT COUNT(*) as c FROM glaze_photos WHERE glaze_id=?').get(req.params.id).c;
-  if (count >= maxPhotos) { try { fs.unlinkSync(req.file.path); } catch (e) {} return res.status(403).json({ error: req.userTier === 'free' ? 'Free tier allows 1 photo per glaze. Upgrade to add up to 3!' : 'Max 3 photos per glaze' }); }
-  const id = uuidv4();
-  db.prepare('INSERT INTO glaze_photos (id,glaze_id,filename,original_name,photo_label,notes,sort_order) VALUES (?,?,?,?,?,?,?)').run(id, req.params.id, req.file.filename, req.file.originalname, req.body.label||null, req.body.notes||null, count);
-  res.json({ id, filename: req.file.filename });
+  try {
+    const result = db.transaction(() => {
+      if (!db.prepare('SELECT 1 FROM glazes WHERE id=? AND user_id=?').get(req.params.id, req.userId)) return null;
+      const existing = db.prepare('SELECT * FROM glaze_photos WHERE glaze_id=? ORDER BY sort_order').all(req.params.id);
+      const target = req.body.replacePhotoId ? existing.find(photo => photo.id === req.body.replacePhotoId) : null;
+      if (req.body.replacePhotoId && !target) return null;
+      const maxPhotos = req.userTier === 'free' ? 1 : 3;
+      if (!target && existing.length >= maxPhotos) return { limit: true };
+      const id = target ? target.id : uuidv4();
+      if (target) {
+        db.prepare('UPDATE glaze_photos SET filename=?,original_name=? WHERE id=? AND glaze_id=?')
+          .run(req.file.filename, req.file.originalname, id, req.params.id);
+      } else {
+        db.prepare('INSERT INTO glaze_photos (id,glaze_id,filename,original_name,photo_label,notes,sort_order) VALUES (?,?,?,?,?,?,?)')
+          .run(id, req.params.id, req.file.filename, req.file.originalname, req.body.label||null, req.body.notes||null, existing.length);
+      }
+      return { id, files: target ? [target.filename] : [] };
+    }).immediate();
+    if (!result || result.limit) {
+      deletionLifecycle.cleanupFiles([req.file.filename]);
+      return res.status(result ? 403 : 404).json({ error: result ? (req.userTier === 'free' ? 'Free tier allows 1 photo per glaze. Upgrade to add up to 3!' : 'Max 3 photos per glaze') : 'Not found' });
+    }
+    deletionLifecycle.cleanupFiles(result.files);
+    res.json({ id: result.id, filename: req.file.filename });
+  } catch (_) {
+    deletionLifecycle.cleanupFiles([req.file.filename]);
+    res.status(500).json({ error: 'Could not save glaze photo.' });
+  }
 });
 
 app.put('/api/glazes/:id/photos/reorder', auth, (req, res) => {
@@ -1795,7 +2363,7 @@ app.put('/api/glazes/:id/photos/reorder', auth, (req, res) => {
   const glaze = db.prepare('SELECT id FROM glazes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!glaze) return res.status(404).json({ error: 'Glaze not found' });
   const owned = db.prepare('SELECT id FROM glaze_photos WHERE glaze_id=?').all(req.params.id).map(row => row.id);
-  if (photoIds.length !== owned.length || photoIds.some(id => !owned.includes(id))) return res.status(400).json({ error: 'Invalid glaze photo order.' });
+  if (new Set(photoIds).size !== photoIds.length || photoIds.length !== owned.length || photoIds.some(id => !owned.includes(id))) return res.status(400).json({ error: 'Invalid glaze photo order.' });
   const update = db.prepare('UPDATE glaze_photos SET sort_order=? WHERE id=? AND glaze_id=?');
   db.transaction(() => photoIds.forEach((photoId, index) => update.run(index, photoId, req.params.id)))();
   res.json({ success: true });
@@ -1803,11 +2371,10 @@ app.put('/api/glazes/:id/photos/reorder', auth, (req, res) => {
 
 // Glaze photo delete
 app.delete('/api/glaze-photos/:id', auth, (req, res) => {
-  const ph = db.prepare('SELECT gp.* FROM glaze_photos gp JOIN glazes g ON gp.glaze_id=g.id WHERE gp.id=? AND g.user_id=?').get(req.params.id, req.userId);
-  if (!ph) return res.status(404).json({ error: 'Not found' });
-  const f = path.join(UPLOADS_DIR, ph.filename); if (fs.existsSync(f)) fs.unlinkSync(f);
-  db.prepare('DELETE FROM glaze_photos WHERE id=?').run(req.params.id);
-  res.json({ success: true });
+  try {
+    if (!deletionLifecycle.deletePhoto(req.userId, req.params.id, 'glaze')) return res.status(404).json({ error: 'Not found' });
+    res.json({ success: true });
+  } catch (error) { res.status(error.status || 500).json({ error: error.message }); }
 });
 
 // Glaze stock toggle
@@ -1822,7 +2389,7 @@ app.get('/api/glazes/:id/clay-tests', auth, (req, res) => {
   const glaze = db.prepare('SELECT id FROM glazes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!glaze) return res.status(404).json({ error: 'Glaze not found' });
   const tests = db.prepare('SELECT * FROM glaze_clay_tests WHERE glaze_id=? ORDER BY created_at DESC').all(req.params.id);
-  res.json(tests);
+  res.json(tests.map(glazeClayTestMediaContract));
 });
 
 app.post('/api/glazes/:id/clay-tests', auth, upload.single('photo'), (req, res) => {
@@ -1831,31 +2398,63 @@ app.post('/api/glazes/:id/clay-tests', auth, upload.single('photo'), (req, res) 
   const { clay_body_id, clay_name, result_notes } = req.body;
   let finalClayName = clay_name || null;
   let finalClayBodyId = clay_body_id || null;
-  // If clay_body_id provided, look up the name from clay_bodies table
+  // A supplied library ID must resolve to this account. Manual text remains valid when no ID is supplied.
   if (finalClayBodyId) {
-    const clay = db.prepare('SELECT name FROM clay_bodies WHERE id=?').get(finalClayBodyId);
-    if (clay) finalClayName = clay.name;
-    else finalClayBodyId = null; // invalid clay_body_id, treat as manual
+    try {
+      finalClayName = ownedRelationship('clay_bodies', req.userId, finalClayBodyId).name;
+    } catch (error) {
+      cleanupRequestUploads([req.file]);
+      return res.status(error.status || 400).json({ error: error.message });
+    }
   }
-  if (!finalClayName) return res.status(400).json({ error: 'Clay name or clay body selection required' });
+  if (!finalClayName) {
+    cleanupRequestUploads([req.file]);
+    return res.status(400).json({ error: 'Clay name or clay body selection required' });
+  }
   const id = uuidv4();
   const photoFilename = req.file ? req.file.filename : null;
-  db.prepare('INSERT INTO glaze_clay_tests (id,glaze_id,clay_body_id,clay_name,result_notes,photo_filename) VALUES (?,?,?,?,?,?)')
-    .run(id, req.params.id, finalClayBodyId, finalClayName, result_notes || null, photoFilename);
+  try {
+    db.prepare('INSERT INTO glaze_clay_tests (id,glaze_id,clay_body_id,clay_name,result_notes,photo_filename) VALUES (?,?,?,?,?,?)')
+      .run(id, req.params.id, finalClayBodyId, finalClayName, result_notes || null, photoFilename);
+  } catch (error) {
+    cleanupRequestUploads([req.file]);
+    return res.status(400).json({ error: 'Could not save clay test.' });
+  }
   res.json({ id, clay_name: finalClayName });
 });
 
-app.delete('/api/glazes/:id/clay-tests/:testId', auth, (req, res) => {
-  const glaze = db.prepare('SELECT id FROM glazes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
-  if (!glaze) return res.status(404).json({ error: 'Glaze not found' });
-  const test = db.prepare('SELECT photo_filename FROM glaze_clay_tests WHERE id=? AND glaze_id=?').get(req.params.testId, req.params.id);
-  if (!test) return res.status(404).json({ error: 'Test not found' });
-  if (test.photo_filename) {
-    const f = path.join(UPLOADS_DIR, test.photo_filename);
-    if (fs.existsSync(f)) fs.unlinkSync(f);
+app.put('/api/glazes/:id/clay-tests/:testId/photo', auth, upload.single('photo'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Photo required' });
+  const existing = db.prepare(`SELECT t.* FROM glaze_clay_tests t JOIN glazes g ON g.id=t.glaze_id
+    WHERE t.id=? AND t.glaze_id=? AND g.user_id=?`).get(req.params.testId, req.params.id, req.userId);
+  if (!existing) {
+    cleanupRequestUploads([req.file]);
+    return res.status(404).json({ error: 'Test not found' });
   }
-  db.prepare('DELETE FROM glaze_clay_tests WHERE id=?').run(req.params.testId);
-  res.json({ success: true });
+  try {
+    db.transaction(() => {
+      const current = db.prepare(`SELECT t.id FROM glaze_clay_tests t JOIN glazes g ON g.id=t.glaze_id
+        WHERE t.id=? AND t.glaze_id=? AND g.user_id=?`).get(req.params.testId, req.params.id, req.userId);
+      if (!current) { const error = new Error('Test not found'); error.status = 404; throw error; }
+      db.prepare('UPDATE glaze_clay_tests SET photo_filename=? WHERE id=? AND glaze_id=?')
+        .run(req.file.filename, req.params.testId, req.params.id);
+    }).immediate();
+  } catch (error) {
+    cleanupRequestUploads([req.file]);
+    return res.status(error.status || 500).json({ error: error.status === 404 ? 'Test not found' : 'Could not replace clay test photo.' });
+  }
+  if (existing.photo_filename && existing.photo_filename !== req.file.filename) deletionLifecycle.cleanupFiles([existing.photo_filename]);
+  const updated = db.prepare('SELECT * FROM glaze_clay_tests WHERE id=? AND glaze_id=?').get(req.params.testId, req.params.id);
+  res.json(glazeClayTestMediaContract(updated));
+});
+
+app.delete('/api/glazes/:id/clay-tests/:testId', auth, (req, res) => {
+  try {
+    const glaze = db.prepare('SELECT id FROM glazes WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+    if (!glaze) return res.status(404).json({ error: 'Glaze not found' });
+    if (!deletionLifecycle.deleteClayTest(req.userId, req.params.id, req.params.testId)) return res.status(404).json({ error: 'Test not found' });
+    res.json({ success: true });
+  } catch (error) { res.status(error.status || 500).json({ error: error.message }); }
 });
 
 // Shopping list — all out-of-stock clays and glazes + custom items
@@ -1942,7 +2541,7 @@ app.delete('/api/glaze-chemicals/:id', auth, (req, res) => {
 // ============ PIECES ============
 app.get('/api/pieces', auth, (req, res) => {
   const { status, clayBodyId, search, limit, offset, excludeCasualties } = req.query;
-  let sql = 'SELECT p.*, cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id WHERE p.user_id=?';
+  let sql = 'SELECT p.*, cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id AND cb.user_id=p.user_id WHERE p.user_id=?';
   const params = [req.userId];
   if (excludeCasualties) { sql += " AND (p.status IS NULL OR p.status NOT IN ('broken','recycled'))"; }
   if (status) { sql += ' AND p.status=?'; params.push(status); }
@@ -1952,12 +2551,13 @@ app.get('/api/pieces', auth, (req, res) => {
   if (limit) { sql += ' LIMIT ?'; params.push(parseInt(limit)); }
   if (offset) { sql += ' OFFSET ?'; params.push(parseInt(offset)); }
   const pieces = db.prepare(sql).all(...params);
-  const getGl = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order');
+  const getGl = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN pieces p ON p.id=pg.piece_id LEFT JOIN glazes g ON pg.glaze_id=g.id AND g.user_id=p.user_id WHERE pg.piece_id=? AND p.user_id=? ORDER BY pg.layer_order');
   const getPh = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order');
   const statusLabels = {'in-progress':'In Progress','bisque-fired':'Bisque Fired','glazed':'Glazed','glaze-fired':'Final Fired','done':'Complete','sold':'Sold','broken':'Broken','recycled':'Recycled'};
   pieces.forEach(p => {
-    p.glazes = getGl.all(p.id);
+    p.glazes = getGl.all(p.id, req.userId);
     p.photos = getPh.all(p.id);
+    p.photoVisibility = classifyPiecePhotoVisibility(p);
     // Clean up legacy data: if studio was used to store clay body text, suppress it
     if (p.studio && p.clay_body_name && p.studio.toLowerCase() === p.clay_body_name.toLowerCase()) {
       p.studio = null;
@@ -1985,11 +2585,12 @@ app.get('/api/pieces', auth, (req, res) => {
 });
 
 app.get('/api/pieces/:id', auth, (req, res) => {
-  const p = db.prepare('SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id WHERE p.id=? AND p.user_id=?').get(req.params.id, req.userId);
+  const p = db.prepare('SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id AND cb.user_id=p.user_id WHERE p.id=? AND p.user_id=?').get(req.params.id, req.userId);
   if (!p) return res.status(404).json({ error: 'Not found' });
-  p.glazes = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order').all(p.id);
+  p.glazes = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id=g.id AND g.user_id=? WHERE pg.piece_id=? ORDER BY pg.layer_order').all(req.userId, p.id);
   p.photos = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order').all(p.id);
-  p.firings = db.prepare('SELECT * FROM firing_logs WHERE piece_id=? ORDER BY date DESC').all(p.id);
+  p.photoVisibility = classifyPiecePhotoVisibility(p);
+  p.firings = db.prepare('SELECT * FROM firing_logs WHERE piece_id=? AND user_id=? ORDER BY date DESC').all(p.id, req.userId);
   // Clean up legacy data: if studio was used to store clay body text, suppress it
   if (p.studio && p.clay_body_name && p.studio.toLowerCase() === p.clay_body_name.toLowerCase()) {
     p.studio = null;
@@ -2024,8 +2625,7 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
   // Handle both JSON and FormData (iOS may send either)
   const body = req.body || {};
   const title = String(body.title || body.name || '').trim() || null;
-  const clayText = String(body.clay || body.studio || '').trim() || null;
-  const clayBodyId = body.clayBodyId || body.clay_body_id || null;
+  let clayText, clayBodyId;
   const statusMap = {'In Progress':'in-progress','Bisque Fired':'bisque-fired','Glazed':'glazed','Final Fired':'glaze-fired','Glaze Fired':'glaze-fired','Complete':'done','Done':'done','Sold':'sold','Broken':'broken','Recycled':'recycled'};
   const rawStatus = String(body.status || 'in-progress').trim();
   const status = statusMap[rawStatus] || rawStatus.toLowerCase().replace(/\s+/g,'-');
@@ -2062,8 +2662,16 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
   const casualtyType = body.casualtyType || body.casualty_type || null;
   const casualtyNotes = body.casualtyNotes || body.casualty_notes || null;
   const casualtyLesson = body.casualtyLesson || body.casualty_lesson || null;
-  let glazeIds = body.glazeIds || body.glaze_ids || null;
-  if (typeof glazeIds === 'string') { try { glazeIds = JSON.parse(glazeIds); } catch(e) { glazeIds = null; } }
+  let glazeIds;
+  try {
+    const validate = (table, id) => ownedRelationship(table, req.userId, id);
+    const clay = pieceEditor.clay(body, {}, validate);
+    clayBodyId = clay.id; clayText = clay.text;
+    glazeIds = pieceEditor.layers(body, [], validate);
+  } catch (error) {
+    cleanupRequestUploads([req.file]);
+    return res.status(error.status || 400).json({ error: error.message });
+  }
 
   console.log('[DEBUG] POST /api/pieces content-type:', req.headers['content-type'], 'body:', JSON.stringify(body), 'file:', req.file ? req.file.originalname : 'none', 'title:', title, 'status:', status, 'clay:', clayText, 'notes:', notes);
 
@@ -2078,13 +2686,14 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
     db.prepare('INSERT INTO pieces (id,user_id,title,description,clay_body_id,studio,status,form,technique,dimensions,weight,material_cost,firing_cost,labor_hours,labor_rate,sale_price,date_started,notes,casualty_type,casualty_notes,casualty_lesson) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
       .run(id, req.userId, title, description, clayBodyId, clayText, status || 'in-progress', form, technique, dimensions, weight, materialCost, firingCost, laborHours, laborRate, salePrice, dateStarted, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null);
     if (glazeIds?.length) {
-      const ins = db.prepare('INSERT INTO piece_glazes (id,piece_id,glaze_id,custom_name,coats,application_method,layer_order) VALUES (?,?,?,?,?,?,?)');
-      glazeIds.forEach((g, i) => ins.run(uuidv4(), id, g.glazeId || null, g.customName || null, g.coats || 1, g.method || null, i));
+      const ins = db.prepare('INSERT INTO piece_glazes (id,piece_id,glaze_id,custom_name,coats,application_method,layer_order,notes) VALUES (?,?,?,?,?,?,?,?)');
+      glazeIds.forEach((g, i) => ins.run(uuidv4(), id, g.glazeId, g.customName, g.coats, g.method, g.layerOrder, g.notes));
     }
   });
   try {
     insertPieceAndGlazes();
   } catch (dbErr) {
+    cleanupRequestUploads([req.file]);
     console.error('[DB ERROR] Insert piece failed:', dbErr.message, { title, status, body });
     return res.status(400).json({ error: 'Could not save piece: ' + dbErr.message });
   }
@@ -2108,30 +2717,19 @@ app.post('/api/pieces', auth, safeUpload('photo'), async (req, res) => {
 app.patch('/api/pieces/:id/photo-search-visibility', auth, (req, res) => {
   const piece = db.prepare('SELECT id, user_id FROM pieces WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
   if (!piece) return res.status(404).json({ error: 'Piece not found' });
+  if (!db.prepare('PRAGMA table_info(pieces)').all().some(c => c.name === 'hide_from_photo_search')) return res.status(409).json({ error: 'Photo search visibility is unavailable for this schema.' });
   const hide = req.body.hide ? 1 : 0;
   db.prepare('UPDATE pieces SET hide_from_photo_search = ? WHERE id = ?').run(hide, piece.id);
   res.json({ success: true, hide_from_photo_search: hide });
 });
 
-// Debug: extract color from an uploaded photo (no auth needed, temp debug)
-app.post('/api/debug/extract-color', upload.single('photo'), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No photo' });
-  try {
-    const buf = fs.readFileSync(req.file.path);
-    const sig = await computeColorSignature(buf);
-    const parsed = JSON.parse(sig);
-    const totalW = parsed.reduce((s, c) => s + (c.weight || 1), 0);
-    const avgR = parsed.reduce((s, c) => s + c.r * (c.weight || 1), 0) / totalW;
-    const avgG = parsed.reduce((s, c) => s + c.g * (c.weight || 1), 0) / totalW;
-    const avgB = parsed.reduce((s, c) => s + c.b * (c.weight || 1), 0) / totalW;
-    const hsl = rgbToHsl(avgR, avgG, avgB);
-    fs.unlinkSync(req.file.path);
-    res.json({ buckets: parsed, avgRgb: { r: Math.round(avgR), g: Math.round(avgG), b: Math.round(avgB) }, hsl: { h: hsl.h, s: hsl.s, l: hsl.l } });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
+// Retired diagnostic uploader: reject before parsing or storing any request bytes.
+app.post('/api/debug/extract-color', (req, res) => res.status(404).json({ error: 'Not found' }));
+
+const photoQuerySafety = require('./ql/photo-query-safety.cjs').createPhotoQuerySafety(db);
 
 // Debug: return stored avg_color for all photos belonging to user (auth required)
-app.get('/api/debug/photo-colors', auth, (req, res) => {
+app.get('/api/debug/photo-colors', auth, photoQuerySafety.account, (req, res) => {
   const photos = db.prepare(`
     SELECT pp.id, pp.filename, pp.avg_color, p.id as piece_id, p.title, p.hide_from_photo_search
     FROM piece_photos pp
@@ -2169,8 +2767,9 @@ app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
   const body = req.body || {};
   const title = body.title || body.name || null;
   const description = body.description || null;
-  const clayBodyId = body.clayBodyId || body.clay_body_id || null;
-  const studio = body.studio || body.clay || null;
+  let clayBodyId, studio;
+  const storedPiece = db.prepare('SELECT * FROM pieces WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!storedPiece) { cleanupRequestUploads([req.file]); return res.status(404).json({error:'Not found'}); }
   const statusMap2 = {'In Progress':'in-progress','Bisque Fired':'bisque-fired','Glazed':'glazed','Final Fired':'glaze-fired','Glaze Fired':'glaze-fired','Complete':'done','Done':'done','Sold':'sold','Broken':'broken','Recycled':'recycled'};
   const rawSt = body.status ? String(body.status).trim() : null;
   const status = rawSt ? (statusMap2[rawSt] || rawSt.toLowerCase().replace(/\s+/g,'-')) : null;
@@ -2204,28 +2803,38 @@ app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
   const casualtyType = body.casualtyType || body.casualty_type || null;
   const casualtyNotes = body.casualtyNotes || body.casualty_notes || null;
   const casualtyLesson = body.casualtyLesson || body.casualty_lesson || null;
-  let glazeIds = body.glazeIds || body.glaze_ids;
-  if (typeof glazeIds === 'string') { try { glazeIds = JSON.parse(glazeIds); } catch(e) { glazeIds = undefined; } }
+  let glazeIds;
+  try {
+    const validate = (table, id) => ownedRelationship(table, req.userId, id);
+    const clay = pieceEditor.clay(body, storedPiece, validate);
+    clayBodyId = clay.id; studio = clay.text;
+    const storedLayers = db.prepare('SELECT * FROM piece_glazes WHERE piece_id=? ORDER BY layer_order').all(storedPiece.id);
+    glazeIds = pieceEditor.layers(body, storedLayers, validate);
+  } catch (error) {
+    cleanupRequestUploads([req.file]);
+    return res.status(error.status || 400).json({ error: error.message });
+  }
   const isCasualty = (status === 'broken' || status === 'recycled');
   // Piece update + glaze replace run in one transaction so a glaze insert
   // failure (e.g. NOT NULL on glaze_id) rolls back the piece update too,
   // instead of leaving the piece partially updated with no glazes.
   let updateResult;
   const updatePieceAndGlazes = db.transaction(() => {
-    updateResult = db.prepare(`UPDATE pieces SET title=?,description=?,clay_body_id=?,studio=?,status=?,form=?,technique=?,dimensions=?,weight=?,material_cost=?,firing_cost=?,labor_hours=?,labor_rate=?,sale_price=?,date_started=?,date_completed=?,date_sold=?,notes=?,casualty_type=?,casualty_notes=?,casualty_lesson=?,updated_at=datetime('now') WHERE id=? AND user_id=?`)
-      .run(title, description, clayBodyId, studio, status, form, technique, dimensions, weight, materialCost, firingCost, laborHours, laborRate, salePrice, dateStarted, dateCompleted, dateSold, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null, req.params.id, req.userId);
+    updateResult = db.prepare(`UPDATE pieces SET title=?,description=?,${clayBodyId === storedPiece.clay_body_id ? '' : 'clay_body_id=?,'}studio=?,status=?,form=?,technique=?,dimensions=?,weight=?,material_cost=?,firing_cost=?,labor_hours=?,labor_rate=?,sale_price=?,date_started=?,date_completed=?,date_sold=?,notes=?,casualty_type=?,casualty_notes=?,casualty_lesson=?,updated_at=datetime('now') WHERE id=? AND user_id=?`)
+      .run(title, description, ...(clayBodyId === storedPiece.clay_body_id ? [] : [clayBodyId]), studio, status, form, technique, dimensions, weight, materialCost, firingCost, laborHours, laborRate, salePrice, dateStarted, dateCompleted, dateSold, notes, isCasualty ? (casualtyType || null) : null, isCasualty ? (casualtyNotes || null) : null, isCasualty ? (casualtyLesson || null) : null, req.params.id, req.userId);
     if (updateResult.changes === 0) return;
     if (glazeIds !== undefined) {
       db.prepare('DELETE FROM piece_glazes WHERE piece_id=?').run(req.params.id);
       if (glazeIds?.length) {
-        const ins = db.prepare('INSERT INTO piece_glazes (id,piece_id,glaze_id,custom_name,coats,application_method,layer_order) VALUES (?,?,?,?,?,?,?)');
-        glazeIds.forEach((g, i) => ins.run(uuidv4(), req.params.id, g.glazeId || null, g.customName || null, g.coats || 1, g.method || null, i));
+        const ins = db.prepare('INSERT INTO piece_glazes (id,piece_id,glaze_id,custom_name,coats,application_method,layer_order,notes) VALUES (?,?,?,?,?,?,?,?)');
+        glazeIds.forEach((g, i) => ins.run(uuidv4(), req.params.id, g.glazeId, g.customName, g.coats, g.method, g.layerOrder, g.notes));
       }
     }
   });
   try {
     updatePieceAndGlazes();
   } catch (dbErr) {
+    cleanupRequestUploads([req.file]);
     console.error('[DB ERROR] Update piece failed:', dbErr.message, { pieceId: req.params.id });
     return res.status(400).json({ error: 'Could not save piece: ' + dbErr.message });
   }
@@ -2234,24 +2843,17 @@ app.put('/api/pieces/:id', auth, safeUpload('photo'), (req, res) => {
 });
 
 app.delete('/api/pieces/:id', auth, (req, res) => {
-  // Treat repeated deletes as successful so stale app screens do not show
-  // an error after the piece was already removed.
-  const piece = db.prepare('SELECT id FROM pieces WHERE id=? AND user_id=?').get(req.params.id, req.userId);
-  if (!piece) return res.json({ success: true });
-
-  const photos = db.prepare('SELECT filename FROM piece_photos WHERE piece_id=?').all(req.params.id);
-  photos.forEach(p => { const f = path.join(UPLOADS_DIR, p.filename); if (fs.existsSync(f)) fs.unlinkSync(f); });
-  db.prepare('DELETE FROM piece_photos WHERE piece_id=?').run(req.params.id);
-  db.prepare('DELETE FROM piece_glazes WHERE piece_id=?').run(req.params.id);
-  db.prepare('DELETE FROM firing_logs WHERE piece_id=?').run(req.params.id);
-  const r = db.prepare('DELETE FROM pieces WHERE id=? AND user_id=?').run(req.params.id, req.userId);
-  if (r.changes === 0) return res.status(404).json({ error: 'Not found' });
-  res.json({ success: true });
+  try {
+    // Missing/foreign IDs remain an idempotent no-op; no metadata is touched.
+    deletionLifecycle.deletePiece(req.userId, req.params.id);
+    res.json({ success: true });
+  } catch (err) { res.status(err.status || 500).json({ error: err.message }); }
 });
 
 // Bulk delete endpoint - reuses existing deletion logic for each type
 app.post('/api/bulk-delete', auth, (req, res) => {
   const { type, ids } = req.body;
+  if (type === 'test-tiles' && !hasTestTileEntitlement(req.userId)) { res.set('Cache-Control', 'private, no-store'); return testTileLocked(res); }
   if (!type || !Array.isArray(ids) || ids.length === 0) {
     return res.status(400).json({ error: 'Invalid request' });
   }
@@ -2264,64 +2866,22 @@ app.post('/api/bulk-delete', auth, (req, res) => {
       try {
         switch(type) {
           case 'pieces':
-            // Reuse pieces deletion logic
-            const photos = db.prepare('SELECT filename FROM piece_photos WHERE piece_id=?').all(id);
-            photos.forEach(p => { const f = path.join(UPLOADS_DIR, p.filename); if (fs.existsSync(f)) fs.unlinkSync(f); });
-            db.prepare('DELETE FROM piece_photos WHERE piece_id=?').run(id);
-            db.prepare('DELETE FROM piece_glazes WHERE piece_id=?').run(id);
-            db.prepare('DELETE FROM firing_logs WHERE piece_id=?').run(id);
-            const pr = db.prepare('DELETE FROM pieces WHERE id=? AND user_id=?').run(id, req.userId);
-            if (pr.changes > 0) deleted++;
+          case 'casualties':
+            deleted += deletionLifecycle.deletePiece(req.userId, id);
             break;
 
           case 'clay-bodies':
-            // Reuse clay deletion logic
-            const clayPhotos = db.prepare('SELECT filename FROM clay_photos WHERE clay_id=?').all(id);
-            clayPhotos.forEach(p => { const f = path.join(UPLOADS_DIR, p.filename); if (fs.existsSync(f)) fs.unlinkSync(f); });
-            db.prepare('DELETE FROM clay_photos WHERE clay_id=?').run(id);
-            const cr = db.prepare('DELETE FROM clay_bodies WHERE id=? AND user_id=?').run(id, req.userId);
-            if (cr.changes > 0) deleted++;
+            deleted += deletionLifecycle.deleteStudioRecord(req.userId, id, 'clay');
             break;
-
           case 'glazes':
-            // Reuse glaze deletion logic
-            db.prepare('DELETE FROM glaze_ingredients WHERE glaze_id=?').run(id);
-            db.prepare('DELETE FROM glaze_photos WHERE glaze_id=?').run(id);
-            const gr = db.prepare('DELETE FROM glazes WHERE id=? AND user_id=?').run(id, req.userId);
-            if (gr.changes > 0) deleted++;
+            deleted += deletionLifecycle.deleteStudioRecord(req.userId, id, 'glaze');
             break;
-
           case 'test-tiles':
-            // Reuse test tile deletion logic (requires tier check)
-            const tile = db.prepare('SELECT * FROM test_tiles WHERE id=? AND user_id=?').get(id, req.userId);
-            if (tile) {
-              [tile.photo_filename, tile.photo_filename2, tile.photo_filename3].forEach(f => {
-                if (f) {
-                  const fp = path.join(UPLOADS_DIR, f);
-                  if (fs.existsSync(fp)) fs.unlinkSync(fp);
-                }
-              });
-              db.prepare('DELETE FROM test_tiles WHERE id=?').run(id);
-              deleted++;
-            }
+            deleted += deletionLifecycle.deleteStudioRecord(req.userId, id, 'testTile');
             break;
 
           case 'firing-logs':
-            // Reuse firing deletion logic
-            const fr = db.prepare('DELETE FROM firing_logs WHERE id=? AND user_id=?').run(id, req.userId);
-            if (fr.changes > 0) deleted++;
-            break;
-
-          case 'casualties':
-            // Casualties are just pieces with status='broken' or 'recycled'
-            // Use same deletion logic as pieces
-            const casualtyPhotos = db.prepare('SELECT filename FROM piece_photos WHERE piece_id=?').all(id);
-            casualtyPhotos.forEach(p => { const f = path.join(UPLOADS_DIR, p.filename); if (fs.existsSync(f)) fs.unlinkSync(f); });
-            db.prepare('DELETE FROM piece_photos WHERE piece_id=?').run(id);
-            db.prepare('DELETE FROM piece_glazes WHERE piece_id=?').run(id);
-            db.prepare('DELETE FROM firing_logs WHERE piece_id=?').run(id);
-            const casr = db.prepare('DELETE FROM pieces WHERE id=? AND user_id=?').run(id, req.userId);
-            if (casr.changes > 0) deleted++;
+            deleted += deletionLifecycle.deleteFiring(req.userId, id);
             break;
 
           default:
@@ -2344,6 +2904,11 @@ app.post('/api/pieces/:id/photos', auth, upload.single('photo'), async (req, res
   if (!req.file) return res.status(400).json({ error: 'No photo' });
   
   console.log('[PHOTO-DIAG] File size:', req.file.size, 'mime:', req.file.mimetype);
+  const piece = db.prepare('SELECT id FROM pieces WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!piece) {
+    cleanupRequestUploads([req.file]);
+    return res.status(404).json({ error: 'Piece not found' });
+  }
   
   const u = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
   const maxPhotos = ((u?.tier || 'free') === 'free') ? 1 : 3;
@@ -2373,77 +2938,47 @@ app.post('/api/pieces/:id/photos', auth, upload.single('photo'), async (req, res
 });
 
 app.delete('/api/photos/:id', auth, (req, res) => {
-  const ph = db.prepare('SELECT pp.* FROM piece_photos pp JOIN pieces p ON pp.piece_id=p.id WHERE pp.id=? AND p.user_id=?').get(req.params.id, req.userId);
-  if (!ph) return res.status(404).json({ error: 'Not found' });
-  const f = path.join(UPLOADS_DIR, ph.filename); if (fs.existsSync(f)) fs.unlinkSync(f);
-  db.prepare('DELETE FROM piece_photos WHERE id=?').run(req.params.id);
+  if (!deletionLifecycle.deletePhoto(req.userId, req.params.id, 'piece')) return res.status(404).json({ error: 'Not found' });
   res.json({ success: true });
 });
 
-const isStoredPhotoOwned = (filename, userId) => {
-  const ownershipChecks = [
-    ['SELECT 1 FROM users WHERE id=? AND (avatar_filename=? OR profile_photo=?)', [userId, filename, filename]],
-    ['SELECT 1 FROM piece_photos pp JOIN pieces p ON pp.piece_id=p.id WHERE pp.filename=? AND p.user_id=?', [filename, userId]],
-    ['SELECT 1 FROM clay_photos cp JOIN clay_bodies c ON cp.clay_id=c.id WHERE cp.filename=? AND c.user_id=?', [filename, userId]],
-    ['SELECT 1 FROM glaze_photos gp JOIN glazes g ON gp.glaze_id=g.id WHERE gp.filename=? AND g.user_id=?', [filename, userId]],
-    ['SELECT 1 FROM glaze_clay_tests gt JOIN glazes g ON gt.glaze_id=g.id WHERE gt.photo_filename=? AND g.user_id=?', [filename, userId]],
-    ['SELECT 1 FROM firing_photos fp JOIN firing_logs f ON fp.firing_id=f.id WHERE fp.filename=? AND f.user_id=?', [filename, userId]],
-    ['SELECT 1 FROM sales WHERE image_filename=? AND user_id=?', [filename, userId]],
-    ['SELECT 1 FROM events WHERE image_filename=? AND user_id=?', [filename, userId]],
-    ['SELECT 1 FROM project_photos pp JOIN projects p ON pp.project_id=p.id WHERE pp.filename=? AND p.user_id=?', [filename, userId]],
-    ['SELECT 1 FROM glaze_combos WHERE (photo_filename=? OR photo_filename2=?) AND user_id=?', [filename, filename, userId]],
-    ['SELECT 1 FROM test_tiles WHERE (photo_filename=? OR photo_filename2=? OR photo_filename3=?) AND user_id=?', [filename, filename, filename, userId]],
-    [`SELECT 1 FROM forum_photos fp
-       LEFT JOIN forum_posts p ON fp.post_id=p.id
-       LEFT JOIN forum_replies r ON fp.reply_id=r.id
-      WHERE fp.filename=? AND (p.user_id=? OR r.user_id=?)`, [filename, userId, userId]],
-  ];
-  return ownershipChecks.some(([sql, params]) => !!db.prepare(sql).get(...params));
-};
-
-const storedPhotoReferenceQueries = [
-  'SELECT 1 FROM users WHERE avatar_filename=? OR profile_photo=? LIMIT 1',
-  'SELECT 1 FROM piece_photos WHERE filename=? LIMIT 1',
-  'SELECT 1 FROM clay_photos WHERE filename=? LIMIT 1',
-  'SELECT 1 FROM glaze_photos WHERE filename=? LIMIT 1',
-  'SELECT 1 FROM glaze_clay_tests WHERE photo_filename=? LIMIT 1',
-  'SELECT 1 FROM firing_photos WHERE filename=? LIMIT 1',
-  'SELECT 1 FROM sales WHERE image_filename=? LIMIT 1',
-  'SELECT 1 FROM events WHERE image_filename=? LIMIT 1',
-  'SELECT 1 FROM project_photos WHERE filename=? LIMIT 1',
-  'SELECT 1 FROM glaze_combos WHERE photo_filename=? OR photo_filename2=? LIMIT 1',
-  'SELECT 1 FROM test_tiles WHERE photo_filename=? OR photo_filename2=? OR photo_filename3=? LIMIT 1',
-  'SELECT 1 FROM forum_photos WHERE filename=? LIMIT 1',
-  'SELECT 1 FROM merchant_products WHERE image_filename=? OR download_filename=? LIMIT 1',
-];
-
-const hasStoredPhotoReference = (filename) => storedPhotoReferenceQueries.some((sql) => {
-  const parameterCount = (sql.match(/\?/g) || []).length;
-  return !!db.prepare(sql).get(...Array(parameterCount).fill(filename));
-});
-
-const replaceStoredPhotoReferences = db.transaction((oldFilename, newFilename, userId) => {
-  let changes = 0;
-  const run = (sql, ...params) => { changes += db.prepare(sql).run(...params).changes; };
-
-  run('UPDATE users SET avatar_filename=CASE WHEN avatar_filename=? THEN ? ELSE avatar_filename END, profile_photo=CASE WHEN profile_photo=? THEN ? ELSE profile_photo END WHERE id=? AND (avatar_filename=? OR profile_photo=?)', oldFilename, newFilename, oldFilename, newFilename, userId, oldFilename, oldFilename);
-  run('UPDATE piece_photos SET filename=? WHERE filename=? AND piece_id IN (SELECT id FROM pieces WHERE user_id=?)', newFilename, oldFilename, userId);
-  run('UPDATE clay_photos SET filename=? WHERE filename=? AND clay_id IN (SELECT id FROM clay_bodies WHERE user_id=?)', newFilename, oldFilename, userId);
-  run('UPDATE glaze_photos SET filename=? WHERE filename=? AND glaze_id IN (SELECT id FROM glazes WHERE user_id=?)', newFilename, oldFilename, userId);
-  run('UPDATE glaze_clay_tests SET photo_filename=? WHERE photo_filename=? AND glaze_id IN (SELECT id FROM glazes WHERE user_id=?)', newFilename, oldFilename, userId);
-  run('UPDATE firing_photos SET filename=? WHERE filename=? AND firing_id IN (SELECT id FROM firing_logs WHERE user_id=?)', newFilename, oldFilename, userId);
-  run('UPDATE sales SET image_filename=? WHERE image_filename=? AND user_id=?', newFilename, oldFilename, userId);
-  run('UPDATE events SET image_filename=? WHERE image_filename=? AND user_id=?', newFilename, oldFilename, userId);
-  run('UPDATE project_photos SET filename=? WHERE filename=? AND project_id IN (SELECT id FROM projects WHERE user_id=?)', newFilename, oldFilename, userId);
-  run('UPDATE glaze_combos SET photo_filename=CASE WHEN photo_filename=? THEN ? ELSE photo_filename END, photo_filename2=CASE WHEN photo_filename2=? THEN ? ELSE photo_filename2 END WHERE user_id=? AND (photo_filename=? OR photo_filename2=?)', oldFilename, newFilename, oldFilename, newFilename, userId, oldFilename, oldFilename);
-  run('UPDATE test_tiles SET photo_filename=CASE WHEN photo_filename=? THEN ? ELSE photo_filename END, photo_filename2=CASE WHEN photo_filename2=? THEN ? ELSE photo_filename2 END, photo_filename3=CASE WHEN photo_filename3=? THEN ? ELSE photo_filename3 END WHERE user_id=? AND (photo_filename=? OR photo_filename2=? OR photo_filename3=?)', oldFilename, newFilename, oldFilename, newFilename, oldFilename, newFilename, userId, oldFilename, oldFilename, oldFilename);
-  run(`UPDATE forum_photos SET filename=? WHERE filename=? AND (
-    post_id IN (SELECT id FROM forum_posts WHERE user_id=?) OR
-    reply_id IN (SELECT id FROM forum_replies WHERE user_id=?)
-  )`, newFilename, oldFilename, userId, userId);
-
-  return changes;
-});
+// Resolve actual editable slots, not an OR of unrelated parent owners. A
+// filename-only request cannot select between two records in the same account.
+function ownedPhotoSlots(filename, userId) {
+  const slots = [];
+  const add = (table, column, sql) => {
+    for (const row of db.prepare(sql).all(filename, userId)) slots.push({ table, column, id: row.id });
+  };
+  for (const column of ['avatar_filename', 'profile_photo']) add('users', column, `SELECT id FROM users WHERE ${column}=? AND id=?`);
+  for (const [table, parent, key] of [
+    ['piece_photos','pieces','piece_id'], ['clay_photos','clay_bodies','clay_id'],
+    ['glaze_photos','glazes','glaze_id'], ['firing_photos','firing_logs','firing_id'],
+    ['project_photos','projects','project_id'], ['glaze_clay_tests','glazes','glaze_id']
+  ]) {
+    const column = table === 'glaze_clay_tests' ? 'photo_filename' : 'filename';
+    add(table, column, `SELECT ph.id FROM ${table} ph JOIN ${parent} p ON p.id=ph.${key} WHERE ph.${column}=? AND p.user_id=?`);
+  }
+  for (const [table, columns] of Object.entries({ sales:['image_filename'], events:['image_filename'],
+    pricing_calculations:['photo_filename'], glaze_combos:['photo_filename','photo_filename2'],
+    test_tiles:['photo_filename','photo_filename2','photo_filename3'] })) {
+    for (const column of columns) add(table, column, `SELECT id FROM ${table} WHERE ${column}=? AND user_id=?`);
+  }
+  add('forum_photos', 'filename', `SELECT ph.id FROM forum_photos ph
+    LEFT JOIN forum_posts p ON p.id=ph.post_id
+    LEFT JOIN forum_replies r ON r.id=ph.reply_id
+    WHERE ph.filename=? AND CASE WHEN ph.reply_id IS NULL THEN p.user_id
+      WHEN (ph.post_id IS NULL OR ph.post_id=r.post_id) AND EXISTS (SELECT 1 FROM forum_posts WHERE id=r.post_id) THEN r.user_id END = ?`);
+  return slots;
+}
+function editablePhotoSlots(filename, userId) {
+  const slots = ownedPhotoSlots(filename, userId);
+  if (!slots.length) { const e = new Error('Photo not found.'); e.status=404; throw e; }
+  // Avatar/profile aliases in one user row are one logical profile image.
+  if (slots.length > 1 && !slots.every(s => s.table === 'users')) {
+    const e = new Error('This photo has multiple record references; replace it from the individual record.'); e.status=409; throw e;
+  }
+  return slots;
+}
 
 const replacementPhotoUpload = (req, res, next) => {
   upload.single('photo')(req, res, (error) => {
@@ -2461,10 +2996,15 @@ const replacementPhotoUpload = (req, res, next) => {
 
 // Replace existing photo pixels. Legacy HEIC/HEIF records migrate to a new JPEG
 // filename because Build 34 always sends JPEG bytes.
-app.put('/api/photos/by-filename/:filename', auth, replacementPhotoUpload, async (req, res) => {
+app.put('/api/photos/by-filename/:filename', auth, (req, res, next) => {
+  if (ownedPhotoSlots(req.params.filename, req.userId).some(slot => slot.table === 'test_tiles') && !hasTestTileEntitlement(req.userId)) {
+    res.set('Cache-Control', 'private, no-store'); return testTileLocked(res);
+  }
+  next();
+}, replacementPhotoUpload, async (req, res) => {
   const rawFilename = String(req.params.filename || '');
   const filename = path.basename(rawFilename);
-  const invalidFilename = !rawFilename || rawFilename !== filename || filename === '.' || filename === '..' || filename.includes('\0') || filename.length > 255;
+  const invalidFilename = !rawFilename || rawFilename !== filename || filename === '.' || filename === '..' || (/[/\\\0]/.test(filename)) || filename.length > 255;
   const discardUpload = () => {
     if (req.file?.path && fs.existsSync(req.file.path)) {
       try { fs.unlinkSync(req.file.path); } catch (error) {}
@@ -2487,11 +3027,11 @@ app.put('/api/photos/by-filename/:filename', auth, replacementPhotoUpload, async
 
   let owned = false;
   try {
-    owned = isStoredPhotoOwned(filename, req.userId);
+    owned = editablePhotoSlots(filename, req.userId).length > 0;
   } catch (error) {
     discardUpload();
     console.error('[PHOTO-EDIT] Ownership check failed:', error.message);
-    return res.status(500).json({ error: 'Could not verify this photo.' });
+    return res.status(error.status || 500).json({ error: error.status ? error.message : 'Could not verify this photo.' });
   }
   if (!owned) {
     discardUpload();
@@ -2499,7 +3039,7 @@ app.put('/api/photos/by-filename/:filename', auth, replacementPhotoUpload, async
   }
 
   const target = path.join(UPLOADS_DIR, filename);
-  if (!fs.existsSync(target)) {
+  if (!fs.existsSync(target) || !fs.lstatSync(target).isFile()) {
     discardUpload();
     return res.status(404).json({ error: 'Photo file not found.' });
   }
@@ -2519,72 +3059,28 @@ app.put('/api/photos/by-filename/:filename', auth, replacementPhotoUpload, async
     return res.status(400).json({ error: 'Edited replacement must be a JPEG.' });
   }
 
-  const isLegacyHeif = new Set(['.heic', '.heif']).has(path.extname(filename).toLowerCase());
-  if (!isLegacyHeif) {
-    try {
-      // Preserve existing same-format behavior for non-legacy assets.
-      const existingMeta = await sharp(target).metadata();
-      if (!new Set(['jpeg', 'png']).has(existingMeta.format)) {
-        discardUpload();
-        return res.status(400).json({ error: 'Replacement image format is not supported.' });
-      }
-      fs.renameSync(req.file.path, target);
-
-      const piecePhoto = db.prepare('SELECT id FROM piece_photos WHERE filename=?').get(filename);
-      if (piecePhoto) {
-        try {
-          const phash = await computePHash(fs.readFileSync(target));
-          db.prepare('UPDATE piece_photos SET phash=? WHERE id=?').run(phash, piecePhoto.id);
-        } catch (error) {
-          console.warn('[PHOTO-EDIT] pHash refresh skipped:', error.message);
-        }
-      }
-      return res.json({ success: true, filename, updatedAt: Date.now() });
-    } catch (error) {
-      discardUpload();
-      console.error('[PHOTO-EDIT] Replacement failed:', error.message);
-      return res.status(500).json({ error: 'Could not save the edited photo.' });
-    }
-  }
-
   const newFilename = `${uuidv4()}.jpg`;
   const newTarget = path.join(UPLOADS_DIR, newFilename);
-  let referencesUpdated = false;
   try {
-    // Create the new JPEG first. A failed DB transaction leaves the old HEIC
-    // and its references untouched; only this unreferenced JPEG is removed.
-    fs.renameSync(req.file.path, newTarget);
-    const changed = replaceStoredPhotoReferences(filename, newFilename, req.userId);
-    if (!changed) {
-      fs.unlinkSync(newTarget);
-      return res.status(404).json({ error: 'Photo reference was not found.' });
-    }
-    referencesUpdated = true;
-
-    const piecePhoto = db.prepare('SELECT id FROM piece_photos WHERE filename=?').get(newFilename);
-    if (piecePhoto) {
-      try {
-        const phash = await computePHash(fs.readFileSync(newTarget));
-        db.prepare('UPDATE piece_photos SET phash=? WHERE id=?').run(phash, piecePhoto.id);
-      } catch (error) {
-        console.warn('[PHOTO-EDIT] pHash refresh skipped:', error.message);
+    // Never overwrite old bytes, including JPEG/PNG and a sole owned reference
+    // shared by another account. Recheck ownership after asynchronous decoding.
+    db.transaction(() => {
+      const slots = editablePhotoSlots(filename, req.userId);
+      fs.copyFileSync(req.file.path, newTarget, fs.constants.COPYFILE_EXCL);
+      for (const slot of slots) {
+        db.prepare(`UPDATE ${slot.table} SET ${slot.column}=? WHERE id=? AND ${slot.column}=?`).run(newFilename, slot.id, filename);
+        if (slot.table === 'piece_photos') db.prepare('UPDATE piece_photos SET phash=NULL,avg_color=NULL WHERE id=?').run(slot.id);
       }
-    }
-
-    // Delete the legacy file only after commit and only when no table refers to it.
-    if (!hasStoredPhotoReference(filename) && fs.existsSync(target)) {
-      try { fs.unlinkSync(target); } catch (error) {
-        console.warn('[PHOTO-EDIT] Old HEIC cleanup skipped:', error.message);
-      }
-    }
+    }).immediate();
+    deletionLifecycle.cleanupFiles([filename]);
+    discardUpload();
     return res.json({ success: true, filename: newFilename, updatedAt: Date.now() });
   } catch (error) {
-    if (!referencesUpdated && fs.existsSync(newTarget)) {
-      try { fs.unlinkSync(newTarget); } catch (cleanupError) {}
-    }
-    console.error('[PHOTO-EDIT] Replacement migration failed:', error.message);
-    return res.status(500).json({ error: 'Could not save the edited photo.' });
+    deletionLifecycle.cleanupFiles([newFilename]);
+    discardUpload();
+    return res.status(error.status || 500).json({ error: error.status ? error.message : 'Could not save the edited photo.' });
   }
+
 });
 
 // Update piece photo stage
@@ -2618,21 +3114,50 @@ app.put('/api/pieces/:id/photos/reorder', auth, (req, res) => {
   res.json({ success: true });
 });
 
+function firingPhotoContract(photo) {
+  return { ...photo, photoDelivery: 'owner-protected', photoVisibility: 'legacy-ambiguous' };
+}
 app.put('/api/firing-logs/:id/photos/reorder', auth, (req, res) => {
   const { photoIds } = req.body;
-  if (!Array.isArray(photoIds)) return res.status(400).json({ error: 'photoIds must be an array' });
-  const log = db.prepare('SELECT * FROM firing_logs WHERE id=? AND user_id=?').get(req.params.id, req.userId);
-  if (!log) return res.status(404).json({ error: 'Firing log not found' });
-  photoIds.forEach((photoId, index) => {
-    db.prepare('UPDATE firing_photos SET sort_order=? WHERE id=? AND firing_id=?').run(index, photoId, req.params.id);
-  });
-  res.json({ success: true });
+  try {
+    const status = db.transaction(() => {
+      if (!db.prepare('SELECT id FROM firing_logs WHERE id=? AND user_id=?').get(req.params.id, req.userId)) return 404;
+      const ids = db.prepare('SELECT id FROM firing_photos WHERE firing_id=?').all(req.params.id).map(p => p.id);
+      if (!Array.isArray(photoIds) || photoIds.length !== ids.length || new Set(photoIds).size !== ids.length || photoIds.some(id => !ids.includes(id))) return 400;
+      photoIds.forEach((id, i) => db.prepare('UPDATE firing_photos SET sort_order=? WHERE id=? AND firing_id=?').run(i, id, req.params.id));
+      return 200;
+    }).immediate();
+    res.status(status).json(status === 200 ? { success: true } : { error: status === 404 ? 'Not found' : 'Invalid photo order' });
+  } catch (_) { res.status(500).json({ error: 'Could not reorder photos' }); }
 });
 
 // ============ FIRING LOGS ============
+// Shared canonical representation for list, detail, and Piece relationships.
+function serializeFiring(log) {
+  const piece = log.piece_id && db.prepare('SELECT title FROM pieces WHERE id=? AND user_id=?').get(log.piece_id, log.user_id);
+  const photos = db.prepare('SELECT id,filename FROM firing_photos WHERE firing_id=? ORDER BY sort_order ASC').all(log.id);
+  return { ...log, piece_title: piece?.title || null, photoDelivery: 'owner-protected', photoVisibility: 'legacy-ambiguous', photos: photos.map(firingPhotoContract) };
+}
+
+// QL studio assistant: isolated, read-only, disabled unless explicitly enabled.
+// Explicit opt-in for the bounded website proof; no user data or client override.
+app.get('/api/ql/assistant/config', (req, res) => {
+  res.set('Cache-Control', 'private, no-store').json({
+    enabled: process.env.QL_ASSISTANT_CORE_ENABLED === '1' && process.env.QL_ASSISTANT_WEB_ENABLED === '1',
+    handsFreeEnabled: process.env.QL_ASSISTANT_CORE_ENABLED === '1' && process.env.QL_ASSISTANT_WEB_ENABLED === '1' && process.env.QL_ASSISTANT_VOICE_WEB_ENABLED === '1' && process.env.QL_ASSISTANT_HANDS_FREE_WEB_ENABLED === '1',
+    voiceEnabled: process.env.QL_ASSISTANT_CORE_ENABLED === '1' && process.env.QL_ASSISTANT_WEB_ENABLED === '1' && process.env.QL_ASSISTANT_VOICE_WEB_ENABLED === '1'
+  });
+});
+if (process.env.QL_ASSISTANT_CORE_ENABLED === '1') {
+  app.post('/api/ql/assistant/turn', require('./ql/assistant/http.cjs').createAssistantHandler({
+    db, jwtSecret: JWT_SECRET, enabled: true
+  }));
+}
+
+
 app.get('/api/firing-logs', auth, (req, res) => {
   const { sort } = req.query;
-  let sql = 'SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id WHERE fl.user_id=?';
+  let sql = 'SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id AND p.user_id=fl.user_id WHERE fl.user_id=?';
   let orderBy = 'ORDER BY fl.date DESC'; // default
   if (sort === 'created_date') orderBy = 'ORDER BY fl.created_at DESC';
   else if (sort === 'firing_type') orderBy = 'ORDER BY fl.firing_type ASC, fl.date DESC';
@@ -2640,18 +3165,15 @@ app.get('/api/firing-logs', auth, (req, res) => {
   else orderBy = 'ORDER BY fl.date DESC'; // 'firing_date' is default
   sql += ' ' + orderBy;
   const firings = db.prepare(sql).all(req.userId);
-  const result = firings.map(f => {
-    const photos = db.prepare('SELECT id,filename FROM firing_photos WHERE firing_id=? ORDER BY sort_order ASC').all(f.id);
-    return { ...f, photos };
-  });
+  const result = firings.map(serializeFiring);
   res.json(result);
 });
 
 app.get('/api/firing-logs/:id', auth, (req, res) => {
-  const log = db.prepare('SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id WHERE fl.id=? AND fl.user_id=?').get(req.params.id, req.userId);
+  const log = db.prepare('SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id AND p.user_id=fl.user_id WHERE fl.id=? AND fl.user_id=?').get(req.params.id, req.userId);
   if (!log) return res.status(404).json({ error: 'Not found' });
-  const photos = db.prepare('SELECT id,filename FROM firing_photos WHERE firing_id=? ORDER BY sort_order ASC').all(req.params.id);
-  res.json({ ...log, photos });
+  res.set('Cache-Control', 'private, no-store');
+  res.json(serializeFiring(log));
 });
 
 app.post('/api/firing-logs', auth, (req, res) => {
@@ -2667,57 +3189,83 @@ app.post('/api/firing-logs', auth, (req, res) => {
   }
 
   const id = uuidv4();
-  db.prepare('INSERT INTO firing_logs (id,user_id,piece_id,firing_type,cone,temperature,atmosphere,kiln_name,schedule,duration,firing_speed,custom_speed_detail,hold_used,hold_duration,date,results,notes,firing_time,firing_mode,load_description,firing_mode_notes,start_time,end_time,open_temp) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
-    .run(id, req.userId, pieceId, firingType || null, cone, temperature, atmosphere || null, kilnName, schedule, duration, firingSpeed || null, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null, firingModeNotes || null, startTime || null, endTime || null, openTemp || null);
+  try {
+    getQlRelationshipService().writeLegacyFiring({ userId: req.userId, firingId: id, pieceId, create: true }, () => {
+      db.prepare('INSERT INTO firing_logs (id,user_id,firing_type,cone,temperature,atmosphere,kiln_name,schedule,duration,firing_speed,custom_speed_detail,hold_used,hold_duration,date,results,notes,firing_time,firing_mode,load_description,firing_mode_notes,start_time,end_time,open_temp) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+        .run(id, req.userId, firingType || null, cone, temperature, atmosphere || null, kilnName, schedule, duration, firingSpeed || null, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null, firingModeNotes || null, startTime || null, endTime || null, openTemp || null);
+    });
+  } catch (error) {
+    if (error.status === 400) return res.status(400).json({ error: error.message });
+    return qlRelationshipError(res, error);
+  }
   res.json({ id });
 });
 
 // Edit firing log
 app.put('/api/firing-logs/:id', auth, (req, res) => {
   const { pieceId, firingType, cone, temperature, atmosphere, kilnName, schedule, duration, firingSpeed, customSpeedDetail, holdUsed, holdDuration, date, results, notes, firingTime, firingMode, loadDescription, firingModeNotes, startTime, endTime, openTemp } = req.body;
-  db.prepare('UPDATE firing_logs SET piece_id=?,firing_type=?,cone=?,temperature=?,atmosphere=?,kiln_name=?,schedule=?,duration=?,firing_speed=?,custom_speed_detail=?,hold_used=?,hold_duration=?,date=?,results=?,notes=?,firing_time=?,firing_mode=?,load_description=?,firing_mode_notes=?,start_time=?,end_time=?,open_temp=? WHERE id=? AND user_id=?')
-    .run(pieceId || null, firingType || null, cone, temperature, atmosphere || null, kilnName, schedule, duration, firingSpeed || null, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null, firingModeNotes || null, startTime || null, endTime || null, openTemp || null, req.params.id, req.userId);
+  try {
+    getQlRelationshipService().writeLegacyFiring({ userId: req.userId, firingId: req.params.id, pieceId }, () => {
+      db.prepare('UPDATE firing_logs SET firing_type=?,cone=?,temperature=?,atmosphere=?,kiln_name=?,schedule=?,duration=?,firing_speed=?,custom_speed_detail=?,hold_used=?,hold_duration=?,date=?,results=?,notes=?,firing_time=?,firing_mode=?,load_description=?,firing_mode_notes=?,start_time=?,end_time=?,open_temp=? WHERE id=? AND user_id=?')
+        .run(firingType || null, cone, temperature, atmosphere || null, kilnName, schedule, duration, firingSpeed || null, customSpeedDetail || null, holdUsed ? 1 : 0, holdDuration, date, results, notes, firingTime || null, firingMode || 'kiln-load', loadDescription || null, firingModeNotes || null, startTime || null, endTime || null, openTemp || null, req.params.id, req.userId);
+    });
+  } catch (error) {
+    if (error.status === 400) return res.status(400).json({ error: error.message });
+    return qlRelationshipError(res, error);
+  }
   res.json({ success: true });
 });
 
 // Delete firing log
 app.delete('/api/firing-logs/:id', auth, (req, res) => {
-  db.prepare('DELETE FROM firing_logs WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  deletionLifecycle.deleteFiring(req.userId, req.params.id);
   res.json({ success: true });
 });
 
 // Firing photos upload
 app.post('/api/firing-logs/:id/photos', auth, upload.array('photos', 3), (req, res) => {
-  if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
-  const nextSortOrder = db.prepare('SELECT COALESCE(MAX(sort_order), -1) + 1 AS next FROM firing_photos WHERE firing_id=?').get(req.params.id).next;
-  const photos = [];
-  req.files.forEach((file, idx) => {
-    const photoId = uuidv4();
-    db.prepare('INSERT INTO firing_photos (id,firing_id,filename,original_name,sort_order) VALUES (?,?,?,?,?)')
-      .run(photoId, req.params.id, file.filename, file.originalname, nextSortOrder + idx);
-    photos.push({ id: photoId, filename: file.filename });
-  });
-  res.json(photos);
+  if (!req.files?.length) return res.status(400).json({ error: 'No files uploaded' });
+  try {
+    const result = db.transaction(() => {
+      if (!db.prepare('SELECT id FROM firing_logs WHERE id=? AND user_id=?').get(req.params.id, req.userId)) return null;
+      const target = req.body.replacePhotoId && db.prepare('SELECT * FROM firing_photos WHERE id=? AND firing_id=?').get(req.body.replacePhotoId, req.params.id);
+      if (req.body.replacePhotoId && (!target || req.files.length !== 1)) return null;
+      const next = db.prepare('SELECT COALESCE(MAX(sort_order), -1)+1 AS n FROM firing_photos WHERE firing_id=?').get(req.params.id).n;
+      const photos = req.files.map((file, i) => {
+        const id = target ? target.id : uuidv4();
+        if (target) db.prepare('UPDATE firing_photos SET filename=?,original_name=? WHERE id=? AND firing_id=?').run(file.filename, file.originalname, id, req.params.id);
+        else db.prepare('INSERT INTO firing_photos (id,firing_id,filename,original_name,sort_order) VALUES (?,?,?,?,?)').run(id, req.params.id, file.filename, file.originalname, next+i);
+        return firingPhotoContract({ id, filename: file.filename });
+      });
+      return { photos, old: target ? [target.filename] : [] };
+    }).immediate();
+    if (!result) { cleanupRequestUploads(req.files); return res.status(404).json({ error: 'Not found' }); }
+    deletionLifecycle.cleanupFiles(result.old);
+    res.json(result.photos);
+  } catch (_) {
+    // Reference-aware cleanup also preserves uploads if a later response fails after commit.
+    cleanupRequestUploads(req.files);
+    res.status(500).json({ error: 'Could not save firing photos' });
+  }
 });
 
 // Get firing photos
 app.get('/api/firing-logs/:id/photos', auth, (req, res) => {
+  const log = db.prepare('SELECT id FROM firing_logs WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+  if (!log) return res.status(404).json({ error: 'Firing log not found' });
   const photos = db.prepare('SELECT * FROM firing_photos WHERE firing_id=? ORDER BY sort_order').all(req.params.id);
-  res.json(photos);
+  res.json(photos.map(firingPhotoContract));
 });
 
 // Delete firing photo
 app.delete('/api/firing-photos/:id', auth, (req, res) => {
-  const photo = db.prepare('SELECT fp.filename,fp.firing_id,fl.user_id FROM firing_photos fp JOIN firing_logs fl ON fp.firing_id=fl.id WHERE fp.id=?').get(req.params.id);
-  if (!photo || photo.user_id !== req.userId) return res.status(403).json({ error: 'Not authorized' });
-  db.prepare('DELETE FROM firing_photos WHERE id=?').run(req.params.id);
-  try { fs.unlinkSync(path.join(UPLOADS_DIR, photo.filename)); } catch(e) { /* ignore */ }
+  if (!deletionLifecycle.deletePhoto(req.userId, req.params.id, 'firing')) return res.status(403).json({ error: 'Not authorized' });
   res.json({ success: true });
 });
 
 // Export firing logs as CSV
 app.get('/api/export/firing-logs', auth, (req, res) => {
-  const firings = db.prepare('SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id WHERE fl.user_id=? ORDER BY fl.date DESC').all(req.userId);
+  const firings = db.prepare('SELECT fl.*,p.title as piece_title FROM firing_logs fl LEFT JOIN pieces p ON fl.piece_id=p.id AND p.user_id=fl.user_id WHERE fl.user_id=? ORDER BY fl.date DESC').all(req.userId);
   let csv = 'Date,Firing Type,Cone,Temperature,Kiln,Duration,Firing Time,Start Time,End Time,Open Temp,Atmosphere,Results,Load Description,Notes\n';
   firings.forEach(f => {
     csv += `"${f.date||''}","${f.firing_type||''}","${f.cone||''}","${f.temperature||''}","${(f.kiln_name||'').replace(/"/g,'""')}","${f.duration||''}","${f.firing_time||''}","${f.start_time||''}","${f.end_time||''}","${f.open_temp||''}","${f.atmosphere||''}","${(f.results||'').replace(/"/g,'""')}","${(f.load_description||'').replace(/"/g,'""')}","${(f.notes||'').replace(/"/g,'""')}"\n`;
@@ -2735,6 +3283,8 @@ const parsePricingCalculation = (row) => ({
   inputs: JSON.parse(row.inputs_json),
   result: JSON.parse(row.result_json),
   photo_filename: row.photo_filename,
+  photoDelivery: 'owner-protected',
+  photoVisibility: 'legacy-ambiguous',
   created_at: row.created_at,
 });
 
@@ -2745,7 +3295,7 @@ app.get('/api/pricing-calculations', auth, (req, res) => {
 
 app.post('/api/pricing-calculations', auth, upload.single('photo'), (req, res) => {
   const discardUpload = () => {
-    if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    deletionLifecycle.cleanupFiles([req.file?.filename]);
   };
   let inputs;
   let result;
@@ -2764,10 +3314,12 @@ app.post('/api/pricing-calculations', auth, upload.single('photo'), (req, res) =
     discardUpload();
     return res.status(400).json({ error: 'Piece photo must be a supported image under 20MB.' });
   }
+  try {
   const id = uuidv4();
   db.prepare('INSERT INTO pricing_calculations (id,user_id,name,description,inputs_json,result_json,photo_filename) VALUES (?,?,?,?,?,?,?)')
     .run(id, req.userId, String(req.body.name || '').trim() || null, String(req.body.description || '').trim() || null, JSON.stringify(inputs), JSON.stringify(result), req.file?.filename || null);
   res.status(201).json(parsePricingCalculation(db.prepare('SELECT * FROM pricing_calculations WHERE id=? AND user_id=?').get(id, req.userId)));
+  } catch (_) { discardUpload(); if (!res.headersSent) res.status(500).json({ error: 'Could not save pricing calculation.' }); }
 });
 
 app.get('/api/pricing-calculations/:id', auth, (req, res) => {
@@ -2779,7 +3331,7 @@ app.get('/api/pricing-calculations/:id', auth, (req, res) => {
 app.put('/api/pricing-calculations/:id', auth, upload.single('photo'), (req, res) => {
   const existing = db.prepare('SELECT * FROM pricing_calculations WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   const discardUpload = () => {
-    if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    deletionLifecycle.cleanupFiles([req.file?.filename]);
   };
   if (!existing) {
     discardUpload();
@@ -2802,50 +3354,60 @@ app.put('/api/pricing-calculations/:id', auth, upload.single('photo'), (req, res
     discardUpload();
     return res.status(400).json({ error: 'Piece photo must be a supported image under 20MB.' });
   }
+  try {
   const oldPhotoFilename = existing.photo_filename;
   const photoFilename = req.file?.filename || oldPhotoFilename;
   db.prepare('UPDATE pricing_calculations SET name=?,description=?,inputs_json=?,result_json=?,photo_filename=? WHERE id=? AND user_id=?')
     .run(String(req.body.name || '').trim() || null, String(req.body.description || '').trim() || null, JSON.stringify(inputs), JSON.stringify(result), photoFilename, req.params.id, req.userId);
   if (req.file && oldPhotoFilename && oldPhotoFilename !== photoFilename) {
-    const referenced = db.prepare('SELECT 1 FROM pricing_calculations WHERE photo_filename=? LIMIT 1').get(oldPhotoFilename);
-    const oldPath = path.join(UPLOADS_DIR, oldPhotoFilename);
-    if (!referenced && fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    deletionLifecycle.cleanupFiles([oldPhotoFilename]);
   }
   res.json(parsePricingCalculation(db.prepare('SELECT * FROM pricing_calculations WHERE id=? AND user_id=?').get(req.params.id, req.userId)));
+  } catch (_) { discardUpload(); if (!res.headersSent) res.status(500).json({ error: 'Could not save pricing calculation.' }); }
 });
 
 app.delete('/api/pricing-calculations/:id', auth, (req, res) => {
   const row = db.prepare('SELECT * FROM pricing_calculations WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!row) return res.status(404).json({ error: 'Pricing calculation not found.' });
   db.prepare('DELETE FROM pricing_calculations WHERE id=? AND user_id=?').run(req.params.id, req.userId);
-  if (row.photo_filename) {
-    const referenced = db.prepare(`SELECT 1 FROM pricing_calculations WHERE photo_filename=? LIMIT 1`).get(row.photo_filename);
-    const target = path.join(UPLOADS_DIR, row.photo_filename);
-    if (!referenced && fs.existsSync(target)) fs.unlinkSync(target);
-  }
+  deletionLifecycle.cleanupFiles([row.photo_filename]);
   res.json({ ok: true });
 });
 
 // ============ SALES ============
+function saleMediaContract(sale) {
+  return sale && { ...sale, photoDelivery: 'owner-protected', photoVisibility: 'legacy-ambiguous' };
+}
+// A copied Piece source must be owned across every stored reference, too.
+function saleSourceIsOwned(filename, userId) {
+  const owned = ownedPhotoSlots(filename, userId);
+  const { fileSlots } = require('./deletion-lifecycle.cjs');
+  for (const [table, columns] of Object.entries(fileSlots)) {
+    const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+    for (const column of columns.filter(c => available.has(c))) {
+      if (db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(filename)
+        .some(row => !owned.some(slot => slot.table === table && slot.column === column && slot.id === row.id))) return false;
+    }
+  }
+  return true;
+}
 app.get('/api/sales', auth, (req, res) => {
   const { dateFrom, dateTo } = req.query;
-  let sql = 'SELECT s.*,p.title as piece_title FROM sales s LEFT JOIN pieces p ON s.piece_id=p.id WHERE s.user_id=?';
+  let sql = 'SELECT s.*,p.title as piece_title FROM sales s LEFT JOIN pieces p ON s.piece_id=p.id AND p.user_id=s.user_id WHERE s.user_id=?';
   const params = [req.userId];
   if (dateFrom) { sql += ' AND s.date >= ?'; params.push(dateFrom); }
   if (dateTo) { sql += ' AND s.date <= ?'; params.push(dateTo); }
   sql += ' ORDER BY s.date DESC';
-  res.json(db.prepare(sql).all(...params));
+  res.json(db.prepare(sql).all(...params).map(sale => ({ ...saleMediaContract(sale),
+    contact_id: sale.contact_id && db.prepare('SELECT 1 FROM contacts WHERE id=? AND user_id=?').get(sale.contact_id, req.userId) ? sale.contact_id : null
+  })));
 });
 
 function saveSaleRecord(req, res) {
   const existing = req.params.id ? db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId) : null;
   let copiedPhoto = null;
   const discardNew = () => {
-    for (const filename of [req.file?.filename, copiedPhoto]) {
-      if (filename && !hasStoredPhotoReference(filename)) {
-        try { fs.unlinkSync(path.join(UPLOADS_DIR, filename)); } catch {}
-      }
-    }
+    deletionLifecycle.cleanupFiles([req.file?.filename, copiedPhoto]);
   };
   try {
     if (req.params.id && !existing) { discardNew(); return res.status(404).json({ error: 'Sale not found' }); }
@@ -2856,6 +3418,10 @@ function saveSaleRecord(req, res) {
     const value = (key, column) => req.body[key] !== undefined ? req.body[key] : existing?.[column];
     const price = moneyCents(value('price', 'price')) / 100;
     const quantity = saleQuantity(value('quantity', 'quantity') ?? 1);
+    const contactId = value('contactId', 'contact_id') || null;
+    if (contactId && !db.prepare('SELECT 1 FROM contacts WHERE id=? AND user_id=?').get(contactId, req.userId)) {
+      discardNew(); return res.status(400).json({ error: 'Contact unavailable.' });
+    }
     const pieceId = value('pieceId', 'piece_id') || null;
     if (pieceId && !db.prepare('SELECT id FROM pieces WHERE id=? AND user_id=?').get(pieceId, req.userId)) {
       discardNew(); return res.status(400).json({ error: 'Choose one of your own pieces.' });
@@ -2869,7 +3435,9 @@ function saveSaleRecord(req, res) {
       const source = db.prepare('SELECT filename FROM piece_photos WHERE piece_id=? ORDER BY is_primary DESC, sort_order, created_at LIMIT 1').get(pieceId);
       if (source) {
         copiedPhoto = uuidv4() + path.extname(source.filename);
-        fs.copyFileSync(path.join(UPLOADS_DIR, source.filename), path.join(UPLOADS_DIR, copiedPhoto));
+        const sourcePath = safeStoredUpload(source.filename);
+        if (!sourcePath || !saleSourceIsOwned(source.filename, req.userId)) throw new Error('Piece photo unavailable.');
+        fs.copyFileSync(sourcePath, path.join(UPLOADS_DIR, copiedPhoto), fs.constants.COPYFILE_EXCL);
         photo = copiedPhoto;
       }
     }
@@ -2878,6 +3446,8 @@ function saveSaleRecord(req, res) {
     const fields = [['venue','venue'], ['venueType','venue_type'], ['buyerName','buyer_name'], ['buyerEmail','buyer_email'], ['buyerPhone','buyer_phone'], ['notes','notes'], ['itemDescription','item_description'], ['eventName','event_name'], ['contactId','contact_id']];
     const values = fields.map(([key, col]) => value(key, col) || null);
     db.transaction(() => {
+      if (contactId && !db.prepare('SELECT 1 FROM contacts WHERE id=? AND user_id=?').get(contactId, req.userId)) throw new Error('Contact unavailable.');
+      if (pieceId && !db.prepare('SELECT 1 FROM pieces WHERE id=? AND user_id=?').get(pieceId, req.userId)) throw new Error('Choose one of your own pieces.');
       if (existing) {
         db.prepare('UPDATE sales SET piece_id=?,date=?,price=?,quantity=?,image_filename=?,venue=?,venue_type=?,buyer_name=?,buyer_email=?,buyer_phone=?,notes=?,item_description=?,event_name=?,contact_id=? WHERE id=? AND user_id=?')
           .run(pieceId, date, price, quantity, photo, ...values, id, req.userId);
@@ -2885,41 +3455,49 @@ function saveSaleRecord(req, res) {
         db.prepare('INSERT INTO sales (piece_id,date,price,quantity,image_filename,venue,venue_type,buyer_name,buyer_email,buyer_phone,notes,item_description,event_name,contact_id,id,user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
           .run(pieceId, date, price, quantity, photo, ...values, id, req.userId);
       }
+      if (existing?.piece_id && existing.piece_id !== pieceId && !db.prepare('SELECT 1 FROM sales WHERE piece_id=?').get(existing.piece_id)) {
+        db.prepare("UPDATE pieces SET status='done',sale_price=NULL,date_sold=NULL,updated_at=datetime('now') WHERE id=? AND user_id=? AND status='sold'").run(existing.piece_id, req.userId);
+      }
       if (pieceId) db.prepare("UPDATE pieces SET status='sold',sale_price=?,date_sold=?,updated_at=datetime('now') WHERE id=? AND user_id=?").run(price, date, pieceId, req.userId);
     })();
     const oldPhoto = existing?.image_filename;
-    if (oldPhoto && oldPhoto !== photo && !hasStoredPhotoReference(oldPhoto)) {
-      try { fs.unlinkSync(path.join(UPLOADS_DIR, oldPhoto)); } catch {}
-    }
-    res.json({ id, ok: true, image_filename: photo });
-  } catch (err) { discardNew(); res.status(400).json({ error: err.message }); }
+    if (oldPhoto !== photo) deletionLifecycle.cleanupFiles([oldPhoto]);
+    res.json(saleMediaContract({ id, ok: true, image_filename: photo }));
+  } catch (err) { discardNew(); if (!res.headersSent) res.status(400).json({ error: 'Could not save sale.' }); }
 }
 app.post('/api/sales', auth, upload.single('photo'), saveSaleRecord);
 app.put('/api/sales/:id', auth, upload.single('photo'), saveSaleRecord);
 
 app.delete('/api/sales/:id', auth, (req, res) => {
-  const existing = db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId);
-  if (!existing) return res.status(404).json({ error: 'Sale not found' });
-  // If the sale was linked to a piece, revert piece status from 'sold' back to 'done'
-  if (existing.piece_id) {
-    const piece = db.prepare('SELECT * FROM pieces WHERE id=? AND user_id=?').get(existing.piece_id, req.userId);
-    if (piece && piece.status === 'sold') {
-      db.prepare(`UPDATE pieces SET status='done',sale_price=NULL,date_sold=NULL,updated_at=datetime('now') WHERE id=? AND user_id=?`).run(existing.piece_id, req.userId);
+  const result = db.transaction(() => {
+    const existing = db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+    if (!existing) return null;
+    // Keep the surviving sales and the Piece's sold state intact. Only the last
+    // Sale deletion restores a sold Piece to done; never mutate a foreign Piece.
+    db.prepare('DELETE FROM sales WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+    if (existing.piece_id && !db.prepare('SELECT 1 FROM sales WHERE piece_id=?').get(existing.piece_id)) {
+      db.prepare("UPDATE pieces SET status='done',sale_price=NULL,date_sold=NULL,updated_at=datetime('now') WHERE id=? AND user_id=? AND status='sold'").run(existing.piece_id, req.userId);
     }
-  }
-  db.prepare('DELETE FROM sales WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+    return existing;
+  }).immediate();
+  if (!result) return res.status(404).json({ error: 'Sale not found' });
+  deletionLifecycle.cleanupFiles([result.image_filename]);
   res.json({ ok: true });
 });
 
 app.post('/api/sales/:id/photo', auth, upload.single('photo'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
-  const sale = db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId);
-  if (!sale) return res.status(404).json({ error: 'Sale not found' });
-  db.prepare('UPDATE sales SET image_filename=? WHERE id=? AND user_id=?').run(req.file.filename, req.params.id, req.userId);
-  if (sale.image_filename && !hasStoredPhotoReference(sale.image_filename)) {
-    try { fs.unlinkSync(path.join(UPLOADS_DIR, sale.image_filename)); } catch {}
-  }
-  res.json({ filename: req.file.filename });
+  const discard = () => deletionLifecycle.cleanupFiles([req.file?.filename]);
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
+    const sale = db.prepare('SELECT * FROM sales WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+    if (!sale) { discard(); return res.status(404).json({ error: 'Sale not found' }); }
+    if (!String(req.file.mimetype || '').startsWith('image/') || req.file.size > MAX_IMAGE_SIZE) {
+      discard(); return res.status(400).json({ error: 'Choose an image under 20MB.' });
+    }
+    db.prepare('UPDATE sales SET image_filename=? WHERE id=? AND user_id=?').run(req.file.filename, req.params.id, req.userId);
+    deletionLifecycle.cleanupFiles([sale.image_filename]);
+    res.json(saleMediaContract({ filename: req.file.filename }));
+  } catch (_) { discard(); if (!res.headersSent) res.status(500).json({ error: 'Could not save sale photo.' }); }
 });
 
 // Bulk sale creation
@@ -2949,7 +3527,7 @@ app.get('/api/sales/summary', auth, requireTier('starter'), (req, res) => {
 
 app.get('/api/sales/export', auth, requireTier('starter'), (req, res) => {
   const { dateFrom, dateTo } = req.query;
-  let sql = 'SELECT s.*,p.title as piece_title FROM sales s LEFT JOIN pieces p ON s.piece_id=p.id WHERE s.user_id=?';
+  let sql = 'SELECT s.*,p.title as piece_title FROM sales s LEFT JOIN pieces p ON s.piece_id=p.id AND p.user_id=s.user_id WHERE s.user_id=?';
   const params = [req.userId];
   if (dateFrom) { sql += ' AND s.date >= ?'; params.push(dateFrom); }
   if (dateTo) { sql += ' AND s.date <= ?'; params.push(dateTo); }
@@ -2966,7 +3544,7 @@ app.get('/api/sales/export', auth, requireTier('starter'), (req, res) => {
 });
 
 app.get('/api/export/pieces', auth, requireTier('starter'), (req, res) => {
-  const pieces = db.prepare('SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id WHERE p.user_id=? ORDER BY p.updated_at DESC').all(req.userId);
+  const pieces = db.prepare('SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id AND cb.user_id=p.user_id WHERE p.user_id=? ORDER BY p.updated_at DESC').all(req.userId);
   let csv = 'Title,Clay Body,Status,Technique,Form,Studio,Date Started,Date Completed,Material Cost,Firing Cost,Sale Price,Notes\n';
   pieces.forEach(p => { csv += `"${(p.title||'').replace(/"/g,'""')}","${(p.clay_body_name||'').replace(/"/g,'""')}","${p.status||''}","${p.technique||''}","${(p.form||'').replace(/"/g,'""')}","${(p.studio||'').replace(/"/g,'""')}","${p.date_started||''}","${p.date_completed||''}","${p.material_cost||''}","${p.firing_cost||''}","${p.sale_price||''}","${(p.notes||'').replace(/"/g,'""')}"\n`; });
   res.setHeader('Content-Type', 'text/csv');
@@ -3001,7 +3579,7 @@ app.get('/api/community/combos', auth, requireTier('starter'), (req, res) => {
   if (sort === 'newest') { sql += ' ORDER BY gc.created_at DESC'; }
   else if (sort === 'comments') { sql += ' ORDER BY comment_count DESC'; }
   else { sql += ' ORDER BY gc.likes DESC, gc.created_at DESC'; }
-  const combos = db.prepare(sql).all(...params);
+  const combos = db.prepare(sql).all(...params).map(glazeComboMediaContract);
   const getL = db.prepare('SELECT * FROM glaze_combo_layers WHERE combo_id=? ORDER BY layer_order');
   const getLike = db.prepare('SELECT id FROM combo_likes WHERE combo_id=? AND user_id=?');
   const getCommentCount = db.prepare('SELECT COUNT(*) as c FROM combo_comments WHERE combo_id=?');
@@ -3019,7 +3597,7 @@ app.get('/api/community/combos/:id', auth, (req, res) => {
   combo.layers = db.prepare('SELECT * FROM glaze_combo_layers WHERE combo_id=? ORDER BY layer_order').all(combo.id);
   combo.user_liked = !!db.prepare('SELECT id FROM combo_likes WHERE combo_id=? AND user_id=?').get(combo.id, req.userId);
   combo.comment_count = db.prepare('SELECT COUNT(*) as c FROM combo_comments WHERE combo_id=?').get(combo.id).c;
-  res.json({ combo });
+  res.json({ combo: glazeComboMediaContract(combo) });
 });
 
 function saveComboRecord(req, res) {
@@ -3056,7 +3634,8 @@ function saveComboRecord(req, res) {
     }
     const id = existing?.id || uuidv4();
     const shared = value('isShared', 'is_shared');
-    const fields = [name, value('clayBodyName','clay_body_name') || null, value('cone','cone') || null, value('atmosphere','atmosphere') || null, value('description','description') || null, value('notes','notes') || null, shared === true || shared === 'true' || shared === 1 ? 1 : 0, ...photos];
+    const sharedValue = shared === null || shared === undefined ? null : (shared === true || shared === 'true' || shared === 1 ? 1 : 0);
+    const fields = [name, value('clayBodyName','clay_body_name') || null, value('cone','cone') || null, value('atmosphere','atmosphere') || null, value('description','description') || null, value('notes','notes') || null, sharedValue, ...photos];
     db.transaction(() => {
       if (existing) db.prepare("UPDATE glaze_combos SET name=?,clay_body_name=?,cone=?,atmosphere=?,description=?,notes=?,is_shared=?,photo_filename=?,photo_filename2=?,updated_at=datetime('now') WHERE id=? AND user_id=?").run(...fields, id, req.userId);
       else db.prepare('INSERT INTO glaze_combos (name,clay_body_name,cone,atmosphere,description,notes,is_shared,photo_filename,photo_filename2,id,user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(...fields, id, req.userId);
@@ -3066,27 +3645,265 @@ function saveComboRecord(req, res) {
         layers.forEach((l,i) => ins.run(uuidv4(), id, l.glazeName, l.brand || null, l.coats || 1, l.method || null, i));
       }
     })();
-    for (const old of oldPhotos) if (old && !photos.includes(old) && !hasStoredPhotoReference(old)) {
-      try { fs.unlinkSync(path.join(UPLOADS_DIR, old)); } catch {}
-    }
+    deletionLifecycle.cleanupFiles(oldPhotos.filter(old => !photos.includes(old)));
+    const savedUploads = new Set(photos.filter(Boolean));
+    deletionLifecycle.cleanupFiles((req.files || []).map(file => file.filename).filter(filename => !savedUploads.has(filename)));
     res.json({ id, success: true, photo_filename: photos[0], photo_filename2: photos[1] });
-  } catch(err) { res.status(400).json({ error: err.message }); }
-  finally {
-    for (const file of req.files || []) if (!hasStoredPhotoReference(file.filename)) {
-      try { fs.unlinkSync(file.path); } catch {}
-    }
+  } catch(err) {
+    deletionLifecycle.cleanupFiles((req.files || []).map(file => file.filename));
+    res.status(400).json({ error: err.message });
   }
 }
 app.post('/api/community/combos', auth, requireTier('starter'), upload.array('photos', 2), saveComboRecord);
 app.put('/api/community/combos/:id', auth, upload.array('photos', 2), saveComboRecord);
 
+// Phase 2K: public Glaze Combo photo delivery. Anonymous only for explicit public states.
+app.get('/api/ql/community/combos/:comboId/photos/:slot/public', (req, res) => {
+  res.set('Cache-Control', 'public, max-age=300');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const field = glazeComboPhotoField(req.params.slot);
+    if (!field) return unavailable();
+    const combo = db.prepare('SELECT * FROM glaze_combos WHERE id=?').get(req.params.comboId);
+    if (!glazeComboExplicitlyPublic(combo)) return unavailable();
+    const filename = combo[field];
+    if (!filename || !publicGlazeComboFilenameSafe(filename)) return unavailable();
+    const target = safeStoredUpload(filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(filename)) return unavailable();
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
+
+// Phase 2K: private/draft Glaze Combo photo delivery. Owner only.
+app.get('/api/ql/community/combos/:comboId/photos/:slot', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const field = glazeComboPhotoField(req.params.slot);
+    if (!field) return unavailable();
+    const combo = db.prepare('SELECT * FROM glaze_combos WHERE id=? AND user_id=?').get(req.params.comboId, req.userId);
+    if (!combo || glazeComboExplicitlyPublic(combo)) return unavailable();
+    if (!(combo.is_shared === 0 && combo.is_public !== 1)) return unavailable();
+    const filename = combo[field];
+    if (!filename) return unavailable();
+    const target = safeStoredUpload(filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(filename)) return unavailable();
+    const owned = ownedPhotoSlots(filename, req.userId);
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(filename);
+        if (rows.some(row => !owned.some(ref => ref.table === table && ref.column === column && ref.id === row.id))) return unavailable();
+      }
+    }
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
+
 // Delete combo (owner only)
 app.delete('/api/community/combos/:id', auth, (req, res) => {
-  const combo = db.prepare('SELECT user_id FROM glaze_combos WHERE id=?').get(req.params.id);
+  const combo = db.prepare('SELECT * FROM glaze_combos WHERE id=?').get(req.params.id);
   if (!combo || combo.user_id !== req.userId) return res.status(403).json({ error: 'Not authorized' });
-  db.prepare('DELETE FROM glaze_combos WHERE id=?').run(req.params.id);
+  const oldPhotos = [combo.photo_filename, combo.photo_filename2].filter(Boolean);
+  db.transaction(() => {
+    db.prepare('DELETE FROM glaze_combos WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  }).immediate();
+  deletionLifecycle.cleanupFiles(oldPhotos);
   res.json({ success: true });
 });
+
+// Phase 2R: Forum media is authenticated community content, not anonymous publication.
+const forumMime = { '.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.gif':'image/gif','.webp':'image/webp','.heic':'image/heic','.heif':'image/heif','.avif':'image/avif','.mp4':'video/mp4','.m4v':'video/mp4','.mov':'video/quicktime','.webm':'video/webm' };
+function forumMediaRecord(id) {
+  return db.prepare(`SELECT m.*, p.user_id AS post_owner, r.user_id AS reply_owner, r.post_id AS thread_id,
+    rp.user_id AS thread_owner FROM forum_photos m LEFT JOIN forum_posts p ON p.id=m.post_id
+    LEFT JOIN forum_replies r ON r.id=m.reply_id LEFT JOIN forum_posts rp ON rp.id=r.post_id WHERE m.id=?`).get(id);
+}
+function validForumRecord(m) {
+  return !!m && (m.reply_id == null ? !!m.post_owner : !!m.reply_owner && !!m.thread_owner && (m.post_id == null || m.post_id === m.thread_id));
+}
+function forumDescriptor(m) {
+  const row = forumMediaRecord(m.id);
+  return { ...m, mediaAccess: validForumRecord(row) ? 'community-authenticated' : 'legacy-ambiguous', mediaType: (forumMime[path.extname(m.filename).toLowerCase()] || '').startsWith('video/') ? 'video' : 'image' };
+}
+function forumHeaders(res) { res.set('Cache-Control','private, no-store'); res.set('X-Content-Type-Options','nosniff'); res.set('Referrer-Policy','no-referrer'); }
+function forumUnavailable(res) { return res.status(404).json({error:'Media unavailable'}); }
+function resolveForumMedia(req) {
+  if (!db.prepare('SELECT 1 FROM users WHERE id=?').get(req.userId)) return null;
+  const m = forumMediaRecord(req.params.mediaId);
+  if (!validForumRecord(m)) return null;
+  const thread = m.reply_id == null ? m.post_id : m.thread_id;
+  if (thread !== req.params.postId || (req.params.replyId ? m.reply_id !== req.params.replyId : m.reply_id != null)) return null;
+  // Collision-safe: a filename may not resolve another media record/category, even same-owner.
+  if (db.prepare('SELECT 1 FROM forum_photos WHERE filename=? AND id<>?').get(m.filename,m.id)) return null;
+  for (const [table, columns] of Object.entries(require('./deletion-lifecycle.cjs').fileSlots)) {
+    if (table === 'forum_photos') continue;
+    const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c=>c.name));
+    for (const column of columns.filter(c=>available.has(c))) if (db.prepare(`SELECT 1 FROM ${table} WHERE ${column}=?`).get(m.filename)) return null;
+  }
+  // Feed/reply blocking is bidirectional. Apply the stricter rule to media as well.
+  for (const owner of new Set([m.post_owner,m.reply_owner,m.thread_owner].filter(Boolean))) {
+    if (db.prepare('SELECT 1 FROM blocked_users WHERE (user_id=? AND blocked_user_id=?) OR (user_id=? AND blocked_user_id=?)').get(req.userId,owner,owner,req.userId)) return null;
+  }
+  const target = safeStoredUpload(m.filename), mime = forumMime[path.extname(m.filename).toLowerCase()];
+  return target && mime ? {target,mime} : null;
+}
+function deliverForumMedia(req,res) {
+  forumHeaders(res);
+  try {
+    const media = resolveForumMedia(req);
+    if (!media) return forumUnavailable(res);
+    res.type(media.mime);
+    // sendFile streams; preserves HEAD, byte ranges, 206/416 and seeking, without buffering video.
+    res.sendFile(media.target,{cacheControl:false},error=>{
+      if (error && !res.headersSent) { if(error.status===416) return res.set('Content-Range','bytes */'+fs.statSync(media.target).size).status(416).end(); forumUnavailable(res); }
+    });
+  } catch (_) { if(!res.headersSent) forumUnavailable(res); }
+}
+const forumMediaPaths = ['/api/ql/forum/posts/:postId/media/:mediaId','/api/ql/forum/posts/:postId/replies/:replyId/media/:mediaId'];
+app.get(forumMediaPaths,auth,deliverForumMedia);
+// A random HttpOnly cookie authorizes streaming. The URL nonce is NOT a credential.
+// Grants are memory-only, revocable, bounded by JWT expiry and 15 minutes; restart fails closed.
+const forumPlaybackSessions = new Map();
+function issueForumPlayback(req,res) {
+  forumHeaders(res);
+  const nonce=req.params.session;
+  if(!/^[a-zA-Z0-9-]{16,100}$/.test(nonce) || !db.prepare('SELECT 1 FROM users WHERE id=?').get(req.userId)) return null;
+  for(const [key,value] of forumPlaybackSessions) if(value.expires<=Date.now()) forumPlaybackSessions.delete(key);
+  let s=forumPlaybackSessions.get(nonce);
+  if(s && (s.userId!==req.userId || s.revoked)) return null;
+  const bearer=req.headers.authorization?.replace('Bearer ','');
+  const decoded=jwt.decode(bearer||'');
+  if(!decoded || decoded.userId!==req.userId) return null;
+  const expires=Math.min(Date.now()+15*60*1000,decoded.exp ? decoded.exp*1000 : Infinity);
+  if(!s) { if(forumPlaybackSessions.size>=10000) return null; s={userId:req.userId,secret:require('crypto').randomBytes(32).toString('hex'),expires}; forumPlaybackSessions.set(nonce,s); }
+  s.expires=Math.min(s.expires,expires);
+  res.cookie('ql_forum',s.secret,{httpOnly:true,secure:req.secure || req.get('x-forwarded-proto')==='https',sameSite:'strict',path:'/api/ql/forum/streams/'+nonce+'/',maxAge:Math.max(0,s.expires-Date.now())});
+  return s;
+}
+app.post('/api/ql/forum/sessions/:session',auth,(req,res)=>{if(!issueForumPlayback(req,res)) return forumUnavailable(res);res.json({ok:true});});
+app.delete('/api/ql/forum/sessions/:session',auth,(req,res)=>{
+  forumHeaders(res);
+  const s=forumPlaybackSessions.get(req.params.session);
+  if(s && s.userId===req.userId) s.revoked=true;
+  // Tombstone closes the race with a late grant/player request after logout.
+  if(!s && /^[a-zA-Z0-9-]{16,100}$/.test(req.params.session) && forumPlaybackSessions.size<10000) forumPlaybackSessions.set(req.params.session,{userId:req.userId,revoked:true,expires:Date.now()+15*60*1000});
+  res.status(204).end();
+});
+const forumStreamPaths=['/api/ql/forum/streams/:session/posts/:postId/media/:mediaId','/api/ql/forum/streams/:session/posts/:postId/replies/:replyId/media/:mediaId'];
+app.get(forumStreamPaths,(req,res)=>{
+  forumHeaders(res);
+  const s=forumPlaybackSessions.get(req.params.session), cookie=(req.headers.cookie||'').split(';').map(v=>v.trim()).find(v=>v.startsWith('ql_forum='))?.slice(9);
+  if(!s || s.revoked || s.expires<=Date.now() || cookie!==s.secret) return res.status(401).json({error:'Not authenticated'});
+  req.userId=s.userId; deliverForumMedia(req,res);
+});
+// Native WebView loads this same-origin document with an Authorization header.
+// Its video subrequests use the scoped HttpOnly cookie, including Range requests.
+app.get(['/api/ql/forum/player/:session/posts/:postId/media/:mediaId','/api/ql/forum/player/:session/posts/:postId/replies/:replyId/media/:mediaId'],auth,(req,res)=>{
+  forumHeaders(res);
+  if(!resolveForumMedia(req) || !issueForumPlayback(req,res)) return forumUnavailable(res);
+  const enc=encodeURIComponent;
+  const src='/api/ql/forum/streams/'+enc(req.params.session)+'/posts/'+enc(req.params.postId)+(req.params.replyId?'/replies/'+enc(req.params.replyId):'')+'/media/'+enc(req.params.mediaId);
+  res.set('Content-Security-Policy',"default-src 'none'; media-src 'self'; style-src 'unsafe-inline'; frame-ancestors 'self'");
+  res.type('html').send('<!doctype html><meta name="viewport" content="width=device-width"><style>body{margin:0;background:#000}video{width:100%;height:100vh}</style><video controls playsinline preload="metadata" src="'+src+'"></video>');
+});
+function forumAccountFiles(userId) {
+  const rows=db.prepare(`SELECT m.* FROM forum_photos m LEFT JOIN forum_posts p ON p.id=m.post_id
+    LEFT JOIN forum_replies r ON r.id=m.reply_id LEFT JOIN forum_posts rp ON rp.id=r.post_id
+    WHERE p.user_id=? OR r.user_id=? OR rp.user_id=?`).all(userId,userId,userId);
+  forumRequire(rows.every(m=>validForumRecord(forumMediaRecord(m.id))),409,'Forum media relationships require review');
+  return rows.map(m=>m.filename);
+}
+function validForumVideo(file,mime) {
+  // Validate container boundaries without decoding, transcoding, or loading the video into memory.
+  const fd=fs.openSync(file.path,'r'),head=Buffer.alloc(16);
+  try {
+    if(fs.readSync(fd,head,0,16,0)<16)return false;
+    if(mime==='video/webm') {
+      if(!head.subarray(0,4).equals(Buffer.from([0x1a,0x45,0xdf,0xa3])))return false;
+      const header=Buffer.alloc(Math.min(4096,file.size));fs.readSync(fd,header,0,header.length,0);
+      return header.includes(Buffer.from('webm')) && header.includes(Buffer.from([0x18,0x53,0x80,0x67])) && file.size>64;
+    }
+    let offset=0,moov=false,mdat=false;
+    while(offset<file.size) {
+      if(file.size-offset<8)return false;
+      fs.readSync(fd,head,0,Math.min(16,file.size-offset),offset);
+      let size=head.readUInt32BE(0),headerSize=8;const type=head.toString('ascii',4,8);
+      if(size===1){if(file.size-offset<16)return false;size=Number(head.readBigUInt64BE(8));headerSize=16;}
+      if(size===0)size=file.size-offset;
+      if(!Number.isSafeInteger(size)||size<headerSize||offset+size>file.size)return false;
+      if(type==='moov' && size>headerSize)moov=true;
+      if(type==='mdat' && size>headerSize)mdat=true;
+      offset+=size;
+    }
+    return moov && mdat;
+  }finally{fs.closeSync(fd);}
+}
+const forumStorage=multer.diskStorage({
+  destination:(_req,_file,cb)=>cb(null,UPLOADS_DIR),
+  filename:(req,file,cb)=>{
+    if(req.aborted)return cb(Error('Upload interrupted'));
+    const filename=uuidv4()+path.extname(file.originalname);
+    req.forumUploadNames.push(filename);cb(null,filename);
+  }
+});
+const forumMultipart=multer({
+  storage:{
+    _handleFile(req,file,cb){
+      const abort=()=>file.stream.destroy(Error('Upload interrupted'));
+      req.once('aborted',abort);
+      forumStorage._handleFile(req,file,(error,result)=>{
+        req.removeListener('aborted',abort);
+        cb(error,result);
+        if(req.aborted)deletionLifecycle.cleanupFiles(req.forumUploadNames);
+      });
+    },
+    _removeFile(req,file,cb){forumStorage._removeFile(req,file,cb);}
+  },
+  limits:{fileSize:MAX_VIDEO_SIZE},
+  fileFilter:(req,file,cb)=>cb(null,true)
+});
+function forumUpload(count) {
+  return (req,res,next)=>{
+    req.forumUploadNames=[];
+    forumMultipart.array('photos',count)(req,res,async error=>{
+    const discard=()=>deletionLifecycle.cleanupFiles(req.forumUploadNames);
+    if(error){discard();return res.status(error.code==='LIMIT_FILE_SIZE'?413:400).json({error:'Could not read Forum media'});}
+    try {
+      for(const file of req.files||[]) {
+        const mime=forumMime[path.extname(file.filename).toLowerCase()];
+        if(!mime || (file.mimetype!==mime && !(mime==='image/jpeg' && file.mimetype==='image/jpg'))) throw Error('type');
+        if(mime.startsWith('image/')) { if(file.size>MAX_IMAGE_SIZE) throw Error('size'); await sharp(file.path).metadata(); }
+        else {
+          if(!validForumVideo(file,mime)) throw Error('video');
+        }
+      }
+      next();
+    }catch(_){discard();res.status(400).json({error:'Invalid Forum media'});}
+    });
+  };
+}
+function forumMutation(req,res,operation) {
+  let result;
+  try { result=db.transaction(operation).immediate(); }
+  catch(error){cleanupRequestUploads(req.files);return res.status(error.status||500).json({error:error.status?error.message:'Could not save Forum changes'});}
+  // Both cleanup and response happen AFTER commit. Never delete committed new media on failure.
+  try { deletionLifecycle.cleanupFiles(result.files||[]); } catch(_) {}
+  res.json(result.body);
+}
+function forumRequire(condition,status,message) { if(!condition) throw Object.assign(Error(message),{status}); }
+function forumOwner(req,table,id,allowAdmin=false) {
+  const row=db.prepare(`SELECT * FROM ${table} WHERE id=?`).get(id);
+  forumRequire(row,404,'Not found');
+  const admin=allowAdmin && db.prepare('SELECT email FROM users WHERE id=?').get(req.userId)?.email===ADMIN_EMAIL;
+  forumRequire(row.user_id===req.userId || admin,403,'Not authorized');return row;
+}
+function insertForumUploads(req,postId,replyId=null) {
+  for(const file of req.files||[]) db.prepare('INSERT INTO forum_photos(id,post_id,reply_id,filename,original_name) VALUES(?,?,?,?,?)').run(uuidv4(),replyId?null:postId,replyId,file.filename,file.originalname);
+}
 
 // ============ FORUM ============
 app.get('/api/forum/categories', auth, (req, res) => {
@@ -3110,8 +3927,8 @@ app.get('/api/forum/posts', auth, (req, res) => {
   if (limit) { sql += ' LIMIT ?'; params.push(parseInt(limit)); }
   if (offset) { sql += ' OFFSET ?'; params.push(parseInt(offset)); }
   const posts = db.prepare(sql).all(...params);
-  const getPhotos = db.prepare('SELECT * FROM forum_photos WHERE post_id=?');
-  posts.forEach(p => { p.photos = getPhotos.all(p.id); });
+  const getPhotos = db.prepare('SELECT * FROM forum_photos WHERE post_id=? AND reply_id IS NULL');
+  posts.forEach(p => { p.photos = getPhotos.all(p.id).map(forumDescriptor); });
   res.json(posts);
 });
 
@@ -3120,130 +3937,81 @@ app.get('/api/forum/posts/:id', auth, (req, res) => {
     FROM forum_posts fp JOIN users u ON fp.user_id=u.id WHERE fp.id=?`).get(req.params.id);
   if (!post) return res.status(404).json({ error: 'Not found' });
   db.prepare('UPDATE forum_posts SET view_count=view_count+1 WHERE id=?').run(req.params.id);
-  post.photos = db.prepare('SELECT * FROM forum_photos WHERE post_id=?').all(post.id);
+  post.photos = db.prepare('SELECT * FROM forum_photos WHERE post_id=? AND reply_id IS NULL').all(post.id).map(forumDescriptor);
   post.replies = db.prepare(`SELECT fr.*,u.display_name as author_name,u.avatar_filename as author_avatar
     FROM forum_replies fr JOIN users u ON fr.user_id=u.id WHERE fr.post_id=?
     AND fr.user_id NOT IN (SELECT blocked_user_id FROM blocked_users WHERE user_id=?)
     AND fr.user_id NOT IN (SELECT user_id FROM blocked_users WHERE blocked_user_id=?)
     ORDER BY fr.created_at`).all(post.id, req.userId, req.userId);
   const getReplyPhotos = db.prepare('SELECT * FROM forum_photos WHERE reply_id=?');
-  post.replies.forEach(r => { r.photos = getReplyPhotos.all(r.id); });
+  post.replies.forEach(r => { r.photos = getReplyPhotos.all(r.id).map(forumDescriptor); });
   res.json(post);
 });
 
-app.post('/api/forum/posts', auth, upload.array('photos', 5), (req, res) => {
-  const { title, body, categoryId } = req.body;
-  if (!title || !body) return res.status(400).json({ error: 'Title and body required' });
-  const id = uuidv4();
-  db.prepare('INSERT INTO forum_posts (id,user_id,category_id,title,body) VALUES (?,?,?,?,?)').run(id, req.userId, categoryId, title, body);
-  if (req.files?.length) {
-    const ins = db.prepare('INSERT INTO forum_photos (id,post_id,filename,original_name) VALUES (?,?,?,?)');
-    req.files.forEach(f => ins.run(uuidv4(), id, f.filename, f.originalname));
-  }
-  res.json({ id });
+app.post('/api/forum/posts', auth, forumUpload(5), (req,res)=>forumMutation(req,res,()=>{
+  const {title,body,categoryId}=req.body;
+  forumRequire(title && body,400,'Title and body required');const id=uuidv4();
+  db.prepare('INSERT INTO forum_posts(id,user_id,category_id,title,body) VALUES(?,?,?,?,?)').run(id,req.userId,categoryId||null,title,body);
+  insertForumUploads(req,id);return {body:{id}};
+}));
+app.post('/api/forum/posts/:id/photos',auth,forumUpload(5),(req,res)=>forumMutation(req,res,()=>{
+  forumOwner(req,'forum_posts',req.params.id);forumRequire(req.files?.length,400,'No files uploaded');insertForumUploads(req,req.params.id);return {body:{uploaded:req.files.length}};
+}));
+app.post('/api/forum/posts/:id/reply',auth,forumUpload(1),(req,res)=>{
+  forumMutation(req,res,()=>{
+    forumRequire(db.prepare('SELECT 1 FROM forum_posts WHERE id=?').get(req.params.id),404,'Not found');
+    forumRequire(req.body.body,400,'Reply body required');
+    forumRequire(!req.files?.length || db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId)?.tier==='starter',403,'Only Unlimited members can attach a photo in comments.');
+    const id=uuidv4();db.prepare('INSERT INTO forum_replies(id,post_id,user_id,body) VALUES(?,?,?,?)').run(id,req.params.id,req.userId,req.body.body);
+    db.prepare("UPDATE forum_posts SET reply_count=reply_count+1,updated_at=datetime('now') WHERE id=?").run(req.params.id);
+    insertForumUploads(req,req.params.id,id);
+    const reply=db.prepare('SELECT fr.*,u.display_name AS author_name,u.avatar_filename AS author_avatar FROM forum_replies fr JOIN users u ON u.id=fr.user_id WHERE fr.id=?').get(id);
+    reply.photos=db.prepare('SELECT * FROM forum_photos WHERE reply_id=?').all(id).map(forumDescriptor);
+    return {body:{reply}};
+  });
+  if(res.statusCode===200) notifyForumReply(req.params.id,req.userId);
 });
-
-// Add photos/videos to an existing forum post (separate upload endpoint for large files)
-app.post('/api/forum/posts/:id/photos', auth, upload.array('photos', 5), (req, res) => {
-  const post = db.prepare('SELECT user_id FROM forum_posts WHERE id=?').get(req.params.id);
-  if (!post) return res.status(404).json({ error: 'Post not found' });
-  if (post.user_id !== req.userId) return res.status(403).json({ error: 'Not your post' });
-  if (!req.files || req.files.length === 0) return res.status(400).json({ error: 'No files uploaded' });
-  const ins = db.prepare('INSERT INTO forum_photos (id,post_id,filename,original_name) VALUES (?,?,?,?)');
-  req.files.forEach(f => ins.run(uuidv4(), req.params.id, f.filename, f.originalname));
-  res.json({ uploaded: req.files.length });
-});
-
-app.post('/api/forum/posts/:id/reply', auth, upload.array('photos', 1), (req, res) => {
-  const { body } = req.body;
-  if (!body) return res.status(400).json({ error: 'Reply body required' });
-
-  const user = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
-  if (req.files?.length && user?.tier !== 'starter') {
-    return res.status(403).json({ error: 'Only Unlimited members can attach a photo in comments.' });
-  }
-
-  const id = uuidv4();
-  db.prepare('INSERT INTO forum_replies (id,post_id,user_id,body) VALUES (?,?,?,?)').run(id, req.params.id, req.userId, body);
-  db.prepare(`UPDATE forum_posts SET reply_count=reply_count+1, updated_at=datetime('now') WHERE id=?`).run(req.params.id);
-  notifyForumReply(req.params.id, req.userId);
-
-  if (req.files?.length) {
-    const ins = db.prepare('INSERT INTO forum_photos (id,reply_id,filename,original_name) VALUES (?,?,?,?)');
-    ins.run(uuidv4(), id, req.files[0].filename, req.files[0].originalname);
-  }
-
-  const fullReply = db.prepare(`SELECT fr.*, u.display_name as author_name, u.avatar_filename as author_avatar FROM forum_replies fr JOIN users u ON fr.user_id=u.id WHERE fr.id=?`).get(id);
-  fullReply.photos = db.prepare('SELECT * FROM forum_photos WHERE reply_id=?').all(id);
-  res.json({ reply: fullReply });
-});
-
-// Edit own forum post (supports multipart for photo/video uploads)
-app.put('/api/forum/posts/:id', auth, upload.array('photos', 5), (req, res) => {
-  const post = db.prepare('SELECT user_id FROM forum_posts WHERE id=?').get(req.params.id);
-  if (!post) return res.status(404).json({ error: 'Not found' });
-  if (post.user_id !== req.userId) return res.status(403).json({ error: 'You can only edit your own posts' });
-  const { title, content, body, categoryId } = req.body;
-  const postBody = content || body || '';
-  db.prepare('UPDATE forum_posts SET title=?,body=?,category_id=COALESCE(?,category_id),updated_at=datetime(\'now\') WHERE id=?')
-    .run(title, postBody, categoryId || null, req.params.id);
-  // Save any new uploaded photos/videos
-  if (req.files && req.files.length > 0) {
-    const ins = db.prepare('INSERT INTO forum_photos (id,post_id,filename,original_name) VALUES (?,?,?,?)');
-    req.files.forEach(f => ins.run(uuidv4(), req.params.id, f.filename, f.originalname));
-  }
-  const photos = db.prepare('SELECT * FROM forum_photos WHERE post_id=?').all(req.params.id);
-  res.json({ id: req.params.id, title, body: postBody, content: postBody, photos });
-});
-
-// Edit own forum reply
-app.put('/api/forum/replies/:id', auth, (req, res) => {
-  const reply = db.prepare('SELECT user_id FROM forum_replies WHERE id=?').get(req.params.id);
-  if (!reply) return res.status(404).json({ error: 'Not found' });
-  if (reply.user_id !== req.userId) return res.status(403).json({ error: 'You can only edit your own replies' });
-  const { content, body } = req.body;
-  const replyBody = content || body || '';
-  db.prepare('UPDATE forum_replies SET body=?,updated_at=datetime(\'now\') WHERE id=?')
-    .run(replyBody, req.params.id);
-  res.json({ id: req.params.id, body: replyBody, content: replyBody });
-});
-
-// Delete own forum post
-app.delete('/api/forum/posts/:id', auth, (req, res) => {
-  const post = db.prepare('SELECT user_id FROM forum_posts WHERE id=?').get(req.params.id);
-  if (!post) return res.status(404).json({ error: 'Not found' });
-  const admin = db.prepare('SELECT email FROM users WHERE id=?').get(req.userId);
-  if (post.user_id !== req.userId && admin?.email !== ADMIN_EMAIL) return res.status(403).json({ error: 'You can only delete your own posts' });
-  db.prepare('DELETE FROM forum_photos WHERE post_id=?').run(req.params.id);
-  db.prepare('DELETE FROM forum_photos WHERE reply_id IN (SELECT id FROM forum_replies WHERE post_id=?)').run(req.params.id);
-  db.prepare('DELETE FROM forum_replies WHERE post_id=?').run(req.params.id);
-  db.prepare('DELETE FROM forum_posts WHERE id=?').run(req.params.id);
-  res.json({ success: true });
-});
-
-// Delete own forum reply
-app.delete('/api/forum/replies/:id', auth, (req, res) => {
-  const reply = db.prepare('SELECT user_id,post_id FROM forum_replies WHERE id=?').get(req.params.id);
-  if (!reply) return res.status(404).json({ error: 'Not found' });
-  const admin = db.prepare('SELECT email FROM users WHERE id=?').get(req.userId);
-  if (reply.user_id !== req.userId && admin?.email !== ADMIN_EMAIL) return res.status(403).json({ error: 'You can only delete your own replies' });
-  db.prepare('DELETE FROM forum_photos WHERE reply_id=?').run(req.params.id);
-  db.prepare('DELETE FROM forum_replies WHERE id=?').run(req.params.id);
-  db.prepare('UPDATE forum_posts SET reply_count=reply_count-1 WHERE id=?').run(reply.post_id);
-  res.json({ success: true });
-});
-
-// Delete a single forum photo (owner or admin only)
-app.delete('/api/forum/photos/:id', auth, (req, res) => {
-  const photo = db.prepare('SELECT fp.*, fpo.user_id as post_owner FROM forum_photos fp LEFT JOIN forum_posts fpo ON fp.post_id=fpo.id WHERE fp.id=?').get(req.params.id);
-  if (!photo) return res.status(404).json({ error: 'Not found' });
-  const admin = db.prepare('SELECT email FROM users WHERE id=?').get(req.userId);
-  if (photo.post_owner !== req.userId && admin?.email !== ADMIN_EMAIL) return res.status(403).json({ error: 'Not your post' });
-  const filePath = path.join(UPLOADS_DIR, photo.filename);
-  if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  db.prepare('DELETE FROM forum_photos WHERE id=?').run(req.params.id);
-  res.json({ success: true });
-});
+app.put('/api/forum/posts/:id',auth,forumUpload(5),(req,res)=>forumMutation(req,res,()=>{
+  const p=forumOwner(req,'forum_posts',req.params.id);
+  const title=req.body.title??p.title, body=req.body.content??req.body.body??p.body;
+  forumRequire(title && body,400,'Title and body required');
+  db.prepare("UPDATE forum_posts SET title=?,body=?,category_id=?,updated_at=datetime('now') WHERE id=?").run(title,body,req.body.categoryId??p.category_id,p.id);
+  insertForumUploads(req,p.id);
+  return {body:{id:p.id,title,body,content:body,photos:db.prepare('SELECT * FROM forum_photos WHERE post_id=? AND reply_id IS NULL').all(p.id).map(forumDescriptor)}};
+}));
+app.put('/api/forum/replies/:id',auth,(req,res)=>forumMutation(req,res,()=>{
+  const r=forumOwner(req,'forum_replies',req.params.id),body=req.body.content??req.body.body??r.body;
+  forumRequire(body,400,'Reply body required');db.prepare("UPDATE forum_replies SET body=?,updated_at=datetime('now') WHERE id=?").run(body,r.id);return {body:{id:r.id,body,content:body}};
+}));
+app.delete('/api/forum/posts/:id',auth,(req,res)=>forumMutation(req,res,()=>{
+  const p=forumOwner(req,'forum_posts',req.params.id,true);
+  // Inconsistent dual-parent historical rows must not cascade into a different thread.
+  const rows=db.prepare('SELECT * FROM forum_photos WHERE post_id=? OR reply_id IN (SELECT id FROM forum_replies WHERE post_id=?)').all(p.id,p.id);
+  forumRequire(rows.every(m=>validForumRecord(forumMediaRecord(m.id)) && (!m.reply_id || forumMediaRecord(m.id).thread_id===p.id)),409,'Media relationships require review');
+  db.prepare('DELETE FROM forum_photos WHERE post_id=? OR reply_id IN (SELECT id FROM forum_replies WHERE post_id=?)').run(p.id,p.id);
+  db.prepare('DELETE FROM forum_replies WHERE post_id=?').run(p.id);db.prepare('DELETE FROM forum_posts WHERE id=?').run(p.id);
+  return {files:rows.map(m=>m.filename),body:{success:true}};
+}));
+app.delete('/api/forum/replies/:id',auth,(req,res)=>forumMutation(req,res,()=>{
+  const r=forumOwner(req,'forum_replies',req.params.id,true),rows=db.prepare('SELECT * FROM forum_photos WHERE reply_id=?').all(r.id);
+  forumRequire(rows.every(m=>validForumRecord(forumMediaRecord(m.id))),409,'Media relationships require review');
+  db.prepare('DELETE FROM forum_photos WHERE reply_id=?').run(r.id);db.prepare('DELETE FROM forum_replies WHERE id=?').run(r.id);
+  db.prepare('UPDATE forum_posts SET reply_count=MAX(0,reply_count-1) WHERE id=?').run(r.post_id);
+  return {files:rows.map(m=>m.filename),body:{success:true}};
+}));
+app.delete('/api/forum/photos/:id',auth,(req,res)=>forumMutation(req,res,()=>{
+  const m=forumMediaRecord(req.params.id);forumRequire(validForumRecord(m),404,'Not found');
+  forumOwner(req,m.reply_id?'forum_replies':'forum_posts',m.reply_id||m.post_id,true);
+  db.prepare('DELETE FROM forum_photos WHERE id=?').run(m.id);return {files:[m.filename],body:{success:true}};
+}));
+// Targeted image/video replacement. Text, parents, sibling media and IDs stay intact.
+app.put('/api/forum/photos/:id',auth,forumUpload(1),(req,res)=>forumMutation(req,res,()=>{
+  const m=forumMediaRecord(req.params.id);forumRequire(validForumRecord(m),404,'Not found');
+  forumOwner(req,m.reply_id?'forum_replies':'forum_posts',m.reply_id||m.post_id);
+  forumRequire(req.files?.length===1,400,'One media file required');const f=req.files[0];
+  db.prepare('UPDATE forum_photos SET filename=?,original_name=? WHERE id=?').run(f.filename,f.originalname,m.id);
+  return {files:[m.filename],body:{id:m.id,filename:f.filename}};
+}));
 
 // ============ ADMIN DISK MANAGEMENT ============
 app.get('/api/admin/disk', auth, (req, res) => {
@@ -3271,11 +4039,8 @@ app.delete('/api/admin/disk/cleanup-videos', auth, (req, res) => {
       if (['.mp4', '.mov', '.webm', '.m4v', '.avi'].includes(ext)) {
         const filePath = path.join(UPLOADS_DIR, f);
         const stat = fs.statSync(filePath);
-        freedBytes += stat.size;
-        fs.unlinkSync(filePath);
-        // Remove from database too
-        db.prepare('DELETE FROM forum_photos WHERE filename=?').run(f);
-        deleted++;
+        deletionLifecycle.cleanupFiles([f]);
+        if (!fs.existsSync(filePath)) { freedBytes += stat.size; deleted++; }
       }
     });
     res.json({ deleted, freedMB: (freedBytes / 1024 / 1024).toFixed(2) });
@@ -3292,10 +4057,8 @@ app.delete('/api/admin/disk/cleanup-large', auth, (req, res) => {
       const filePath = path.join(UPLOADS_DIR, f);
       const stat = fs.statSync(filePath);
       if (stat.size > thresholdMB * 1024 * 1024) {
-        freedBytes += stat.size;
-        fs.unlinkSync(filePath);
-        db.prepare('DELETE FROM forum_photos WHERE filename=?').run(f);
-        deleted++;
+        deletionLifecycle.cleanupFiles([f]);
+        if (!fs.existsSync(filePath)) { freedBytes += stat.size; deleted++; }
       }
     });
     res.json({ deleted, freedMB: (freedBytes / 1024 / 1024).toFixed(2), threshold: thresholdMB + 'MB' });
@@ -3303,15 +4066,72 @@ app.delete('/api/admin/disk/cleanup-large', auth, (req, res) => {
 });
 
 // ============ MERCHANT SHOP ============
-app.get('/api/shop/products', (req, res) => {
-  const products = db.prepare('SELECT id,name,description,price,product_type,image_filename,is_digital FROM merchant_products WHERE is_active=1 ORDER BY sort_order, created_at').all();
-  res.json(products);
+// Phase 2S: publication is explicit is_active=1; this is a single admin-owned shop.
+function shopUnavailable(res) {
+  return res.set({'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'}).status(404).json({error:'Media unavailable'});
+}
+function shopAdmin(req) {
+  try { if(jwt.verify(req.headers.authorization?.slice(7),JWT_SECRET,{algorithms:['HS256']}).orderId)return false; }catch{return false;}
+  // Match the documented Christina-only merchant contract, never client owner IDs.
+  return db.prepare('SELECT email FROM users WHERE id=?').get(req.userId)?.email === ADMIN_EMAIL;
+}
+function requireShopAdmin(req,res,next) {
+  if (!shopAdmin(req)) return shopUnavailable(res);
+  next();
+}
+function safeShopAsset(filename) {
+  if (!['the-potters-mud-log.pdf','mud-log-preview.pdf'].includes(filename)) return null;
+  const target=path.join(__dirname,'public','shop',filename);
+  try { return fs.lstatSync(target).isFile() ? target : null; } catch { return null; }
+}
+function shopFileIsolated(product, field) {
+  const filename=product[field];
+  if (!filename) return false;
+  for (const [table,columns] of Object.entries(require('./deletion-lifecycle.cjs').fileSlots)) {
+    const existing=new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c=>c.name));
+    for (const column of columns.filter(c=>existing.has(c))) {
+      const rows=db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(filename);
+      if (rows.some(row=>table!=='merchant_products'||column!==field||row.id!==product.id)) return false;
+    }
+  }
+  return true;
+}
+function shopDownloadFile(product) {
+  // No fallback from an unbound/ambiguous order to the universal Mud Log original.
+  if (!product || product.is_digital!==1 || !shopFileIsolated(product,'download_filename')) return null;
+  const filename=product.download_filename;
+  if (filename==='mud-log-preview.pdf') return null;
+  if (filename==='the-potters-mud-log.pdf') {
+    // Two physical candidates with the same stored identity are ambiguous.
+    if (safeStoredUpload(filename)) return null;
+    return safeShopAsset(filename);
+  }
+  return safeStoredUpload(filename);
+}
+function shopProductView(p) {
+  const {download_filename,...publicFields}=p;
+  return {...publicFields,mediaAccess:p.is_active===1?'public-catalog':p.is_active===0?'merchant-private':'legacy-ambiguous',
+    image_url:p.image_filename?`/api/ql/shop/products/${encodeURIComponent(p.id)}/image/public`:null};
+}
+function sendShopImage(req,res,privateView) {
+  try {
+    const p=db.prepare('SELECT * FROM merchant_products WHERE id=?').get(req.params.productId);
+    if (!p || (!privateView && p.is_active!==1) || !shopFileIsolated(p,'image_filename')) return shopUnavailable(res);
+    const file=safeStoredUpload(p.image_filename);
+    if (!file || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(p.image_filename)) return shopUnavailable(res);
+    res.set({'Cache-Control':privateView?'private, no-store':'public, max-age=0, must-revalidate','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'});
+    res.sendFile(file,e=>{if(e&&!res.headersSent)shopUnavailable(res)});
+  } catch { if(!res.headersSent)shopUnavailable(res); }
+}
+app.get('/api/ql/shop/products/:productId/image/public',(req,res)=>sendShopImage(req,res,false));
+app.get('/api/ql/shop/products/:productId/image',auth,requireShopAdmin,(req,res)=>sendShopImage(req,res,true));
+app.get('/api/shop/products',(req,res)=>{
+  res.json(db.prepare('SELECT * FROM merchant_products WHERE is_active=1 ORDER BY sort_order,created_at').all().map(shopProductView));
 });
-
-app.get('/api/shop/products/:id', (req, res) => {
-  const p = db.prepare('SELECT * FROM merchant_products WHERE id=? AND is_active=1').get(req.params.id);
-  if (!p) return res.status(404).json({ error: 'Not found' });
-  res.json(p);
+app.get('/api/shop/products/:id',(req,res)=>{
+  const p=db.prepare('SELECT * FROM merchant_products WHERE id=? AND is_active=1').get(req.params.id);
+  if(!p)return shopUnavailable(res);
+  res.json(shopProductView(p));
 });
 
 app.post('/api/shop/checkout', auth, async (req, res) => {
@@ -3339,31 +4159,61 @@ app.post('/api/shop/checkout', auth, async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Admin: manage merchant products (simple — Christina only for now)
-app.post('/api/shop/products', auth, upload.single('image'), (req, res) => {
-  const { name, description, price, productType, isDigital } = req.body;
-  if (!name || !price) return res.status(400).json({ error: 'Name and price required' });
-  const id = uuidv4();
-  db.prepare('INSERT INTO merchant_products (id,name,description,price,product_type,image_filename,is_digital,sort_order) VALUES (?,?,?,?,?,?,?,?)')
-    .run(id, name, description, parseFloat(price), productType || 'other', req.file?.filename || null, isDigital ? 1 : 0, 0);
-  res.json({ id });
+// Admin-only mutation, authorization before multipart writes. No original upload workflow
+// exists in this repository; download_filename is never accepted from request bodies.
+function shopUpload(req,res,next) {
+  const discard=()=>cleanupRequestUploads([req.file]);
+  res.once('close',discard); // Safe after commit: reference-aware cleanup retains live files.
+  upload.single('image')(req,res,async error=>{
+    if(error){discard();return res.status(400).json({error:'Image upload unavailable'});}
+    try {
+      if(req.file){
+        if(req.file.size>MAX_IMAGE_SIZE)throw Error('Image too large');
+        const metadata=await require('sharp')(req.file.path).metadata();
+        if(!metadata.width||!metadata.height)throw Error('Invalid image');
+        await require('sharp')(req.file.path).stats();
+      }
+      if(req.aborted||res.destroyed){discard();return;}
+      next();
+    }catch{discard();res.status(400).json({error:'Image upload unavailable'});}
+  });
+}
+function shopBoolean(value) {
+  if(value===true||value===1||value==='1'||value==='true')return 1;
+  if(value===false||value===0||value==='0'||value==='false')return 0;
+  throw Error('Invalid state');
+}
+app.post('/api/shop/products',auth,requireShopAdmin,shopUpload,(req,res)=>{
+  try {
+    const {name,description,price,productType,isDigital}=req.body;
+    if(!name||!price)throw Error('Name and price required');
+    const id=uuidv4();
+    db.transaction(()=>db.prepare('INSERT INTO merchant_products (id,name,description,price,product_type,image_filename,is_digital,sort_order) VALUES (?,?,?,?,?,?,?,?)')
+      .run(id,name,description||null,parseFloat(price),productType||'other',req.file?.filename||null,isDigital===undefined?0:shopBoolean(isDigital),0)).immediate();
+    res.json({id});
+  }catch{cleanupRequestUploads([req.file]);if(!res.headersSent)res.status(400).json({error:'Product unavailable'});}
 });
-
-app.put('/api/shop/products/:id', auth, upload.single('image'), (req, res) => {
-  const { name, description, price, productType, isDigital, isActive } = req.body;
-  const updates = [];
-  const params = [];
-  if (name !== undefined) { updates.push('name=?'); params.push(name); }
-  if (description !== undefined) { updates.push('description=?'); params.push(description); }
-  if (price !== undefined) { updates.push('price=?'); params.push(parseFloat(price)); }
-  if (productType !== undefined) { updates.push('product_type=?'); params.push(productType); }
-  if (isDigital !== undefined) { updates.push('is_digital=?'); params.push(isDigital ? 1 : 0); }
-  if (isActive !== undefined) { updates.push('is_active=?'); params.push(isActive ? 1 : 0); }
-  if (req.file) { updates.push('image_filename=?'); params.push(req.file.filename); }
-  if (!updates.length) return res.status(400).json({ error: 'Nothing to update' });
-  params.push(req.params.id);
-  db.prepare(`UPDATE merchant_products SET ${updates.join(',')} WHERE id=?`).run(...params);
-  res.json({ success: true });
+app.put('/api/shop/products/:id',auth,requireShopAdmin,(req,res,next)=>{
+  if(!db.prepare('SELECT 1 FROM merchant_products WHERE id=?').get(req.params.id))return shopUnavailable(res);
+  next();
+},shopUpload,(req,res)=>{
+  try {
+    const previous=db.transaction(()=>{
+      const old=db.prepare('SELECT * FROM merchant_products WHERE id=?').get(req.params.id);
+      if(!old)throw Error('Missing product');
+      const fields={name:'name',description:'description',price:'price',productType:'product_type',isDigital:'is_digital',isActive:'is_active'};
+      const updates=[],values=[];
+      for(const [key,column]of Object.entries(fields))if(req.body[key]!==undefined){
+        updates.push(column+'=?');values.push(key==='isDigital'||key==='isActive'?shopBoolean(req.body[key]):key==='price'?parseFloat(req.body[key]):req.body[key]);
+      }
+      if(req.file){updates.push('image_filename=?');values.push(req.file.filename);}
+      if(!updates.length)throw Error('No changes');
+      db.prepare(`UPDATE merchant_products SET ${updates.join(',')} WHERE id=?`).run(...values,old.id);
+      return req.file?old.image_filename:null;
+    }).immediate();
+    deletionLifecycle.cleanupFiles([previous]);
+    res.json({success:true});
+  }catch{cleanupRequestUploads([req.file]);if(!res.headersSent)res.status(400).json({error:'Product unavailable'});}
 });
 
 // My Purchases — list user's completed orders with download info
@@ -3382,39 +4232,30 @@ app.get('/api/shop/my-purchases', auth, (req, res) => {
   res.json(orders);
 });
 
-// Download purchased digital product
-app.get('/api/shop/download/:orderId', (req, res) => {
-  // Accept either auth header or token query param (for email links)
-  let userId = null;
-  const tokenParam = req.query.token;
-  if (tokenParam) {
-    try {
-      const decoded = require('jsonwebtoken').verify(tokenParam, JWT_SECRET);
-      if (decoded.orderId === req.params.orderId) userId = decoded.userId;
-    } catch(e) { /* invalid token */ }
-  }
-  if (!userId) {
-    // Try normal auth
-    const authHeader = req.headers.authorization;
-    if (authHeader?.startsWith('Bearer ')) {
-      try {
-        const decoded = require('jsonwebtoken').verify(authHeader.slice(7), JWT_SECRET);
-        userId = decoded.userId;
-      } catch(e) { /* invalid */ }
+// Existing 30-day signed email grant is order-scoped, not a guest checkout.
+app.get('/api/shop/download/:orderId',(req,res)=>{
+  res.set({'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer'});
+  try {
+    let userId=null;
+    const bearer=req.headers.authorization?.startsWith('Bearer ')?req.headers.authorization.slice(7):null;
+    // An explicit signed-in account takes precedence; foreign email grants cannot override it.
+    if(bearer){
+      const decoded=jwt.verify(bearer,JWT_SECRET,{algorithms:['HS256']});
+      if(decoded.orderId) {if(decoded.orderId===req.params.orderId)userId=decoded.userId;}
+      else userId=decoded.userId;
+    }else if(typeof req.query.token==='string'){
+      const decoded=jwt.verify(req.query.token,JWT_SECRET,{algorithms:['HS256']});
+      if(decoded.orderId===req.params.orderId)userId=decoded.userId;
     }
-  }
-  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-
-  const order = db.prepare('SELECT mo.*, mp.product_type, mp.name as product_name FROM merchant_orders mo JOIN merchant_products mp ON mo.product_id=mp.id WHERE mo.id=? AND mo.user_id=? AND mo.status=?')
-    .get(req.params.orderId, userId, 'completed');
-  if (!order) return res.status(404).json({ error: 'Purchase not found' });
-
-  // Serve the PDF file
-  const filePath = require('path').join(__dirname, 'public', 'shop', 'the-potters-mud-log.pdf');
-  if (!require('fs').existsSync(filePath)) return res.status(404).json({ error: 'File not available' });
-  res.setHeader('Content-Disposition', `attachment; filename="${order.product_name.replace(/[^a-zA-Z0-9 .-]/g, '')}.pdf"`);
-  res.setHeader('Content-Type', 'application/pdf');
-  res.sendFile(filePath);
+    if(!userId||!db.prepare('SELECT 1 FROM users WHERE id=?').get(userId))return shopUnavailable(res);
+    const p=db.prepare(`SELECT mp.* FROM merchant_orders mo JOIN merchant_products mp ON mp.id=mo.product_id
+      WHERE mo.id=? AND mo.user_id=? AND mo.status='completed'`).get(req.params.orderId,userId);
+    const file=shopDownloadFile(p);
+    if(!file)return shopUnavailable(res);
+    // Unpublishing does not revoke an existing completed purchase (existing business rule).
+    res.attachment(path.basename(file));
+    res.sendFile(file,e=>{if(e&&!res.headersSent)shopUnavailable(res)});
+  }catch{if(!res.headersSent)shopUnavailable(res);}
 });
 
 // ============ DASHBOARD ============
@@ -3423,13 +4264,13 @@ app.get('/api/dashboard', auth, (req, res) => {
   const tier = u?.tier || 'free';
   const totalPieces = db.prepare('SELECT COUNT(*) as c FROM pieces WHERE user_id=?').get(req.userId).c;
   const byStatus = db.prepare('SELECT status,COUNT(*) as count FROM pieces WHERE user_id=? GROUP BY status').all(req.userId);
-  const recentPieces = db.prepare("SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id WHERE p.user_id=? AND (p.status IS NULL OR p.status NOT IN ('broken','recycled')) ORDER BY p.updated_at DESC LIMIT 5").all(req.userId);
+  const recentPieces = db.prepare("SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id AND cb.user_id=p.user_id WHERE p.user_id=? AND (p.status IS NULL OR p.status NOT IN ('broken','recycled')) ORDER BY p.updated_at DESC LIMIT 5").all(req.userId);
   const totalClays = db.prepare('SELECT COUNT(*) as c FROM clay_bodies WHERE user_id=?').get(req.userId).c;
   const totalGlazes = db.prepare('SELECT COUNT(*) as c FROM glazes WHERE user_id=?').get(req.userId).c;
 
   const getPh = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order LIMIT 1');
-  const getGl = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order');
-  recentPieces.forEach(p => { p.primaryPhoto = getPh.get(p.id) || null; p.glazes = getGl.all(p.id); });
+  const getGl = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id=g.id AND g.user_id=? WHERE pg.piece_id=? ORDER BY pg.layer_order');
+  recentPieces.forEach(p => { p.photoVisibility = classifyPiecePhotoVisibility(p); p.primaryPhoto = getPh.get(p.id) || null; p.glazes = getGl.all(req.userId, p.id); });
 
   const stats = { totalPieces, byStatus, recentPieces, totalClays, totalGlazes, tier };
 
@@ -3449,14 +4290,15 @@ app.get('/api/dashboard', auth, (req, res) => {
 // ============ CASUALTIES ============
 app.get('/api/casualties', auth, (req, res) => {
   const pieces = db.prepare(`SELECT p.*, cb.name as clay_body_name 
-    FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id 
+    FROM pieces p LEFT JOIN clay_bodies cb ON p.clay_body_id=cb.id AND cb.user_id=p.user_id 
     WHERE p.user_id=? AND p.status IN ('broken','recycled') 
     ORDER BY p.updated_at DESC`).all(req.userId);
-  const getGl = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id=g.id WHERE pg.piece_id=? ORDER BY pg.layer_order');
+  const getGl = db.prepare('SELECT pg.*,COALESCE(g.name, pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id=g.id AND g.user_id=? WHERE pg.piece_id=? ORDER BY pg.layer_order');
   const getPh = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order');
   pieces.forEach(p => {
-    p.glazes = getGl.all(p.id);
+    p.glazes = getGl.all(req.userId, p.id);
     const allPhotos = getPh.all(p.id);
+    p.photoVisibility = classifyPiecePhotoVisibility(p);
     p.photos = allPhotos;
     p.primaryPhoto = allPhotos[0] || null;
   });
@@ -3822,19 +4664,45 @@ app.post('/api/admin/announce', auth, (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Manually upgrade/fix a member (e.g. when Stripe webhook missed). Admin only.
-// Body: { tier, billingPeriod, stripeCustomerId, stripeSubscriptionId }
+// Explicit Admin access is independent of interval and payment-provider evidence.
+function adminUpgrade(user, body, targetTier, allowProviderUpdates) {
+  if (!['free', 'basic', 'mid', 'top', 'starter'].includes(targetTier)) {
+    return { status: 400, error: 'Invalid tier' };
+  }
+  const supplied = key => Object.prototype.hasOwnProperty.call(body, key);
+  if (supplied('billingPeriod') && !['monthly', 'yearly', 'promo'].includes(body.billingPeriod)) {
+    return { status: 400, error: 'Invalid billingPeriod' };
+  }
+  if (!user) return { status: 404, error: 'User not found' };
+  for (const key of ['stripeCustomerId', 'stripeSubscriptionId']) {
+    if (allowProviderUpdates && supplied(key) && body[key] !== null && (typeof body[key] !== 'string' || !body[key].trim())) {
+      return { status: 400, error: 'Invalid ' + key };
+    }
+  }
+  const billing = supplied('billingPeriod') ? body.billingPeriod
+    : user.billing_period === 'stripe-monthly' ? 'monthly' : user.billing_period;
+  const grant = targetTier === 'starter' ? 1 : targetTier === 'free' ? 0 : user.admin_granted_access;
+  // A single constrained statement is atomic even when a trigger or constraint fails.
+  const assignments = ['tier=?', 'billing_period=?', 'admin_granted_access=?'];
+  const values = [targetTier, billing, grant];
+  for (const [key, column] of [['stripeCustomerId', 'stripe_customer_id'], ['stripeSubscriptionId', 'stripe_subscription_id']]) {
+    if (allowProviderUpdates && supplied(key)) { assignments.push(column + '=?'); values.push(body[key]); }
+  }
+  db.prepare('UPDATE users SET ' + assignments.join(', ') + ' WHERE id=?').run(...values, user.id);
+  return { status: 200 };
+}
+
+// Explicit null is the supported provider-ID clear instruction; omission preserves.
 app.post('/api/admin/members/:id/upgrade', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
-    const { tier, billingPeriod, stripeCustomerId, stripeSubscriptionId } = req.body || {};
-    if (!tier) return res.status(400).json({ error: 'tier required' });
-    db.pragma('ignore_check_constraints = ON');
-    db.prepare(`UPDATE users SET tier=?, billing_period=?, stripe_customer_id=?, stripe_subscription_id=? WHERE id=?`)
-      .run(tier, billingPeriod || 'stripe-monthly', stripeCustomerId || null, stripeSubscriptionId || null, req.params.id);
-    db.pragma('ignore_check_constraints = OFF');
-    const u = db.prepare('SELECT id,email,tier,billing_period,stripe_customer_id,stripe_subscription_id FROM users WHERE id=?').get(req.params.id);
-    res.json({ success: true, user: u });
+    const body = req.body || {};
+    const target = db.prepare('SELECT * FROM users WHERE id=?').get(req.params.id);
+    if (!target) return res.status(404).json({ error: 'User not found' });
+    const result = adminUpgrade(target, body, body.tier, true);
+    if (result.error) return res.status(result.status).json({ error: result.error });
+    const u = db.prepare('SELECT id,email,tier,billing_period,admin_granted_access,stripe_customer_id,stripe_subscription_id FROM users WHERE id=?').get(req.params.id);
+    res.json({ success: true, user: { ...u, billing_period: iap.compatibleBillingPeriod(u) } });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -3842,8 +4710,9 @@ app.get('/api/admin/members/search', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   const { q } = req.query;
   if (!q) return res.json([]);
-  const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, created_at 
-    FROM users WHERE email LIKE ? OR display_name LIKE ? ORDER BY created_at DESC LIMIT 20`).all('%'+q+'%', '%'+q+'%');
+  const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, admin_granted_access, plan_expires_at, created_at
+    FROM users WHERE email LIKE ? OR display_name LIKE ? ORDER BY created_at DESC LIMIT 20`).all('%'+q+'%', '%'+q+'%')
+    .map(m => ({ ...m, billing_period: iap.compatibleBillingPeriod(m) }));
   res.json(members);
 });
 
@@ -3910,11 +4779,18 @@ app.delete('/api/goals/:id', auth, (req, res) => {
 });
 
 // ============ PROJECTS ============
+// Delivery is owner scoped; historical publication remains unclassified.
+function projectMediaContract(record) {
+  return { ...record, photoDelivery: 'owner-protected', photoVisibility: 'legacy-ambiguous' };
+}
+function projectPhotos(projectId) {
+  return db.prepare('SELECT id,filename,sort_order FROM project_photos WHERE project_id=? ORDER BY sort_order ASC, rowid ASC').all(projectId).map(projectMediaContract);
+}
 app.get('/api/projects', auth, (req, res) => {
   const projects = db.prepare('SELECT * FROM projects WHERE user_id=? ORDER BY due_date ASC, updated_at DESC').all(req.userId);
   const result = projects.map(p => {
-    const photos = db.prepare('SELECT id,filename FROM project_photos WHERE project_id=? ORDER BY sort_order ASC').all(p.id);
-    return { ...p, photos };
+    const photos = projectPhotos(p.id);
+    return projectMediaContract({ ...p, photos });
   });
   res.json(result);
 });
@@ -3942,11 +4818,12 @@ app.post('/api/projects', auth, (req, res) => {
 app.get('/api/projects/:id', auth, (req, res) => {
   const project = db.prepare('SELECT * FROM projects WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!project) return res.status(404).json({ error: 'Project not found' });
-  const photos = db.prepare('SELECT id,filename FROM project_photos WHERE project_id=? ORDER BY sort_order ASC').all(project.id);
-  res.json({ ...project, photos });
+  const photos = projectPhotos(project.id);
+  res.json(projectMediaContract({ ...project, photos }));
 });
 
 app.put('/api/projects/:id', auth, (req, res) => {
+  if (!db.prepare('SELECT 1 FROM projects WHERE id=? AND user_id=?').get(req.params.id, req.userId)) return res.status(404).json({ error: 'Not found' });
   const { title, name, description, status, dueDate, deadline, notes, priority, contactName, contactEmail, contactPhone, contactNotes, shoppingList, budget } = req.body;
   const projectTitle = title || name;
   if (!projectTitle) return res.status(400).json({ error: 'Project name is required' });
@@ -3963,45 +4840,109 @@ app.put('/api/projects/:id', auth, (req, res) => {
 });
 
 app.delete('/api/projects/:id', auth, (req, res) => {
-  db.prepare('DELETE FROM projects WHERE id=? AND user_id=?').run(req.params.id, req.userId);
-  res.json({ success: true });
+  try {
+    const files = db.transaction(() => {
+      if (!db.prepare('SELECT 1 FROM projects WHERE id=? AND user_id=?').get(req.params.id, req.userId)) return null;
+      const files = db.prepare('SELECT filename FROM project_photos WHERE project_id=?').all(req.params.id).map(p => p.filename);
+      db.prepare('DELETE FROM project_photos WHERE project_id=?').run(req.params.id);
+      db.prepare('DELETE FROM projects WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+      return files;
+    }).immediate();
+    if (!files) return res.status(404).json({ error: 'Not found' });
+    deletionLifecycle.cleanupFiles(files);
+    res.json({ success: true });
+  } catch (_) { if (!res.headersSent) res.status(500).json({ error: 'Could not delete project' }); }
 });
 
 app.post('/api/projects/:id/photos', auth, upload.array('photos', 5), (req, res) => {
-  const projectId = req.params.id;
-  const project = db.prepare('SELECT user_id FROM projects WHERE id=?').get(projectId);
-  if (!project || project.user_id !== req.userId) return res.status(403).json({ error: 'Unauthorized' });
-  for (const f of req.files) {
-    const photoId = uuidv4();
-    db.prepare('INSERT INTO project_photos (id,project_id,filename,original_name) VALUES (?,?,?,?)')
-      .run(photoId, projectId, f.filename, f.originalname);
+  const files = req.files || [];
+  try {
+    const result = db.transaction(() => {
+      if (!db.prepare('SELECT 1 FROM projects WHERE id=? AND user_id=?').get(req.params.id, req.userId)) return null;
+      const target = req.body.replacePhotoId ? db.prepare('SELECT * FROM project_photos WHERE project_id=? AND id=?').get(req.params.id, req.body.replacePhotoId) : null;
+      if (req.body.replacePhotoId && !target) return null;
+      if (!files.length || (target && files.length !== 1)) { const e = new Error('Invalid photos'); e.status = 400; throw e; }
+      if (target) {
+        db.prepare('UPDATE project_photos SET filename=?,original_name=? WHERE id=? AND project_id=?').run(files[0].filename, files[0].originalname, target.id, req.params.id);
+        return { files: [target.filename], photos: [{ id: target.id, filename: files[0].filename }] };
+      }
+      const last = db.prepare('SELECT MAX(sort_order) AS n FROM project_photos WHERE project_id=?').get(req.params.id).n;
+      const photos = files.map((f, index) => {
+        const id = uuidv4();
+        db.prepare('INSERT INTO project_photos (id,project_id,filename,original_name,sort_order) VALUES (?,?,?,?,?)').run(id, req.params.id, f.filename, f.originalname, (last ?? -1) + 1 + index);
+        return { id, filename: f.filename };
+      });
+      return { files: [], photos };
+    }).immediate();
+    if (!result) {
+      deletionLifecycle.cleanupFiles(files.map(f => f.filename));
+      return res.status(404).json({ error: 'Not found' });
+    }
+    deletionLifecycle.cleanupFiles(result.files);
+    res.json({ success: true, ...result.photos[0], photos: result.photos.map(projectMediaContract) });
+  } catch (error) {
+    // Reference-aware cleanup also protects a committed replacement if sending fails.
+    deletionLifecycle.cleanupFiles(files.map(f => f.filename));
+    if (!res.headersSent) res.status(error.status || 500).json({ error: 'Could not save project photos' });
   }
-  res.json({ success: true });
 });
 
 app.get('/api/projects/:id/photos', auth, (req, res) => {
-  const projectId = req.params.id;
-  const project = db.prepare('SELECT user_id FROM projects WHERE id=?').get(projectId);
-  if (!project || project.user_id !== req.userId) return res.status(403).json({ error: 'Unauthorized' });
-  const photos = db.prepare('SELECT id,filename FROM project_photos WHERE project_id=? ORDER BY sort_order ASC').all(projectId);
-  res.json(photos);
+  if (!db.prepare('SELECT 1 FROM projects WHERE id=? AND user_id=?').get(req.params.id, req.userId)) return res.status(404).json({ error: 'Not found' });
+  res.json(projectPhotos(req.params.id));
 });
 
 app.delete('/api/project-photos/:id', auth, (req, res) => {
-  const photo = db.prepare('SELECT p.project_id, pr.user_id FROM project_photos p JOIN projects pr ON p.project_id=pr.id WHERE p.id=?').get(req.params.id);
-  if (!photo || photo.user_id !== req.userId) return res.status(403).json({ error: 'Unauthorized' });
-  const filename = db.prepare('SELECT filename FROM project_photos WHERE id=?').get(req.params.id)?.filename;
-  if (filename) {
-    try { fs.unlinkSync(path.join(uploadsDir, filename)); } catch(e) {}
-  }
-  db.prepare('DELETE FROM project_photos WHERE id=?').run(req.params.id);
-  res.json({ success: true });
+  try {
+    const photo = db.transaction(() => {
+      const photo = db.prepare('SELECT ph.filename FROM project_photos ph JOIN projects p ON ph.project_id=p.id WHERE ph.id=? AND p.user_id=?').get(req.params.id, req.userId);
+      if (!photo) return null;
+      db.prepare('DELETE FROM project_photos WHERE id=?').run(req.params.id);
+      return photo;
+    }).immediate();
+    if (!photo) return res.status(404).json({ error: 'Not found' });
+    deletionLifecycle.cleanupFiles([photo.filename]);
+    res.json({ success: true });
+  } catch (_) { if (!res.headersSent) res.status(500).json({ error: 'Could not delete project photo' }); }
 });
 
 // ============ EVENTS ============
+// Calendar subscription and Event sharing expose metadata only. Event images have no
+// publication flag, so current owner responses use authenticated protected delivery.
+// Historical static URLs remain legacy-compatible until publication state can be proven.
+function eventMediaContract(event) {
+  if (!event) return event;
+  event.photoDelivery = event.image_filename ? 'owner-protected' : null;
+  event.photoVisibility = event.image_filename ? 'legacy-ambiguous' : null;
+  return event;
+}
+
+app.get('/api/ql/events/:eventId/photos/:filename', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  res.set('X-Content-Type-Options', 'nosniff');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const photo = db.prepare('SELECT image_filename AS filename FROM events WHERE id=? AND user_id=? AND image_filename=?')
+      .get(req.params.eventId, req.userId, req.params.filename);
+    if (!photo) return unavailable();
+    const target = safeStoredUpload(photo.filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(photo.filename)) return unavailable();
+    const owned = ownedPhotoSlots(photo.filename, req.userId);
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(photo.filename);
+        if (rows.some(row => !owned.some(slot => slot.table === table && slot.column === column && slot.id === row.id))) return unavailable();
+      }
+    }
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
+});
+
 app.get('/api/events', auth, (req, res) => {
   const events = db.prepare('SELECT * FROM events WHERE user_id=? ORDER BY event_date ASC').all(req.userId);
-  res.json(events);
+  res.json(events.map(eventMediaContract));
 });
 
 app.post('/api/events', auth, (req, res) => {
@@ -4025,26 +4966,38 @@ app.post('/api/events', auth, (req, res) => {
 
 app.post('/api/events/:id/photo', auth, upload.single('photo'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo uploaded' });
-  const ev = db.prepare('SELECT * FROM events WHERE id=? AND user_id=?').get(req.params.id, req.userId);
-  if (!ev) return res.status(404).json({ error: 'Event not found' });
-  // Remove old image if exists
-  if (ev.image_filename) {
-    const old = path.join(UPLOADS_DIR, ev.image_filename);
-    if (fs.existsSync(old)) fs.unlinkSync(old);
+  const discardNew = () => deletionLifecycle.cleanupFiles([req.file?.filename]);
+  try {
+    const ev = db.prepare('SELECT * FROM events WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+    if (!ev) { discardNew(); return res.status(404).json({ error: 'Event not found' }); }
+    const result = db.prepare("UPDATE events SET image_filename=?,updated_at=datetime('now') WHERE id=? AND user_id=?")
+      .run(req.file.filename, req.params.id, req.userId);
+    if (!result.changes) { discardNew(); return res.status(404).json({ error: 'Event not found' }); }
+    deletionLifecycle.cleanupFiles([ev.image_filename]);
+    res.json(eventMediaContract({ filename: req.file.filename, image_filename: req.file.filename }));
+  } catch (_) {
+    discardNew();
+    if (!res.headersSent) res.status(500).json({ error: 'Could not save event photo' });
   }
-  db.prepare('UPDATE events SET image_filename=? WHERE id=?').run(req.file.filename, req.params.id);
-  res.json({ filename: req.file.filename });
 });
 
 app.put('/api/events/:id', auth, (req, res) => {
   const { title, description, eventDate, startTime, endTime, location, venue, address, website } = req.body;
-  db.prepare('UPDATE events SET title=?,description=?,event_date=?,start_time=?,end_time=?,location=?,venue=?,address=?,website=?,updated_at=datetime(\'now\') WHERE id=? AND user_id=?')
+  const result = db.prepare("UPDATE events SET title=?,description=?,event_date=?,start_time=?,end_time=?,location=?,venue=?,address=?,website=?,updated_at=datetime('now') WHERE id=? AND user_id=?")
     .run(title, description, eventDate, startTime, endTime, location, venue || null, address || null, website || null, req.params.id, req.userId);
+  if (!result.changes) return res.status(404).json({ error: 'Event not found' });
   res.json({ success: true });
 });
 
 app.delete('/api/events/:id', auth, (req, res) => {
-  db.prepare('DELETE FROM events WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  const result = db.transaction(() => {
+    const ev = db.prepare('SELECT image_filename FROM events WHERE id=? AND user_id=?').get(req.params.id, req.userId);
+    if (!ev) return null;
+    const deleted = db.prepare('DELETE FROM events WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+    return deleted.changes ? ev : null;
+  }).immediate();
+  if (!result) return res.status(404).json({ error: 'Event not found' });
+  deletionLifecycle.cleanupFiles([result.image_filename]);
   res.json({ success: true });
 });
 
@@ -4060,7 +5013,8 @@ app.get('/api/events/export/ics', auth, (req, res) => {
   res.send(icsContent);
 });
 
-// iCal subscription feed — live URL for Google/Apple Calendar to poll
+// iCal subscription feed — live URL for Google/Apple Calendar to poll.
+// buildICS intentionally excludes image_filename and protected/static image URLs.
 app.get('/api/events/subscribe/:userId', (req, res) => {
   const user = db.prepare('SELECT id FROM users WHERE id=?').get(req.params.userId);
   if (!user) return res.status(404).send('Not found');
@@ -4123,7 +5077,17 @@ app.put('/api/contacts/:id', auth, (req, res) => {
 });
 
 app.delete('/api/contacts/:id', auth, (req, res) => {
-  db.prepare('DELETE FROM contacts WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  db.transaction(() => {
+    if (!db.prepare('SELECT 1 FROM contacts WHERE id=? AND user_id=?').get(req.params.id, req.userId)) return;
+    for (const table of ['sales', 'events']) {
+      if (!db.prepare(`PRAGMA table_info(${table})`).all().some(c => c.name === 'contact_id')) continue;
+      if (db.prepare(`SELECT 1 FROM ${table} WHERE contact_id=? AND user_id IS NOT ?`).get(req.params.id, req.userId)) {
+        const error = new Error('Contact has inconsistent references; deletion requires review'); error.status = 409; throw error;
+      }
+      db.prepare(`UPDATE ${table} SET contact_id=NULL WHERE contact_id=? AND user_id=?`).run(req.params.id, req.userId);
+    }
+    db.prepare('DELETE FROM contacts WHERE id=? AND user_id=?').run(req.params.id, req.userId);
+  }).immediate();
   res.json({ success: true });
 });
 
@@ -4185,7 +5149,7 @@ app.get('/api/combos/public/:shareId', (req, res) => {
     if (!combo) return res.status(404).json({ error: 'Combo not found or is private' });
     const layers = db.prepare('SELECT * FROM glaze_combo_layers WHERE combo_id=? ORDER BY layer_order').all(combo.id);
     combo.layers = layers;
-    res.json(combo);
+    res.json(glazeComboMediaContract(combo));
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -4275,20 +5239,20 @@ app.put('/api/admin/blog/:id/publish', auth, (req, res) => {
 
 // Remote admin: upgrade a user's tier by email (password-protected)
 app.post('/api/admin/upgrade-tier/remote', (req, res) => {
-  const { password, email, tier } = req.body;
+  const body = req.body || {};
+  const { password, email } = body;
   if (!process.env.ADMIN_BLOG_PASSWORD || password !== process.env.ADMIN_BLOG_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
-  if (!email) return res.status(400).json({ error: 'Email required' });
-  const targetTier = tier || 'starter';
+  if (typeof email !== 'string' || !email.trim()) return res.status(400).json({ error: 'Email required' });
+  const targetTier = Object.prototype.hasOwnProperty.call(body, 'tier') ? body.tier : 'starter';
   try {
-    db.pragma('ignore_check_constraints = ON');
-    const result = db.prepare('UPDATE users SET tier=?, billing_period=? WHERE LOWER(email)=?').run(targetTier, 'stripe-monthly', email.toLowerCase());
-    db.pragma('ignore_check_constraints = OFF');
-    if (result.changes === 0) return res.status(404).json({ error: 'User not found' });
+    const target = db.prepare('SELECT * FROM users WHERE LOWER(email)=?').get(email.toLowerCase());
+    if (!target) return res.status(404).json({ error: 'User not found' });
+    // Remote route has no interval-edit contract: validate input, then preserve storage.
+    if (Object.prototype.hasOwnProperty.call(body, 'billingPeriod') && !['monthly','yearly','promo'].includes(body.billingPeriod)) return res.status(400).json({error:'Invalid billingPeriod'});
+    const result = adminUpgrade(target, {}, targetTier, false);
+    if (result.error) return res.status(result.status).json({ error: result.error });
     res.json({ success: true, email, tier: targetTier });
-  } catch(e) {
-    db.pragma('ignore_check_constraints = OFF');
-    res.status(500).json({ error: e.message });
-  }
+  } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 // Admin blog via password (for remote management without JWT)
@@ -5197,6 +6161,7 @@ app.post('/api/admin/run-migration', (req, res) => {
     return res.status(403).json({ error: 'Admin key required' });
   }
 
+  if (db.prepare("SELECT 1 FROM sqlite_master WHERE name GLOB 'ql_*' LIMIT 1").get()) return res.status(409).json({ error: 'Legacy migrations are disabled with QL schema installed.' });
   const { filename } = req.body;
   if (!filename) {
     return res.status(400).json({ error: 'Migration filename required' });
@@ -5576,6 +6541,10 @@ const sharp = require('sharp');
 // pHash: DCT-based perceptual hash — captures structural/frequency information.
 // Far better than aHash at distinguishing plates from bowls, mugs from vases, etc.
 // Uses 32x32 resize, 8x8 DCT coefficients, median threshold → 16 hex chars (64 bits).
+// Memoize constants only: identical multiply/add order and bit-exact DCT output.
+// No image data, account data or feature version is cached here.
+const photoDctCos = Array.from({ length: 8 }, (_, u) =>
+  Float64Array.from({ length: 32 }, (_, x) => Math.cos((2 * x + 1) * u * Math.PI / 64)));
 async function computePHash(buffer) {
   const size = 32;
   // Compare the centered subject, not the full camera/gallery frame. The
@@ -5605,8 +6574,7 @@ async function computePHash(buffer) {
       for (let x = 0; x < size; x++) {
         for (let y = 0; y < size; y++) {
           sum += pixels[x * size + y] *
-            Math.cos((2 * x + 1) * u * Math.PI / (2 * size)) *
-            Math.cos((2 * y + 1) * v * Math.PI / (2 * size));
+            photoDctCos[u][x] * photoDctCos[v][y];
         }
       }
       dct.push((cu * cv * sum * 2) / size);
@@ -5785,41 +6753,14 @@ function parseColorSignature(signature) {
 // Select an object cluster when a very light dominant cluster is likely background.
 // The existing cluster distance, pHash, hue gate, score formula, and response stay unchanged.
 function selectObjectCluster(signature) {
-  if (!signature.length) {
-    console.log('[Photo Diagnostic] selector: no clusters available; selected=null');
-    return null;
-  }
+  if (!signature.length) return null;
   const dominant = signature.reduce((best, cluster) => cluster.weight > best.weight ? cluster : best, signature[0]);
   const dominantHsl = rgbToHsl(dominant.r, dominant.g, dominant.b);
-  const clusterDiagnostics = signature.map((cluster, index) => {
-    const hsl = rgbToHsl(cluster.r, cluster.g, cluster.b);
-    const lightPass = dominantHsl.l > 0.72;
-    const darkPass = hsl.l < 0.58;
-    const representationPass = cluster.weight >= dominant.weight * 0.12;
-    const reasons = [];
-    if (!lightPass) reasons.push('dominant lightness <= 0.72');
-    if (!darkPass) reasons.push('cluster lightness >= 0.58');
-    if (!representationPass) reasons.push('weight below dominant*0.12');
-    return { index, rgb: [cluster.r, cluster.g, cluster.b], hsl: { h: +hsl.h.toFixed(3), s: +hsl.s.toFixed(3), l: +hsl.l.toFixed(3) }, weight: cluster.weight, conditions: { dominantLightPass: lightPass, darkPass, representationPass }, result: lightPass && darkPass && representationPass ? 'passed' : 'failed', reasons };
-  });
-  console.log('[Photo Diagnostic] selector:', JSON.stringify({
-    clusterCount: signature.length,
-    dominantIndex: signature.indexOf(dominant),
-    dominant: { rgb: [dominant.r, dominant.g, dominant.b], hsl: { h: +dominantHsl.h.toFixed(3), s: +dominantHsl.s.toFixed(3), l: +dominantHsl.l.toFixed(3) }, weight: dominant.weight },
-    thresholds: { dominantLightnessGreaterThan: 0.72, objectLightnessLessThan: 0.58, minimumWeightRatio: 0.12 },
-    clusters: clusterDiagnostics
-  }));
   if (dominantHsl.l > 0.72) {
     const darkCluster = signature
       .filter(cluster => rgbToHsl(cluster.r, cluster.g, cluster.b).l < 0.58 && cluster.weight >= dominant.weight * 0.12)
       .sort((a, b) => b.weight - a.weight)[0];
-    if (darkCluster) {
-      console.log('[Photo Diagnostic] selector result: dark object cluster selected', JSON.stringify({ rgb: [darkCluster.r, darkCluster.g, darkCluster.b], weight: darkCluster.weight }));
-      return darkCluster;
-    }
-    console.log('[Photo Diagnostic] selector result: dominant selected; no cluster passed all object conditions');
-  } else {
-    console.log('[Photo Diagnostic] selector result: dominant selected; dominant lightness condition failed');
+    if (darkCluster) return darkCluster;
   }
   return dominant;
 }
@@ -5977,14 +6918,15 @@ try {
     console.log(`[Photo Search] Migration phash_v9b_dct: cleared ${cleared.changes} phashes — recomputing with pHash (DCT)`);
   }
 } catch(e) { console.warn('[Photo Search] Migration v9b error:', e.message); }
-app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, res) => {
+app.post('/api/pieces/photo-search', auth, photoQuerySafety.account, photoQuerySafety.upload, async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No photo provided' });
 
   try {
-    const searchBuffer = fs.readFileSync(req.file.path);
+    const searchBuffer = req.file.buffer;
     const searchHash = await computePHash(searchBuffer);
     const searchColor = await computeColorSignature(searchBuffer);
 
+    const visibility = db.prepare('PRAGMA table_info(pieces)').all().some(c => c.name === 'hide_from_photo_search') ? 'COALESCE(p.hide_from_photo_search,0)=0' : '1=1';
     // Get all piece photos for this user (excluding pieces hidden from photo search)
     let userPhotos = db.prepare(`
       SELECT pp.*, pp.phash, pp.avg_color, p.id as piece_id, p.title, p.status, p.notes,
@@ -5993,39 +6935,49 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
              cb.name as clay_body_name
       FROM piece_photos pp
       JOIN pieces p ON pp.piece_id = p.id
-      LEFT JOIN clay_bodies cb ON p.clay_body_id = cb.id
-      WHERE p.user_id = ? AND (p.hide_from_photo_search IS NULL OR p.hide_from_photo_search = 0)
+      LEFT JOIN clay_bodies cb ON p.clay_body_id = cb.id AND cb.user_id=p.user_id
+      WHERE p.user_id = ? AND ${visibility}
     `).all(req.userId);
 
-    // Minimal inline backfill: compute up to 10 photos inline (~50-100ms total)
-    // so the first search after cold start returns *something* without blocking for minutes.
-    // Remaining photos are handled by the async startup backfill.
+    // Complete the eligible snapshot before ranking. Never return a partial ranking.
+    // Serial decoding bounds working memory; the request budget bounds cold work.
+    if (userPhotos.some(ph => !safeStoredUpload(ph.filename))) {
+      return res.status(503).json({ error: 'A candidate photo could not be evaluated. Please retry.' });
+    }
     const needsBackfill = userPhotos.filter(ph => !ph.phash || !ph.avg_color);
-    const INLINE_LIMIT = 10;
-    const inlineBatch = needsBackfill.slice(0, INLINE_LIMIT);
+    const inlineBatch = needsBackfill;
+    const featureDeadline = Date.now() + 25000;
     
     for (const ph of inlineBatch) {
+      if (req.aborted || res.destroyed) return;
+      if (Date.now() > featureDeadline) return res.status(503).json({ error: 'Photo features are still preparing. Please retry.' });
       try {
-        const filePath = path.join(UPLOADS_DIR, ph.filename);
-        if (!fs.existsSync(filePath)) continue;
-        const buf = fs.readFileSync(filePath);
+        const filePath = safeStoredUpload(ph.filename);
+        if (!filePath) continue;
+        // Bound encoded and decoded work for stored media as well as query uploads.
+        const stat = fs.statSync(filePath);
+        if (!stat.isFile() || stat.size > 12 * 1024 * 1024) throw new Error('Candidate size limit');
+        const buf = await fs.promises.readFile(filePath);
+        if (buf.length > 12 * 1024 * 1024) throw new Error('Candidate size limit');
+        const meta = await sharp(buf, { limitInputPixels: 40e6, failOn: 'warning' }).metadata();
+        if (!meta.width || !meta.height || meta.width > 12000 || meta.height > 12000 || meta.width * meta.height > 40e6 || (meta.pages || 1) > 1) throw new Error('Candidate dimensions limit');
         if (!ph.phash) {
           const hash = await computePHash(buf);
-          db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ?').run(hash, ph.id);
+          db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ? AND filename = ? AND piece_id IN (SELECT id FROM pieces WHERE user_id = ?)').run(hash, ph.id, ph.filename, req.userId);
           ph.phash = hash;
         }
         if (!ph.avg_color) {
           const color = await computeColorSignature(buf);
-          db.prepare('UPDATE piece_photos SET avg_color = ? WHERE id = ?').run(color, ph.id);
+          db.prepare('UPDATE piece_photos SET avg_color = ? WHERE id = ? AND filename = ? AND piece_id IN (SELECT id FROM pieces WHERE user_id = ?)').run(color, ph.id, ph.filename, req.userId);
           ph.avg_color = color;
         }
       } catch (e) {
-        console.warn('[v9] Inline backfill error:', ph.filename, e.message);
+        console.warn('[Photo Search] Candidate feature unavailable:', ph.id);
+        return res.status(503).json({ error: 'A candidate photo could not be evaluated. Please retry.' });
       }
     }
 
     userPhotos = userPhotos.filter(ph => ph.avg_color && ph.phash);
-    console.log('[v9] Searching against', userPhotos.length, 'photos (backfilled', inlineBatch.length, 'inline,', Math.max(0, needsBackfill.length - inlineBatch.length), 'remaining)');
 
     // === CLUSTER-TO-CLUSTER MATCHING (v9) ===
     // Compare dominant color clusters directly instead of averaging them into a single hue.
@@ -6034,8 +6986,7 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
     const candidateMatches = [];
     const searchSig = parseColorSignature(searchColor);
     if (!searchSig.length) {
-      fs.unlinkSync(req.file.path);
-      return res.json({ matches: [], total: 0 });
+      return res.json({ matches: [], total: 0, confidence: require('./ql/photo-result-confidence.cjs').classifyPhotoResults([]) });
     }
 
     // Find dominant cluster (highest weight) from search photo
@@ -6045,10 +6996,13 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
     const scoringSearchSig = objectColorSearch ? [dominantSearch] : searchSig;
     const dominantHsl = rgbToHsl(dominantSearch.r, dominantSearch.g, dominantSearch.b);
 
-    console.log('[v9] Search dominant RGB:', dominantSearch.r, dominantSearch.g, dominantSearch.b, 'weight:', dominantSearch.weight.toFixed(3));
-    console.log('[v9] Search dominant HSL: h=', dominantHsl.h.toFixed(1), 's=', dominantHsl.s.toFixed(2), 'l=', dominantHsl.l.toFixed(2));
 
-    for (const ph of userPhotos) {
+    for (const [index, ph] of userPhotos.entries()) {
+      if (index % 32 === 0) {
+        await new Promise(resolve => setImmediate(resolve));
+        if (req.aborted || res.destroyed) return;
+        if (Date.now() > featureDeadline) return res.status(503).json({ error: 'Photo features are still preparing. Please retry.' });
+      }
       const photoSig = parseColorSignature(ph.avg_color);
       if (!photoSig.length) continue;
 
@@ -6063,7 +7017,6 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
         let hueDiff = Math.abs(dominantHsl.h - photoHsl.h);
         if (hueDiff > 180) hueDiff = 360 - hueDiff;
         if (hueDiff > 50) {
-          console.log('[v9] REJECT:', ph.title, 'hueDiff=', hueDiff.toFixed(1), 'searchH=', dominantHsl.h.toFixed(1), 'photoH=', photoHsl.h.toFixed(1));
           continue;
         }
       }
@@ -6119,7 +7072,12 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
       }
 
       const neutralToneWeight = avgSaturation < 0.15 ? 0.10 : 0;
-      const score = Math.min(1.0, (colorScore * colorWeight) + (shapeScore * shapeWeight) + (toneScore * neutralToneWeight) + nearDuplicateBonus);
+      const rawScore = (colorScore * colorWeight) + (shapeScore * shapeWeight) + (toneScore * neutralToneWeight) + nearDuplicateBonus;
+      // Low-saturation searches rely on structure: clipping erased the useful
+      // near-duplicate differences. Normalize by the analytical maximum instead.
+      // Keep the measured saturated-color path intact. These are similarity scores,
+      // not probabilities. Existing feature bytes and MAX-per-Piece remain valid.
+      const score = dominantHsl.s < 0.30 ? rawScore / 1.20 : Math.min(1.0, rawScore);
 
       // Hue diff for logging
       let hueDiff2 = Math.abs(dominantHsl.h - photoHsl.h);
@@ -6151,18 +7109,6 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
     }
 
     candidateMatches.sort((a, b) => b.score - a.score);
-    console.log('[v9] Candidates passed hue gate:', candidateMatches.length);
-    console.log('[v9] Top candidates:', candidateMatches.slice(0, 8).map((m) => ({
-      piece: m.title,
-      score: Number(m.score.toFixed(3)),
-      color: Number(m.colorScore.toFixed(3)),
-      shape: Number(m.shapeScore.toFixed(3)),
-      cW: Number(m.colorWeight.toFixed(2)),
-      sW: Number(m.shapeWeight.toFixed(2)),
-      sat: Number(m.avgSaturation.toFixed(2)),
-      hueDiff: Number(m.hueDiff.toFixed(1)),
-    })));
-
     const bestByPiece = new Map();
     for (const match of candidateMatches) {
       const existing = bestByPiece.get(match.piece_id);
@@ -6175,23 +7121,35 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
     for (const best of bestByPiece.values()) {
       if (best.score < 0.45) continue; // v9: cluster-based scoring, lower threshold
 
-      const piecePhotos = db.prepare('SELECT * FROM piece_photos WHERE piece_id = ? ORDER BY sort_order').all(best.piece_id);
-      const pieceGlazes = db.prepare('SELECT pg.*, COALESCE(g.name, pg.custom_name) as glaze_name, g.brand, g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON pg.glaze_id = g.id WHERE pg.piece_id = ? ORDER BY pg.layer_order').all(best.piece_id);
+      // Re-resolve after asynchronous hashing; deleted/reassigned records cannot
+      // reuse stale candidate metadata to escape the authenticated owner boundary.
+      const current = db.prepare(`SELECT p.*,cb.name as clay_body_name FROM pieces p LEFT JOIN clay_bodies cb ON cb.id=p.clay_body_id AND cb.user_id=p.user_id WHERE p.id=? AND p.user_id=? AND ${visibility}`).get(best.piece_id, req.userId);
+      if (!current) continue;
+      const piecePhotos = db.prepare('SELECT * FROM piece_photos WHERE piece_id=? ORDER BY sort_order').all(current.id).filter(ph => safeStoredUpload(ph.filename));
+      // Resolve the winning photo against the current owned Piece, never a path.
+      // If it disappeared during async extraction, omit the stale identification.
+      const matchedPhoto = piecePhotos.find(photo => photo.id === best.photo_id);
+      if (!matchedPhoto) continue;
+      const pieceGlazes = db.prepare('SELECT pg.*, COALESCE(g.name,pg.custom_name) as glaze_name,g.brand,g.glaze_type FROM piece_glazes pg LEFT JOIN glazes g ON g.id=pg.glaze_id AND g.user_id=? WHERE pg.piece_id=? AND (pg.glaze_id IS NULL OR g.id IS NOT NULL) ORDER BY pg.layer_order').all(req.userId,current.id);
 
       matches.push({
         _id: best.piece_id,
         id: best.piece_id,
-        title: best.title,
-        status: best.status,
-        notes: best.notes,
-        description: best.description,
-        clay_body_name: best.clay_body_name,
-        technique: best.technique,
-        form: best.form,
-        date_started: best.date_started,
-        date_completed: best.date_completed,
+        title: current.title,
+        user_id: current.user_id,
+        is_public: current.is_public,
+        photoVisibility: classifyPiecePhotoVisibility(current),
+        status: current.status,
+        notes: current.notes,
+        description: current.description,
+        clay_body_name: current.clay_body_name,
+        technique: current.technique,
+        form: current.form,
+        date_started: current.date_started,
+        date_completed: current.date_completed,
         photos: piecePhotos,
         glazes: pieceGlazes,
+        matchedPhotoId: matchedPhoto.id,
         matchScore: best.score,
       });
     }
@@ -6199,14 +7157,16 @@ app.post('/api/pieces/photo-search', auth, upload.single('photo'), async (req, r
     // Sort by score descending
     matches.sort((a, b) => b.matchScore - a.matchScore);
 
-    // Clean up uploaded search photo
-    fs.unlinkSync(req.file.path);
+    if (!photoQuerySafety.exists(req.userId)) return res.status(401).json({ error: 'Account authentication required' });
+    if (req.aborted || res.destroyed) return;
 
-    res.json({ matches, total: matches.length });
+    const confidence = require('./ql/photo-result-confidence.cjs').classifyPhotoResults(matches);
+    res.json({ matches, total: matches.length, confidence });
   } catch (err) {
     console.error('[Photo Search] Error:', err.message);
-    if (req.file?.path && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-    res.status(500).json({ error: 'Photo search failed. Please try again.' });
+    if (!res.destroyed) res.status(500).json({ error: 'Photo search failed. Please try again.' });
+  } finally {
+    req.releasePhotoQuery();
   }
 });
 
@@ -6217,33 +7177,71 @@ const originalPhotoHandler = null; // handled inline above via backfill
 // ==================== TEST TILE LIBRARY (Unlimited only) ====================
 
 // GET all test tiles for the user
-app.get('/api/test-tiles', auth, requireTier('starter'), (req, res) => {
+app.get('/api/test-tiles', auth, requireTestTileEntitlement, (req, res) => {
   const tiles = db.prepare(`
     SELECT tt.*, g.name as glaze_library_name, cb.name as clay_library_name
     FROM test_tiles tt
-    LEFT JOIN glazes g ON tt.glaze_id = g.id
-    LEFT JOIN clay_bodies cb ON tt.clay_body_id = cb.id
+    LEFT JOIN glazes g ON tt.glaze_id = g.id AND g.user_id = tt.user_id
+    LEFT JOIN clay_bodies cb ON tt.clay_body_id = cb.id AND cb.user_id = tt.user_id
     WHERE tt.user_id = ?
     ORDER BY tt.created_at DESC
   `).all(req.userId);
-  res.json(tiles);
+  res.json(tiles.map(serializeTestTile));
+});
+
+// Free tier: can see that the feature exists but gets upgrade prompt
+app.get('/api/test-tiles/preview', auth, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  res.json({
+    feature: 'Test Tile Library',
+    description: 'Track every test tile with glaze, clay body, firing details, thickness, layering, photos, and results. Build a searchable library of all your glaze experiments.',
+    available: hasTestTileEntitlement(req.userId),
+    upgradeMessage: 'Upgrade to Unlimited to access the Test Tile Library and organize all your glaze experiments in one place.'
+  });
 });
 
 // GET single test tile
-app.get('/api/test-tiles/:id', auth, requireTier('starter'), (req, res) => {
+app.get('/api/test-tiles/:id', auth, requireTestTileEntitlement, (req, res) => {
   const tile = db.prepare(`
     SELECT tt.*, g.name as glaze_library_name, cb.name as clay_library_name
     FROM test_tiles tt
-    LEFT JOIN glazes g ON tt.glaze_id = g.id
-    LEFT JOIN clay_bodies cb ON tt.clay_body_id = cb.id
+    LEFT JOIN glazes g ON tt.glaze_id = g.id AND g.user_id = tt.user_id
+    LEFT JOIN clay_bodies cb ON tt.clay_body_id = cb.id AND cb.user_id = tt.user_id
     WHERE tt.id = ? AND tt.user_id = ?
   `).get(req.params.id, req.userId);
   if (!tile) return res.status(404).json({ error: 'Test tile not found' });
-  res.json(tile);
+  res.json(serializeTestTile(tile));
+});
+
+// Protected Test Tile photo delivery. Slot is 1..3 and maps exactly to the stored field.
+app.get('/api/ql/test-tiles/:tileId/photos/:slot', auth, requireTestTileEntitlement, (req, res) => {
+  res.set('Cache-Control', 'private, no-store');
+  const unavailable = () => res.status(404).json({ error: 'Photo unavailable' });
+  try {
+    const slot = Number(req.params.slot);
+    if (![1, 2, 3].includes(slot)) return unavailable();
+    const field = slot === 1 ? 'photo_filename' : `photo_filename${slot}`;
+    const tile = db.prepare('SELECT * FROM test_tiles WHERE id=? AND user_id=?').get(req.params.tileId, req.userId);
+    const filename = tile?.[field];
+    if (!filename) return unavailable();
+    const target = safeStoredUpload(filename);
+    if (!target || !/\.(?:jpe?g|png|webp|gif|avif|heic|heif)$/i.test(filename)) return unavailable();
+    const owned = ownedPhotoSlots(filename, req.userId);
+    const { fileSlots } = require('./deletion-lifecycle.cjs');
+    for (const [table, columns] of Object.entries(fileSlots)) {
+      const available = new Set(db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name));
+      for (const column of columns.filter(c => available.has(c))) {
+        const rows = db.prepare(`SELECT id FROM ${table} WHERE ${column}=?`).all(filename);
+        if (rows.some(row => !owned.some(ref => ref.table === table && ref.column === column && ref.id === row.id))) return unavailable();
+      }
+    }
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.sendFile(target, error => { if (error && !res.headersSent) unavailable(); });
+  } catch (_) { if (!res.headersSent) unavailable(); }
 });
 
 // CREATE test tile
-app.post('/api/test-tiles', auth, requireTier('starter'), upload.array('photos', 3), (req, res) => {
+app.post('/api/test-tiles', auth, requireTestTileEntitlement, upload.array('photos', 3), (req, res) => {
   const { name, glaze_id, glaze_name, clay_body_id, clay_name, cone, atmosphere, application_method, coats, thickness, surface_result, color_result, layered_over, layered_under, kiln_position, firing_schedule, notes, rating, tags } = req.body;
   const id = uuidv4();
   const photos = req.files || [];
@@ -6251,18 +7249,15 @@ app.post('/api/test-tiles', auth, requireTier('starter'), upload.array('photos',
   const photo_filename2 = photos[1] ? photos[1].filename : null;
   const photo_filename3 = photos[2] ? photos[2].filename : null;
   
-  // Resolve clay name from library if clay_body_id provided
+  // Supplied library IDs must belong to the authenticated account.
   let finalClayName = clay_name || null;
-  if (clay_body_id) {
-    const clay = db.prepare('SELECT name FROM clay_bodies WHERE id=? AND user_id=?').get(clay_body_id, req.userId);
-    if (clay) finalClayName = clay.name;
-  }
-  
-  // Resolve glaze name from library if glaze_id provided
   let finalGlazeName = glaze_name || null;
-  if (glaze_id) {
-    const glaze = db.prepare('SELECT name FROM glazes WHERE id=? AND user_id=?').get(glaze_id, req.userId);
-    if (glaze) finalGlazeName = glaze.name;
+  try {
+    if (clay_body_id) finalClayName = ownedRelationship('clay_bodies', req.userId, clay_body_id).name;
+    if (glaze_id) finalGlazeName = ownedRelationship('glazes', req.userId, glaze_id).name;
+  } catch (error) {
+    cleanupRequestUploads(photos);
+    return res.status(error.status || 400).json({ error: error.message });
   }
 
   try {
@@ -6287,7 +7282,7 @@ app.post('/api/test-tiles', auth, requireTier('starter'), upload.array('photos',
 });
 
 // UPDATE test tile
-app.put('/api/test-tiles/:id', auth, requireTier('starter'), upload.array('photos', 3), (req, res) => {
+app.put('/api/test-tiles/:id', auth, requireTestTileEntitlement, upload.array('photos', 3), (req, res) => {
   const tile = db.prepare('SELECT * FROM test_tiles WHERE id=? AND user_id=?').get(req.params.id, req.userId);
   if (!tile) return res.status(404).json({ error: 'Test tile not found' });
   
@@ -6301,24 +7296,33 @@ app.put('/api/test-tiles/:id', auth, requireTier('starter'), upload.array('photo
   const originalPhotos = originalSlots.filter(Boolean);
   const removeFlags = [remove_photo, remove_photo2, remove_photo3];
   const removedExistingPhotos = originalSlots.filter((filename, index) => filename && removeFlags[index] === 'true');
-  removedExistingPhotos.forEach(filename => photosToDelete.push(path.join(UPLOADS_DIR, filename)));
+  removedExistingPhotos.forEach(filename => photosToDelete.push(filename));
 
-  let orderedPhotos = originalPhotos.filter(filename => !removedExistingPhotos.includes(filename));
+  // Preserve slot identity even when two slots reference the same filename.
+  const remainingEntries = originalSlots
+    .map((filename, index) => ({ filename, index }))
+    .filter(entry => entry.filename && removeFlags[entry.index] !== 'true');
+  let orderedEntries = [...remainingEntries];
   if (photo_order) {
     try {
       const requestedOrder = JSON.parse(photo_order);
       if (Array.isArray(requestedOrder)) {
-        orderedPhotos = requestedOrder.filter(filename => orderedPhotos.includes(filename));
-        orderedPhotos.push(...originalPhotos.filter(filename => !removedExistingPhotos.includes(filename) && !orderedPhotos.includes(filename)));
+        const pool = [...remainingEntries];
+        const requested = [];
+        for (const filename of requestedOrder) {
+          const match = pool.findIndex(entry => entry.filename === filename);
+          if (match >= 0) requested.push(pool.splice(match, 1)[0]);
+        }
+        orderedEntries = [...requested, ...pool];
       }
     } catch (error) {
-      // Keep the existing order if an older or malformed client sends no usable order.
+      // Keep exact surviving slot order if an older or malformed client sends no usable order.
     }
   }
 
-  let photo_filename = orderedPhotos[0] || null;
-  let photo_filename2 = orderedPhotos[1] || null;
-  let photo_filename3 = orderedPhotos[2] || null;
+  let photo_filename = orderedEntries[0]?.filename || null;
+  let photo_filename2 = orderedEntries[1]?.filename || null;
+  let photo_filename3 = orderedEntries[2]?.filename || null;
 
   // Handle new photo uploads (fill empty slots)
   let photoIdx = 0;
@@ -6326,16 +7330,15 @@ app.put('/api/test-tiles/:id', auth, requireTier('starter'), upload.array('photo
   if (photos.length > photoIdx && !photo_filename2) { photo_filename2 = photos[photoIdx++].filename; }
   if (photos.length > photoIdx && !photo_filename3) { photo_filename3 = photos[photoIdx++].filename; }
   
-  // Resolve names from library
+  // Resolve only same-owner library records; manual names remain valid when no ID changes.
   let finalClayName = clay_name !== undefined ? clay_name : tile.clay_name;
-  if (clay_body_id) {
-    const clay = db.prepare('SELECT name FROM clay_bodies WHERE id=? AND user_id=?').get(clay_body_id, req.userId);
-    if (clay) finalClayName = clay.name;
-  }
   let finalGlazeName = glaze_name !== undefined ? glaze_name : tile.glaze_name;
-  if (glaze_id) {
-    const glaze = db.prepare('SELECT name FROM glazes WHERE id=? AND user_id=?').get(glaze_id, req.userId);
-    if (glaze) finalGlazeName = glaze.name;
+  try {
+    if (clay_body_id) finalClayName = ownedRelationship('clay_bodies', req.userId, clay_body_id).name;
+    if (glaze_id) finalGlazeName = ownedRelationship('glazes', req.userId, glaze_id).name;
+  } catch (error) {
+    cleanupRequestUploads(photos);
+    return res.status(error.status || 400).json({ error: error.message });
   }
 
   try {
@@ -6355,50 +7358,29 @@ app.put('/api/test-tiles/:id', auth, requireTier('starter'), upload.array('photo
     return res.status(500).json({ error: 'Could not update test tile. Your existing tile was not changed.' });
   }
 
-  photosToDelete.forEach(photoPath => {
-    if (fs.existsSync(photoPath)) fs.unlinkSync(photoPath);
-  });
+  deletionLifecycle.cleanupFiles(photosToDelete);
   console.log('[Test Tiles] Updated', { userId: req.userId, tileId: req.params.id, photoCount: photos.length });
   res.json({ success: true });
 });
 
 // DELETE test tile
-app.delete('/api/test-tiles/:id', auth, requireTier('starter'), (req, res) => {
-  const tile = db.prepare('SELECT * FROM test_tiles WHERE id=? AND user_id=?').get(req.params.id, req.userId);
-  if (!tile) return res.status(404).json({ error: 'Test tile not found' });
-  
-  // Clean up photos
-  [tile.photo_filename, tile.photo_filename2, tile.photo_filename3].forEach(f => {
-    if (f) {
-      const fp = path.join(UPLOADS_DIR, f);
-      if (fs.existsSync(fp)) fs.unlinkSync(fp);
-    }
-  });
-  
-  db.prepare('DELETE FROM test_tiles WHERE id=?').run(req.params.id);
-  res.json({ success: true });
+app.delete('/api/test-tiles/:id', auth, requireTestTileEntitlement, (req, res) => {
+  try {
+    if (!deletionLifecycle.deleteStudioRecord(req.userId, req.params.id, 'testTile')) return res.status(404).json({ error: 'Test tile not found' });
+    res.json({ success: true });
+  } catch (error) { res.status(error.status || 500).json({ error: error.message }); }
 });
 
 // GET test tiles filtered by glaze
-app.get('/api/glazes/:id/test-tiles', auth, requireTier('starter'), (req, res) => {
+app.get('/api/glazes/:id/test-tiles', auth, requireTestTileEntitlement, (req, res) => {
   const tiles = db.prepare('SELECT * FROM test_tiles WHERE glaze_id=? AND user_id=? ORDER BY created_at DESC').all(req.params.id, req.userId);
-  res.json(tiles);
+  res.json(tiles.map(serializeTestTile));
 });
 
 // GET test tiles filtered by clay body
-app.get('/api/clay-bodies/:id/test-tiles', auth, requireTier('starter'), (req, res) => {
+app.get('/api/clay-bodies/:id/test-tiles', auth, requireTestTileEntitlement, (req, res) => {
   const tiles = db.prepare('SELECT * FROM test_tiles WHERE clay_body_id=? AND user_id=? ORDER BY created_at DESC').all(req.params.id, req.userId);
-  res.json(tiles);
-});
-
-// Free tier: can see that the feature exists but gets upgrade prompt
-app.get('/api/test-tiles/preview', auth, (req, res) => {
-  res.json({
-    feature: 'Test Tile Library',
-    description: 'Track every test tile with glaze, clay body, firing details, thickness, layering, photos, and results. Build a searchable library of all your glaze experiments.',
-    available: req.userTier === 'starter',
-    upgradeMessage: 'Upgrade to Unlimited to access the Test Tile Library and organize all your glaze experiments in one place.'
-  });
+  res.json(tiles.map(serializeTestTile));
 });
 
 // =========================================================================== 
@@ -6422,9 +7404,7 @@ app.get('/api/studio/notes/:id', auth, (req, res) => {
 app.post('/api/studio/notes', auth, (req, res) => {
   const { title, body } = req.body;
   if (!body || !body.trim()) return res.status(400).json({ error: 'Body is required' });
-  const id = uuidv4();
-  db.prepare('INSERT INTO studio_notes (id, user_id, title, body) VALUES (?, ?, ?, ?)').run(id, req.userId, title || null, body);
-  const created = db.prepare('SELECT * FROM studio_notes WHERE id=?').get(id);
+  const created = require('./ql/studio-notes.cjs').createStudioNote(db,{userId:req.userId,title,body});
   res.json(created);
 });
 
@@ -6490,7 +7470,7 @@ app.get('/api/gallery', (req, res) => {
         (SELECT filename FROM piece_photos WHERE piece_id=p.id ORDER BY sort_order LIMIT 1) as first_photo
       FROM pieces p
       LEFT JOIN users u ON p.user_id = u.id
-      LEFT JOIN clay_bodies cb ON p.clay_body_id = cb.id
+      LEFT JOIN clay_bodies cb ON p.clay_body_id = cb.id AND cb.user_id=p.user_id
       WHERE p.is_public = 1 AND REPLACE(LOWER(REPLACE(REPLACE(TRIM(p.status), ' ', '-'), '_', '-')), 'final-fired', 'glaze-fired') IN ('glaze-fired', 'done', 'complete', 'sold')
       ORDER BY p.updated_at DESC
       LIMIT ? OFFSET ?
@@ -6505,6 +7485,10 @@ app.get('/api/gallery', (req, res) => {
       technique: p.technique,
       clayBody: p.clay_body_name,
       photo: p.primary_photo || p.first_photo,
+      photoId: db.prepare('SELECT id FROM piece_photos WHERE piece_id=? AND filename=? ORDER BY sort_order LIMIT 1').get(p.id, p.primary_photo || p.first_photo)?.id || null,
+      photoVisibility: 'public',
+      is_public: 1,
+      status: p.status,
       displayName: p.public_display_name || p.creator_name || 'Anonymous Potter',
       creatorUsername: p.creator_username,
       creatorAvatar: p.creator_avatar,
@@ -6526,7 +7510,7 @@ app.get('/api/gallery/:id', (req, res) => {
         cb.name as clay_body_name
       FROM pieces p
       LEFT JOIN users u ON p.user_id = u.id
-      LEFT JOIN clay_bodies cb ON p.clay_body_id = cb.id
+      LEFT JOIN clay_bodies cb ON p.clay_body_id = cb.id AND cb.user_id=p.user_id
       WHERE p.id=? AND p.is_public=1
     `).get(req.params.id);
     if (!piece) return res.status(404).json({ error: 'Piece not found or not public' });
@@ -6534,7 +7518,7 @@ app.get('/api/gallery/:id', (req, res) => {
     const photos = db.prepare('SELECT id, filename, stage FROM piece_photos WHERE piece_id=? ORDER BY sort_order').all(req.params.id);
     const glazes = db.prepare(`
       SELECT COALESCE(g.name, pg.custom_name) as glaze_name FROM piece_glazes pg
-      LEFT JOIN glazes g ON pg.glaze_id = g.id
+      LEFT JOIN glazes g ON pg.glaze_id = g.id AND g.user_id=(SELECT user_id FROM pieces WHERE id=pg.piece_id)
       WHERE pg.piece_id=?
     `).all(req.params.id);
 
@@ -6624,46 +7608,7 @@ app.post('/api/emergency/disk-cleanup', (req, res) => {
   if (!process.env.ADMIN_BLOG_PASSWORD || password !== process.env.ADMIN_BLOG_PASSWORD) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-  try {
-    let freed = 0, deleted = 0;
-    // 1. Delete WAL and SHM files
-    const walPath = path.join(__dirname, 'data', 'pottery.db-wal');
-    const shmPath = path.join(__dirname, 'data', 'pottery.db-shm');
-    if (fs.existsSync(walPath)) {
-      freed += fs.statSync(walPath).size;
-      fs.unlinkSync(walPath);
-      console.log('[EMERGENCY] Deleted WAL file');
-    }
-    if (fs.existsSync(shmPath)) {
-      freed += fs.statSync(shmPath).size;
-      fs.unlinkSync(shmPath);
-      console.log('[EMERGENCY] Deleted SHM file');
-    }
-    // 2. Delete ALL uploaded files
-    if (fs.existsSync(UPLOADS_DIR)) {
-      const files = fs.readdirSync(UPLOADS_DIR)
-        .map(f => ({ name: f, size: fs.statSync(path.join(UPLOADS_DIR, f)).size }))
-        .sort((a, b) => b.size - a.size);
-      for (const f of files) {
-        try {
-          fs.unlinkSync(path.join(UPLOADS_DIR, f.name));
-          freed += f.size;
-          deleted++;
-        } catch(e) {}
-      }
-    }
-    // 3. Run VACUUM on the database to reclaim space
-    try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch(e) {}
-    try { db.exec('VACUUM'); } catch(e) { console.log('[EMERGENCY] VACUUM failed:', e.message); }
-    res.json({
-      success: true,
-      freedMB: (freed / 1024 / 1024).toFixed(2),
-      filesDeleted: deleted,
-      message: 'Emergency cleanup complete. Uploads deleted, WAL removed, VACUUM attempted.'
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
+  return res.status(409).json({ error: 'Emergency file deletion disabled. Use the reviewed recovery runbook.' });
 });
 
 // One-time migration endpoint (remove after use)
@@ -6672,6 +7617,7 @@ app.post('/api/admin/run-migration-007', (req, res) => {
   if (!process.env.ADMIN_BLOG_PASSWORD || password !== process.env.ADMIN_BLOG_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
   
   try {
+  if (db.prepare("SELECT 1 FROM sqlite_master WHERE name GLOB 'ql_*' LIMIT 1").get()) return res.status(409).json({ error: 'Legacy migrations are disabled with QL schema installed.' });
     console.log('[MIGRATION] Running 007-add-custom-clay-type.sql');
     db.exec('ALTER TABLE clay_bodies ADD COLUMN custom_clay_type TEXT');
     console.log('[MIGRATION] ✓ Migration completed');
@@ -6710,16 +7656,16 @@ app.listen(PORT, '0.0.0.0', () => {
       let done = 0;
       for (const ph of needsWork) {
         try {
-          const filePath = path.join(UPLOADS_DIR, ph.filename);
-          if (!fs.existsSync(filePath)) continue;
+          const filePath = safeStoredUpload(ph.filename);
+          if (!filePath) continue;
           const buf = fs.readFileSync(filePath);
           if (!ph.phash || ph.phash.length === 32) {
             const hash = await computePHash(buf);
-            db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ?').run(hash, ph.id);
+            db.prepare('UPDATE piece_photos SET phash = ? WHERE id = ? AND filename = ?').run(hash, ph.id, ph.filename);
           }
           if (!ph.avg_color) {
             const color = await computeColorSignature(buf);
-            db.prepare('UPDATE piece_photos SET avg_color = ? WHERE id = ?').run(color, ph.id);
+            db.prepare('UPDATE piece_photos SET avg_color = ? WHERE id = ? AND filename = ?').run(color, ph.id, ph.filename);
           }
           done++;
         } catch(e) {
