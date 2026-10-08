@@ -171,7 +171,8 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
       if(addition.ambiguous)return reply(addition.clarification || 'What words should I add to your note? Please say the words you want included. Nothing changed.','clarification',state);
       const current=db.prepare('SELECT body FROM studio_notes WHERE id=? AND user_id=?').get(target.noteId,userId);
       if(!current || current.body!==target.originalBody){clear(userId);return reply('That note changed or is no longer available. Please open it to review the latest text. Nothing changed.','clarification');}
-      const body=(d && d.id===state?.noteDraftId ? d.body : current.body)+'\n'+addition.body;
+      const base=d && d.id===state?.noteDraftId && d.target?.noteId===target.noteId ? d.body : current.body;
+      const body=base+'\n'+addition.body;
       if(body.length>10000)return reply('This addition would make the note too long. Nothing changed.','clarification',state);
       return this.draft(userId,body,{target});
     },
