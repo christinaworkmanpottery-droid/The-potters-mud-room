@@ -49,11 +49,12 @@ async function fixture(t, config = {enabled:true,voiceEnabled:true,handsFreeEnab
 const start = f => f.el('qlAssistantSessionStart').click();
 const state = f => f.el('qlAssistantSession').dataset.state;
 const restart = f => f.timers.get(650)();
-test('no automatic activation and explicit flag only',async t=>{
+test('hands-free requires one foreground activation and explicit flag only',async t=>{
  for(const cfg of [{enabled:true,voiceEnabled:true},{enabled:true,voiceEnabled:false,handsFreeEnabled:true},{enabled:true,voiceEnabled:true,handsFreeEnabled:'true'}]) {
   const f=await fixture(t,cfg);assert.equal(f.el('qlAssistantSession'),null);assert.equal(f.engines.length,0);
  }
- const f=await fixture(t);assert.equal(f.engines.length,0);assert.equal(state(f),'stopped');
+ const f=await fixture(t);assert.equal(f.engines.length,0);assert.equal(state(f),'ready');assert.equal(f.el('qlAssistantSessionStart').textContent,'Activate Clayton');
+ start(f);assert.equal(f.engines.length,1);
 });
 test('five navigation commands need only one activation',async t=>{
  const f=await fixture(t);start(f);start(f);
@@ -97,7 +98,7 @@ test('engine watchdog cannot overlap a stuck recognizer',async t=>{
 test('no-speech missing onend stops without restarting',async t=>{
  const f=await fixture(t);start(f);f.engines[0].onerror({error:'no-speech'});f.timers.get(5000)();assert.equal(state(f),'unavailable');assert.equal(f.engines.length,1);
 });
-for(const action of ['button','voice','hidden','logout','storage','pagehide','typed','timeout']) test('session cancellation and queued callbacks '+action,async t=>{
+for(const action of ['button','voice','hidden','logout','storage','pagehide','typed']) test('session cancellation and queued callbacks '+action,async t=>{
  const f=await fixture(t);start(f);const e=f.engines[0],late=e.onresult;
  if(action==='button')f.el('qlAssistantSessionStop').click();
  if(action==='voice')e.result('Stop listening');
@@ -106,7 +107,6 @@ for(const action of ['button','voice','hidden','logout','storage','pagehide','ty
  if(action==='storage'){f.w.localStorage.setItem('mudlog_token','other');f.w.dispatchEvent(new f.w.StorageEvent('storage',{key:'mudlog_token'}));}
  if(action==='pagehide')f.w.dispatchEvent(new f.w.Event('pagehide'));
  if(action==='typed'){f.el('qlAssistantInput').value='manual';f.el('qlAssistantInput').dispatchEvent(new f.w.Event('input'));}
- if(action==='timeout')f.timers.get(900000)();
  late({results:[{isFinal:true,0:{transcript:'Open glazes'}}]});assert.equal(f.pending.length,0);assert.equal(f.engines.length,1);assert.equal(state(f),'stopped');
 });
 test('End session suppresses late HTTP navigation',async t=>{
@@ -346,4 +346,15 @@ test('Safari tail-only final callback preserves the complete earlier transcript'
  assert.equal(f.el('qlAssistantSessionCommand').textContent,'Hearing: Make 30 soy sauce dishes in B-Mix clay fire at cone 04');
  e.onend();assert.equal(f.pending.length,1);
  assert.equal(f.pending[0].body.input.text,'Make 30 soy sauce dishes in B-Mix clay fire at cone 04');
+});
+
+
+test('no arbitrary session timeout is scheduled',async t=>{
+ const f=await fixture(t);start(f);assert.equal(f.timers.has(900000),false);
+});
+test('pagehide requires a fresh foreground activation',async t=>{
+ const f=await fixture(t);start(f);assert.equal(f.engines.length,1);
+ f.w.dispatchEvent(new f.w.Event('pagehide'));assert.equal(state(f),'stopped');
+ f.w.dispatchEvent(new f.w.Event('pageshow'));await tick();
+ assert.equal(f.engines.length,1);assert.equal(state(f),'ready');assert.equal(f.el('qlAssistantSessionStart').textContent,'Activate Clayton');
 });
