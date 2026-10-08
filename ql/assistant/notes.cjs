@@ -94,6 +94,7 @@ function noteAddition(text) {
   const reference='(?:(?:the|my|this|that)\\s+)?(?:(?:last|latest|previous|current|most recent)\\s+)?(?:studio\\s+)?note(?:\\s+(?:I|we)\\s+(?:just\\s+)?saved)?';
   const destinationFirst=new RegExp('^(?:add(?:\\s+in)?|append|include|mention)\\s+(?:to|in|into|on)\\s+'+reference+'[,:]?\\s+(.+)$','i');
   const m=words.match(destinationFirst) || words.match(/^(?:add(?:\s+in)?|append|include|mention)\s+(.+)$/i);
+  if(!m)return null;
   const suffix=new RegExp('\\s+(?:to|in|into|on)\\s+'+reference+'[.!?]*$','i');
   const prefix=new RegExp('^(?:to|in|into|on)\\s+'+reference+'[,:]?\\s+','i');
   // Parse destination separately from literal content, including destination-first
