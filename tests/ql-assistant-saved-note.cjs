@@ -105,3 +105,21 @@ test('saved note correction fails closed when phrase is missing or repeated',asy
  x=await f.ask('Change blue clay to B-Mix clay',x.context);assert.equal(x.result.status,'clarification');assert.match(x.response.text,/could not find/);
  assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,'red clay and red clay');
 });
+
+
+test('natural positional insertion previews and saves safely',async t=>{
+ const f=fixture(t);let r=await f.ask('New note Soy sauce dishes in B mix clay fire at cone six');r=await f.ask('Save note',r.context);const id=r.result.noteId;
+ let preview=await f.ask('Add 30 before soy sauce dishes',r.context);
+ assert.equal(preview.result.status,'draft');assert.equal(preview.result.draftText,'30 Soy sauce dishes in B mix clay fire at cone six');
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes WHERE id=?').get(id).body,'Soy sauce dishes in B mix clay fire at cone six');
+ let result=await f.ask('Save it',preview.context);assert.equal(result.result.noteId,id);
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes WHERE id=?').get(id).body,'30 Soy sauce dishes in B mix clay fire at cone six');
+ preview=await f.ask('Add with Sapphire Float after cone six',result.context);
+ assert.equal(preview.result.draftText,'30 Soy sauce dishes in B mix clay fire at cone six with Sapphire Float');
+});
+test('positional insertion fails closed for missing or repeated anchor',async t=>{
+ const f=fixture(t);let r=await f.ask('New note red clay and red clay');r=await f.ask('Save note',r.context);
+ let x=await f.ask('Add 30 before blue clay',r.context);assert.equal(x.result.status,'clarification');assert.match(x.response.text,/could not find/);
+ x=await f.ask('Add 30 before red clay',x.context);assert.equal(x.result.status,'clarification');assert.match(x.response.text,/more than once/);
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,'red clay and red clay');
+});
