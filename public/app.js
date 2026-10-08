@@ -1037,15 +1037,31 @@ if (dz) {
 }
 async function uploadPhoto(e) {
   e.preventDefault();
+  const button = document.getElementById('photoSubmitBtn');
+  const status = document.getElementById('photoUploadStatus');
+  if (button.dataset.uploading === 'true') return;
+  const show = (message, error) => { status.textContent = message; status.style.color = error ? '#a32b20' : 'var(--text)'; status.style.display = 'block'; };
   const pid = document.getElementById('photoPieceId').value;
-  const f = croppedPhotoBlob || document.getElementById('photoFile').files[0]; if (!f) return;
-  const fd = new FormData(); fd.append('photo', f, 'photo.jpg'); fd.append('stage', document.getElementById('photoStage').value);
+  const file = croppedPhotoBlob || document.getElementById('photoFile').files[0];
+  if (!file) { show('Choose a photo first.', true); return; }
+  button.dataset.uploading = 'true'; button.disabled = true; button.textContent = 'Uploading...';
+  show('Uploading photo. Please wait...', false);
   try {
-    const r = await fetch('/api/pieces/' + pid + '/photos', { method:'POST', headers:{Authorization:'Bearer '+token}, body:fd });
-    const d = await r.json(); if (!r.ok) throw new Error(d.error);
-    toast('Photo uploaded!','success'); trackActivity('upload_photo', 'pieces'); closeModal('photoModal'); viewPiece(pid);
-    croppedPhotoBlob = null;
-  } catch(err) { toast(err.message,'error'); }
+    const piece = await api('/api/pieces/' + pid);
+    if ((piece.photos || []).length >= 3) throw new Error('This piece already has 3 photos, the maximum allowed. Delete one before adding another.');
+    const fd = new FormData(); fd.append('photo', file, 'photo.jpg'); fd.append('stage', document.getElementById('photoStage').value);
+    const response = await fetch('/api/pieces/' + pid + '/photos', { method:'POST', headers:{Authorization:'Bearer ' + token}, body:fd });
+    const raw = await response.text(); let result = {}; try { result = JSON.parse(raw); } catch (_) {}
+    if (!response.ok) throw new Error(result.error || 'Upload failed (HTTP ' + response.status + ').');
+    croppedPhotoBlob = null; closeModal('photoModal');
+    toast('Photo saved successfully!', 'success');
+    await viewPiece(pid);
+  } catch (err) {
+    console.error('Photo upload failed:', err);
+    show(err.message || 'Upload failed. Please try again.', true);
+  } finally {
+    button.dataset.uploading = 'false'; button.disabled = false; button.textContent = 'Upload Photo';
+  }
 }
 
 // ---- Clay Bodies ----
