@@ -13,7 +13,7 @@ const materialChoice = text => {
   return null;
 };
 // Parse the request separately from its payload; preserve the user's exact body.
-const notePrefix = /^(?:(?:okay|ok|hey)[, ]+)?(?:(?:can|could|would) you\s+|i (?:want|need|would like) to\s+|i[’']d like to\s+)?(?:please\s+)?(?:(?:add|create|make|start|take|write|record)\s+(?:(?:me\s+)?(?:a|another)\s+)?(?:new\s+)?(?:studio\s+)?note|(?:a\s+)?new\s+(?:studio\s+)?note|(?:jot|write)\s+(?:this\s+)?down)\b/i;
+const notePrefix = /^(?:(?:okay|ok|hey|hi)(?:\s+clayton)?[, ]+)?(?:(?:can|could|would) you\s+|i (?:want|need|would like) to\s+|i[’']d like to\s+)?(?:please\s+)?(?:(?:add|create|make|start|take|write|record)\s+(?:(?:me\s+)?(?:a|another)\s+)?(?:new\s+)?(?:studio\s+)?note|(?:a\s+)?new\s+(?:studio\s+)?note|(?:jot|write)\s+(?:this\s+)?down)\b/i;
 function noteRequest(text) {
   if(typeof text !== 'string' || /[\x00-\x1f\x7f]/.test(text)) return null;
   const match=text.trim().match(notePrefix);
@@ -48,7 +48,7 @@ function noteStart(text) {
   const topic=body.match(/^about\s+(.+?)[.!?]?$/i);
   return topic ? {topic:topic[1]} : null;
 }
-const commandWords=text=>typeof text==='string' ? text.trim().replace(/[.!?]+$/,'').replace(/^(?:okay|ok)[, ]+/i,'').replace(/^(?:(?:can|could|would) you\s+)?(?:please\s+)?/i,'').replace(/\s+please$/i,'') : '';
+const commandWords=text=>typeof text==='string' ? text.trim().replace(/[.!?]+$/,'').replace(/^(?:okay|ok|hey|hi)(?:\s+clayton)?[, ]+/i,'').replace(/^(?:(?:can|could|would) you\s+)?(?:please\s+)?/i,'').replace(/\s+please$/i,'') : '';
 const confirmation=(text,hasDraft=false)=>typeof text==='string' && (materialChoice(text) !== null || /^(?:yes|save|done|that(?:'|’)s it|that is it|save (?:(?:the|this|my) )?note|confirm (?:(?:the|this) )?note)$/i.test(commandWords(text)) || hasDraft && /^(?:save (?:it|that|this)|yes[,]? (?:save (?:it|that|this)|go ahead)|go ahead and save(?: (?:it|that|this))?)$/i.test(commandWords(text)));
 // Misheard save-like speech asks for clarification, never a guessed write.
 const unclearNoteCommand=text=>typeof text==='string' && /^(?:\S+\s+){0,3}(?:save|confirm)\s+(?:(?:the|this|my)\s+)?note[.!?]*$/i.test(text.trim()) && !confirmation(text) && noteBody(text)===null && !cancellation(text);
@@ -59,7 +59,7 @@ const incompleteNote = text => /(?:\b(?:and|or|because|with|for|to|the|my|buy|ne
 // Follow-up content stays literal. Explicit non-note destinations never become text.
 function conversationalCommand(text){
   return commandWords(text)
-    .replace(/^(?:(?:please|hey|okay|ok)\s+)+/i,'')
+    .replace(/^(?:(?:please|hey|hi|okay|ok)(?:\s+clayton)?\s+)+/i,'')
     .replace(/^(?:(?:can|could|would|will)\s+you\s+)/i,'')
     .replace(/^i\s+(?:need|want|would like)\s+you\s+to\s+/i,'')
     .replace(/\s+(?:please|thanks|thank you)$/i,'')
