@@ -1009,17 +1009,26 @@ function closeCropper() {
 }
 
 function acceptCroppedPhoto() {
-  if (!photoCropper) return;
-  photoCropper.getCroppedCanvas({ width: 1024, height: 1024, imageSmoothingQuality: 'high' }).toBlob(blob => {
-    croppedPhotoBlob = blob;
-    const p = document.getElementById('photoPreview');
-    p.innerHTML = '<img src="' + URL.createObjectURL(blob) + '" style="max-width:100%;max-height:200px;border-radius:var(--radius-sm)">';
-    p.classList.remove('hidden');
-    document.getElementById('photoSubmitBtn').disabled = false;
+  const file = document.getElementById('photoFile').files[0];
+  if (!file) { toast('Select a photo first.', 'error'); return; }
+  const finish = blob => {
     closeCropper();
-    croppedPhotoBlob = blob;
-  }, 'image/jpeg', 0.9);
+    croppedPhotoBlob = blob || file;
+    const preview = document.getElementById('photoPreview');
+    preview.innerHTML = '<img src="' + URL.createObjectURL(croppedPhotoBlob) + '" style="max-width:100%;max-height:200px;border-radius:var(--radius-sm)">';
+    preview.classList.remove('hidden');
+    document.getElementById('photoSubmitBtn').disabled = false;
+  };
+  try {
+    const canvas = photoCropper && photoCropper.getCroppedCanvas({ maxWidth:1024, maxHeight:1024 });
+    if (!canvas || !canvas.width || !canvas.height) { finish(file); return; }
+    canvas.toBlob(blob => finish(blob || file), 'image/jpeg', 0.9);
+  } catch (err) {
+    console.error('Photo crop failed', err);
+    finish(file);
+  }
 }
+
 const dz = document.getElementById('photoDropZone');
 if (dz) {
   dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
