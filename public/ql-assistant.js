@@ -14,7 +14,7 @@
   let handsFreeEnabled = false, handsFree = false, sessionTimer, restartTimer, speechTimer, speechProbeTimer, requestTimer;
   let dock, dockStatus, dockCommand, dockReply, sessionStart, sessionStop, spokenReplies, utterance, notePreview, notePreviewText;
   let speechReview = null;
-  let emptyAttempts = 0, voiceEpoch = 0, internalNavigation = false;
+  let emptyAttempts = 0, voiceEpoch = 0, internalNavigation = false, autoStartTimer = null;
   const inVoiceContext = () => entered && (currentPage === 'qlAssistant' || handsFree);
   function sessionState(state, message) {
     if (!dock) return;
@@ -27,7 +27,7 @@
     speechReview = null;
     handsFree = false; voiceEpoch++; conversationToken = null; noteDictation = false; recordNavigation = false;
     if(notePreview){notePreview.hidden=true;notePreviewText.textContent='';}
-    clearTimeout(restartTimer); clearTimeout(sessionTimer); clearTimeout(speechTimer); clearTimeout(speechProbeTimer); clearTimeout(requestTimer);
+    clearTimeout(restartTimer); clearTimeout(sessionTimer); clearTimeout(speechTimer); clearTimeout(speechProbeTimer); clearTimeout(requestTimer); clearTimeout(autoStartTimer);
     if (utterance) { utterance.onend = utterance.onerror = utterance.onstart = null; utterance = null; window.speechSynthesis?.cancel(); }
     cancelVoice();
     sessionState(state, message);
@@ -95,9 +95,18 @@
     if (!handsFreeEnabled || interactionMode() !== 'handsfree' || !available() || document.hidden || handsFree) return;
     if (!speechSupported()) { sessionState('unavailable', 'Voice unavailable. Typing and the menu remain available.'); return; }
     invalidate(); handsFree = true; entered = true; emptyAttempts = 0;
-    // An explicit new activation only; never resume after hiding or permission denial.
-    sessionTimer = setTimeout(() => pauseSession('Stopped after 15 minutes. Tap Start voice session to continue.'), 15 * 60 * 1000);
+    // Hands-Free lasts for the foreground Mud Room session. Page/account teardown
+    // owns shutdown; there is no arbitrary 15-minute assistant timeout.
     startVoice();
+  }
+  function autoStartHandsFree(message = 'Starting Hands-Free Clayton…') {
+    clearTimeout(autoStartTimer);
+    if (!handsFreeEnabled || interactionMode() !== 'handsfree' || !available() || document.hidden || handsFree || recognition) return;
+    sessionState('starting', message);
+    autoStartTimer = setTimeout(() => {
+      syncSession();
+      if (handsFreeEnabled && interactionMode() === 'handsfree' && available() && !document.hidden && !handsFree && !recognition) beginSession();
+    }, 250);
   }
   const speechConstructor = () => window.SpeechRecognition || window.webkitSpeechRecognition;
   const speechSupported = () => window.isSecureContext === true && typeof speechConstructor() === 'function';
@@ -306,10 +315,11 @@
     const next = identity();
     if (next !== session) { invalidate(); session = next; }
     if (entry) entry.hidden = !available();
-    if (dock) { dock.hidden = !available() || interactionMode() !== 'handsfree'; sessionStart.disabled = handsFree || !available() || !speechSupported() || interactionMode() !== 'handsfree'; }
+    if (dock) { dock.hidden = !available() || interactionMode() !== 'handsfree'; sessionStart.hidden = interactionMode() === 'handsfree'; sessionStart.disabled = handsFree || !available() || !speechSupported() || interactionMode() !== 'handsfree'; }
     if (form) { input.disabled = !available(); send.disabled = !available(); }
     if (!available()) { entered = false; if (page) page.classList.remove('active'); }
     if (talk) talk.disabled = handsFree || !available() || !speechSupported() || Boolean(recognition);
+    if (spokenReplies) { spokenReplies.checked = interactionMode() === 'handsfree' ? true : spokenReplies.checked; spokenReplies.disabled = interactionMode() === 'handsfree'; }
   }
   function sessionInvalid() {
     invalidate(); invalidSession = identity(); syncSession();
@@ -461,11 +471,12 @@
       sessionStop = node('button', 'End session'); sessionStop.id = 'qlAssistantSessionStop';
       for (const b of [sessionStart, sessionStop]) { b.type = 'button'; b.className = 'btn btn-secondary'; }
       sessionStart.onclick = beginSession; sessionStop.onclick = () => pauseSession();
-      const spokenLabel = node('label', ' Spoken replies (experimental) ');
+      const spokenLabel = node('label', ' Clayton talks back ');
       spokenReplies = node('input'); spokenReplies.type = 'checkbox'; spokenReplies.id = 'qlAssistantSpokenReplies';
-      // Audio/recognition handoff is unreliable on some Safari versions. Opt in explicitly.
+      spokenReplies.checked = interactionMode() === 'handsfree';
+      spokenReplies.disabled = interactionMode() === 'handsfree';
       spokenLabel.prepend(spokenReplies);
-      spokenReplies.onchange = () => { if (handsFree) pauseSession('Reply preference changed. Start the session again.'); };
+      spokenReplies.onchange = () => { if (handsFree) pauseSession('Reply preference changed.'); };
       dockStatus = node('p'); dockStatus.id = 'qlAssistantSessionStatus'; dockStatus.setAttribute('role', 'status');
       dockCommand = node('p'); dockCommand.id = 'qlAssistantSessionCommand'; dockCommand.style.whiteSpace = 'pre-wrap'; dockCommand.setAttribute('aria-label', 'Live speech transcript');
       dockReply = node('p'); dockReply.id = 'qlAssistantSessionReply'; dockReply.setAttribute('role', 'status'); dockReply.setAttribute('aria-live', 'polite');
@@ -494,6 +505,7 @@
     if (select) select.value = mode;
     syncSession();
     voiceState(mode === 'manual' ? (speechSupported() ? 'Ready when you tap.' : 'Speech is unavailable in this browser. You can type your question.') : '');
+    if (mode === 'handsfree') autoStartHandsFree();
     return true;
   }
   const modeSelect = document.getElementById('profileAssistantMode');
@@ -509,14 +521,15 @@
   window.addEventListener('pagehide', () => { entered = false; invalidate(); });
   // A visible page can lose focus to browser controls/permission UI. Only actual
   // hiding, pagehide, navigation, or account changes cancel foreground speech.
-  window.addEventListener('pageshow', () => { syncSession(); if (available() && currentPage === 'qlAssistant') entered = true; });
+  window.addEventListener('pageshow', () => { syncSession(); if (available() && currentPage === 'qlAssistant') entered = true; autoStartHandsFree('Resuming Hands-Free Clayton…'); });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) invalidate();
     syncSession();
+    if (!document.hidden) autoStartHandsFree('Resuming Hands-Free Clayton…');
   });
   // Failed/missing configuration is OFF. No HTML entry exists until explicit opt-in.
   fetch(API + '/api/ql/assistant/config', {cache: 'no-store'})
     .then(r => r.ok ? r.json() : null)
-    .then(config => { if (config?.enabled === true) { enabled = true; voiceEnabled = config.voiceEnabled === true; handsFreeEnabled = voiceEnabled && config.handsFreeEnabled === true; mount(); } })
+    .then(config => { if (config?.enabled === true) { enabled = true; voiceEnabled = config.voiceEnabled === true; handsFreeEnabled = voiceEnabled && config.handsFreeEnabled === true; mount(); autoStartHandsFree(); } })
     .catch(() => {});
 })();
