@@ -60,13 +60,13 @@ const incompleteNote = text => /(?:\b(?:and|or|because|with|for|to|the|my|buy|ne
 function noteReplacement(text) {
   if(typeof text!=='string' || /[\x00-\x1f\x7f]/.test(text))return null;
   let n=commandWords(text);
-  n=n.replace(/^(?:(?:please|hey|okay|ok)\\s+)+/i,'')
-    .replace(/^(?:(?:can|could|would|will)\\s+you\\s+)/i,'')
-    .replace(/^i\\s+(?:need|want|would like)\\s+you\\s+to\\s+/i,'')
-    .replace(/\\s+(?:please|thanks|thank you)$/i,'').trim();
-  const reference='(?:(?:the|my|this|that)\\s+)?(?:(?:last|latest|previous|current|most recent)\\s+)?(?:studio\\s+)?note';
-  let m=n.match(new RegExp('^(?:change|replace)\\s+'+reference+'\\s+(.+?)\\s+(?:to|with)\\s+(.+)$','i'));
-  if(!m)m=n.match(new RegExp('^(?:on|in)\\s+'+reference+'[,]?\\s+(?:change|replace)\\s+(.+?)\\s+(?:to|with)\\s+(.+)$','i'));
+  n=n.replace(/^(?:(?:please|hey|okay|ok)\s+)+/i,'')
+    .replace(/^(?:(?:can|could|would|will)\s+you\s+)/i,'')
+    .replace(/^i\s+(?:need|want|would like)\s+you\s+to\s+/i,'')
+    .replace(/\s+(?:please|thanks|thank you)$/i,'').trim();
+  const reference='(?:(?:the|my|this|that)\s+)?(?:(?:last|latest|previous|current|most recent)\s+)?(?:studio\s+)?note';
+  let m=n.match(new RegExp('^(?:change|replace)\s+'+reference+'\s+(.+?)\s+(?:to|with)\s+(.+)$','i'));
+  if(!m)m=n.match(new RegExp('^(?:on|in)\s+'+reference+'[,]?\s+(?:change|replace)\s+(.+?)\s+(?:to|with)\s+(.+)$','i'));
   if(!m)m=n.match(/^(?:change|replace|correct|fix|update)\s+(.+?)\s+(?:to|with|so it says)\s+(.+)$/i);
   if(!m)return null;
   const from=m[1].trim().replace(/^(?:"([\s\S]*)"|“([\s\S]*)”)$/,(_,a,b)=>a ?? b);
@@ -91,12 +91,12 @@ function noteInsertion(text) {
 function noteAddition(text) {
   if(typeof text!=='string' || /[\x00-\x1f\x7f]/.test(text))return null;
   const words=commandWords(text).replace(/^(?:and\s+)?(?:also\s+)?/i,'');
-  const reference='(?:(?:the|my|this|that)\\s+)?(?:(?:last|latest|previous|current|most recent)\\s+)?(?:studio\\s+)?note(?:\\s+(?:I|we)\\s+(?:just\\s+)?saved)?';
-  const destinationFirst=new RegExp('^(?:add(?:\\s+in)?|append|include|mention)\\s+(?:to|in|into|on)\\s+'+reference+'[,:]?\\s+(.+)$','i');
+  const reference='(?:(?:the|my|this|that)\s+)?(?:(?:last|latest|previous|current|most recent)\s+)?(?:studio\s+)?note(?:\s+(?:I|we)\s+(?:just\s+)?saved)?';
+  const destinationFirst=new RegExp('^(?:add(?:\s+in)?|append|include|mention)\s+(?:to|in|into|on)\s+'+reference+'[,:]?\s+(.+)$','i');
   const m=words.match(destinationFirst) || words.match(/^(?:add(?:\s+in)?|append|include|mention)\s+(.+)$/i);
   if(!m)return null;
-  const suffix=new RegExp('\\s+(?:to|in|into|on)\\s+'+reference+'[.!?]*$','i');
-  const prefix=new RegExp('^(?:to|in|into|on)\\s+'+reference+'[,:]?\\s+','i');
+  const suffix=new RegExp('\s+(?:to|in|into|on)\s+'+reference+'[.!?]*$','i');
+  const prefix=new RegExp('^(?:to|in|into|on)\s+'+reference+'[,:]?\s+','i');
   // Parse destination separately from literal content, including destination-first
   // requests. A quoted payload is literal even if it mentions a note itself.
   let body=m[1].trim();
