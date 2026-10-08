@@ -48,6 +48,8 @@
   }
   function voiceReply(text) {
     if (!handsFree) return;
+    cancelVoice();
+    clearTimeout(restartTimer);
     dockReply.textContent = text;
     sessionState('responding', 'Response ready.');
     if (!spokenReplies.checked) { listenAgain('Ready for another command…'); return; }
@@ -155,6 +157,7 @@
   }
   function conciseSpeech(text) {
     const t=(text || '').trim();
+    if(/Did you mean “B-Mix clay”/.test(t))return 'Did you mean “B-Mix clay”? Say yes, or keep original words.';
     if(/^Saved your Studio Note:/i.test(t)) return 'Done. I saved the note.';
     if(/^Updated your Studio Note:/i.test(t)) return 'Done. I updated the note.';
     if(/^Updated note preview:/i.test(t)) return 'Got it. I updated the draft.';
@@ -162,6 +165,10 @@
     if(/^Opening\b/i.test(t)) return t.split(/[.!?]/)[0]+'.';
     if(/isn[’']t supported|not available through this assistant/i.test(t)) return 'I can’t do that yet.';
     return t.length>180 ? t.split(/(?<=[.!?])\s+/)[0] : t;
+  }
+  // Classification only: the server owns command interpretation and note text.
+  function isNoteControl(text) {
+    return /^(?:(?:hey|hi|okay|ok)[, ]+)?(?:clayton[, ]+)?(?:(?:can|could|would|will) you\s+)?(?:please\s+)?(?:save|safe draft|confirm|cancel|discard|edit|change|correct|replace|remove|delete|add|insert|i (?:said|meant)|no|yes|stop|shut up|on (?:the )?(?:live )?(?:note|draft)|in (?:the )?(?:note|draft))\b/i.test(text.trim());
   }
   function acceptSpeech(text, uncertain) {
     if (/^(stop listening|pause voice|end voice session|stop voice session)[.!?]?$/i.test(text)) { pauseSession(); return; }
@@ -180,7 +187,7 @@
   }
   function startVoice() {
     syncSession();
-    if (!voiceEnabled || !available() || !inVoiceContext() || document.hidden || recognition) return;
+    if (!voiceEnabled || !available() || !inVoiceContext() || document.hidden || recognition || utterance || (handsFree && pendingText)) return;
     if (!speechSupported()) { voiceState('Speech is unavailable in this browser. You can type your question.'); return; }
     // A new voice attempt supersedes any pending typed/voice answer.
     if (!handsFree) invalidate();
@@ -201,15 +208,7 @@
         cancelVoice('', !ended);
         if (handsFree && allowFinal && (finalText || draft)) {
           emptyAttempts = 0;
-          const heard=(finalText || draft).trim();
-          if(noteDictation && !/^(save note|save|done|cancel)$/i.test(heard)){
-            input.value=heard;
-            voiceState('Thinking pause - keep talking.');
-            setTimeout(()=>{ if(input.value===heard) acceptSpeech(heard,false); },5000);
-            listenAgain('Listening - take your time.');
-            return;
-          }
-          acceptSpeech(heard, !finalText || turn.uncertain || turn.timedOut);
+          acceptSpeech((finalText || draft).trim(), !finalText || turn.uncertain || turn.timedOut);
         } else if (allowFinal && finalText) {
           if (handsFree && /^(stop listening|pause voice|end voice session|stop voice session)[.!?]?$/i.test(finalText)) {
             pauseSession(); return;
@@ -246,7 +245,7 @@
           // replace it with only the final tail. When that tail is an exact
           // suffix of the same in-progress utterance, keep the longer transcript
           // instead of discarding the already-heard beginning/middle.
-          const compact = s => (s || '').trim().replace(/\\s+/g, ' ');
+          const compact = s => (s || '').trim().replace(/\s+/g, ' ');
           const priorCompact = compact(priorDraft), eventCompact = compact(eventText), previousCompact = compact(previous);
           const carriesPriorDraft = priorCompact.length > eventCompact.length &&
             priorCompact.toLowerCase().endsWith(eventCompact.toLowerCase()) &&
@@ -272,7 +271,7 @@
         if (dockCommand) dockCommand.textContent = 'Hearing: ' + text;
         // Some engines omit confidence or return zero as an unknown value.
         turn.uncertain = turn.uncertain || results.some(r => Number.isFinite(r?.[0]?.confidence) && r[0].confidence > 0 && r[0].confidence < 0.6);
-        if(noteDictation && notePreview && !/^(?:save(?: note)?|confirm(?: note)?|yes|no|cancel|stop listening)[.!?]?$/i.test(text)){notePreview.hidden=false;notePreviewText.textContent=text;}
+        if(noteDictation && notePreview && !isNoteControl(text)){notePreview.hidden=false;notePreviewText.textContent=text;}
         if (allFinal) {
           turn.finalText = turn.committedFinal;
           // A final segment is not the end of the utterance. Wait for onend

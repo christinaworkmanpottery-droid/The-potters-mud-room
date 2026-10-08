@@ -109,9 +109,26 @@ test('full website + actual HTTP + SQLite: hands-free Piece conversation and man
   assert.match(await say('Save'),/clarify the clay name first/);
   assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE body LIKE '%the mix clay%'").get().n,0);
   await say('Yes');assert.equal(el('qlAssistantNotePreviewText').textContent,'Make 50 soy sauce dishes in B-Mix clay fire at cone 05');
-  assert.match(spoken.at(-1),/B-Mix clay fire at cone 05/);
+  assert.equal(spoken.at(-1),'Got it. I have the draft.'); // Concise spoken response; full corrected text asserted above.
   await say('Save');await say('Add sapphire float glaze to last note');await say('Save');
   const savedBody='Make 50 soy sauce dishes in B-Mix clay fire at cone 05\nsapphire float glaze';
   assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a' AND body=?").get(savedBody).n,1);
+  // October 8 sequence crosses actual HTTP, browser context, canonical save and SQL.
+  await say('Clayton create a new note for me');
+  await say('I need to make 30 soy subs dishes in B mixed clay fire at cone six with Sapphire float blaze BMX');
+  await say('Edit draft');
+  await say('On the live note draft remove BMX');
+  await say('I said B-Mix clay');
+  await say('I meant soy sauce dishes');
+  await say('Correct that to cone 6');
+  await say('I said Sapphire Float glaze');
+  const recovered='I need to make 30 soy sauce dishes in B-Mix clay fire at cone 6 with Sapphire Float glaze';
+  assert.equal(el('qlAssistantNotePreviewText').textContent,recovered);
+  await say('Save draft');
+  const row=db.prepare("SELECT id,body FROM studio_notes WHERE user_id='a' AND body=?").get(recovered);assert.ok(row);
+  await say('Reopen my note');await say('Change 30 to 25');await say('Save draft');
+  assert.equal(db.prepare('SELECT body FROM studio_notes WHERE id=?').get(row.id).body,recovered.replace('30','25'));
+  await say('Edit my note');await say('Remove Sapphire Float glaze');await say('Cancel draft');
+  assert.equal(db.prepare('SELECT body FROM studio_notes WHERE id=?').get(row.id).body,recovered.replace('30','25'));
  } finally {await pause(50);dom?.window.close();await fixture.stop();}
 });

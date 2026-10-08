@@ -119,7 +119,7 @@ test('manual navigation during pending voice cancels stale action',async t=>{
 test('speech output waits for recognizer release and completion before listening',async t=>{
  const f=await fixture(t);let spoken,canceled=0;f.w.SpeechSynthesisUtterance=class {constructor(text){this.text=text;}};f.w.speechSynthesis={speak(s){spoken=s;},cancel(){canceled++;}};
  f.el('qlAssistantSpokenReplies').checked=true;start(f);f.engines[0].result('last firing');f.reply();await tick();assert.ok(spoken);assert.equal(f.engines.length,1);spoken.onstart();assert.equal(state(f),'speaking');spoken.onend();restart(f);assert.equal(f.engines.length,2);
- f.engines[1].result('last firing');f.reply(1);await tick();const late=spoken.onend;f.el('qlAssistantSessionStop').click();late();assert.equal(canceled,1);assert.equal(f.engines.length,2);
+ f.engines[1].result('last firing');f.reply(1);await tick();const late=spoken.onend;f.el('qlAssistantSessionStop').click();late();assert.equal(canceled,2,'activation primer plus session shutdown');assert.equal(f.engines.length,2);
 });
 for(const mode of ['missing','error','watchdog']) test('audio fallback '+mode,async t=>{
  const f=await fixture(t);let spoken;if(mode!=='missing'){f.w.SpeechSynthesisUtterance=class {};f.w.speechSynthesis={speak(s){spoken=s;},cancel(){}};}
@@ -331,7 +331,7 @@ test('Safari spoken reply resumes microphone when synthesis onend is missing',as
  assert.ok(spoken);assert.equal(f.engines.length,1);
  let probe=f.timers.get(250);probe();assert.equal(f.engines.length,1,'microphone stays off while synthesis reports speaking');
  synth.speaking=false;probe=f.timers.get(250);probe();
- assert.equal(canceled,1,'stale Safari synthesis session is explicitly released');
+ assert.equal(canceled,2,'activation primer plus stale Safari synthesis release');
  restart(f);assert.equal(f.engines.length,2,'hands-free recognition resumes without SpeechSynthesisUtterance.onend');
  f.engines[1].result('I need to buy sapphire float glaze and make 30 soy sauce dishes in B-Mix clay');
  assert.equal(f.pending.length,2,'second utterance is accepted after spoken prompt handoff');
@@ -358,4 +358,30 @@ test('pagehide requires a fresh foreground activation',async t=>{
  f.w.dispatchEvent(new f.w.Event('pageshow'));await tick();
  const auto=f.timers.get(650);if(typeof auto==='function')auto();await tick();
  assert.equal(f.engines.length,1);assert.equal(state(f),'ready');assert.equal(f.el('qlAssistantSessionStart').textContent,'Activate Clayton');
+});
+
+// October 8 recovery: exercise stale callback races, not only parser strings.
+test('Oct8 draft submission owns turn until spoken reply finishes; own voice and queued restart cannot enter dictation',async t=>{
+ const f=await fixture(t);let spoken;
+ f.w.SpeechSynthesisUtterance=class{constructor(text){this.text=text;}};
+ f.w.speechSynthesis={speaking:false,pending:false,speak(s){spoken=s;},cancel(){}};
+ f.el('qlAssistantSpokenReplies').checked=true;start(f);
+ f.engines[0].result('New note');f.reply(0,'What should the note say?',{result:{tool:'studio.note',status:'collecting'},context:{token:'a'.repeat(48)}});await tick();spoken.onend();const oldRestart=f.timers.get(650);oldRestart();
+ const engine=f.engines[1],late=engine.onresult;
+ engine.result('I need to make 30 soy sauce dishes');assert.equal(f.pending.length,2,'no unmanaged five-second submission');
+ oldRestart();assert.equal(f.engines.length,2,'pending HTTP cannot open microphone');
+ f.reply(1,'Draft studio note: “I need to make 30 soy sauce dishes”.',{result:{tool:'studio.note',status:'draft',draftText:'I need to make 30 soy sauce dishes'},context:{token:'b'.repeat(48)}});await tick();
+ oldRestart();late({results:[{isFinal:true,0:{transcript:'Got it. I have the draft.'}}]});
+ assert.equal(f.engines.length,2);assert.equal(f.pending.length,2,'late recognized speaker output is inert');
+ spoken.onend();restart(f);assert.equal(f.engines.length,3);
+ f.engines[2].result('Save draft');assert.equal(f.pending[2].body.input.text,'Save draft');
+});
+test('Oct8 cancel and edit interim commands never overwrite live draft preview',async t=>{
+ const f=await fixture(t);start(f);f.engines[0].result('New note');f.reply(0,'Draft',{result:{tool:'studio.note',status:'draft',draftText:'Buy clay'},context:{token:'a'.repeat(48)}});await tick();restart(f);
+ for(const command of ['Cancel draft','Edit draft','On the live note draft remove BMX','I said B-Mix clay']){f.engines[1].result(command,false);assert.equal(f.el('qlAssistantNotePreviewText').textContent,'Buy clay');}
+ assert.equal(f.pending.length,1);
+});
+test('Oct8 low-confidence and interim-only note text never bypass transcript review',async t=>{
+ const f=await fixture(t);start(f);f.engines[0].result('New note');f.reply(0,'Text?',{result:{tool:'studio.note',status:'collecting'},context:{token:'a'.repeat(48)}});await tick();restart(f);
+ f.engines[1].onresult({results:[{isFinal:true,0:{transcript:'BMX cone use',confidence:.2}}]});f.engines[1].onend();assert.equal(f.pending.length,1);assert.match(f.el('qlAssistantSessionReply').textContent,/misheard/);
 });

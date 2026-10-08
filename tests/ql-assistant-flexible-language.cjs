@@ -58,15 +58,16 @@ test('two requested facts clarify and keep the selected Piece',async()=>{
  let r=await ask('Open the blue bowl');r=await ask('Tell me its glaze and when it was fired',r.context);
  assert.equal(r.result.status,'clarification');r=await ask('glazes',r.context);assert.deepEqual(r.result.glazes,['Sapphire']);
 });
-test('uncertain write preserves exact request and note draft, never changes data',async()=>{
+test('active note state resolves additions without mutating a Piece',async()=>{
  const before=db.prepare('SELECT * FROM piece_glazes').all();
  let r=await ask('New note Make 25 dishes with B-Mix clay');
- r=await ask('Add sapphire to that',r.context);assert.match(r.response.text,/current note/);assert.equal(r.result.draftText,'Make 25 dishes with B-Mix clay');
+ r=await ask('Add sapphire to that',r.context);
+ assert.equal(r.result.draftText,'Make 25 dishes with B-Mix clay\nsapphire');
  const noteCount=db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n;
- r=await ask('Save note',r.context);assert.match(r.response.text,/clarify the revised note/);assert.equal(db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n,noteCount);
- r=await ask('the note',r.context);assert.match(r.response.text,/Add sapphire to that/);assert.equal(r.result.draftText,'Make 25 dishes with B-Mix clay');
- r=await ask('Replace note with Make 25 dishes with B-Mix clay and sapphire glaze',r.context);
- r=await ask('Save note',r.context);assert.equal(r.result.status,'saved');assert.deepEqual(db.prepare('SELECT * FROM piece_glazes').all(),before);
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n,noteCount);
+ r=await ask('Save note',r.context);assert.equal(r.result.status,'saved');
+ assert.equal(db.prepare('SELECT COUNT(*) n FROM studio_notes').get().n,noteCount+1);
+ assert.deepEqual(db.prepare('SELECT * FROM piece_glazes').all(),before);
 });
 test('write reference uses a clear Piece context and clarifies when no target is known',async()=>{
  let r=await ask('Add sapphire to that');assert.match(r.response.text,/Studio Note or a Piece/);
