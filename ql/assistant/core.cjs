@@ -125,7 +125,7 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
       const context = request.context ? contexts.read(request.context.token,userId) : null;
       const activeDraft=notes.wantsText(userId,context);
       const noteFocused=activeDraft || notes.canAmend(userId,context);
-      const editOperation=!input.command && noteFocused ? noteEdit(input.text) : null;
+      const editOperation=!input.command && noteFocused ? notes.pendingEdit(userId,context,input.text) || noteEdit(input.text) : null;
       const fragmentChoice=!editOperation && !input.command ? notes.fragmentChoice(userId,context,input.text) : null;
       const fullDraftReplacement=!fragmentChoice && !input.command && activeDraft && /^(?:replace (?:the )?note with|change (?:the )?note to)\s+/i.test(input.text || '') ? noteBody(input.text) : null;
       const replacement=!fragmentChoice && !fullDraftReplacement && !input.command && noteFocused ? noteReplacement(input.text) : null;

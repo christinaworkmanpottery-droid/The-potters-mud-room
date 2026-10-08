@@ -71,6 +71,19 @@ test('recovery: real note phrases through speech events, HTTP, displayed content
   await say('Add sapphire float glaze to last note');await say('Save note');
   assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,total);
   assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a' AND body=?").get('Make 25 soy sauce dishes in B-Mix clay\nsapphire float glaze').n,1);
+  // October 8 acceptance: real client speech -> HTTP -> saved-row editing,
+  // with spoken acknowledgement and listening resumed by say() after each turn.
+  const before='I need to make three ring dishes in B-Mix clay, fired to cone 6, using Sapphire Float.';
+  const after=before.replace('I need to make','I made');
+  await say('New note '+before.replace('B-Mix','BMX'));
+  assert.match(el('qlAssistantResponse').textContent,/Did you mean “B-Mix clay”/);
+  await say('yes');await say('Save note');
+  const noteId=db.prepare('SELECT id FROM studio_notes WHERE user_id=? AND body=?').get('a',before).id;
+  await say('Remove I need to make and put I made instead');
+  assert.equal(el('qlAssistantNotePreviewText').textContent,after);
+  assert.match(await say('Save note'),/Updated your Studio Note/);
+  assert.equal(db.prepare('SELECT body FROM studio_notes WHERE id=?').get(noteId).body,after);
+  assert.equal(spoken.at(-1),'Done. I updated the note.','saved edit confirmed aloud');
   assert.match(await say('When was my last firing?'),/2026-10-01/);
   assert.ok(engines.length>30,'one activation supports all turns');
  } finally {await pause(50);dom?.window.close();await fixture.stop();}

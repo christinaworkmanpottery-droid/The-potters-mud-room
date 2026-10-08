@@ -69,10 +69,13 @@ function noteReplacement(text) {
   if(typeof text!=='string' || /[\x00-\x1f\x7f]/.test(text))return null;
   const n=conversationalCommand(text);
   const reference='(?:(?:the|my|this|that)\\s+)?(?:(?:last|latest|previous|current|most recent)\\s+)?(?:studio\\s+)?note';
-  let m=n.match(new RegExp('^(?:change|replace)\\s+'+reference+'\\s+(.+?)\\s+(?:to|with)\\s+(.+)$','i'));
+  let m=n.match(/^(?:remove|delete|take out)\s+(.+?)\s+and\s+(?:put|say|use|replace (?:it|that) with)\s+(.+?)(?:\s+instead)?$/i) || n.match(/^instead of\s+(.+?),?\s+(?:say|put|use)\s+(.+)$/i);
+  if(!m)m=n.match(new RegExp('^(?:change|replace)\\s+'+reference+'\\s+(.+?)\\s+(?:to|with)\\s+(.+)$','i'));
   if(!m)m=n.match(new RegExp('^(?:on|in)\\s+'+reference+'[,]?\\s+(?:change|replace)\\s+(.+?)\\s+(?:to|with)\\s+(.+)$','i'));
+  if(!m)m=n.match(/^(?:change|replace|correct|fix|update)\s+(I (?:need|want|plan|have) to [\p{L}]+)\s+(?:to|with|so it says)\s+(.+)$/iu);
   if(!m)m=n.match(/^(?:change|replace|correct|fix|update)\s+(.+?)\s+(?:to|with|so it says)\s+(.+)$/i);
   if(!m)return null;
+  m[1]=m[1].replace(/,$/,'');
   const from=m[1].trim().replace(/^(?:"([\s\S]*)"|“([\s\S]*)”)$/,(_,x,y)=>x ?? y);
   const to=m[2].trim().replace(/^(?:"([\s\S]*)"|“([\s\S]*)”)$/,(_,x,y)=>x ?? y);
   if(!from || !to || from.length>200 || to.length>200)return null;
@@ -117,11 +120,15 @@ function noteEdit(text) {
   if(new RegExp('^(?:edit|change|update|correct|fix|reopen|open|show(?: me)?)\\s+'+noteReference+'$','i').test(n))return {kind:'review'};
   const full=n.match(new RegExp('^(?:replace|change|rewrite)\\s+'+noteReference+'\\s+(?:with|to|so it says)\\s+(.+)$','i'));
   if(full)return {kind:'full',body:full[1]+(text.trim().match(/[.!?]+$/)?.[0] || '')};
+  const beginning=n.match(/^(?:change|replace|update)\s+(?:the\s+)?(?:beginning|start|opening)(?: of (?:the |my )?note)?\s+(?:to|with|so it says)\s+(.+)$/i);
+  if(beginning)return {kind:'beginning',to:beginning[1]};
+  if(/^(?:remove|delete|take out|instead of)\b/i.test(n) && noteReplacement(text))return null;
   const remove=n.match(/^(?:remove|delete|take out)\s+(.+)$/i);
   if(remove)return {kind:'remove',from:remove[1].replace(new RegExp('\\s+from\\s+'+noteReference+'$','i'),'').replace(/^["“]|["”]$/g,'')};
   const correction=n.match(/^(?:no[, ]+)?(?:i said|i meant|it should (?:say|be)|correct that to)\s+(.+)$/i);
   if(correction)return {kind:'correction',body:correction[1]};
   if(noteReplacement(text))return null;
+  if(/^(?:instead of|change|replace|remove|delete|take out)\b/i.test(n))return {kind:'clarify'};
   if(/^(?:safe draft|shut up|stop talking|stop speaking|(?:i said|i meant|correct|fix|edit)\b.*)$/i.test(n))return {kind:'clarify'};
   return null;
 }
@@ -139,6 +146,16 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
   const reply=(text,status,state={})=>({result:{tool:'studio.note',status},response:{text},state});
   return {
     clear,
+    pendingEdit(userId,state,text){
+      prune();
+      const holder=state?.noteDraftId && drafts.get(userId)?.id===state.noteDraftId ? drafts.get(userId) : saved.get(userId)?.ref===state?.savedNoteRef ? saved.get(userId) : null;
+      if(!holder?.pendingEdit)return null;
+      if(/^(?:yes|yes please|that's right|that is right|correct)$/i.test(commandWords(text))){
+        const operation=holder.pendingEdit;delete holder.pendingEdit;return operation;
+      }
+      delete holder.pendingEdit;
+      return null;
+    },
     edit(userId,state,operation){
       prune();
       const d=drafts.get(userId)?.id===state?.noteDraftId ? drafts.get(userId) : null;
@@ -155,6 +172,17 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
         if(body)r.result.draftText=body;
         return r;
       };
+      if(operation.expectedBody && operation.expectedBody!==body)return clarify('That note changed. Please repeat the correction.');
+      const propose=(from,to)=>{
+        (d || target).pendingEdit={kind:'replace',from,to,expectedBody:body};
+        return clarify('Replace “'+from+'” with “'+to+'”?');
+      };
+      if(operation.kind==='beginning'){
+        // Bound the opening to a recognizable planning phrase; never guess how
+        // much of an arbitrary sentence the speaker wants removed.
+        const opening=body.match(/^I (?:need|want|plan|have) to [\p{L}]+\b/iu)?.[0];
+        return opening ? propose(opening,operation.to) : clarify('Which opening words should I replace with “'+operation.to+'”?');
+      }
       if(operation.kind==='review'){
         if(!body)return clarify('What should the note say?');
         const r=this.draft(userId,body,{target,reviewMaterial:false});
@@ -178,6 +206,18 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
       const escaped=from.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
       const pattern=new RegExp('(?<![\\p{L}\\p{N}])'+escaped+'(?![\\p{L}\\p{N}])','giu');
       const matches=[...body.matchAll(pattern)];
+      if(matches.length===0 && operation.kind==='replace'){
+        const words=from.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+        const tokens=[...body.matchAll(/[\p{L}\p{N}]+/gu)];
+        const candidates=[];
+        // A single misheard word in a multi-word target is a proposal only.
+        if(words.length>=3)for(let i=0;i<=tokens.length-words.length;i++){
+          let differences=0;
+          for(let j=0;j<words.length;j++)if(tokens[i+j][0].toLowerCase()!==words[j])differences++;
+          if(differences<=1)candidates.push(body.slice(tokens[i].index,tokens[i+words.length-1].index+tokens[i+words.length-1][0].length));
+        }
+        if(candidates.length===1)return propose(candidates[0],to);
+      }
       if(matches.length!==1)return clarify(matches.length?'Those words occur more than once. Which occurrence?':'I could not find “'+from+'”. Which words should I change?');
       const revised=body.replace(pattern,()=>to).replace(/ {2,}/g,' ').trim();
       if(!revised)return clarify('Removing that would empty the note. Would you like to cancel the draft?');

@@ -40,3 +40,45 @@ test('ambiguous or nonpottery corrections never guess, repeated text and foreign
  r=await f.ask('Replace draft with Remind Glenn to buy oat milk',r.context);r=await f.ask('Save draft',r.context);const original=f.rows()[0].body;await assert.rejects(f.ask('Remove Glenn',r.context,'b'));assert.equal(f.rows()[0].body,original);
  r=await f.ask('Change oat milk to tea',r.context);f.db.prepare('UPDATE studio_notes SET body=?').run('Manual update');r=await f.ask('Save draft',r.context);assert.equal(r.result.status,'failed');assert.equal(f.rows()[0].body,'Manual update');
 });
+
+const acceptedBody='I need to make three ring dishes in B-Mix clay, fired to cone 6, using Sapphire Float.';
+const editedBody=acceptedBody.replace('I need to make','I made');
+for(const saved of [false,true])for(const phrase of [
+ 'Remove I need to make and put I made instead',
+ 'Instead of I need to make, say I made',
+ 'Change I need to make to I made',
+ 'Change the beginning to I made',
+ 'Remove I knead to make and put I made instead'
+])test('Oct8 conversational replacement '+(saved?'saved: ':'draft: ')+phrase,async t=>{
+ const f=fixture(t);let r=await f.ask('New note '+acceptedBody.replace('B-Mix','BMX'));
+ assert.equal(r.result.status,'material-review');r=await f.ask('yes',r.context);
+ assert.equal(r.result.draftText,acceptedBody);
+ let id;if(saved){r=await f.ask('Save note',r.context);id=r.result.noteId;}
+ r=await f.ask(phrase,r.context);
+ if(/beginning|knead/.test(phrase)){
+  assert.match(r.response.text,/Replace “I need to make” with “I made”/);
+  assert.equal(r.result.draftText,acceptedBody);r=await f.ask('Yes',r.context);
+ }
+ assert.equal(r.result.draftText,editedBody);
+ assert.equal(f.rows().length,saved?1:0);
+ if(saved)assert.equal(f.rows()[0].body,acceptedBody);
+ r=await f.ask('Save draft',r.context);assert.equal(r.result.status,'saved');
+ assert.equal(f.rows().length,1);assert.equal(f.rows()[0].body,editedBody);
+ if(saved)assert.equal(r.result.noteId,id);
+ assert.match(r.response.text,/I made three ring dishes/);
+});
+test('ambiguous, repeated and incomplete replacement commands preserve note and are never dictation',async t=>{
+ const f=fixture(t);const body='I need to make bowls. I need to make plates.';
+ let r=await f.ask('New note '+body);
+ for(const phrase of ['Remove I need to make and put I made instead','Instead of I need to make','Change the start to I made']){
+  r=await f.ask(phrase,r.context);assert.equal(r.result.draftText,body);
+ }
+ r=await f.ask('yes',r.context);assert.equal(r.result.draftText,body);assert.equal(f.rows().length,0);
+});
+test('rejecting an inferred edit cancels without persisting or swallowing a later new command',async t=>{
+ const f=fixture(t);let r=await f.ask('New note '+acceptedBody);r=await f.ask('Save note',r.context);
+ r=await f.ask('Change the beginning to I made',r.context);r=await f.ask('no',r.context);
+ assert.equal(f.rows()[0].body,acceptedBody);
+ r=await f.ask('New note Call Glenn tomorrow',r.context);r=await f.ask('Save note',r.context);
+ assert.equal(f.rows().length,2);
+});
