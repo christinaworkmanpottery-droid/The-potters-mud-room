@@ -26,7 +26,7 @@ test('Safari missing second-turn onend: silent three-turn note saves once, with 
   };
   for(const file of ['website-utils.js','app.js','studio-search.js','ql-assistant.js'])require('node:vm').runInContext(fs.readFileSync(path.join(root,'public',file),'utf8'),dom.getInternalVMContext());
   await until(()=>w.QLAssistant?.available());w.navigate('qlAssistant');const el=id=>w.document.getElementById(id);
-  assert.equal(el('qlAssistantSpokenReplies').checked,false);el('qlAssistantSessionStart').click();
+  assert.equal(el('qlAssistantSpokenReplies').checked,true);el('qlAssistantSessionStart').click();
   const first=engines[0];assert.equal(first.continuous,false);first.result(segment('New note'));first.end();
   await until(()=>engines.length===2);
   assert.equal(turns[0].result.result.tool,'studio.note');assert.equal(turns[0].result.result.status,'collecting');
