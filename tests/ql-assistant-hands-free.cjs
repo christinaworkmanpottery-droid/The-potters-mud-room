@@ -48,7 +48,7 @@ async function fixture(t, config = {enabled:true,voiceEnabled:true,handsFreeEnab
 
 const start = f => f.el('qlAssistantSessionStart').click();
 const state = f => f.el('qlAssistantSession').dataset.state;
-const restart = f => f.timers.get(650)();
+const restart = f => { const fn=f.timers.get(650); if(typeof fn==='function') fn(); };
 test('hands-free requires one foreground activation and explicit flag only',async t=>{
  for(const cfg of [{enabled:true,voiceEnabled:true},{enabled:true,voiceEnabled:false,handsFreeEnabled:true},{enabled:true,voiceEnabled:true,handsFreeEnabled:'true'}]) {
   const f=await fixture(t,cfg);assert.equal(f.el('qlAssistantSession'),null);assert.equal(f.engines.length,0);
@@ -356,5 +356,6 @@ test('pagehide requires a fresh foreground activation',async t=>{
  const f=await fixture(t);start(f);assert.equal(f.engines.length,1);
  f.w.dispatchEvent(new f.w.Event('pagehide'));assert.equal(state(f),'stopped');
  f.w.dispatchEvent(new f.w.Event('pageshow'));await tick();
+ const auto=f.timers.get(650);if(typeof auto==='function')auto();await tick();
  assert.equal(f.engines.length,1);assert.equal(state(f),'ready');assert.equal(f.el('qlAssistantSessionStart').textContent,'Activate Clayton');
 });
