@@ -72,13 +72,17 @@ function noteReplacement(text) {
 }
 function noteInsertion(text) {
   if(typeof text!=='string' || /[\x00-\x1f\x7f]/.test(text))return null;
-  const n=commandWords(text);
-  const m=n.match(/^(?:add|insert|put)\s+(.+?)\s+(before|after)\s+(.+)$/i);
+  let n=commandWords(text);
+  n=n.replace(/^(?:(?:please|hey|okay|ok)\s+)+/i,'')
+    .replace(/^(?:(?:can|could|would|will)\s+you\s+)/i,'')
+    .replace(/^i\s+(?:need|want|would like)\s+you\s+to\s+/i,'')
+    .replace(/\s+(?:please|thanks|thank you)$/i,'').trim();
+  const m=n.match(/^(?:add|insert|put|place|include)\s+(.+?)\s+(before|after|in front of|following)\s+(.+)$/i);
   if(!m)return null;
   const body=m[1].trim().replace(/^(?:\"([\s\S]*)\"|“([\s\S]*)”)$/,(_,a,b)=>a ?? b);
   const anchor=m[3].trim().replace(/^(?:\"([\s\S]*)\"|“([\s\S]*)”)$/,(_,a,b)=>a ?? b);
   if(!body || !anchor || body.length>200 || anchor.length>200)return null;
-  return {body,position:m[2].toLowerCase(),anchor};
+  return {body,position:/^(?:before|in front of)$/i.test(m[2])?'before':'after',anchor};
 }
 function noteAddition(text) {
   if(typeof text!=='string' || /[\x00-\x1f\x7f]/.test(text))return null;
