@@ -70,6 +70,16 @@ function noteReplacement(text) {
   if(!from || !to || from.length>200 || to.length>200)return null;
   return {from,to};
 }
+function noteInsertion(text) {
+  if(typeof text!=='string' || /[\x00-\x1f\x7f]/.test(text))return null;
+  const n=commandWords(text);
+  const m=n.match(/^(?:add|insert|put)\s+(.+?)\s+(before|after)\s+(.+)$/i);
+  if(!m)return null;
+  const body=m[1].trim().replace(/^(?:\"([\s\S]*)\"|“([\s\S]*)”)$/,(_,a,b)=>a ?? b);
+  const anchor=m[3].trim().replace(/^(?:\"([\s\S]*)\"|“([\s\S]*)”)$/,(_,a,b)=>a ?? b);
+  if(!body || !anchor || body.length>200 || anchor.length>200)return null;
+  return {body,position:m[2].toLowerCase(),anchor};
+}
 function noteAddition(text) {
   if(typeof text!=='string' || /[\x00-\x1f\x7f]/.test(text))return null;
   const words=commandWords(text).replace(/^(?:and\s+)?(?:also\s+)?/i,'');
@@ -118,6 +128,29 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
       if(matches.length>1)return reply('I found “'+needle+'” more than once. Please tell me which occurrence you mean. Nothing changed.','clarification',state);
       const body=current.body.replace(new RegExp(escaped,'i'),next);
       return this.draft(userId,body,{target});
+    },
+    insert(userId,state,insertion){
+      prune();
+      const d=drafts.get(userId);
+      const savedTarget=saved.get(userId)?.ref===state?.savedNoteRef ? saved.get(userId) : null;
+      const target=d && d.id===state?.noteDraftId ? d.target : savedTarget;
+      let body=d && d.id===state?.noteDraftId && d.body ? d.body : null;
+      if(!body && savedTarget){
+        const current=db.prepare('SELECT body FROM studio_notes WHERE id=? AND user_id=?').get(savedTarget.noteId,userId);
+        if(!current || current.body!==savedTarget.originalBody){clear(userId);return reply('That note changed or is no longer available. Please open it to review the latest text. Nothing changed.','clarification');}
+        body=current.body;
+      }
+      if(!body)return reply('Which note should I change? I do not have a current note in this conversation. Nothing changed.','clarification');
+      const needle=insertion?.anchor || '', addition=insertion?.body || '';
+      if(!needle || !addition || !['before','after'].includes(insertion?.position))
+        return reply('Please tell me what words to add and where they belong. Nothing changed.','clarification',state);
+      const escaped=needle.replace(/[.*+?^${}()|[\]\\]/g,'\\    amend(userId,state,addition){');
+      const matches=body.match(new RegExp(escaped,'gi')) || [];
+      if(matches.length===0)return reply('I could not find “'+needle+'” in that note. Please say the exact nearby words. Nothing changed.','clarification',state);
+      if(matches.length>1)return reply('I found “'+needle+'” more than once. Please tell me which occurrence you mean. Nothing changed.','clarification',state);
+      const replacement=insertion.position==='before' ? addition+' '+matches[0] : matches[0]+' '+addition;
+      const revised=body.replace(new RegExp(escaped,'i'),replacement);
+      return this.draft(userId,revised,{target});
     },
     amend(userId,state,addition){
       prune();
@@ -230,4 +263,4 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
     }
   };
 }
-module.exports={noteAddition,noteReplacement,dictationBody,materialChoice,noteStart,isNoteText,noteBody,confirmation,cancellation,unclearNoteCommand,createNoteDrafts};
+module.exports={noteAddition,noteReplacement,noteInsertion,dictationBody,materialChoice,noteStart,isNoteText,noteBody,confirmation,cancellation,unclearNoteCommand,createNoteDrafts};
