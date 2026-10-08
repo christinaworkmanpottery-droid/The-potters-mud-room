@@ -123,3 +123,17 @@ test('positional insertion fails closed for missing or repeated anchor',async t=
  x=await f.ask('Add 30 before red clay',x.context);assert.equal(x.result.status,'clarification');assert.match(x.response.text,/more than once/);
  assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,'red clay and red clay');
 });
+
+
+for(const words of [
+ 'Put 30 in front of soy sauce dishes',
+ 'Please insert 30 before soy sauce dishes',
+ 'Could you place 30 before soy sauce dishes please',
+ 'I need you to include 30 before soy sauce dishes',
+ 'Add 30 before soy sauce dishes thanks'
+]) test('positional edit accepts conversational wording: '+words,async t=>{
+ const f=fixture(t);let r=await f.ask('New note Soy sauce dishes in B mix clay');r=await f.ask('Save note',r.context);
+ const preview=await f.ask(words,r.context);
+ assert.equal(preview.result.status,'draft');
+ assert.equal(preview.result.draftText,'30 Soy sauce dishes in B mix clay');
+});
