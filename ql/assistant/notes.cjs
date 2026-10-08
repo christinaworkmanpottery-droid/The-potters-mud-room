@@ -220,7 +220,8 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
     },
     revise(userId,state,body){
       const d=drafts.get(userId);
-      return this.draft(userId,body,{target:d && d.id===state?.noteDraftId ? d.target : null});
+      const target=d && d.id===state?.noteDraftId ? d.target : saved.get(userId)?.ref===state?.savedNoteRef ? saved.get(userId) : null;
+      return this.draft(userId,body,{target});
     },
     begin(userId,topic){
       prune();clear(userId);while(drafts.size>=max)drafts.delete(drafts.keys().next().value);
