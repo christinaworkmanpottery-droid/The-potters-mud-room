@@ -2920,7 +2920,7 @@
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" onclick="closeModal('photoModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary" id="photoSubmitBtn" disabled>Upload Photo</button>
+        <div id="photoUploadStatus" role="status" aria-live="polite" style="padding:8px;color:#a32b20;font-weight:600"></div><button type="submit" class="btn btn-primary" id="photoSubmitBtn" disabled>Upload Photo</button>
       </div>
     </form>
   </div>
@@ -3353,7 +3353,7 @@
 </div>
 
 <script src="/website-utils.js?v=20260925b"></script>
-<script src="/app.js?v=20261008-safari-photo"></script>
+<script src="/app.js?v=20261008-photo-upload3"></script>
 
   <!-- Studio Note Modal -->
   <div id="studioNoteModal" class="modal-overlay" onclick="if(event.target===this)closeModal('studioNoteModal')">
