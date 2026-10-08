@@ -223,7 +223,11 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
       return reply('What would you like the note to say'+(topic?' about '+topic:'')+'? Speak the note text next, or say “cancel”. Nothing has been saved.','collecting',{noteDraftId:id});
     },
     draft(userId,body,{reviewMaterial=true,target=null}={}){
-      prune();clear(userId);
+      prune();
+      // A preview of an edit to the just-saved note must keep the saved target
+      // alive until explicit Save/Cancel. Starting an unrelated new draft still
+      // clears that focus through begin()/the caller's normal lifecycle.
+      drafts.delete(userId);
       while(drafts.size>=max)drafts.delete(drafts.keys().next().value);
       const id=randomBytes(24).toString('hex');
       const uncertainClay=/\b(?:bmx|the\s+mix|bee\s+mix)(?=\s+clay\b)/gi;
