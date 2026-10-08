@@ -52,7 +52,8 @@
     sessionState('responding', 'Response ready.');
     if (!spokenReplies.checked) { listenAgain('Ready for another command…'); return; }
     if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
-      pauseSession('Spoken replies are unavailable. Turn off spoken replies and restart for text responses.', 'unavailable'); return;
+      dockReply.textContent = text;
+      listenAgain('Spoken audio is unavailable on this device. Clayton will keep listening and show replies on screen.'); return;
     }
     const own = voiceEpoch, synth = window.speechSynthesis;
     const speech = new window.SpeechSynthesisUtterance(text.slice(0, 600)); utterance = speech;
@@ -85,8 +86,8 @@
     };
     speech.onstart = () => { if (active()) { observedSpeaking = true; quietChecks = 0; sessionState('speaking', 'Speaking — microphone is off.'); } };
     speech.onend = () => completeSpeech(false);
-    speech.onerror = () => { if (active()) pauseSession('Audio could not play. Turn off spoken replies and restart the session.', 'unavailable'); };
-    speechTimer = setTimeout(() => { if (active()) pauseSession('Audio did not finish. Turn off spoken replies and restart the session.', 'unavailable'); }, 30000);
+    speech.onerror = () => { if (active()) { utterance = null; listenAgain('Audio could not play. Clayton will keep listening and show replies on screen.'); } };
+    speechTimer = setTimeout(() => { if (active()) { try { synth.cancel(); } catch (_) {} utterance = null; listenAgain('Audio did not finish. Clayton will keep listening and show replies on screen.'); } }, 30000);
     speechProbeTimer = setTimeout(probeSpeech, 250);
     try { synth.speak(speech); } catch (_) { speech.onerror(); }
   }
