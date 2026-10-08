@@ -201,7 +201,15 @@
         cancelVoice('', !ended);
         if (handsFree && allowFinal && (finalText || draft)) {
           emptyAttempts = 0;
-          acceptSpeech(finalText || draft, !finalText || turn.uncertain || turn.timedOut);
+          const heard=(finalText || draft).trim();
+          if(noteDictation && !/^(save note|save|done|cancel)$/i.test(heard)){
+            input.value=heard;
+            voiceState('Thinking pause - keep talking.');
+            setTimeout(()=>{ if(input.value===heard) acceptSpeech(heard,false); },5000);
+            listenAgain('Listening - take your time.');
+            return;
+          }
+          acceptSpeech(heard, !finalText || turn.uncertain || turn.timedOut);
         } else if (allowFinal && finalText) {
           if (handsFree && /^(stop listening|pause voice|end voice session|stop voice session)[.!?]?$/i.test(finalText)) {
             pauseSession(); return;
