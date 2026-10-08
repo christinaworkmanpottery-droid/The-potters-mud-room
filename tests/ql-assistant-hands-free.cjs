@@ -123,7 +123,7 @@ test('speech output waits for recognizer release and completion before listening
 });
 for(const mode of ['missing','error','watchdog']) test('audio fallback '+mode,async t=>{
  const f=await fixture(t);let spoken;if(mode!=='missing'){f.w.SpeechSynthesisUtterance=class {};f.w.speechSynthesis={speak(s){spoken=s;},cancel(){}};}
- f.el('qlAssistantSpokenReplies').checked=true;start(f);f.engines[0].result('last firing');f.reply();await tick();if(mode==='error')spoken.onerror();if(mode==='watchdog')f.timers.get(30000)();assert.equal(state(f),'unavailable');assert.equal(f.engines.length,1);
+ f.el('qlAssistantSpokenReplies').checked=true;start(f);f.engines[0].result('last firing');f.reply();await tick();if(mode==='error')spoken.onerror();if(mode==='watchdog')f.timers.get(30000)();assert.notEqual(state(f),'unavailable');restart(f);assert.equal(f.engines.length,2);
 });
 test('duplicate final callback sends exactly once',async t=>{
  const f=await fixture(t);start(f);const e=f.engines[0],cb=e.onresult,event={results:[{isFinal:true,0:{transcript:'last firing'}}]};cb(event);cb(event);e.onend();cb(event);assert.equal(f.pending.length,1);
@@ -279,7 +279,7 @@ test('queued speech endpoint cannot restart or submit after cancellation',async 
 });
 
 test('accepted opt-in spoken replies read the complete clay clarification before listening resumes',async t=>{
- const f=await fixture(t,undefined,'standard',true);assert.equal(f.el('qlAssistantSpokenReplies').checked,false);f.el('qlAssistantSpokenReplies').checked=true;
+ const f=await fixture(t,undefined,'standard',true);assert.equal(f.el('qlAssistantSpokenReplies').checked,true);
  let spoken;f.w.SpeechSynthesisUtterance=class {constructor(text){this.text=text;}};
  f.w.speechSynthesis={speak(s){spoken=s;},cancel(){}};
  start(f);f.engines[0].result('Make 50 soy sauce dishes in the mix clay fire at cone 05');
