@@ -76,6 +76,10 @@ function noteReplacement(text) {
   const from=m[1].trim().replace(/^(?:"([\s\S]*)"|“([\s\S]*)”)$/,(_,x,y)=>x ?? y);
   const to=m[2].trim().replace(/^(?:"([\s\S]*)"|“([\s\S]*)”)$/,(_,x,y)=>x ?? y);
   if(!from || !to || from.length>200 || to.length>200)return null;
+  // Generic field words are not safe literal replacements. "Change clay to X"
+  // is semantically ambiguous and must be clarified rather than producing text
+  // such as "B mix Electric Brown" from "B mix clay".
+  if(/^(?:clay|glaze|piece|firing|note|body)$/i.test(from))return null;
   return {from,to};
 }
 function noteInsertion(text) {
