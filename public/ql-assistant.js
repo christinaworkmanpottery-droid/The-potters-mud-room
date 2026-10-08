@@ -14,7 +14,7 @@
   let handsFreeEnabled = false, handsFree = false, sessionTimer, restartTimer, speechTimer, speechProbeTimer, requestTimer;
   let dock, dockStatus, dockCommand, dockReply, sessionStart, sessionStop, spokenReplies, utterance, notePreview, notePreviewText;
   let speechReview = null;
-  let emptyAttempts = 0, voiceEpoch = 0, internalNavigation = false, autoStartTimer = null, foregroundVoiceActivated = false;
+  let emptyAttempts = 0, voiceEpoch = 0, internalNavigation = false, autoStartTimer = null, foregroundVoiceActivated = false, speechAudioUnlocked = false;
   const inVoiceContext = () => entered && (currentPage === 'qlAssistant' || handsFree);
   function sessionState(state, message) {
     if (!dock) return;
@@ -93,6 +93,15 @@
   }
   function beginSession() {
     syncSession();
+    // iPhone Safari may expose speechSynthesis but suppress later asynchronous
+    // utterances unless audio was primed by the user's activation gesture.
+    if (window.speechSynthesis && window.SpeechSynthesisUtterance && !speechAudioUnlocked) {
+      try {
+        const primer = new window.SpeechSynthesisUtterance(''); primer.volume = 0;
+        window.speechSynthesis.cancel(); window.speechSynthesis.speak(primer);
+        speechAudioUnlocked = true;
+      } catch (_) { /* Visible replies remain the safe fallback. */ }
+    }
     if (!handsFreeEnabled || interactionMode() !== 'handsfree' || !available() || document.hidden || handsFree) return;
     if (!speechSupported()) { sessionState('unavailable', 'Voice unavailable. Typing and the menu remain available.'); return; }
     invalidate(); handsFree = true; entered = true; emptyAttempts = 0; foregroundVoiceActivated = true;
