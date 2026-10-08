@@ -125,10 +125,11 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
       const context = request.context ? contexts.read(request.context.token,userId) : null;
       const activeDraft=notes.wantsText(userId,context);
       const fragmentChoice=!input.command ? notes.fragmentChoice(userId,context,input.text) : null;
-      const replacement=!fragmentChoice && !input.command && notes.canAmend(userId,context) ? noteReplacement(input.text) : null;
-      const insertion=!fragmentChoice && !replacement && !input.command && notes.canAmend(userId,context) ? noteInsertion(input.text) : null;
-      const addition=!fragmentChoice && !replacement && !insertion && !input.command && notes.canAmend(userId,context) ? noteAddition(input.text) : null;
-      let language = !fragmentChoice && !replacement && !insertion && !addition && !input.command && intentProvider===deterministicProvider && !noteStart(input.text) && !noteBody(input.text) && !confirmation(input.text,activeDraft) && !cancellation(input.text) ? interpret(input.text,context) : null;
+      const fullDraftReplacement=!fragmentChoice && !input.command && activeDraft && /^(?:replace (?:the )?note with|change (?:the )?note to)\s+/i.test(input.text || '') ? noteBody(input.text) : null;
+      const replacement=!fragmentChoice && !fullDraftReplacement && !input.command && notes.canAmend(userId,context) ? noteReplacement(input.text) : null;
+      const insertion=!fragmentChoice && !fullDraftReplacement && !replacement && !input.command && notes.canAmend(userId,context) ? noteInsertion(input.text) : null;
+      const addition=!fragmentChoice && !fullDraftReplacement && !replacement && !insertion && !input.command && notes.canAmend(userId,context) ? noteAddition(input.text) : null;
+      let language = !fragmentChoice && !fullDraftReplacement && !replacement && !insertion && !addition && !input.command && intentProvider===deterministicProvider && !noteStart(input.text) && !noteBody(input.text) && !confirmation(input.text,activeDraft) && !cancellation(input.text) ? interpret(input.text,context) : null;
       // A bare feature name can be literal note dictation. Only explicit read
       // requests may leave a draft; shorthand navigation is for read context.
       if(activeDraft && language?.intent?.name==='studio.navigate' && !/\b(?:open|show|bring|pull|go|take|look|see)\b/i.test(input.text))language=null;
@@ -138,7 +139,7 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
       const capture=activeDraft && !language && isNoteText(input.text) && (!politeRequest || isNoteText(envelope(input.text)));
       let clarifyNote=unclearNoteCommand(input.text);
       let proposed;
-      try { proposed = fragmentChoice ? {name:'studio.note.fragment',arguments:{choice:fragmentChoice}} : replacement ? {name:'studio.note.replaceSaved',arguments:{}} : insertion ? {name:'studio.note.insert',arguments:{}} : addition ? {name:'studio.note.append',arguments:{}} : language?.clarification ? {name:'studio.language.clarify',arguments:{}} :
+      try { proposed = fragmentChoice ? {name:'studio.note.fragment',arguments:{choice:fragmentChoice}} : fullDraftReplacement ? {name:'studio.note.draft',arguments:{body:fullDraftReplacement}} : replacement ? {name:'studio.note.replaceSaved',arguments:{}} : insertion ? {name:'studio.note.insert',arguments:{}} : addition ? {name:'studio.note.append',arguments:{}} : language?.clarification ? {name:'studio.language.clarify',arguments:{}} :
         clarifyNote ? {name:'studio.note.review',arguments:{}} :
         activeDraft && confirmation(input.text,true) ? {name:'studio.note.confirm',arguments:{}} :
         capture ? {name:'studio.note.draft',arguments:{body:dictationBody(input.text)}} :
