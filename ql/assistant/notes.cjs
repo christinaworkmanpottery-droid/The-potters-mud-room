@@ -59,11 +59,15 @@ const incompleteNote = text => /(?:\b(?:and|or|because|with|for|to|the|my|buy|ne
 // Follow-up content stays literal. Explicit non-note destinations never become text.
 function noteReplacement(text) {
   if(typeof text!=='string' || /[\x00-\x1f\x7f]/.test(text))return null;
-  const n=commandWords(text);
+  let n=commandWords(text);
+  n=n.replace(/^(?:(?:please|hey|okay|ok)\\s+)+/i,'')
+    .replace(/^(?:(?:can|could|would|will)\\s+you\\s+)/i,'')
+    .replace(/^i\\s+(?:need|want|would like)\\s+you\\s+to\\s+/i,'')
+    .replace(/\\s+(?:please|thanks|thank you)$/i,'').trim();
   const reference='(?:(?:the|my|this|that)\\s+)?(?:(?:last|latest|previous|current|most recent)\\s+)?(?:studio\\s+)?note';
   let m=n.match(new RegExp('^(?:change|replace)\\s+'+reference+'\\s+(.+?)\\s+(?:to|with)\\s+(.+)$','i'));
   if(!m)m=n.match(new RegExp('^(?:on|in)\\s+'+reference+'[,]?\\s+(?:change|replace)\\s+(.+?)\\s+(?:to|with)\\s+(.+)$','i'));
-  if(!m)m=n.match(/^(?:change|replace)\s+(.+?)\s+(?:to|with)\s+(.+)$/i);
+  if(!m)m=n.match(/^(?:change|replace|correct|fix|update)\s+(.+?)\s+(?:to|with|so it says)\s+(.+)$/i);
   if(!m)return null;
   const from=m[1].trim().replace(/^(?:"([\s\S]*)"|“([\s\S]*)”)$/,(_,a,b)=>a ?? b);
   const to=m[2].trim().replace(/^(?:"([\s\S]*)"|“([\s\S]*)”)$/,(_,a,b)=>a ?? b);
