@@ -137,3 +137,18 @@ for(const words of [
  assert.equal(preview.result.status,'draft');
  assert.equal(preview.result.draftText,'30 Soy sauce dishes in B mix clay');
 });
+
+
+for(const words of [
+ 'Please change B mix clay to B-Mix clay',
+ 'Could you replace B mix clay with B-Mix clay please',
+ 'I need you to correct B mix clay to B-Mix clay',
+ 'Fix B mix clay so it says B-Mix clay',
+ 'Update B mix clay to B-Mix clay thanks'
+]) test('saved note correction accepts conversational wording: '+words,async t=>{
+ const f=fixture(t);let r=await f.ask('New note Make mugs in B mix clay');r=await f.ask('Save note',r.context);
+ const preview=await f.ask(words,r.context);
+ assert.equal(preview.result.status,'draft');
+ assert.equal(preview.result.draftText,'Make mugs in B-Mix clay');
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,'Make mugs in B mix clay');
+});
