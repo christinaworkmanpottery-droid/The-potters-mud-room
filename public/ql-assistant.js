@@ -2,6 +2,8 @@
 (() => {
   'use strict';
   const displayName = 'QL assistant — testing recovery';
+  const interactionModeKey = 'ql_assistant_interaction_mode';
+  const interactionMode = () => localStorage.getItem(interactionModeKey) === 'manual' ? 'manual' : 'handsfree';
   const identity = () => JSON.stringify([token, currentUser?.id, localStorage.getItem('mudlog_token')]);
   let conversationToken = null, recordNavigation = false, noteDictation = false;
   let session = identity(), invalidSession = null, generation = 0, serial = 0;
@@ -18,7 +20,7 @@
     if (!dock) return;
     dock.dataset.state = state;
     dockStatus.textContent = message;
-    sessionStart.disabled = handsFree || !available() || !speechSupported();
+    sessionStart.disabled = handsFree || !available() || !speechSupported() || interactionMode() !== 'handsfree';
     sessionStop.hidden = !handsFree;
   }
   function endSession(message = 'Stopped — tap Start voice session to resume.', state = 'stopped') {
@@ -90,7 +92,7 @@
   }
   function beginSession() {
     syncSession();
-    if (!handsFreeEnabled || !available() || document.hidden || handsFree) return;
+    if (!handsFreeEnabled || interactionMode() !== 'handsfree' || !available() || document.hidden || handsFree) return;
     if (!speechSupported()) { sessionState('unavailable', 'Voice unavailable. Typing and the menu remain available.'); return; }
     invalidate(); handsFree = true; entered = true; emptyAttempts = 0;
     // An explicit new activation only; never resume after hiding or permission denial.
@@ -101,7 +103,7 @@
   const speechSupported = () => window.isSecureContext === true && typeof speechConstructor() === 'function';
   function voiceState(message = '') {
     if (!talk) return;
-    talk.hidden = !speechSupported();
+    talk.hidden = interactionMode() !== 'manual' || !speechSupported();
     talk.disabled = handsFree || !available() || !speechSupported() || Boolean(recognition);
     stop.hidden = cancel.hidden = !recognition;
     stop.disabled = Boolean(recognition?.stopping);
@@ -304,7 +306,7 @@
     const next = identity();
     if (next !== session) { invalidate(); session = next; }
     if (entry) entry.hidden = !available();
-    if (dock) { dock.hidden = !available(); sessionStart.disabled = handsFree || !available() || !speechSupported(); }
+    if (dock) { dock.hidden = !available() || interactionMode() !== 'handsfree'; sessionStart.disabled = handsFree || !available() || !speechSupported() || interactionMode() !== 'handsfree'; }
     if (form) { input.disabled = !available(); send.disabled = !available(); }
     if (!available()) { entered = false; if (page) page.classList.remove('active'); }
     if (talk) talk.disabled = handsFree || !available() || !speechSupported() || Boolean(recognition);
@@ -484,9 +486,24 @@
     syncSession();
     if (available() && location.hash === '#qlAssistant') navigate('qlAssistant', {fromHistory: true});
   }
-  window.QLAssistant = {invalidate, syncSession, sessionInvalid, available, onNavigate, enter};
+  function setInteractionMode(mode) {
+    if (!['handsfree','manual'].includes(mode)) return false;
+    if (handsFree || recognition) endSession('Interaction mode changed. Start again when ready.');
+    localStorage.setItem(interactionModeKey, mode);
+    const select = document.getElementById('profileAssistantMode');
+    if (select) select.value = mode;
+    syncSession();
+    voiceState(mode === 'manual' ? (speechSupported() ? 'Ready when you tap.' : 'Speech is unavailable in this browser. You can type your question.') : '');
+    return true;
+  }
+  const modeSelect = document.getElementById('profileAssistantMode');
+  if (modeSelect) {
+    modeSelect.value = interactionMode();
+    modeSelect.addEventListener('change', () => setInteractionMode(modeSelect.value));
+  }
+  window.QLAssistant = {invalidate, syncSession, sessionInvalid, available, onNavigate, enter, setInteractionMode, interactionMode};
   window.addEventListener('storage', e => {
-    if (e.key === 'mudlog_token' || e.key == null) { invalidate(); syncSession(); }
+    if (e.key === 'mudlog_token' || e.key === interactionModeKey || e.key == null) { if (e.key === interactionModeKey && handsFree) endSession('Interaction mode changed on this device.'); else if (e.key !== interactionModeKey) invalidate(); syncSession(); const select=document.getElementById('profileAssistantMode'); if(select) select.value=interactionMode(); }
   });
   for (const event of ['hashchange', 'popstate']) window.addEventListener(event, () => onNavigate(location.hash.slice(1).split('?')[0]));
   window.addEventListener('pagehide', () => { entered = false; invalidate(); });
