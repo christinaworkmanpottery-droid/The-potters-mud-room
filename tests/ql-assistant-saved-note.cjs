@@ -152,3 +152,12 @@ for(const words of [
  assert.equal(preview.result.draftText,'Make mugs in B-Mix clay');
  assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,'Make mugs in B mix clay');
 });
+
+
+test('unrelated saved-note follow-up fails closed instead of crashing',async t=>{
+ const f=fixture(t);const r=await saved(f);
+ const x=await f.ask('What glaze did I use last time?',r.context);
+ assert.ok(x.response && typeof x.response.text==='string');
+ assert.equal(f.count(),1);
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,'I need to make 25 soy sauce dishes in B mix clay');
+});
