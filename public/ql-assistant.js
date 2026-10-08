@@ -14,7 +14,7 @@
   let handsFreeEnabled = false, handsFree = false, sessionTimer, restartTimer, speechTimer, speechProbeTimer, requestTimer;
   let dock, dockStatus, dockCommand, dockReply, sessionStart, sessionStop, spokenReplies, utterance, notePreview, notePreviewText;
   let speechReview = null;
-  let emptyAttempts = 0, voiceEpoch = 0, internalNavigation = false, autoStartTimer = null;
+  let emptyAttempts = 0, voiceEpoch = 0, internalNavigation = false, autoStartTimer = null, foregroundVoiceActivated = false;
   const inVoiceContext = () => entered && (currentPage === 'qlAssistant' || handsFree);
   function sessionState(state, message) {
     if (!dock) return;
@@ -94,7 +94,7 @@
     syncSession();
     if (!handsFreeEnabled || interactionMode() !== 'handsfree' || !available() || document.hidden || handsFree) return;
     if (!speechSupported()) { sessionState('unavailable', 'Voice unavailable. Typing and the menu remain available.'); return; }
-    invalidate(); handsFree = true; entered = true; emptyAttempts = 0;
+    invalidate(); handsFree = true; entered = true; emptyAttempts = 0; foregroundVoiceActivated = true;
     // Hands-Free lasts for the foreground Mud Room session. Page/account teardown
     // owns shutdown; there is no arbitrary 15-minute assistant timeout.
     startVoice();
@@ -102,6 +102,11 @@
   function autoStartHandsFree(message = 'Starting Hands-Free Clayton…') {
     clearTimeout(autoStartTimer);
     if (!handsFreeEnabled || interactionMode() !== 'handsfree' || !available() || document.hidden || handsFree || recognition) return;
+    if (!foregroundVoiceActivated) {
+      sessionState('ready', 'Hands-Free is selected. Tap once to activate Clayton for this app session.');
+      if (sessionStart) { sessionStart.hidden = false; sessionStart.textContent = 'Activate Clayton'; }
+      return;
+    }
     sessionState('starting', message);
     autoStartTimer = setTimeout(() => {
       syncSession();
@@ -315,7 +320,7 @@
     const next = identity();
     if (next !== session) { invalidate(); session = next; }
     if (entry) entry.hidden = !available();
-    if (dock) { dock.hidden = !available() || interactionMode() !== 'handsfree'; sessionStart.hidden = interactionMode() === 'handsfree'; sessionStart.disabled = handsFree || !available() || !speechSupported() || interactionMode() !== 'handsfree'; }
+    if (dock) { dock.hidden = !available() || interactionMode() !== 'handsfree'; sessionStart.hidden = interactionMode() === 'handsfree' && foregroundVoiceActivated; sessionStart.disabled = handsFree || !available() || !speechSupported() || interactionMode() !== 'handsfree'; }
     if (form) { input.disabled = !available(); send.disabled = !available(); }
     if (!available()) { entered = false; if (page) page.classList.remove('active'); }
     if (talk) talk.disabled = handsFree || !available() || !speechSupported() || Boolean(recognition);
