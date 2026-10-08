@@ -1017,6 +1017,7 @@ function acceptCroppedPhoto() {
     p.classList.remove('hidden');
     document.getElementById('photoSubmitBtn').disabled = false;
     closeCropper();
+    croppedPhotoBlob = blob;
   }, 'image/jpeg', 0.9);
 }
 const dz = document.getElementById('photoDropZone');
