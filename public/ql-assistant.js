@@ -476,7 +476,7 @@
       sessionStart = node('button', 'Start voice session'); sessionStart.id = 'qlAssistantSessionStart';
       sessionStop = node('button', 'End session'); sessionStop.id = 'qlAssistantSessionStop';
       for (const b of [sessionStart, sessionStop]) { b.type = 'button'; b.className = 'btn btn-secondary'; }
-      sessionStart.onclick = beginSession; sessionStop.onclick = () => pauseSession();
+      sessionStart.onclick = beginSession; sessionStop.onclick = () => { foregroundVoiceActivated = false; pauseSession(); syncSession(); };
       const spokenLabel = node('label', ' Clayton talks back ');
       spokenReplies = node('input'); spokenReplies.type = 'checkbox'; spokenReplies.id = 'qlAssistantSpokenReplies';
       spokenReplies.checked = interactionMode() === 'handsfree';
@@ -506,7 +506,7 @@
   function setInteractionMode(mode) {
     if (!['handsfree','manual'].includes(mode)) return false;
     if (handsFree || recognition) endSession('Interaction mode changed. Start again when ready.');
-    localStorage.setItem(interactionModeKey, mode);
+    localStorage[interactionModeKey] = mode;
     const select = document.getElementById('profileAssistantMode');
     if (select) select.value = mode;
     syncSession();
@@ -524,7 +524,7 @@
     if (e.key === 'mudlog_token' || e.key === interactionModeKey || e.key == null) { if (e.key === interactionModeKey && handsFree) endSession('Interaction mode changed on this device.'); else if (e.key !== interactionModeKey) invalidate(); syncSession(); const select=document.getElementById('profileAssistantMode'); if(select) select.value=interactionMode(); }
   });
   for (const event of ['hashchange', 'popstate']) window.addEventListener(event, () => onNavigate(location.hash.slice(1).split('?')[0]));
-  window.addEventListener('pagehide', () => { entered = false; invalidate(); });
+  window.addEventListener('pagehide', () => { foregroundVoiceActivated = false; entered = false; invalidate(); syncSession(); });
   // A visible page can lose focus to browser controls/permission UI. Only actual
   // hiding, pagehide, navigation, or account changes cancel foreground speech.
   window.addEventListener('pageshow', () => { syncSession(); if (available() && currentPage === 'qlAssistant') entered = true; autoStartHandsFree('Resuming Hands-Free Clayton…'); });
