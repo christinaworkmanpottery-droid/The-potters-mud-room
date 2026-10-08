@@ -57,32 +57,53 @@ const cancellation=text=>typeof text==='string' && /^(?:no|no thanks|cancel|canc
 // Deliberately bounded fragment guard; exact saved text is never rewritten.
 const incompleteNote = text => /(?:\b(?:and|or|because|with|for|to|the|my|buy|need)|\bi[’']ve been|\bi have been|\bi[’']m going to)[.!?]*$/i.test((text || '').trim());
 // Follow-up content stays literal. Explicit non-note destinations never become text.
+function conversationalCommand(text){
+  return commandWords(text)
+    .replace(/^(?:(?:please|hey|okay|ok)\s+)+/i,'')
+    .replace(/^(?:(?:can|could|would|will)\s+you\s+)/i,'')
+    .replace(/^i\s+(?:need|want|would like)\s+you\s+to\s+/i,'')
+    .replace(/\s+(?:please|thanks|thank you)$/i,'')
+    .trim();
+}
 function noteReplacement(text) {
   if(typeof text!=='string' || /[\x00-\x1f\x7f]/.test(text))return null;
-  const n=commandWords(text);
+  const n=conversationalCommand(text);
   const reference='(?:(?:the|my|this|that)\\s+)?(?:(?:last|latest|previous|current|most recent)\\s+)?(?:studio\\s+)?note';
   let m=n.match(new RegExp('^(?:change|replace)\\s+'+reference+'\\s+(.+?)\\s+(?:to|with)\\s+(.+)$','i'));
   if(!m)m=n.match(new RegExp('^(?:on|in)\\s+'+reference+'[,]?\\s+(?:change|replace)\\s+(.+?)\\s+(?:to|with)\\s+(.+)$','i'));
-  if(!m)m=n.match(/^(?:change|replace)\s+(.+?)\s+(?:to|with)\s+(.+)$/i);
+  if(!m)m=n.match(/^(?:change|replace|correct|fix|update)\s+(.+?)\s+(?:to|with|so it says)\s+(.+)$/i);
   if(!m)return null;
-  const from=m[1].trim().replace(/^(?:"([\s\S]*)"|“([\s\S]*)”)$/,(_,a,b)=>a ?? b);
-  const to=m[2].trim().replace(/^(?:"([\s\S]*)"|“([\s\S]*)”)$/,(_,a,b)=>a ?? b);
+  const from=m[1].trim().replace(/^(?:"([\s\S]*)"|“([\s\S]*)”)$/,(_,x,y)=>x ?? y);
+  const to=m[2].trim().replace(/^(?:"([\s\S]*)"|“([\s\S]*)”)$/,(_,x,y)=>x ?? y);
   if(!from || !to || from.length>200 || to.length>200)return null;
+  // Generic field words are not safe literal replacements. "Change clay to X"
+  // is semantically ambiguous and must be clarified rather than producing text
+  // such as "B mix Electric Brown" from "B mix clay".
+  if(/^(?:clay|glaze|piece|firing|note|body)$/i.test(from))return null;
   return {from,to};
+}
+function noteInsertion(text) {
+  if(typeof text!=='string' || /[\x00-\x1f\x7f]/.test(text))return null;
+  const n=conversationalCommand(text);
+  const m=n.match(/^(?:add|insert|put|place|include)\s+(.+?)\s+(before|after|in front of|following)\s+(.+)$/i);
+  if(!m)return null;
+  const body=m[1].trim().replace(/^(?:"([\s\S]*)"|“([\s\S]*)”)$/,(_,x,y)=>x ?? y);
+  const anchor=m[3].trim().replace(/^(?:"([\s\S]*)"|“([\s\S]*)”)$/,(_,x,y)=>x ?? y);
+  if(!body || !anchor || body.length>200 || anchor.length>200)return null;
+  return {body,position:/^(?:before|in front of)$/i.test(m[2])?'before':'after',anchor};
 }
 function noteAddition(text) {
   if(typeof text!=='string' || /[\x00-\x1f\x7f]/.test(text))return null;
-  const words=commandWords(text).replace(/^(?:and\s+)?(?:also\s+)?/i,'');
+  const words=conversationalCommand(text).replace(/^(?:and\s+)?(?:also\s+)?/i,'');
   const reference='(?:(?:the|my|this|that)\\s+)?(?:(?:last|latest|previous|current|most recent)\\s+)?(?:studio\\s+)?note(?:\\s+(?:I|we)\\s+(?:just\\s+)?saved)?';
   const destinationFirst=new RegExp('^(?:add(?:\\s+in)?|append|include|mention)\\s+(?:to|in|into|on)\\s+'+reference+'[,:]?\\s+(.+)$','i');
   const m=words.match(destinationFirst) || words.match(/^(?:add(?:\s+in)?|append|include|mention)\s+(.+)$/i);
+  if(!m)return null;
   const suffix=new RegExp('\\s+(?:to|in|into|on)\\s+'+reference+'[.!?]*$','i');
   const prefix=new RegExp('^(?:to|in|into|on)\\s+'+reference+'[,:]?\\s+','i');
-  // Parse destination separately from literal content, including destination-first
-  // requests. A quoted payload is literal even if it mentions a note itself.
   let body=m[1].trim();
   if(!/^(?:"[\s\S]*"|“[\s\S]*”)$/.test(body))body=body.replace(suffix,'').replace(prefix,'').replace(/\s+to\s+(?:that|it|this)[.!?]*$/i,'').trim();
-  body=body.replace(/^(?:"([\s\S]*)"|“([\s\S]*)”)$/,(_,a,b)=>a ?? b);
+  body=body.replace(/^(?:"([\s\S]*)"|“([\s\S]*)”)$/,(_,x,y)=>x ?? y);
   if(/\b(?:to|in|on|into)\s+[^.!?]*\bnote\b/i.test(body) && !/^(?:"|“)/.test(m[1]))return {body:'',ambiguous:true,clarification:'Which note do you mean? I can add to the note just saved in this conversation; I will not choose a different note for you.'};
   if(/\b(?:to|on|into|in)\s+(?:(?:the|my|a|this|that)\s+)?(?:piece|glaze collection|glaze library|shopping list|inventory|bowl|vase)\b/i.test(body))return null;
   if(/^(?:a |another |new |studio )*note\b/i.test(body))return null;
@@ -119,6 +140,29 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
       const body=current.body.replace(new RegExp(escaped,'i'),next);
       return this.draft(userId,body,{target});
     },
+    insert(userId,state,insertion){
+      prune();
+      const d=drafts.get(userId);
+      const savedTarget=saved.get(userId)?.ref===state?.savedNoteRef ? saved.get(userId) : null;
+      const target=d && d.id===state?.noteDraftId ? d.target : savedTarget;
+      let body=d && d.id===state?.noteDraftId && d.body ? d.body : null;
+      if(!body && savedTarget){
+        const current=db.prepare('SELECT body FROM studio_notes WHERE id=? AND user_id=?').get(savedTarget.noteId,userId);
+        if(!current || current.body!==savedTarget.originalBody){clear(userId);return reply('That note changed or is no longer available. Please open it to review the latest text. Nothing changed.','clarification');}
+        body=current.body;
+      }
+      if(!body)return reply('Which note should I change? I do not have a current note in this conversation. Nothing changed.','clarification');
+      const needle=insertion?.anchor || '', addition=insertion?.body || '';
+      if(!needle || !addition || !['before','after'].includes(insertion?.position))
+        return reply('Please tell me what words to add and where they belong. Nothing changed.','clarification',state);
+      const escaped=needle.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      const matches=body.match(new RegExp(escaped,'gi')) || [];
+      if(matches.length===0)return reply('I could not find “'+needle+'” in that note. Please say the exact nearby words. Nothing changed.','clarification',state);
+      if(matches.length>1)return reply('I found “'+needle+'” more than once. Please tell me which occurrence you mean. Nothing changed.','clarification',state);
+      const replacement=insertion.position==='before' ? addition+' '+matches[0] : matches[0]+' '+addition;
+      const revised=body.replace(new RegExp(escaped,'i'),replacement);
+      return this.draft(userId,revised,{target});
+    },
     amend(userId,state,addition){
       prune();
       const d=drafts.get(userId);
@@ -127,7 +171,8 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
       if(addition.ambiguous)return reply(addition.clarification || 'What words should I add to your note? Please say the words you want included. Nothing changed.','clarification',state);
       const current=db.prepare('SELECT body FROM studio_notes WHERE id=? AND user_id=?').get(target.noteId,userId);
       if(!current || current.body!==target.originalBody){clear(userId);return reply('That note changed or is no longer available. Please open it to review the latest text. Nothing changed.','clarification');}
-      const body=(d && d.id===state?.noteDraftId ? d.body : current.body)+'\n'+addition.body;
+      const base=d && d.id===state?.noteDraftId && d.target?.noteId===target.noteId ? d.body : current.body;
+      const body=base+'\n'+addition.body;
       if(body.length>10000)return reply('This addition would make the note too long. Nothing changed.','clarification',state);
       return this.draft(userId,body,{target});
     },
@@ -175,7 +220,8 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
     },
     revise(userId,state,body){
       const d=drafts.get(userId);
-      return this.draft(userId,body,{target:d && d.id===state?.noteDraftId ? d.target : null});
+      const target=d && d.id===state?.noteDraftId ? d.target : saved.get(userId)?.ref===state?.savedNoteRef ? saved.get(userId) : null;
+      return this.draft(userId,body,{target});
     },
     begin(userId,topic){
       prune();clear(userId);while(drafts.size>=max)drafts.delete(drafts.keys().next().value);
@@ -183,7 +229,11 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
       return reply('What would you like the note to say'+(topic?' about '+topic:'')+'? Speak the note text next, or say “cancel”. Nothing has been saved.','collecting',{noteDraftId:id});
     },
     draft(userId,body,{reviewMaterial=true,target=null}={}){
-      prune();clear(userId);
+      prune();
+      // A preview of an edit to the just-saved note must keep the saved target
+      // alive until explicit Save/Cancel. Starting an unrelated new draft still
+      // clears that focus through begin()/the caller's normal lifecycle.
+      drafts.delete(userId);
       while(drafts.size>=max)drafts.delete(drafts.keys().next().value);
       const id=randomBytes(24).toString('hex');
       const uncertainClay=/\b(?:bmx|the\s+mix|bee\s+mix)(?=\s+clay\b)/gi;
@@ -230,4 +280,4 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
     }
   };
 }
-module.exports={noteAddition,noteReplacement,dictationBody,materialChoice,noteStart,isNoteText,noteBody,confirmation,cancellation,unclearNoteCommand,createNoteDrafts};
+module.exports={noteAddition,noteReplacement,noteInsertion,dictationBody,materialChoice,noteStart,isNoteText,noteBody,confirmation,cancellation,unclearNoteCommand,createNoteDrafts};

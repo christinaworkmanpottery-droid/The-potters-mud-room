@@ -2,6 +2,8 @@
 (() => {
   'use strict';
   const displayName = 'QL assistant — testing recovery';
+  const interactionModeKey = 'ql_assistant_interaction_mode';
+  const interactionMode = () => localStorage[interactionModeKey] === 'manual' ? 'manual' : 'handsfree';
   const identity = () => JSON.stringify([token, currentUser?.id, localStorage.getItem('mudlog_token')]);
   let conversationToken = null, recordNavigation = false, noteDictation = false;
   let session = identity(), invalidSession = null, generation = 0, serial = 0;
@@ -12,20 +14,20 @@
   let handsFreeEnabled = false, handsFree = false, sessionTimer, restartTimer, speechTimer, speechProbeTimer, requestTimer;
   let dock, dockStatus, dockCommand, dockReply, sessionStart, sessionStop, spokenReplies, utterance, notePreview, notePreviewText;
   let speechReview = null;
-  let emptyAttempts = 0, voiceEpoch = 0, internalNavigation = false;
+  let emptyAttempts = 0, voiceEpoch = 0, internalNavigation = false, autoStartTimer = null, foregroundVoiceActivated = false;
   const inVoiceContext = () => entered && (currentPage === 'qlAssistant' || handsFree);
   function sessionState(state, message) {
     if (!dock) return;
     dock.dataset.state = state;
     dockStatus.textContent = message;
-    sessionStart.disabled = handsFree || !available() || !speechSupported();
+    sessionStart.disabled = handsFree || !available() || !speechSupported() || interactionMode() !== 'handsfree';
     sessionStop.hidden = !handsFree;
   }
   function endSession(message = 'Stopped — tap Start voice session to resume.', state = 'stopped') {
     speechReview = null;
     handsFree = false; voiceEpoch++; conversationToken = null; noteDictation = false; recordNavigation = false;
     if(notePreview){notePreview.hidden=true;notePreviewText.textContent='';}
-    clearTimeout(restartTimer); clearTimeout(sessionTimer); clearTimeout(speechTimer); clearTimeout(speechProbeTimer); clearTimeout(requestTimer);
+    clearTimeout(restartTimer); clearTimeout(sessionTimer); clearTimeout(speechTimer); clearTimeout(speechProbeTimer); clearTimeout(requestTimer); clearTimeout(autoStartTimer);
     if (utterance) { utterance.onend = utterance.onerror = utterance.onstart = null; utterance = null; window.speechSynthesis?.cancel(); }
     cancelVoice();
     sessionState(state, message);
@@ -50,7 +52,8 @@
     sessionState('responding', 'Response ready.');
     if (!spokenReplies.checked) { listenAgain('Ready for another command…'); return; }
     if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
-      pauseSession('Spoken replies are unavailable. Turn off spoken replies and restart for text responses.', 'unavailable'); return;
+      dockReply.textContent = text;
+      listenAgain('Spoken audio is unavailable on this device. Clayton will keep listening and show replies on screen.'); return;
     }
     const own = voiceEpoch, synth = window.speechSynthesis;
     const speech = new window.SpeechSynthesisUtterance(text.slice(0, 600)); utterance = speech;
@@ -83,25 +86,39 @@
     };
     speech.onstart = () => { if (active()) { observedSpeaking = true; quietChecks = 0; sessionState('speaking', 'Speaking — microphone is off.'); } };
     speech.onend = () => completeSpeech(false);
-    speech.onerror = () => { if (active()) pauseSession('Audio could not play. Turn off spoken replies and restart the session.', 'unavailable'); };
-    speechTimer = setTimeout(() => { if (active()) pauseSession('Audio did not finish. Turn off spoken replies and restart the session.', 'unavailable'); }, 30000);
+    speech.onerror = () => { if (active()) { utterance = null; listenAgain('Audio could not play. Clayton will keep listening and show replies on screen.'); } };
+    speechTimer = setTimeout(() => { if (active()) { try { synth.cancel(); } catch (_) {} utterance = null; listenAgain('Audio did not finish. Clayton will keep listening and show replies on screen.'); } }, 30000);
     speechProbeTimer = setTimeout(probeSpeech, 250);
     try { synth.speak(speech); } catch (_) { speech.onerror(); }
   }
   function beginSession() {
     syncSession();
-    if (!handsFreeEnabled || !available() || document.hidden || handsFree) return;
+    if (!handsFreeEnabled || interactionMode() !== 'handsfree' || !available() || document.hidden || handsFree) return;
     if (!speechSupported()) { sessionState('unavailable', 'Voice unavailable. Typing and the menu remain available.'); return; }
-    invalidate(); handsFree = true; entered = true; emptyAttempts = 0;
-    // An explicit new activation only; never resume after hiding or permission denial.
-    sessionTimer = setTimeout(() => pauseSession('Stopped after 15 minutes. Tap Start voice session to continue.'), 15 * 60 * 1000);
+    invalidate(); handsFree = true; entered = true; emptyAttempts = 0; foregroundVoiceActivated = true;
+    // Hands-Free lasts for the foreground Mud Room session. Page/account teardown
+    // owns shutdown; there is no arbitrary 15-minute assistant timeout.
     startVoice();
+  }
+  function autoStartHandsFree(message = 'Starting Hands-Free Clayton…') {
+    clearTimeout(autoStartTimer);
+    if (!handsFreeEnabled || interactionMode() !== 'handsfree' || !available() || document.hidden || handsFree || recognition) return;
+    if (!foregroundVoiceActivated) {
+      sessionState('ready', 'Hands-Free is selected. Tap once to activate Clayton for this app session.');
+      if (sessionStart) { sessionStart.hidden = false; sessionStart.textContent = 'Activate Clayton'; }
+      return;
+    }
+    sessionState('starting', message);
+    autoStartTimer = setTimeout(() => {
+      syncSession();
+      if (handsFreeEnabled && interactionMode() === 'handsfree' && available() && !document.hidden && !handsFree && !recognition) beginSession();
+    }, 250);
   }
   const speechConstructor = () => window.SpeechRecognition || window.webkitSpeechRecognition;
   const speechSupported = () => window.isSecureContext === true && typeof speechConstructor() === 'function';
   function voiceState(message = '') {
     if (!talk) return;
-    talk.hidden = !speechSupported();
+    talk.hidden = interactionMode() !== 'manual' || !speechSupported();
     talk.disabled = handsFree || !available() || !speechSupported() || Boolean(recognition);
     stop.hidden = cancel.hidden = !recognition;
     stop.disabled = Boolean(recognition?.stopping);
@@ -304,10 +321,11 @@
     const next = identity();
     if (next !== session) { invalidate(); session = next; }
     if (entry) entry.hidden = !available();
-    if (dock) { dock.hidden = !available(); sessionStart.disabled = handsFree || !available() || !speechSupported(); }
+    if (dock) { dock.hidden = !available() || interactionMode() !== 'handsfree'; sessionStart.hidden = interactionMode() === 'handsfree' && foregroundVoiceActivated; sessionStart.disabled = handsFree || !available() || !speechSupported() || interactionMode() !== 'handsfree'; }
     if (form) { input.disabled = !available(); send.disabled = !available(); }
     if (!available()) { entered = false; if (page) page.classList.remove('active'); }
     if (talk) talk.disabled = handsFree || !available() || !speechSupported() || Boolean(recognition);
+    if (spokenReplies) { spokenReplies.checked = interactionMode() === 'handsfree' ? true : spokenReplies.checked; spokenReplies.disabled = interactionMode() === 'handsfree'; }
   }
   function sessionInvalid() {
     invalidate(); invalidSession = identity(); syncSession();
@@ -458,12 +476,13 @@
       sessionStart = node('button', 'Start voice session'); sessionStart.id = 'qlAssistantSessionStart';
       sessionStop = node('button', 'End session'); sessionStop.id = 'qlAssistantSessionStop';
       for (const b of [sessionStart, sessionStop]) { b.type = 'button'; b.className = 'btn btn-secondary'; }
-      sessionStart.onclick = beginSession; sessionStop.onclick = () => pauseSession();
-      const spokenLabel = node('label', ' Spoken replies (experimental) ');
+      sessionStart.onclick = beginSession; sessionStop.onclick = () => { foregroundVoiceActivated = false; pauseSession(); syncSession(); };
+      const spokenLabel = node('label', ' Clayton talks back ');
       spokenReplies = node('input'); spokenReplies.type = 'checkbox'; spokenReplies.id = 'qlAssistantSpokenReplies';
-      // Audio/recognition handoff is unreliable on some Safari versions. Opt in explicitly.
+      spokenReplies.checked = interactionMode() === 'handsfree';
+      spokenReplies.disabled = interactionMode() === 'handsfree';
       spokenLabel.prepend(spokenReplies);
-      spokenReplies.onchange = () => { if (handsFree) pauseSession('Reply preference changed. Start the session again.'); };
+      spokenReplies.onchange = () => { if (handsFree) pauseSession('Reply preference changed.'); };
       dockStatus = node('p'); dockStatus.id = 'qlAssistantSessionStatus'; dockStatus.setAttribute('role', 'status');
       dockCommand = node('p'); dockCommand.id = 'qlAssistantSessionCommand'; dockCommand.style.whiteSpace = 'pre-wrap'; dockCommand.setAttribute('aria-label', 'Live speech transcript');
       dockReply = node('p'); dockReply.id = 'qlAssistantSessionReply'; dockReply.setAttribute('role', 'status'); dockReply.setAttribute('aria-live', 'polite');
@@ -484,22 +503,39 @@
     syncSession();
     if (available() && location.hash === '#qlAssistant') navigate('qlAssistant', {fromHistory: true});
   }
-  window.QLAssistant = {invalidate, syncSession, sessionInvalid, available, onNavigate, enter};
+  function setInteractionMode(mode) {
+    if (!['handsfree','manual'].includes(mode)) return false;
+    if (handsFree || recognition) endSession('Interaction mode changed. Start again when ready.');
+    localStorage[interactionModeKey] = mode;
+    const select = document.getElementById('profileAssistantMode');
+    if (select) select.value = mode;
+    syncSession();
+    voiceState(mode === 'manual' ? (speechSupported() ? 'Ready when you tap.' : 'Speech is unavailable in this browser. You can type your question.') : '');
+    if (mode === 'handsfree') autoStartHandsFree();
+    return true;
+  }
+  const modeSelect = document.getElementById('profileAssistantMode');
+  if (modeSelect) {
+    modeSelect.value = interactionMode();
+    modeSelect.addEventListener('change', () => setInteractionMode(modeSelect.value));
+  }
+  window.QLAssistant = {invalidate, syncSession, sessionInvalid, available, onNavigate, enter, setInteractionMode, interactionMode};
   window.addEventListener('storage', e => {
-    if (e.key === 'mudlog_token' || e.key == null) { invalidate(); syncSession(); }
+    if (e.key === 'mudlog_token' || e.key === interactionModeKey || e.key == null) { if (e.key === interactionModeKey && handsFree) endSession('Interaction mode changed on this device.'); else if (e.key !== interactionModeKey) invalidate(); syncSession(); const select=document.getElementById('profileAssistantMode'); if(select) select.value=interactionMode(); }
   });
   for (const event of ['hashchange', 'popstate']) window.addEventListener(event, () => onNavigate(location.hash.slice(1).split('?')[0]));
-  window.addEventListener('pagehide', () => { entered = false; invalidate(); });
+  window.addEventListener('pagehide', () => { foregroundVoiceActivated = false; entered = false; invalidate(); syncSession(); });
   // A visible page can lose focus to browser controls/permission UI. Only actual
   // hiding, pagehide, navigation, or account changes cancel foreground speech.
-  window.addEventListener('pageshow', () => { syncSession(); if (available() && currentPage === 'qlAssistant') entered = true; });
+  window.addEventListener('pageshow', () => { syncSession(); if (available() && currentPage === 'qlAssistant') entered = true; autoStartHandsFree('Resuming Hands-Free Clayton…'); });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) invalidate();
     syncSession();
+    if (!document.hidden) autoStartHandsFree('Resuming Hands-Free Clayton…');
   });
   // Failed/missing configuration is OFF. No HTML entry exists until explicit opt-in.
   fetch(API + '/api/ql/assistant/config', {cache: 'no-store'})
     .then(r => r.ok ? r.json() : null)
-    .then(config => { if (config?.enabled === true) { enabled = true; voiceEnabled = config.voiceEnabled === true; handsFreeEnabled = voiceEnabled && config.handsFreeEnabled === true; mount(); } })
+    .then(config => { if (config?.enabled === true) { enabled = true; voiceEnabled = config.voiceEnabled === true; handsFreeEnabled = voiceEnabled && config.handsFreeEnabled === true; mount(); autoStartHandsFree(); } })
     .catch(() => {});
 })();

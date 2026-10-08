@@ -105,3 +105,59 @@ test('saved note correction fails closed when phrase is missing or repeated',asy
  x=await f.ask('Change blue clay to B-Mix clay',x.context);assert.equal(x.result.status,'clarification');assert.match(x.response.text,/could not find/);
  assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,'red clay and red clay');
 });
+
+
+test('natural positional insertion previews and saves safely',async t=>{
+ const f=fixture(t);let r=await f.ask('New note Soy sauce dishes in B mix clay fire at cone six');r=await f.ask('Save note',r.context);const id=r.result.noteId;
+ let preview=await f.ask('Add 30 before soy sauce dishes',r.context);
+ assert.equal(preview.result.status,'draft');assert.equal(preview.result.draftText,'30 Soy sauce dishes in B mix clay fire at cone six');
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes WHERE id=?').get(id).body,'Soy sauce dishes in B mix clay fire at cone six');
+ let result=await f.ask('Save it',preview.context);assert.equal(result.result.noteId,id);
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes WHERE id=?').get(id).body,'30 Soy sauce dishes in B mix clay fire at cone six');
+ preview=await f.ask('Add with Sapphire Float after cone six',result.context);
+ assert.equal(preview.result.draftText,'30 Soy sauce dishes in B mix clay fire at cone six with Sapphire Float');
+});
+test('positional insertion fails closed for missing or repeated anchor',async t=>{
+ const f=fixture(t);let r=await f.ask('New note red clay and red clay');r=await f.ask('Save note',r.context);
+ let x=await f.ask('Add 30 before blue clay',r.context);assert.equal(x.result.status,'clarification');assert.match(x.response.text,/could not find/);
+ x=await f.ask('Add 30 before red clay',x.context);assert.equal(x.result.status,'clarification');assert.match(x.response.text,/more than once/);
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,'red clay and red clay');
+});
+
+
+for(const words of [
+ 'Put 30 in front of soy sauce dishes',
+ 'Please insert 30 before soy sauce dishes',
+ 'Could you place 30 before soy sauce dishes please',
+ 'I need you to include 30 before soy sauce dishes',
+ 'Add 30 before soy sauce dishes thanks'
+]) test('positional edit accepts conversational wording: '+words,async t=>{
+ const f=fixture(t);let r=await f.ask('New note Soy sauce dishes in B mix clay');r=await f.ask('Save note',r.context);
+ const preview=await f.ask(words,r.context);
+ assert.equal(preview.result.status,'draft');
+ assert.equal(preview.result.draftText,'30 Soy sauce dishes in B mix clay');
+});
+
+
+for(const words of [
+ 'Please change B mix clay to B-Mix clay',
+ 'Could you replace B mix clay with B-Mix clay please',
+ 'I need you to correct B mix clay to B-Mix clay',
+ 'Fix B mix clay so it says B-Mix clay',
+ 'Update B mix clay to B-Mix clay thanks'
+]) test('saved note correction accepts conversational wording: '+words,async t=>{
+ const f=fixture(t);let r=await f.ask('New note Make mugs in B mix clay');r=await f.ask('Save note',r.context);
+ const preview=await f.ask(words,r.context);
+ assert.equal(preview.result.status,'draft');
+ assert.equal(preview.result.draftText,'Make mugs in B-Mix clay');
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,'Make mugs in B mix clay');
+});
+
+
+test('unrelated saved-note follow-up fails closed instead of crashing',async t=>{
+ const f=fixture(t);const r=await saved(f);
+ const x=await f.ask('What glaze did I use last time?',r.context);
+ assert.ok(x.response && typeof x.response.text==='string');
+ assert.equal(f.count(),1);
+ assert.equal(f.db.prepare('SELECT body FROM studio_notes').get().body,'I need to make 25 soy sauce dishes in B mix clay');
+});
