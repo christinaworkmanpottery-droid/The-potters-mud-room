@@ -124,7 +124,8 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
       if (signal?.aborted) fail(409, 'CANCELLED', 'Assistant request cancelled.');
       const context = request.context ? contexts.read(request.context.token,userId) : null;
       const activeDraft=notes.wantsText(userId,context);
-      const fragmentChoice=!input.command ? notes.fragmentChoice(userId,context,input.text) : null;
+      const editSavedRequest=!activeDraft && notes.canAmend(userId,context) && /^(?:(?:hey|hi)\s+clayton[,]?\s*)?(?:edit|change|update|correct|fix)\s+(?:(?:the|my|this|that)\s+)?(?:(?:last|latest|previous|most recent)\s+)?(?:studio\s+)?note[.!?]*$/i.test(input.text || '');
+      const fragmentChoice=!editSavedRequest && !input.command ? notes.fragmentChoice(userId,context,input.text) : null;
       const fullDraftReplacement=!fragmentChoice && !input.command && activeDraft && /^(?:replace (?:the )?note with|change (?:the )?note to)\s+/i.test(input.text || '') ? noteBody(input.text) : null;
       const replacement=!fragmentChoice && !fullDraftReplacement && !input.command && notes.canAmend(userId,context) ? noteReplacement(input.text) : null;
       const insertion=!fragmentChoice && !fullDraftReplacement && !replacement && !input.command && notes.canAmend(userId,context) ? noteInsertion(input.text) : null;
@@ -139,7 +140,7 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
       const capture=activeDraft && !language && isNoteText(input.text) && (!politeRequest || isNoteText(envelope(input.text)));
       let clarifyNote=unclearNoteCommand(input.text);
       let proposed;
-      try { proposed = fragmentChoice ? {name:'studio.note.fragment',arguments:{choice:fragmentChoice}} : fullDraftReplacement ? {name:'studio.note.draft',arguments:{body:fullDraftReplacement}} : replacement ? {name:'studio.note.replaceSaved',arguments:{}} : insertion ? {name:'studio.note.insert',arguments:{}} : addition ? {name:'studio.note.append',arguments:{}} : language?.clarification ? {name:'studio.language.clarify',arguments:{}} :
+      try { proposed = editSavedRequest ? {name:'studio.note.review',arguments:{}} : fragmentChoice ? {name:'studio.note.fragment',arguments:{choice:fragmentChoice}} : fullDraftReplacement ? {name:'studio.note.draft',arguments:{body:fullDraftReplacement}} : replacement ? {name:'studio.note.replaceSaved',arguments:{}} : insertion ? {name:'studio.note.insert',arguments:{}} : addition ? {name:'studio.note.append',arguments:{}} : language?.clarification ? {name:'studio.language.clarify',arguments:{}} :
         clarifyNote ? {name:'studio.note.review',arguments:{}} :
         activeDraft && confirmation(input.text,true) ? {name:'studio.note.confirm',arguments:{}} :
         capture ? {name:'studio.note.draft',arguments:{body:dictationBody(input.text)}} :
@@ -183,7 +184,7 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
         if(!addition)fail(400,'INVALID_REQUEST','No note addition is pending.');
         ({result,response,state:nextState}=notes.amend(userId,context,addition));
       } else if (intent.name === 'studio.note.review') {
-        if(!clarifyNote)fail(400,'INVALID_REQUEST','No note clarification is pending.');
+        if(!clarifyNote && !editSavedRequest)fail(400,'INVALID_REQUEST','No note clarification is pending.');
         ({result,response,state:nextState}=!activeDraft && notes.canAmend(userId,context) ? notes.reviewSaved(userId,context) : notes.review(userId,context));
       } else if (intent.name === 'studio.note.begin') {
         if(!request.context || noteStart(input.text)?.topic!==intent.arguments.topic) fail(400,'INVALID_REQUEST','Please request a note using your own words.');
