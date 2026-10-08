@@ -3,7 +3,7 @@
   'use strict';
   const displayName = 'QL assistant — testing recovery';
   const interactionModeKey = 'ql_assistant_interaction_mode';
-  const interactionMode = () => localStorage.getItem(interactionModeKey) === 'manual' ? 'manual' : 'handsfree';
+  const interactionMode = () => localStorage[interactionModeKey] === 'manual' ? 'manual' : 'handsfree';
   const identity = () => JSON.stringify([token, currentUser?.id, localStorage.getItem('mudlog_token')]);
   let conversationToken = null, recordNavigation = false, noteDictation = false;
   let session = identity(), invalidSession = null, generation = 0, serial = 0;
