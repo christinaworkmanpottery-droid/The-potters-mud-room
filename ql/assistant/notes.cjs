@@ -146,6 +146,14 @@ function createNoteDrafts(db,{now=Date.now,ttl=5*60*1000,max=1000}={}) {
   const reply=(text,status,state={})=>({result:{tool:'studio.note',status},response:{text},state});
   return {
     clear,
+    selectedId(userId,state){prune();return saved.get(userId)?.ref===state?.savedNoteRef?saved.get(userId)?.noteId:null;},
+    selectSaved(userId,id){
+      const note=db.prepare('SELECT id,body FROM studio_notes WHERE id=? AND user_id=?').get(id,userId);
+      if(!note)return {};
+      clear(userId);const ref=randomBytes(24).toString('hex');
+      saved.set(userId,{ref,noteId:note.id,originalBody:note.body,expires:now()+ttl});
+      return {savedNoteRef:ref};
+    },
     pendingEdit(userId,state,text){
       prune();
       const holder=state?.noteDraftId && drafts.get(userId)?.id===state.noteDraftId ? drafts.get(userId) : saved.get(userId)?.ref===state?.savedNoteRef ? saved.get(userId) : null;

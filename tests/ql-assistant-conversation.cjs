@@ -86,9 +86,10 @@ test('new intents cannot supply IDs, owner, arbitrary fields or writes',()=>{
  for(const index of [0,6,1.1,'1',null])assert.throws(()=>validateIntent({name:'studio.piece.choose',arguments:{index}}));
  for(const context of [{token:null,pieceId:'b-blue'},{token:'b-blue'},{token:[]},{userId:'b'}])assert.throws(()=>validateRequest({version:1,requestId:'x',input:{text:'Open it'},context}));
 });
-test('writes remain unavailable and context is not a write authorization',async()=>{
+test('Piece writes remain unavailable and Piece context cannot select a Studio Note',async()=>{
  const before=db.prepare('SELECT * FROM pieces ORDER BY id').all();const r=await ask('Find blue pieces');
- for(const text of ['Edit a studio note','Delete it','Save that'])await assert.rejects(ask(text,r.context),e=>e.code==='ACTION_NOT_AVAILABLE');
+ assert.equal((await ask('Edit a studio note',r.context)).result.status,'clarification');
+ for(const text of ['Delete it','Save that'])await assert.rejects(ask(text,r.context),e=>e.code==='ACTION_NOT_AVAILABLE');
  assert.deepEqual(db.prepare('SELECT * FROM pieces ORDER BY id').all(),before);
 });
 test('injected provider uses same bounded references with no history or data exposure',async()=>{
@@ -205,7 +206,7 @@ test('Studio Note draft preserves exact words; explicit confirmation saves once'
  const results=await Promise.all([ask('Save note',draft.context),ask('Save note',draft.context)]);
  assert.equal(results.filter(r=>r.result.status==='saved').length,1);
  const saved=results.find(r=>r.result.status==='saved');assert.equal(saved.response.navigation.page,'studioNotes');
- const row=db.prepare('SELECT * FROM studio_notes WHERE id=?').get(saved.result.noteId);assert.equal(row.body,text);assert.equal(row.user_id,'a');assert.equal(row.title,null);
+ const row=db.prepare('SELECT * FROM studio_notes WHERE id=?').get(saved.result.noteId);assert.equal(row.body,text);assert.equal(row.user_id,'a');assert.equal(row.title,'Try this combination again');
  assert.equal(db.prepare("SELECT COUNT(*) n FROM studio_notes WHERE user_id='a'").get().n,before+1);
  assert.notEqual((await ask('Yes',saved.context)).result.status,'saved');
 });

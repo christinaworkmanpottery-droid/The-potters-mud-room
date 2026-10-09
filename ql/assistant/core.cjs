@@ -33,9 +33,13 @@ function validateRequest(value) {
   if (!(exact(value, ['version', 'requestId', 'input']) || exact(value, ['version', 'requestId', 'input', 'context'])) || value.version !== 1 ||
       typeof value.requestId !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(value.requestId))
     fail(400, 'INVALID_REQUEST', 'Invalid assistant request.');
-  if (Object.hasOwn(value,'context') && (!exact(value.context,['token']) ||
+  if (Object.hasOwn(value,'context') && (!(exact(value.context,['token']) || exact(value.context,['token','timeZone'])) ||
       !(value.context.token === null || typeof value.context.token === 'string' && /^[a-f0-9]{48}$/.test(value.context.token))))
     fail(400, 'INVALID_REQUEST', 'Invalid conversation reference.');
+  if(value.context?.timeZone!==undefined){
+    try { if(typeof value.context.timeZone!=='string'||value.context.timeZone.length>80)throw Error(); new Intl.DateTimeFormat('en',{timeZone:value.context.timeZone}); }
+    catch { fail(400,'INVALID_REQUEST','Invalid time zone.'); }
+  }
   const input = value.input;
   if (exact(input, ['command'])) validateIntent(input.command);
   else if (!exact(input, ['text']) || typeof input.text !== 'string' || !input.text.trim() || input.text.length > 200)
@@ -114,6 +118,7 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
   let searchService;
   const contexts = createContextStore();
   const notes = createNoteDrafts(db);
+  const management = require('./note-management.cjs').createNoteManagement(db,notes);
   const search = options => { searchService ||= require('../studio-search.cjs').createStudioSearchService(db); return searchService.search(options); };
   const conversation = createConversationTools(db,{search,validDate});
   return Object.freeze({
@@ -123,6 +128,10 @@ function createAssistantCore(db, {intentProvider = deterministicProvider} = {}) 
       const {requestId, input} = validateRequest(request);
       if (signal?.aborted) fail(409, 'CANCELLED', 'Assistant request cancelled.');
       const context = request.context ? contexts.read(request.context.token,userId) : null;
+      if(!input.command && request.context){
+        const managed=management.handle(input.text,userId,context,request.context.timeZone||'UTC');
+        if(managed)return {version:1,requestId,accountId:userId,intent:{name:'studio.note.manage',arguments:{}},result:managed.result,response:managed.response,context:contexts.save(userId,managed.state)};
+      }
       const activeDraft=notes.wantsText(userId,context);
       const noteFocused=activeDraft || notes.canAmend(userId,context);
       const editOperation=!input.command && noteFocused ? notes.pendingEdit(userId,context,input.text) || noteEdit(input.text) : null;

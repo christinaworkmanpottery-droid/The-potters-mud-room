@@ -30,6 +30,7 @@
     if (!preserveContext) {
       speechReview = speechSuggestion = null;
       conversationToken = null; noteDictation = false; recordNavigation = false;
+      window.QLNoteSharing?.clear();
       if(notePreview){notePreview.hidden=true;notePreviewText.textContent='';}
     }
     clearTimeout(restartTimer); clearTimeout(sessionTimer); clearTimeout(speechBurstTimer); speechBurst = ''; clearTimeout(speechTimer); clearTimeout(speechProbeTimer); clearTimeout(requestTimer); clearTimeout(autoStartTimer);
@@ -490,13 +491,14 @@
       requestTimer = setTimeout(() => { if (active()) pauseSession('The assistant did not respond. Start again or use the menu.', 'unavailable'); }, 30000);
     }
     let quietAcknowledgement = false;
+    window.QLNoteSharing?.clear();
     pendingText = text; output.textContent = 'Looking up your studio request…';
     retry.hidden = true; fallback.hidden = true; form.setAttribute('aria-busy', 'true');
     try {
       const response = await fetch(API + '/api/ql/assistant/turn', {
         method: 'POST', cache: 'no-store', signal: abort.signal,
         headers: {'Content-Type': 'application/json', Authorization: 'Bearer ' + credential},
-        body: JSON.stringify({version: 1, requestId, input: {text}, context:{token:conversationToken}})
+        body: JSON.stringify({version: 1, requestId, input: {text}, context:{token:conversationToken,...(/\b(?:today|yesterday)\b/i.test(text)?{timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'}:{})}})
       });
       if (!active()) return;
       if (response.status === 401) { sessionInvalid(); return; }
@@ -515,7 +517,7 @@
         if (data.context !== undefined && (typeof data.context?.token !== 'string' || !/^[a-f0-9]{48}$/.test(data.context.token) || Object.keys(data.context).length !== 1)) throw Error('Invalid context');
         conversationToken = data.context?.token || null;
         quietAcknowledgement = fromVoice && spokenReplies.checked && !isNoteControl(text) && data.result?.tool === 'studio.note' && data.result.status === 'draft';
-        noteDictation = data.result?.tool === 'studio.note' && ['collecting','draft','incomplete','material-review'].includes(data.result.status);
+        noteDictation = data.result?.status === 'conversation' ? noteDictation : data.result?.tool === 'studio.note' && ['collecting','draft','incomplete','material-review'].includes(data.result.status);
         if(notePreview){
           notePreview.hidden=!noteDictation;
           if(!noteDictation || data.result.status==='collecting')notePreviewText.textContent='';
@@ -523,6 +525,19 @@
         }
         // The core owns all facts and wording, including empty/undated/tied records.
         output.textContent = data.response.text;
+        if(['renamed','deleted'].includes(data.result?.status) && data.result.tool==='studio.note.manage'){
+          if(document.getElementById('studioNoteId')?.value===data.result.noteId){
+            if(data.result.status==='deleted')closeModal('studioNoteModal');
+            else document.getElementById('studioNoteTitle').value=data.result.title;
+          }
+          if(currentPage==='studioNotes')void loadStudioNotes();
+        }
+        if(data.result?.status==='saved' && document.getElementById('studioNoteId')?.value===data.result.noteId)closeModal('studioNoteModal');
+        if(data.response.share)window.QLNoteSharing?.present(data.response.share,{
+          active:()=>identity()===ownSession && available(),
+          onHandoff:()=>endSession('Sharing opened — return and tap Start voice session when ready.', 'stopped', true)
+        });
+        if(data.response.endSession===true){foregroundVoiceActivated=false;endSession(data.response.text);}
         fallback.hidden = !['studio.firing.latest','studio.firing.openLatest'].includes(data.intent?.name);
         if (data.response.navigation) {
           internalNavigation = true;
@@ -552,6 +567,14 @@
     const keys = Object.keys(target).sort().join(',');
     if (target.kind === 'page' && keys === 'kind,page' && pages.includes(target.page)) {
       recordNavigation = false; navigate(target.page); return;
+    }
+    if(target.kind==='record' && keys==='id,kind,type' && target.type==='studio-note' && typeof target.id==='string' && target.id.length<=200){
+      const own=identity();recordNavigation={type:'studio-note',id:target.id};
+      navigate('studioNotes');
+      void api('/api/studio/notes/'+encodeURIComponent(target.id)).then(note=>{
+        if(identity()!==own||!available()||recordNavigation?.id!==target.id)return;
+        openStudioNoteModal(note);
+      }).catch(()=>{if(identity()===own)output.textContent='That note could not be opened. Please search again.';});return;
     }
     if (target.kind === 'record' && keys === 'id,kind,type' && ['firing','piece'].includes(target.type) &&
         typeof target.id === 'string' && target.id.length > 0 && target.id.length <= 200 && window.StudioSearch) {
