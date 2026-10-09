@@ -24,6 +24,8 @@ test('recovery: real note phrases through speech events, HTTP, displayed content
   const el=id=>w.document.getElementById(id);el('qlAssistantSpokenReplies').checked=true;el('qlAssistantSessionStart').click();
   async function say(text){const count=engines.length;const engine=engines.at(-1);engine.onresult?.({results:[{isFinal:false,0:{transcript:text}}]});assert.ok(el('qlAssistantSessionCommand').textContent.includes(text),'live transcript visible');assert.equal(el('qlAssistantForm').getAttribute('aria-busy'),'false');engine.result(text);engine.onend?.();await until(()=>engines.length>count);return el('qlAssistantResponse').textContent;}
 
+  async function interrupt(){const count=engines.length;const engine=engines.at(-1);engine.onerror({error:'aborted'});assert.equal(el('qlAssistantSession').dataset.state,'recovering');assert.equal(engines.length,count);engine.onend();await until(()=>engines.length>count);}
+
   const cases=[
    ['I need to make 25 soy sauce dishes in B-Mix clay.'],
    ['Make 30 soy sauce dishes in electric brown clay, fire at cone 04.'],
@@ -77,13 +79,18 @@ test('recovery: real note phrases through speech events, HTTP, displayed content
   const after=before.replace('I need to make','I made');
   await say('New note '+before.replace('B-Mix','BMX'));
   assert.match(el('qlAssistantResponse').textContent,/Did you mean “B-Mix clay”/);
-  await say('yes');await say('Save note');
+  await interrupt(); // pending B-Mix clarification survives recovery
+  await say('yes');await interrupt(); // corrected draft survives recovery
+  assert.equal(el('qlAssistantNotePreviewText').textContent,before);
+  await say('Save note');
+  await interrupt(); // saved-note follow-up context survives recovery
   const noteId=db.prepare('SELECT id FROM studio_notes WHERE user_id=? AND body=?').get('a',before).id;
   await say('Remove I need to make and put I made instead');
   assert.equal(el('qlAssistantNotePreviewText').textContent,after);
   assert.match(await say('Save note'),/Updated your Studio Note/);
   assert.equal(db.prepare('SELECT body FROM studio_notes WHERE id=?').get(noteId).body,after);
   assert.equal(spoken.at(-1),'Done. I updated the note.','saved edit confirmed aloud');
+  await interrupt(); // operation continues after the persisted edit
   assert.match(await say('When was my last firing?'),/2026-10-01/);
   assert.ok(engines.length>30,'one activation supports all turns');
  } finally {await pause(50);dom?.window.close();await fixture.stop();}

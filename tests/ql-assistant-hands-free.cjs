@@ -89,7 +89,7 @@ test('no-speech retries only after disconnect, bounded at three attempts',async 
 test('interim-only words never execute and retry after disconnect',async t=>{
  const f=await fixture(t);start(f);f.engines[0].result('open glazes',false);f.engines[0].onend();assert.equal(f.pending.length,0);restart(f);f.engines[1].result('Open glazes');assert.equal(f.pending.length,1);
 });
-for(const error of ['not-allowed','service-not-allowed','audio-capture','network','aborted']) test('terminal error stops session '+error,async t=>{
+for(const error of ['not-allowed','service-not-allowed','audio-capture']) test('terminal error stops session '+error,async t=>{
  const f=await fixture(t);start(f);f.engines[0].onerror({error});assert.equal(state(f),error.includes('allowed')?'permission-denied':'unavailable');assert.equal(f.engines.length,1);assert.equal(f.el('qlAssistantSessionStop').hidden,true);
 });
 test('engine watchdog cannot overlap a stuck recognizer',async t=>{
@@ -439,4 +439,69 @@ test('Issue8 cancellation makes queued quiet acknowledgement inert',async t=>{
  f.w.speechSynthesis={speak(s){speeches.push(s);},cancel(){}};f.el('qlAssistantSpokenReplies').checked=true;start(f);
  f.engines[0].result('New note Buy clay');f.reply(0,'Draft studio note: “Buy clay”.',{result:{tool:'studio.note',status:'draft',draftText:'Buy clay'}});await tick();const queued=f.timers.get(3000);
  f.el('qlAssistantSessionStop').click();queued();assert.equal(speeches.filter(s=>s.text).length,0);assert.equal(f.engines.length,1);
+});
+
+for (const error of ['aborted', 'network']) test('October 9: recover '+error+' only after disconnect, once', async t => {
+ const f=await fixture(t);start(f);const e=f.engines[0],end=e.onend,err=e.onerror;
+ err({error});err({error});e.onstart();e.onaudiostart();e.onsoundstart();
+ assert.equal(state(f),'recovering');assert.equal(f.engines.length,1);
+ end();const retry=f.timers.get(650);end();retry();retry();
+ assert.equal(f.engines.length,2);assert.equal(e.aborts,0);
+ err({error});assert.notEqual(state(f),'unavailable');
+ f.engines[1].result('Open glazes');assert.equal(f.pending.length,1);
+});
+test('October 9: repeated aborts exhaust budget even when each engine starts',async t=>{
+ const f=await fixture(t);start(f);
+ for(let i=0;i<3;i++){const e=f.engines[i];e.onstart();e.onerror({error:'aborted'});e.onend();restart(f);}
+ assert.equal(f.engines.length,3);assert.equal(state(f),'unavailable');
+ assert.match(f.el('qlAssistantSessionStatus').textContent,/Listening is stopped/);
+ f.w.dispatchEvent(new f.w.Event('pageshow'));f.timers.get(250)?.();assert.equal(f.engines.length,3);
+});
+test('October 9: missing disconnect stops truthfully without overlapping engines',async t=>{
+ const f=await fixture(t);start(f);const e=f.engines[0],late=e.onend;
+ e.onerror({error:'aborted'});f.timers.get(5000)();late();restart(f);
+ assert.equal(f.engines.length,1);assert.equal(e.aborts,1);assert.equal(state(f),'unavailable');
+});
+for(const afterEnd of [false,true]) test('October 9: intentional end cancels recovery '+afterEnd,async t=>{
+ const f=await fixture(t);start(f);const e=f.engines[0],late=e.onend;
+ e.onerror({error:'aborted'});if(afterEnd)late();
+ f.el('qlAssistantSessionStop').click();late();restart(f);
+ assert.equal(f.engines.length,1);assert.equal(state(f),'stopped');
+});
+test('October 9: abort callback from released mic cannot interrupt spoken response',async t=>{
+ const f=await fixture(t,undefined,'standard',true);let spoken;
+ f.w.SpeechSynthesisUtterance=class {constructor(text){this.text=text;}};
+ f.w.speechSynthesis={speak(s){spoken=s;},cancel(){}};
+ start(f);const e=f.engines[0],late=e.onerror,end=e.onend;
+ e.result('New note');f.reply(0,'What would you like the note to say?',{context:{token:'a'.repeat(48)},result:{tool:'studio.note',status:'collecting'}});await tick();
+ spoken.onstart();late({error:'aborted'});end();restart(f);
+ assert.equal(state(f),'speaking');assert.equal(f.engines.length,1);
+ spoken.onend();restart(f);assert.equal(f.engines.length,2);
+ f.engines[1].result('Make three dishes in BMX clay');
+ assert.equal(f.pending[1].body.context.token,'a'.repeat(48));
+ assert.equal(f.pending[1].body.input.text,'Make three dishes in BMX clay','server owns ambiguous clay clarification');
+});
+for(const status of ['draft','saved','updated']) test('October 9: '+status+' note context survives interruption and next edit',async t=>{
+ const f=await fixture(t);start(f);f.engines[0].result('New note');
+ const token='b'.repeat(48),text='I need to make three dishes in B-Mix clay';
+ f.reply(0,'Draft studio note: '+text,{context:{token},result:{tool:'studio.note',status,draftText:text}});await tick();restart(f);
+ const e=f.engines[1];e.onerror({error:'aborted'});e.onend();restart(f);
+ if(status==='draft'){assert.equal(f.el('qlAssistantNotePreview').hidden,false);assert.equal(f.el('qlAssistantNotePreviewText').textContent,text);}
+ f.engines[2].result('replace I need to make with I made');
+ assert.equal(f.pending[1].body.context.token,token);assert.equal(f.pending[1].body.input.text,'replace I need to make with I made');
+ f.reply(1,'Updated your Studio Note: I made three dishes in B-Mix clay',{context:{token},result:{tool:'studio.note',status:'updated'}});await tick();restart(f);
+ assert.equal(f.engines.length,4);
+});
+test('October 9: exhausted retries retain draft for explicit resume',async t=>{
+ const f=await fixture(t);start(f);f.engines[0].result('New note');const token='c'.repeat(48);
+ f.reply(0,'Draft studio note: Make dishes',{context:{token},result:{tool:'studio.note',status:'draft',draftText:'Make dishes'}});await tick();restart(f);
+ for(let i=1;i<=3;i++){f.engines[i].onerror({error:'aborted'});f.engines[i].onend();restart(f);}
+ assert.equal(state(f),'unavailable');assert.equal(f.el('qlAssistantNotePreviewText').textContent,'Make dishes');
+ start(f);f.engines[4].result('save draft');assert.equal(f.pending[1].body.context.token,token);
+});
+test('October 9: interrupted partial edit is retained but never executed',async t=>{
+ const f=await fixture(t);start(f);const e=f.engines[0];e.result('replace I need',false);
+ e.onerror({error:'aborted'});e.onresult({results:[{isFinal:true,0:{transcript:'replace I need'}}]});e.onend();
+ assert.equal(f.pending.length,0);assert.equal(f.el('qlAssistantInput').value,'replace I need');restart(f);
+ f.engines[1].result('Open glazes');assert.equal(f.pending.length,1);
 });

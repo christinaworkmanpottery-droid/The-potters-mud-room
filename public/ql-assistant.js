@@ -15,6 +15,7 @@
   let dock, dockStatus, dockCommand, dockReply, sessionStart, sessionStop, spokenReplies, utterance, notePreview, notePreviewText;
   let speechReview = null, speechSuggestion = null, quietDraftReply = null, speechBurst = '', speechBurstTimer = null;
   let emptyAttempts = 0, voiceEpoch = 0, internalNavigation = false, autoStartTimer = null, foregroundVoiceActivated = false, speechAudioUnlocked = false;
+  let interruptionAttempts = 0, recoveryPaused = false, restartSequence = 0;
   const inVoiceContext = () => entered && (currentPage === 'qlAssistant' || handsFree);
   function sessionState(state, message) {
     if (!dock) return;
@@ -23,26 +24,40 @@
     sessionStart.disabled = handsFree || !available() || !speechSupported() || interactionMode() !== 'handsfree';
     sessionStop.hidden = !handsFree;
   }
-  function endSession(message = 'Stopped — tap Start voice session to resume.', state = 'stopped') {
-    speechReview = speechSuggestion = quietDraftReply = null;
-    handsFree = false; voiceEpoch++; conversationToken = null; noteDictation = false; recordNavigation = false;
-    if(notePreview){notePreview.hidden=true;notePreviewText.textContent='';}
+  function endSession(message = 'Stopped — tap Start voice session to resume.', state = 'stopped', preserveContext = false) {
+    quietDraftReply = null;
+    handsFree = false; voiceEpoch++; restartSequence++; recoveryPaused = preserveContext;
+    if (!preserveContext) {
+      speechReview = speechSuggestion = null;
+      conversationToken = null; noteDictation = false; recordNavigation = false;
+      if(notePreview){notePreview.hidden=true;notePreviewText.textContent='';}
+    }
     clearTimeout(restartTimer); clearTimeout(sessionTimer); clearTimeout(speechBurstTimer); speechBurst = ''; clearTimeout(speechTimer); clearTimeout(speechProbeTimer); clearTimeout(requestTimer); clearTimeout(autoStartTimer);
     if (utterance) { utterance.onend = utterance.onerror = utterance.onstart = null; utterance = null; window.speechSynthesis?.cancel(); }
     cancelVoice();
     sessionState(state, message);
   }
   function pauseSession(message = 'Stopped — tap Start voice session to resume.', state = 'stopped') {
+    foregroundVoiceActivated = false;
     invalidate();
     sessionState(state, message);
+  }
+  function stopRecovery(message) {
+    // Keep server conversation/draft and local clarification state for an explicit
+    // retry. Do not call invalidate(), which discards that context.
+    foregroundVoiceActivated = false;
+    endSession(message + ' Your note context is retained. Tap Start voice session to retry or type.', 'unavailable', true);
   }
   function listenAgain(message = 'Preparing microphone for your next command…') {
     if (!handsFree) return;
     const own = voiceEpoch;
+    const restartId = ++restartSequence;
     sessionState('starting', message);
     clearTimeout(restartTimer);
     restartTimer = setTimeout(() => {
       syncSession();
+      if (restartId !== restartSequence) return;
+      restartSequence++;
       if (handsFree && own === voiceEpoch && available() && !document.hidden) startVoice();
     }, 650);
   }
@@ -63,6 +78,7 @@
   function voiceReply(text) {
     if (!handsFree) return;
     cancelVoice();
+    restartSequence++;
     clearTimeout(restartTimer);
     dockReply.textContent = text;
     sessionState('responding', 'Response ready.');
@@ -124,7 +140,9 @@
     }
     if (!handsFreeEnabled || interactionMode() !== 'handsfree' || !available() || document.hidden || handsFree) return;
     if (!speechSupported()) { sessionState('unavailable', 'Voice unavailable. Typing and the menu remain available.'); return; }
-    invalidate(); handsFree = true; entered = true; emptyAttempts = 0; foregroundVoiceActivated = true;
+    if (!recoveryPaused) invalidate();
+    recoveryPaused = false; interruptionAttempts = 0;
+    handsFree = true; entered = true; emptyAttempts = 0; foregroundVoiceActivated = true;
     // Hands-Free lasts for the foreground Mud Room session. Page/account teardown
     // owns shutdown; there is no arbitrary 15-minute assistant timeout.
     startVoice();
@@ -276,11 +294,11 @@
         } else voiceState(message);
       };
       turn.finish = finish;
-      engine.onstart = () => { if (active()) voiceState(turn.stopping ? 'Finishing speech…' : 'Listening — speak now. Tap Stop when finished.'); };
-      engine.onaudiostart = () => { if (active() && !turn.stopping) voiceState('Microphone ready — speak now. Tap Stop when finished.'); };
-      engine.onsoundstart = () => { if (active()) { turn.heardSound = true; clearTimeout(speechBurstTimer); quietDraftReply = null; turn.quietReply = null; voiceState('Sound detected. Listening for your words…'); } };
+      engine.onstart = () => { if (active() && !turn.interrupted) voiceState(turn.stopping ? 'Finishing speech…' : 'Listening — speak now. Tap Stop when finished.'); };
+      engine.onaudiostart = () => { if (active() && !turn.stopping && !turn.interrupted) voiceState('Microphone ready — speak now. Tap Stop when finished.'); };
+      engine.onsoundstart = () => { if (active() && !turn.interrupted) { turn.heardSound = true; clearTimeout(speechBurstTimer); quietDraftReply = null; turn.quietReply = null; voiceState('Sound detected. Listening for your words…'); } };
       engine.onresult = event => {
-        if (!active()) return;
+        if (!active() || turn.interrupted) return;
         clearTimeout(turn.finalDisconnectTimer);
         const results = Array.from(event.results || []);
         const eventText = results.map(r => typeof r?.[0]?.transcript === 'string' ? r[0].transcript.trim() : '').filter(Boolean).join(' ');
@@ -340,6 +358,19 @@
         if (!active()) return;
         clearTimeout(turn.finalDisconnectTimer);
         if (handsFree) {
+          if (event.error === 'aborted' || event.error === 'network') {
+            if (turn.interrupted) return;
+            turn.interrupted = true;
+            clearTimeout(voiceTimer); clearTimeout(stopTimer);
+            clearTimeout(speechBurstTimer); quietDraftReply = null; turn.quietReply = null;
+            // onerror is not a disconnect acknowledgement. Keep this engine as
+            // the sole microphone owner until onend; never restart from onerror.
+            sessionState('recovering', 'Speech interrupted — waiting for microphone disconnect…');
+            voiceTimer = setTimeout(() => {
+              if (active()) stopRecovery('Microphone did not disconnect. Listening is stopped.');
+            }, 5000);
+            return;
+          }
           if (event.error === 'no-speech') {
             // Wait for onend before recycling the recognizer. If it never arrives,
             // stop rather than overlap two microphone owners.
@@ -364,21 +395,38 @@
         };
         finish(messages[event.error] || 'Speech is unavailable. You can try again or type your question.');
       };
-      engine.onend = () => finish(turn.heardSound
+      engine.onend = () => {
+        if (!active()) return;
+        if (turn.interrupted) {
+          const partial = turn.finalText || turn.draft;
+          cancelVoice('', false);
+          if (partial) { input.value = partial; dockCommand.textContent = 'Interrupted, not sent: ' + partial; }
+          if (++interruptionAttempts > 2) {
+            stopRecovery('Speech recovery failed after two retries. Listening is stopped.');
+          } else {
+            listenAgain('Recovering microphone — retry ' + interruptionAttempts + ' of 2. ' + (partial ? 'Please repeat the interrupted words when ready.' : 'Your conversation is retained.'));
+          }
+          return;
+        }
+        // Reset only after a successful speech turn, not onstart: an engine
+        // repeatedly starting and aborting must still exhaust the retry budget.
+        if (turn.finalText) interruptionAttempts = 0;
+        finish(turn.heardSound
         ? 'Sound was detected, but the speech service returned no words. You can retry or type your question.'
         : 'No speech text was returned by the browser. Wait for “Microphone ready” before speaking, or type your question.', true, true);
+      };
       voiceState('Starting microphone… Wait for “Microphone ready” before speaking.');
       // Watchdog bounds every attempt, even when Safari emits no terminal event.
       voiceTimer = setTimeout(() => { if (active()) { turn.timedOut = true; stopVoice(); } }, handsFree ? 30000 : 20000);
       engine.start();
     } catch (_) {
-      if (handsFree) { pauseSession('Speech could not start. Check permission and tap Start voice session to retry.', 'unavailable'); return; }
+      if (handsFree) { stopRecovery('Speech could not start. Listening is stopped. Check microphone permission.'); return; }
       cancelVoice('Speech could not start. Check microphone permission, or type your question.');
     }
   }
   function stopVoice() {
     const turn = recognition;
-    if (!turn || turn.stopping) return;
+    if (!turn || turn.stopping || turn.interrupted) return;
     clearTimeout(turn.finalDisconnectTimer);
     turn.stopping = true; voiceState('Finishing speech…');
     stopTimer = setTimeout(() => {
