@@ -1468,7 +1468,7 @@ app.delete('/api/admin/members/:id', auth, (req, res) => {
 });
 
 // Admin dashboard — see all members, signups, cancellations, tiers
-app.get('/api/admin/members', auth, (req, res) => {
+app.get('/api/admin/members', auth, async (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
     const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, 
@@ -1482,11 +1482,26 @@ app.get('/api/admin/members', auth, (req, res) => {
       SELECT DISTINCT user_id FROM iap_purchases
       WHERE environment='production' AND expires_at > CAST(strftime('%s','now') AS INTEGER)
     `).all().map(row => row.user_id));
+    // Confirm Stripe references against the billing provider. Unknown status must
+    // never be silently counted as paid or gifted.
+    const stripeStatuses = new Map();
+    const stripeIds = [...new Set(members.filter(m => m.stripe_subscription_id).map(m => m.stripe_subscription_id))];
+    if (stripe) {
+      for (const id of stripeIds) {
+        try {
+          const subscription = await stripe.subscriptions.retrieve(id);
+          stripeStatuses.set(id, subscription.status === 'active' ? 'active' : 'inactive');
+        } catch (error) {
+          console.error('Admin Stripe verification failed:', error.message);
+          stripeStatuses.set(id, 'unknown');
+        }
+      }
+    }
     const stats = {
       total: members.length,
       byTier: { free: 0, paid: 0, gifted: 0 },
-      billingEvidence: { activeProductionIAP: 0, stripeUnverified: 0, manuallyGrantedOrGifted: 0 },
-      paidCountVerifiedByStripe: false,
+      billingEvidence: { activeProductionIAP: 0, stripeUnverified: 0, stripeVerifiedActive: 0, stripeVerifiedInactive: 0, manuallyGrantedOrGifted: 0 },
+      paidCountVerifiedByStripe: !!stripe && stripeIds.every(id => stripeStatuses.get(id) !== 'unknown'),
       recent7d: 0,
       recent30d: 0
     };
@@ -1499,8 +1514,15 @@ app.get('/api/admin/members', auth, (req, res) => {
         stats.byTier.paid++;
         stats.billingEvidence.activeProductionIAP++;
       } else if (m.stripe_subscription_id) {
-        // A stored ID can be stale or belong to a canceled subscription.
-        stats.billingEvidence.stripeUnverified++;
+        const status = stripeStatuses.get(m.stripe_subscription_id);
+        if (status === 'active') {
+          stats.byTier.paid++;
+          stats.billingEvidence.stripeVerifiedActive++;
+        } else if (status === 'inactive') {
+          stats.billingEvidence.stripeVerifiedInactive++;
+        } else {
+          stats.billingEvidence.stripeUnverified++;
+        }
       } else {
         stats.byTier.gifted++;
         stats.billingEvidence.manuallyGrantedOrGifted++;
