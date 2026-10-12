@@ -4487,6 +4487,21 @@ async function loadAdminUsage() {
       '<div class="stat-box"><div class="stat-number">' + (d.totalActions || 0) + '</div><div class="stat-label">Total Actions</div></div>' +
       '</div>';
 
+    // Supplemental engagement data excludes admin and common test aliases.
+    if (d.engagementV2) {
+      const e = d.engagementV2;
+      html += '<h4 style="margin:20px 0 8px">Member Engagement (content creation)</h4>';
+      html += '<p style="font-size:12px;opacity:.8">Excludes the admin account and +test email aliases. These are content creators, not everyone who logged in or browsed.</p>';
+      html += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">' +
+        '<div class="stat-box"><div class="stat-number">' + e.eligibleMembers + '</div><div class="stat-label">Eligible Members</div></div>' +
+        '<div class="stat-box"><div class="stat-number">' + e.neverCreatedContent + '</div><div class="stat-label">Never Created Content</div></div></div>';
+      html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr><th style="text-align:left">Feature</th><th>7d Members</th><th>30d Members</th><th>90d Members</th><th>30d Actions</th></tr></thead><tbody>';
+      (e.featureEngagement || []).forEach(f => {
+        html += '<tr><td>' + f.action.replace(/_/g, ' ') + '</td><td style="text-align:center">' + f.last7d.uniqueMembers + '</td><td style="text-align:center">' + f.last30d.uniqueMembers + '</td><td style="text-align:center">' + f.last90d.uniqueMembers + '</td><td style="text-align:center">' + f.last30d.actions + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+
     // Feature usage ranked bar chart
     if (d.featureUsage && d.featureUsage.length) {
       const maxCount = d.featureUsage[0].count;
