@@ -4999,7 +4999,16 @@ app.get('/api/admin/activity-summary', auth, (req, res) => {
       ORDER BY last_active DESC NULLS LAST
     `).all().map(u => ({
       ...u,
-      total_actions: (u.pieces + u.firing_logs + u.forum_posts + u.forum_replies + u.studio_notes)
+      total_actions: (u.pieces + u.firing_logs + u.forum_posts + u.forum_replies + u.studio_notes),
+      top_feature: (() => {
+        const features = [
+          ['Pieces', u.pieces], ['Firings', u.firing_logs],
+          ['Forum posts', u.forum_posts], ['Forum replies', u.forum_replies],
+          ['Studio notes', u.studio_notes]
+        ];
+        features.sort((a, b) => b[1] - a[1]);
+        return features[0][1] > 0 ? features[0][0] : null;
+      })()
     }));
 
     // Daily new pieces (proxy for daily activity, last 30 days)
