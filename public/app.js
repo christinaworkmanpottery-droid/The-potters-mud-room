@@ -4564,22 +4564,23 @@ async function loadAdminUsage() {
         '<span>' + (d.dailyActiveUsers[d.dailyActiveUsers.length-1]?.day?.slice(5) || '') + '</span></div>';
     }
 
-    // Per-user activity cards: readable on narrow mobile screens without horizontal scrolling.
+    // Compact, mobile-friendly activity table. Keep all columns visible without sideways scrolling.
     if (d.perUser && d.perUser.length) {
       html += '<h4 style="margin:20px 0 8px">User Activity</h4>';
-      html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:12px">';
+      html += '<table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:0.78rem">';
+      html += '<colgroup><col style="width:38%"><col style="width:13%"><col style="width:22%"><col style="width:27%"></colgroup>';
+      html += '<tr style="border-bottom:2px solid var(--border);text-align:left">' +
+        '<th style="padding:8px 4px">User</th><th style="padding:8px 4px">Actions</th>' +
+        '<th style="padding:8px 4px">Last Active</th><th style="padding:8px 4px">Top Feature</th></tr>';
       d.perUser.forEach(u => {
-        const feature = (u.top_feature || '').replace(/_/g, ' ').trim();
-        html += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px;min-width:0;background:var(--surface)">' +
-          '<div style="font-weight:600;overflow-wrap:anywhere">' + esc(u.display_name || u.email) + '</div>' +
-          '<div style="font-size:0.78rem;color:var(--text-light);overflow-wrap:anywhere;margin-top:2px">' + esc(u.email) + '</div>' +
-          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">' +
-          '<div><div style="font-size:0.72rem;color:var(--text-light)">Actions</div><div style="font-weight:600">' + Number(u.total_actions || 0) + '</div></div>' +
-          '<div><div style="font-size:0.72rem;color:var(--text-light)">Last Active</div><div style="font-weight:600">' + timeAgo(u.last_active) + '</div></div>' +
-          '</div><div style="margin-top:10px"><div style="font-size:0.72rem;color:var(--text-light)">Top Feature</div>' +
-          '<div style="font-weight:600;overflow-wrap:anywhere;margin-top:2px">' + (feature ? esc(feature) : 'No feature recorded') + '</div></div></div>';
+        html += '<tr style="border-bottom:1px solid var(--border)">' +
+          '<td style="padding:9px 4px;overflow-wrap:anywhere;vertical-align:top"><strong>' + esc(u.display_name || u.email) + '</strong>' +
+          '<div style="font-size:0.7rem;color:var(--text-light);overflow-wrap:anywhere">' + esc(u.email) + '</div></td>' +
+          '<td style="padding:9px 4px;vertical-align:top">' + Number(u.total_actions || 0) + '</td>' +
+          '<td style="padding:9px 4px;vertical-align:top;overflow-wrap:anywhere">' + timeAgo(u.last_active) + '</td>' +
+          '<td style="padding:9px 4px;vertical-align:top;overflow-wrap:anywhere">' + esc(u.top_feature || '—') + '</td></tr>';
       });
-      html += '</div>';
+      html += '</table>';
     }
 
     el.innerHTML = html;
