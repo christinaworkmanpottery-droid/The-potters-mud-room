@@ -1474,29 +1474,40 @@ app.get('/api/admin/members', auth, (req, res) => {
     const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, 
       avatar_filename, created_at, updated_at, stripe_customer_id, stripe_subscription_id 
       FROM users ORDER BY created_at DESC`).all();
+    // Billing evidence is not the same as a confirmed payment.
+    // Never count billing_period='stripe-monthly' as a paid subscription.
+    // Native production purchases with a future expiry have verified receipt evidence;
+    // Stripe references are reported separately until checked against Stripe.
+    const activeIAP = new Set(db.prepare(`
+      SELECT DISTINCT user_id FROM iap_purchases
+      WHERE environment='production' AND expires_at > CAST(strftime('%s','now') AS INTEGER)
+    `).all().map(row => row.user_id));
     const stats = {
       total: members.length,
       byTier: { free: 0, paid: 0, gifted: 0 },
+      billingEvidence: { activeProductionIAP: 0, stripeUnverified: 0, manuallyGrantedOrGifted: 0 },
+      paidCountVerifiedByStripe: false,
       recent7d: 0,
       recent30d: 0
     };
     const now = Date.now();
     members.forEach(m => {
       const isUnlimited = m.tier === 'starter' || ['basic','mid','top'].includes(m.tier);
-      if (isUnlimited) {
-        const hasStripe = m.stripe_subscription_id && m.stripe_subscription_id !== '';
-        const isStripeMonthly = m.billing_period === 'stripe-monthly';
-        if (hasStripe || isStripeMonthly) {
-          stats.byTier.paid++;
-        } else {
-          stats.byTier.gifted++;
-        }
-      } else {
+      if (!isUnlimited) {
         stats.byTier.free++;
+      } else if (activeIAP.has(m.id)) {
+        stats.byTier.paid++;
+        stats.billingEvidence.activeProductionIAP++;
+      } else if (m.stripe_subscription_id) {
+        // A stored ID can be stale or belong to a canceled subscription.
+        stats.billingEvidence.stripeUnverified++;
+      } else {
+        stats.byTier.gifted++;
+        stats.billingEvidence.manuallyGrantedOrGifted++;
       }
       const age = now - new Date(m.created_at).getTime();
-      if (age < 7 * 86400000) stats.recent7d++;
-      if (age < 30 * 86400000) stats.recent30d++;
+      if (age >= 0 && age < 7 * 86400000) stats.recent7d++;
+      if (age >= 0 && age < 30 * 86400000) stats.recent30d++;
     });
     res.json({ members, stats });
   } catch(err) {
