@@ -49,6 +49,31 @@ try {
   }
 } catch (err) { console.error('[blog] Draft import error:', err.message); }
 
+// One-time editorial cleanup of the three October review drafts. Never touch published posts.
+try {
+  const reviewSlugs = [
+    'beginner-prevent-pottery-cracks-while-drying',
+    'intermediate-fix-common-pottery-glaze-defects',
+    'advanced-pottery-glaze-testing-repeatable-results'
+  ];
+  const selectReview = db.prepare('SELECT id, title, content FROM blog_posts WHERE slug = ? AND is_published = 0');
+  const updateReview = db.prepare('UPDATE blog_posts SET content = ? WHERE id = ? AND is_published = 0');
+  for (const slug of reviewSlugs) {
+    const post = selectReview.get(slug);
+    if (!post) continue;
+    let clean = post.content;
+    clean = clean.replace(/<h1>[^<]*<\/h1>\s*/i, '');
+    clean = clean.replace(/<p>\s*<strong>SEO keywords:<\/strong>[^<]*<\/p>\s*/gi, '');
+    clean = clean.replace(/<p>\s*<strong>Level:<\/strong>[^<]*<\/p>\s*/gi, '');
+    clean = clean.replace(/<h2>/g, '<h2 style="font-size:1.35rem;line-height:1.35;margin:1.4em 0 .5em">');
+    clean = clean.replace(/<p>/g, '<p style="line-height:1.7;margin:0 0 1em">');
+    if (clean !== post.content) {
+      updateReview.run(clean, post.id);
+      console.log('[blog] Cleaned unpublished review draft:', slug);
+    }
+  }
+} catch (err) { console.error('[blog] Review draft cleanup error:', err.message); }
+
 // AI usage tracking table
 db.exec(`CREATE TABLE IF NOT EXISTS ai_usage (
   id TEXT PRIMARY KEY,
