@@ -122,7 +122,7 @@ async function test(name,fn){await fn();console.log('PASS',name);}
  });
  await test('sample PDF is a real PDF; styles/scripts resolve from nested URLs',async()=>{
   const r=await fetch(base+'/shop/mud-log-preview.pdf');assert.match(r.headers.get('content-type'),/application\/pdf/);assert.equal((await r.text()).slice(0,5),'%PDF-');
-  const html=await (await fetch(base+'/nested/preview')).text();assert.match(html,/src="\/app.js\?v=20260925b"/);assert.match(html,/href="\/style.css/);
+  const html=await (await fetch(base+'/nested/preview')).text();assert.match(html,/src="\/app.js\?v=[^"]+"/);assert.match(html,/href="\/style.css/);
  });
  await test('server restart retains records and every saved photo',async()=>{
   const photos=fs.readdirSync(path.join(tmp,'data/uploads')).sort();
