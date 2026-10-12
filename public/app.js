@@ -4564,21 +4564,22 @@ async function loadAdminUsage() {
         '<span>' + (d.dailyActiveUsers[d.dailyActiveUsers.length-1]?.day?.slice(5) || '') + '</span></div>';
     }
 
-    // Per-user activity table
+    // Per-user activity cards: readable on narrow mobile screens without horizontal scrolling.
     if (d.perUser && d.perUser.length) {
       html += '<h4 style="margin:20px 0 8px">User Activity</h4>';
-      html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
-      html += '<tr style="border-bottom:2px solid var(--border);text-align:left">' +
-        '<th style="padding:6px">User</th><th style="padding:6px">Actions</th>' +
-        '<th style="padding:6px">Last Active</th><th style="padding:6px">Top Feature</th></tr>';
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:12px">';
       d.perUser.forEach(u => {
-        html += '<tr style="border-bottom:1px solid var(--border)">' +
-          '<td style="padding:6px">' + esc(u.display_name || u.email) + '<div style="font-size:0.75rem;color:var(--text-light)">' + esc(u.email) + '</div></td>' +
-          '<td style="padding:6px">' + u.total_actions + '</td>' +
-          '<td style="padding:6px">' + timeAgo(u.last_active) + '</td>' +
-          '<td style="padding:6px"><span class="piece-meta-tag">' + esc((u.top_feature || '').replace(/_/g, ' ')) + '</span></td></tr>';
+        const feature = (u.top_feature || '').replace(/_/g, ' ').trim();
+        html += '<div style="border:1px solid var(--border);border-radius:10px;padding:12px;min-width:0;background:var(--surface)">' +
+          '<div style="font-weight:600;overflow-wrap:anywhere">' + esc(u.display_name || u.email) + '</div>' +
+          '<div style="font-size:0.78rem;color:var(--text-light);overflow-wrap:anywhere;margin-top:2px">' + esc(u.email) + '</div>' +
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">' +
+          '<div><div style="font-size:0.72rem;color:var(--text-light)">Actions</div><div style="font-weight:600">' + Number(u.total_actions || 0) + '</div></div>' +
+          '<div><div style="font-size:0.72rem;color:var(--text-light)">Last Active</div><div style="font-weight:600">' + timeAgo(u.last_active) + '</div></div>' +
+          '</div><div style="margin-top:10px"><div style="font-size:0.72rem;color:var(--text-light)">Top Feature</div>' +
+          '<div style="font-weight:600;overflow-wrap:anywhere;margin-top:2px">' + (feature ? esc(feature) : 'No feature recorded') + '</div></div></div>';
       });
-      html += '</table></div>';
+      html += '</div>';
     }
 
     el.innerHTML = html;
