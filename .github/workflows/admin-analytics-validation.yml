@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - fix/admin-analytics-issue-10
+      - fix/admin-user-activity-mobile
   pull_request:
     paths:
       - server.js
