@@ -23,16 +23,31 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) throw new Error('JWT_SECRET must be configured');
 const db = initDB();
-// Import editorial review drafts once into the existing admin blog table.
-// Never publish or modify an existing post; no notification is sent.
+// Import unpublished editorial review drafts into the admin blog table once.
 try {
-  const draftDir = path.join(__dirname, 'content', 'blog-review');
-  if (fs.existsSync(draftDir)) {
-    for (const filename of fs.readdirSync(draftDir).filter(n => n.endsWith('.md'))) {
-      const raw = fs.readFileSync(path.join(draftDir, filename), 'utf8');
-      const parts = raw.match(/^---\\r?\\n([\\s\\S]*?)\\r?\\n---\\r?\\n([\\s\\S]*)$/);
-      if (!parts) continue;
-      const field = key => (parts[1].match(new RegExp('^' + key + ':\\\\s*(.*)
+  const dir = path.join(__dirname, 'content', 'blog-review');
+  if (fs.existsSync(dir)) for (const filename of fs.readdirSync(dir)) {
+    if (!filename.endsWith('.md')) continue;
+    const raw = fs.readFileSync(path.join(dir, filename), 'utf8');
+    const sections = raw.split('---');
+    if (sections.length < 3) continue;
+    const metadata = Object.fromEntries(sections[1].split('\n').map(line => {
+      const i = line.indexOf(':');
+      return i < 0 ? ['', ''] : [line.slice(0, i).trim(), line.slice(i + 1).trim().replace(/^"/, '').replace(/"$/, '')];
+    }));
+    if (metadata.status !== 'draft' || metadata.publish !== 'false' || !metadata.slug) continue;
+    if (db.prepare('SELECT id FROM blog_posts WHERE slug=?').get(metadata.slug)) continue;
+    const esc = v => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const html = sections.slice(2).join('---').trim().split('\n').map(line => {
+      if (line.startsWith('## ')) return '<h2>' + esc(line.slice(3)) + '</h2>';
+      if (line.startsWith('# ')) return '<h1>' + esc(line.slice(2)) + '</h1>';
+      return line.trim() ? '<p>' + esc(line).replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>') + '</p>' : '';
+    }).join('\n');
+    db.prepare('INSERT INTO blog_posts (id,title,slug,content,excerpt,author,is_published) VALUES (?,?,?,?,?,?,0)')
+      .run(uuidv4(), metadata.title, metadata.slug, html, metadata.seo_description, 'Christina Workman');
+    console.log('[blog] Draft imported:', metadata.slug);
+  }
+} catch (err) { console.error('[blog] Draft import error:', err.message); }
 
 // AI usage tracking table
 db.exec(`CREATE TABLE IF NOT EXISTS ai_usage (
