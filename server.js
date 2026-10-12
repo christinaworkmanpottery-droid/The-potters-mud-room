@@ -1508,6 +1508,11 @@ app.get('/api/admin/members', auth, async (req, res) => {
     const now = Date.now();
     members.forEach(m => {
       const isUnlimited = m.tier === 'starter' || ['basic','mid','top'].includes(m.tier);
+      m.billingClassification = !isUnlimited ? 'free'
+        : activeIAP.has(m.id) ? 'paid'
+        : m.stripe_subscription_id && stripeStatuses.get(m.stripe_subscription_id) === 'active' ? 'paid'
+        : m.stripe_subscription_id && stripeStatuses.get(m.stripe_subscription_id) === 'inactive' ? 'inactive'
+        : m.stripe_subscription_id ? 'unverified' : 'gifted';
       if (!isUnlimited) {
         stats.byTier.free++;
       } else if (activeIAP.has(m.id)) {
