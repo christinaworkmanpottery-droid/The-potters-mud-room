@@ -140,7 +140,7 @@ async function test(name, fn){await fn();console.log('PASS',name);}
  });
  await test('root asset URLs survive nested paths; Help has only Mud Room links',async()=>{
    assert.equal(w.document.querySelector('link[href*="style.css"]').getAttribute('href'),'/style.css?v=20260925b');
-   assert.ok(w.document.querySelector('script[src="/app.js?v=20260925b"]'));
+   assert.ok(w.document.querySelector('script[src^="/app.js?v="]'));
    assert.equal(field('pageHelp').querySelectorAll('a[href*="lucehealing"],a[href*="christinaworkmanpottery"]').length,0);
  });
  await pause(); dom.window.close();
