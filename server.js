@@ -1468,35 +1468,73 @@ app.delete('/api/admin/members/:id', auth, (req, res) => {
 });
 
 // Admin dashboard — see all members, signups, cancellations, tiers
-app.get('/api/admin/members', auth, (req, res) => {
+app.get('/api/admin/members', auth, async (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
     const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, 
       avatar_filename, created_at, updated_at, stripe_customer_id, stripe_subscription_id 
       FROM users ORDER BY created_at DESC`).all();
+    // Billing evidence is not the same as a confirmed payment.
+    // Never count billing_period='stripe-monthly' as a paid subscription.
+    // Native production purchases with a future expiry have verified receipt evidence;
+    // Stripe references are reported separately until checked against Stripe.
+    const activeIAP = new Set(db.prepare(`
+      SELECT DISTINCT user_id FROM iap_purchases
+      WHERE environment='production' AND expires_at > CAST(strftime('%s','now') AS INTEGER)
+    `).all().map(row => row.user_id));
+    // Confirm Stripe references against the billing provider. Unknown status must
+    // never be silently counted as paid or gifted.
+    const stripeStatuses = new Map();
+    const stripeIds = [...new Set(members.filter(m => m.stripe_subscription_id).map(m => m.stripe_subscription_id))];
+    if (stripe) {
+      for (const id of stripeIds) {
+        try {
+          const subscription = await stripe.subscriptions.retrieve(id);
+          stripeStatuses.set(id, subscription.status === 'active' ? 'active' : 'inactive');
+        } catch (error) {
+          console.error('Admin Stripe verification failed:', error.message);
+          stripeStatuses.set(id, 'unknown');
+        }
+      }
+    }
     const stats = {
       total: members.length,
       byTier: { free: 0, paid: 0, gifted: 0 },
+      billingEvidence: { activeProductionIAP: 0, stripeUnverified: 0, stripeVerifiedActive: 0, stripeVerifiedInactive: 0, manuallyGrantedOrGifted: 0 },
+      paidCountVerifiedByStripe: !!stripe && stripeIds.every(id => stripeStatuses.get(id) !== 'unknown'),
       recent7d: 0,
       recent30d: 0
     };
     const now = Date.now();
     members.forEach(m => {
       const isUnlimited = m.tier === 'starter' || ['basic','mid','top'].includes(m.tier);
-      if (isUnlimited) {
-        const hasStripe = m.stripe_subscription_id && m.stripe_subscription_id !== '';
-        const isStripeMonthly = m.billing_period === 'stripe-monthly';
-        if (hasStripe || isStripeMonthly) {
+      m.billingClassification = !isUnlimited ? 'free'
+        : activeIAP.has(m.id) ? 'paid'
+        : m.stripe_subscription_id && stripeStatuses.get(m.stripe_subscription_id) === 'active' ? 'paid'
+        : m.stripe_subscription_id && stripeStatuses.get(m.stripe_subscription_id) === 'inactive' ? 'inactive'
+        : m.stripe_subscription_id ? 'unverified' : 'gifted';
+      if (!isUnlimited) {
+        stats.byTier.free++;
+      } else if (activeIAP.has(m.id)) {
+        stats.byTier.paid++;
+        stats.billingEvidence.activeProductionIAP++;
+      } else if (m.stripe_subscription_id) {
+        const status = stripeStatuses.get(m.stripe_subscription_id);
+        if (status === 'active') {
           stats.byTier.paid++;
+          stats.billingEvidence.stripeVerifiedActive++;
+        } else if (status === 'inactive') {
+          stats.billingEvidence.stripeVerifiedInactive++;
         } else {
-          stats.byTier.gifted++;
+          stats.billingEvidence.stripeUnverified++;
         }
       } else {
-        stats.byTier.free++;
+        stats.byTier.gifted++;
+        stats.billingEvidence.manuallyGrantedOrGifted++;
       }
       const age = now - new Date(m.created_at).getTime();
-      if (age < 7 * 86400000) stats.recent7d++;
-      if (age < 30 * 86400000) stats.recent30d++;
+      if (age >= 0 && age < 7 * 86400000) stats.recent7d++;
+      if (age >= 0 && age < 30 * 86400000) stats.recent30d++;
     });
     res.json({ members, stats });
   } catch(err) {
@@ -4898,6 +4936,38 @@ app.get('/api/admin/activity-summary', auth, (req, res) => {
     const totalForumReplies = db.prepare("SELECT COUNT(*) as c FROM forum_replies").get().c;
     const totalStudioNotes = db.prepare("SELECT COUNT(*) as c FROM studio_notes").get().c;
 
+    // Engagement analytics: count distinct members separately from their actions.
+    // Exclude the admin account and explicitly flagged test accounts from this
+    // supplemental view; do not silently alter legacy dashboard response fields.
+    const activityTables = [
+      ['pieces_logged', 'pieces'], ['firing_logs', 'firing_logs'],
+      ['forum_posts', 'forum_posts'], ['forum_replies', 'forum_replies'],
+      ['studio_notes', 'studio_notes']
+    ];
+    const memberFilter = "LOWER(TRIM(u.email)) != LOWER(?) AND LOWER(COALESCE(u.email,'')) NOT LIKE '%+test@%'";
+    const featureEngagement = activityTables.map(([action, table]) => {
+      const byWindow = days => db.prepare(`
+        SELECT COUNT(*) AS actions, COUNT(DISTINCT t.user_id) AS uniqueMembers
+        FROM ${table} t JOIN users u ON u.id=t.user_id
+        WHERE ${memberFilter} AND t.created_at >= datetime('now', ?)
+      `).get(ADMIN_EMAIL, '-' + days + ' days');
+      const lifetime = db.prepare(`
+        SELECT COUNT(*) AS actions, COUNT(DISTINCT t.user_id) AS uniqueMembers
+        FROM ${table} t JOIN users u ON u.id=t.user_id
+        WHERE ${memberFilter}
+      `).get(ADMIN_EMAIL);
+      return { action, lifetime, last7d: byWindow(7), last30d: byWindow(30), last90d: byWindow(90) };
+    }).sort((a,b) => b.last30d.uniqueMembers - a.last30d.uniqueMembers || b.last30d.actions - a.last30d.actions);
+    const eligibleMembers = db.prepare(`SELECT COUNT(*) AS count FROM users u WHERE ${memberFilter}`).get(ADMIN_EMAIL).count;
+    const neverCreatedContent = db.prepare(`
+      SELECT COUNT(*) AS count FROM users u WHERE ${memberFilter}
+      AND NOT EXISTS (SELECT 1 FROM pieces p WHERE p.user_id=u.id)
+      AND NOT EXISTS (SELECT 1 FROM firing_logs f WHERE f.user_id=u.id)
+      AND NOT EXISTS (SELECT 1 FROM forum_posts p WHERE p.user_id=u.id)
+      AND NOT EXISTS (SELECT 1 FROM forum_replies r WHERE r.user_id=u.id)
+      AND NOT EXISTS (SELECT 1 FROM studio_notes n WHERE n.user_id=u.id)
+    `).get(ADMIN_EMAIL).count;
+
     const featureUsage = [
       { action: 'pieces_logged', count: totalPieces },
       { action: 'firing_logs', count: totalFiringLogs },
@@ -4964,6 +5034,7 @@ app.get('/api/admin/activity-summary', auth, (req, res) => {
       newThisWeek,
       newThisMonth,
       featureUsage,
+      engagementV2: { eligibleMembers, neverCreatedContent, featureEngagement, definition: 'Content created; excludes admin email and +test email aliases. Not login/session activity.' },
       dailyActiveUsers,
       perUser,
       activityOverTime,

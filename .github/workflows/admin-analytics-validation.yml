@@ -1,0 +1,27 @@
+name: Admin analytics validation
+on:
+  push:
+    branches:
+      - fix/admin-analytics-issue-10
+  pull_request:
+    paths:
+      - server.js
+      - public/app.js
+      - tests/**
+      - package.json
+      - package-lock.json
+      - .github/workflows/admin-analytics-validation.yml
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node --check server.js
+      - run: node --check public/app.js
+      - run: npm run test:website

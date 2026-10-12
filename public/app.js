@@ -264,12 +264,12 @@ if (document.readyState === 'loading') {
 function showMemberGroup(filter) {
   const m = window._adminMembers || [];
   let filtered = m;
-  if (filter === 'paid') filtered = m.filter(x => (x.stripe_subscription_id && x.stripe_subscription_id !== '') || x.billing_period === 'stripe-monthly');
-  else if (filter === 'gifted') filtered = m.filter(x => (x.tier==='starter'||['basic','mid','top'].includes(x.tier)) && (!x.stripe_subscription_id || x.stripe_subscription_id === '') && x.billing_period !== 'stripe-monthly');
+  if (filter === 'paid') filtered = m.filter(x => x.billingClassification === 'paid');
+  else if (filter === 'gifted') filtered = m.filter(x => x.billingClassification === 'gifted');
   else if (filter === 'free') filtered = m.filter(x => x.tier === 'free' || (!x.tier));
   else if (filter === 'recent7') { const c=Date.now(); filtered=m.filter(x=>c-new Date(x.created_at).getTime()<7*86400000); }
   else if (filter === 'recent30') { const c=Date.now(); filtered=m.filter(x=>c-new Date(x.created_at).getTime()<30*86400000); }
-  let rows = filtered.map(x => '<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px">' + esc(x.display_name||'—') + '</td><td style="padding:8px;font-size:0.8rem">' + esc(x.email) + '</td><td style="padding:8px">' + ((x.stripe_subscription_id && x.stripe_subscription_id !== '') || x.billing_period === 'stripe-monthly' ? '💳 Paid' : (x.tier==='free' ? '🆓 Free' : '🎁 Gifted')) + '</td><td style="padding:8px;font-size:0.8rem">' + (x.created_at?new Date(x.created_at).toLocaleDateString():'') + '</td></tr>').join('');
+  let rows = filtered.map(x => '<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px">' + esc(x.display_name||'—') + '</td><td style="padding:8px;font-size:0.8rem">' + esc(x.email) + '</td><td style="padding:8px">' + esc(({paid:'Paid',free:'Free',gifted:'Gifted',inactive:'Inactive subscription',unverified:'Unverified subscription'})[x.billingClassification] || 'Unknown') + '</td><td style="padding:8px;font-size:0.8rem">' + (x.created_at?new Date(x.created_at).toLocaleDateString():'') + '</td></tr>').join('');
   document.getElementById('adminMemberFilter').innerHTML = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem"><tr style="border-bottom:2px solid var(--border);text-align:left"><th style="padding:8px">Name</th><th style="padding:8px">Email</th><th style="padding:8px">Type</th><th style="padding:8px">Joined</th></tr>' + rows + '</table></div>';
   document.getElementById('adminMemberFilterTitle').innerText = filtered.length + ' member(s)';
   document.getElementById('adminMemberFilterBox').style.display = 'block';
@@ -4486,6 +4486,21 @@ async function loadAdminUsage() {
       '<div class="stat-box"><div class="stat-number">' + (d.activeMonth || 0) + '</div><div class="stat-label">This Month</div></div>' +
       '<div class="stat-box"><div class="stat-number">' + (d.totalActions || 0) + '</div><div class="stat-label">Total Actions</div></div>' +
       '</div>';
+
+    // Supplemental engagement data excludes admin and common test aliases.
+    if (d.engagementV2) {
+      const e = d.engagementV2;
+      html += '<h4 style="margin:20px 0 8px">Member Engagement (content creation)</h4>';
+      html += '<p style="font-size:12px;opacity:.8">Excludes the admin account and +test email aliases. These are content creators, not everyone who logged in or browsed.</p>';
+      html += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">' +
+        '<div class="stat-box"><div class="stat-number">' + e.eligibleMembers + '</div><div class="stat-label">Eligible Members</div></div>' +
+        '<div class="stat-box"><div class="stat-number">' + e.neverCreatedContent + '</div><div class="stat-label">Never Created Content</div></div></div>';
+      html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr><th style="text-align:left">Feature</th><th>7d Members</th><th>30d Members</th><th>90d Members</th><th>30d Actions</th></tr></thead><tbody>';
+      (e.featureEngagement || []).forEach(f => {
+        html += '<tr><td>' + f.action.replace(/_/g, ' ') + '</td><td style="text-align:center">' + f.last7d.uniqueMembers + '</td><td style="text-align:center">' + f.last30d.uniqueMembers + '</td><td style="text-align:center">' + f.last90d.uniqueMembers + '</td><td style="text-align:center">' + f.last30d.actions + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+    }
 
     // Feature usage ranked bar chart
     if (d.featureUsage && d.featureUsage.length) {
