@@ -55,7 +55,7 @@ test('six exact images, immediate selection and ordered per-account persistence'
  const f=await fixture(t);const choices=[...f.w.document.querySelectorAll('[data-avatar]')];
  assert.equal(choices.length,6);assert.equal(avatar(f).querySelector('img').alt,'Studio Bowl');
  const expected=['Bag of Clay','Studio Bowl','Pottery Buddy','Studio Pebble','Moon & Stars','Microphone'];
- for(const [i,b] of choices.entries()) {b.click();assert.equal(avatar(f).querySelector('img').alt,expected[i]);assert.equal(b.getAttribute('aria-pressed'),'true');assert.match(avatar(f).querySelector('img').src,/^data:image\/jpeg;base64,/);}
+  for(const [i,b] of choices.entries()) {b.click();assert.equal(avatar(f).querySelector('img').alt,expected[i]);assert.equal(f.w.document.querySelector('.clayton-dock-avatar img').alt,expected[i]);assert.equal(b.getAttribute('aria-pressed'),'true');assert.match(avatar(f).querySelector('img').src,/^data:image\/jpeg;base64,/);}
  await tick();const puts=f.calls.filter(x=>x.options.method==='PUT');
  assert.equal(puts.length,6);assert.deepEqual(puts.map(x=>JSON.parse(x.options.body).avatar),['bag','bowl','buddy','pebble','moon','microphone']);
  assert.ok(puts.every(x=>x.options.headers.Authorization==='Bearer token-a'));

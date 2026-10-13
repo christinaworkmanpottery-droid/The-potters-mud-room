@@ -14,14 +14,16 @@
     const status = document.createElement('p'); status.className = 'clayton-status'; status.setAttribute('role', 'status'); status.textContent = 'Idle';
     const choices = document.createElement('div'); choices.className = 'clayton-choices';
     const saved = document.createElement('p'); saved.className = 'clayton-save'; saved.setAttribute('role', 'status');
-    let selected = 'bag', account = null, revision = 0, queue = Promise.resolve();
+    let selected = 'bag', account = null, revision = 0, queue = Promise.resolve(), dockImage, dockStage, dockLabel;
     function render(id) {
       selected = valid(id) ? id : 'bag'; img.src = assets[selected]; img.alt = names[selected];
+      if (dockImage) {dockImage.src = assets[selected]; dockImage.alt = names[selected];}
       for (const b of choices.children) b.setAttribute('aria-pressed', String(b.dataset.avatar === selected));
     }
     function state(value) {
       if (!['idle','listening','thinking','speaking','success','error'].includes(value)) return;
       stage.dataset.state = value; status.textContent = value.charAt(0).toUpperCase() + value.slice(1);
+      if (dockStage) {dockStage.dataset.state = value; dockLabel.textContent = 'Clayton · ' + status.textContent;}
     }
     async function request(owner, method = 'GET', avatar) {
       const response = await fetch(controls.api + '/api/ql/assistant/preferences', {method, cache:'no-store',
@@ -61,7 +63,13 @@
     panel.append(stage, status, choices, saved, actions, feedback); host.append(panel); render('bag');
     const events = {ready:'idle',listening:'listening',processing:'thinking',replyStarted:'speaking',replyFinished:'idle',noteSaved:'success',noteUpdated:'success',noteDeleted:'success',cancelled:'idle',failed:'error',speechAborted:'error',speechUnavailable:'error',stopped:'idle'};
     for (const [event, value] of Object.entries(events)) window.addEventListener('clayton:' + event, () => state(value));
-    return {feedback(message) {feedback.textContent = message;}, sync() {
+    return {attachDock(dock) {
+      const companion = document.createElement('div'); companion.className = 'clayton-companion';
+      dockStage = document.createElement('div'); dockStage.className = 'clayton-dock-avatar'; dockStage.dataset.state = stage.dataset.state;
+      dockImage = document.createElement('img'); dockImage.src = assets[selected]; dockImage.alt = names[selected]; dockImage.width = 72; dockImage.height = 53;
+      dockLabel = document.createElement('strong'); dockLabel.textContent = 'Clayton · ' + status.textContent;
+      dockStage.append(dockImage); companion.append(dockStage, dockLabel); dock.prepend(companion);
+    }, feedback(message) {feedback.textContent = message;}, sync() {
       const next = controls.account();
       if (account?.id === next?.id && account?.token === next?.token) return;
       account = next; const own = account, version = ++revision;

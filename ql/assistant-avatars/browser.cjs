@@ -48,8 +48,9 @@ try {
   await page.waitForFunction(()=>document.getElementById('qlAssistantForm').getAttribute('aria-busy')==='false');
  };
  await send('Add a studio note that Avatar verification B-Mix cone 6');
- await send('save draft');await page.locator('.clayton-stage[data-state=success]').waitFor();
+ await send('save draft');await page.locator('.clayton-dock-avatar[data-state=success]').waitFor({state:'visible'});
  assert.ok(db.prepare("SELECT body FROM studio_notes WHERE user_id='a'").all().some(n=>n.body.includes('Avatar verification')));
+ await page.evaluate(()=>navigate('qlAssistant'));
  await page.locator('#clayton-stop').click();await page.locator('.clayton-stage[data-state=idle]').waitFor();
  fs.mkdirSync('test-results',{recursive:true});
  await page.locator('.clayton-avatars').screenshot({path:'test-results/clayton-mobile-webkit.png'});

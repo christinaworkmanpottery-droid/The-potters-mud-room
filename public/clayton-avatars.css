@@ -19,3 +19,12 @@
 @keyframes clayton-speak{to{transform:scale(1.02,.98)}}
 @media(prefers-reduced-motion:reduce){.clayton-stage{animation:none!important}}
 #pageQLAssistant{padding-bottom:38vh}
+.clayton-companion{display:flex;align-items:center;gap:14px;margin:3px 4px 10px}
+.clayton-dock-avatar{width:72px;flex:none;border-radius:10px;overflow:hidden;box-shadow:0 0 0 3px #e4e8ea}
+.clayton-dock-avatar img{display:block;width:100%;height:auto}
+.clayton-dock-avatar[data-state=listening]{box-shadow:0 0 0 4px #9fc5db;animation:clayton-breathe 1.3s infinite}
+.clayton-dock-avatar[data-state=thinking]{animation:clayton-ponder 1.1s infinite}
+.clayton-dock-avatar[data-state=speaking]{animation:clayton-speak .4s infinite alternate}
+.clayton-dock-avatar[data-state=success]{box-shadow:0 0 0 4px #8eba94}
+.clayton-dock-avatar[data-state=error]{box-shadow:0 0 0 4px #d8a4a4}
+@media(prefers-reduced-motion:reduce){.clayton-dock-avatar{animation:none!important}}
