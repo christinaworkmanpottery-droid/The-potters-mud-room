@@ -9,7 +9,7 @@
       id: p.id,
       title: String(p.name || p.title || p.piece_name || 'Untitled piece'),
       status: String(p.status || 'Unspecified'),
-      clay: String(p.clay_body || p.clay_name || ''),
+      clay: String(p.clay_body_name || p.clay_body || p.clay_name || ''),
       glaze: String(p.glaze || p.glaze_name || ''),
       photoUrl: typeof p.photo_url === 'string' && p.photo_url.startsWith('/') ? p.photo_url : null
     }));
