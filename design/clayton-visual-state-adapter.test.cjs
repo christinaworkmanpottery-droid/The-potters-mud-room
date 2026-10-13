@@ -37,3 +37,6 @@ test('requires explicit controller and event source',()=>{
  assert.throws(()=>connect({}),/avatarController required/);
  assert.throws(()=>connect({avatarController:{setState(){}}}),/event source required/);
 });
+
+test('speech abort and unavailable signal visual error only',()=>{const x=setup();connect(x);x.source.emit('speechAborted');x.source.emit('speechUnavailable');assert.deepEqual(x.states,['error','error'])});
+test('note update and delete signal visual success only',()=>{const x=setup();connect(x);x.source.emit('noteUpdated');x.source.emit('noteDeleted');assert.deepEqual(x.states,['success','success'])});
