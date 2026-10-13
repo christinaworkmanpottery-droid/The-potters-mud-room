@@ -4898,7 +4898,14 @@ const SURVEY_CHOICES = [
   ['Easier setup','Better tutorials','More features','Fewer steps','Other'],
   ['Yes!','Maybe','Not right now','Other']
 ];
+const surveySubmissionCooldown = new Map();
 app.post('/api/member-survey', (req, res) => {
+  // Lightweight anti-spam controls; no IP address is stored with survey answers.
+  if (req.body?.website) return res.json({ ok: true });
+  const requester = req.ip || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  for (const [key, until] of surveySubmissionCooldown) if (until <= now) surveySubmissionCooldown.delete(key);
+  if (surveySubmissionCooldown.has(requester)) return res.status(429).json({ error: 'Please wait before sending another response.' });
   const answers = req.body?.answers;
   if (!Array.isArray(answers) || answers.length !== 5) return res.status(400).json({ error: 'Please submit the five survey questions.' });
   const cleaned = [];
@@ -4915,6 +4922,7 @@ app.post('/api/member-survey', (req, res) => {
   if (!cleaned.some(a => a.choice)) return res.status(400).json({ error: 'Please answer at least one question.' });
   try {
     db.prepare('INSERT INTO member_survey_responses (answers_json) VALUES (?)').run(JSON.stringify(cleaned));
+    surveySubmissionCooldown.set(requester, Date.now() + 60 * 60 * 1000);
     res.json({ ok: true });
   } catch (e) { console.error('Survey save failed:', e.message); res.status(500).json({ error: 'Unable to save feedback.' }); }
 });
