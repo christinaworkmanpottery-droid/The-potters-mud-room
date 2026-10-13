@@ -12,6 +12,7 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const { parseScheduledAt, publishDueBlogPosts } = require('./lib/blog-scheduler');
 const { Expo } = require('expo-server-sdk');
 const { initDB } = require('./database');
 const iap = require('./iap');
@@ -4277,6 +4278,13 @@ app.get('/api/combos/public/:shareId', (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Publish scheduled articles in bounded batches. No live deployment is triggered by this branch.
+const blogScheduleTimer = setInterval(() => {
+  try { publishDueBlogPosts(db, notifyAllBlogPost); }
+  catch (err) { console.error('[blog scheduler] failed:', err.message); }
+}, 60 * 1000);
+blogScheduleTimer.unref?.();
+
 // ============ BLOG SYSTEM ============
 // Public: list published blog posts
 app.get('/api/blog/posts', (req, res) => {
@@ -4308,12 +4316,14 @@ app.get('/api/admin/blog/posts', auth, (req, res) => {
 app.post('/api/admin/blog/posts', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
-    const { title, slug, content, excerpt, author, isPublished } = req.body;
+    const { title, slug, content, excerpt, author, isPublished, scheduledAt } = req.body;
     if (!title || !content) return res.status(400).json({ error: 'Title and content required' });
     const finalSlug = slug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    if (isPublished && scheduledAt) return res.status(400).json({ error: 'Choose publish now or schedule, not both' });
+    const scheduled = scheduledAt ? parseScheduledAt(scheduledAt) : null;
     const id = uuidv4();
-    db.prepare('INSERT INTO blog_posts (id, title, slug, content, excerpt, author, is_published) VALUES (?,?,?,?,?,?,?)')
-      .run(id, title, finalSlug, content, excerpt || content.substring(0, 200) + '...', author || 'Christina Workman', isPublished ? 1 : 0);
+    db.prepare('INSERT INTO blog_posts (id, title, slug, content, excerpt, author, is_published, scheduled_at, published_at) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run(id, title, finalSlug, content, excerpt || content.substring(0, 200) + '...', author || 'Christina Workman', isPublished ? 1 : 0, scheduled, isPublished ? new Date().toISOString() : null);
     // If published immediately, notify all members
     if (isPublished) notifyAllBlogPost(id, title, finalSlug);
     res.json({ id, slug: finalSlug });
@@ -4330,9 +4340,12 @@ app.put('/api/admin/blog/posts/:id', auth, (req, res) => {
     const { title, slug, content, excerpt, author, isPublished } = req.body;
     // Check if this is transitioning from unpublished to published
     const existing = db.prepare('SELECT is_published FROM blog_posts WHERE id=?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Post not found' });
+    if (isPublished && scheduledAt) return res.status(400).json({ error: 'Choose publish now or schedule, not both' });
+    const scheduled = scheduledAt ? parseScheduledAt(scheduledAt) : null;
     const wasPublished = existing && existing.is_published === 1;
-    db.prepare(`UPDATE blog_posts SET title=?, slug=?, content=?, excerpt=?, author=?, is_published=?, updated_at=datetime('now') WHERE id=?`)
-      .run(title, slug, content, excerpt, author || 'Christina Workman', isPublished ? 1 : 0, req.params.id);
+    db.prepare(`UPDATE blog_posts SET title=?, slug=?, content=?, excerpt=?, author=?, is_published=?, scheduled_at=?, published_at=CASE WHEN ?=1 AND is_published=0 THEN datetime('now') ELSE published_at END, updated_at=datetime('now') WHERE id=?`)
+      .run(title, slug, content, excerpt, author || 'Christina Workman', isPublished ? 1 : 0, scheduled, isPublished ? 1 : 0, req.params.id);
     // Notify only when transitioning from draft to published
     if (isPublished && !wasPublished) notifyAllBlogPost(req.params.id, title, slug);
     res.json({ success: true });
@@ -4352,7 +4365,7 @@ app.delete('/api/admin/blog/posts/:id', auth, (req, res) => {
 app.put('/api/admin/blog/:id/publish', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
-    db.prepare(`UPDATE blog_posts SET is_published=1, published_at=datetime('now'), updated_at=datetime('now') WHERE id=?`)
+    db.prepare(`UPDATE blog_posts SET is_published=1, scheduled_at=NULL, published_at=datetime('now'), updated_at=datetime('now') WHERE id=?`)
       .run(req.params.id);
     // Notify all members about the new blog post
     const post = db.prepare('SELECT id, title, slug FROM blog_posts WHERE id=?').get(req.params.id);
