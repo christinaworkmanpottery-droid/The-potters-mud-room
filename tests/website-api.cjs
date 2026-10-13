@@ -124,6 +124,41 @@ async function test(name,fn){await fn();console.log('PASS',name);}
   const r=await fetch(base+'/shop/mud-log-preview.pdf');assert.match(r.headers.get('content-type'),/application\/pdf/);assert.equal((await r.text()).slice(0,5),'%PDF-');
   const html=await (await fetch(base+'/nested/preview')).text();assert.match(html,/src="\/app.js\?v=[^"]+"/);assert.match(html,/href="\/style.css/);
  });
+ await test('survey page serves real HTML with optional Other fields',async()=>{
+  const response=await fetch(base+'/survey.html');
+  assert.equal(response.status,200);
+  const html=await response.text();
+  assert.match(html,/Help shape The Potter's Mud Room/);
+  assert.match(html,/Tell us more \(optional\)/);
+  assert.match(html,/name="website"/);
+ });
+ await test('survey saves anonymous answers, enforces validation, and restricts results to admin',async()=>{
+  const answers=[
+    {choice:'Not yet',other:''},
+    {choice:'Other',other:'I could not find my glaze records'},
+    {choice:'Studio Notes',other:''},
+    {choice:'Other',other:'A simpler first-use walkthrough'},
+    {choice:'Maybe',other:''}
+  ];
+  const invalid=await fetch(base+'/api/member-survey',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answers:[{choice:'Nope'}]})});
+  assert.equal(invalid.status,400);
+  const badChoice=await fetch(base+'/api/member-survey',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answers:answers.map((a,i)=>i===0?{choice:'Nope'}:a)})});
+  assert.equal(badChoice.status,400);
+  const submitted=await request('/api/member-survey','POST',{answers},{});
+  assert.equal(submitted.ok,true);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM member_survey_responses').get().n,1);
+  const row=db.prepare('SELECT * FROM member_survey_responses').get();
+  assert.equal(row.answers_json.includes('fixture@example.com'),false);
+  const repeat=await fetch(base+'/api/member-survey',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({answers})});
+  assert.equal(repeat.status,429);
+  const forbidden=await fetch(base+'/api/admin/member-survey',{headers});
+  assert.equal(forbidden.status,403);
+  const admin=await request('/api/admin/member-survey','GET',undefined,{'x-admin-key':adminKey});
+  assert.equal(admin.total,1);
+  assert.equal(admin.counts[0]['Not yet'],1);
+  assert.equal(admin.counts[1].Other,1);
+  assert.equal(admin.responses[0].answers[3].other,'A simpler first-use walkthrough');
+ });
  await test('server restart retains records and every saved photo',async()=>{
   const photos=fs.readdirSync(path.join(tmp,'data/uploads')).sort();
   db.close();db=null;
