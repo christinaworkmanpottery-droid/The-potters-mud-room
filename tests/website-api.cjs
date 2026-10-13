@@ -10,6 +10,7 @@ const root=path.resolve(__dirname,'..');
 const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'mudroom-master-test-'));
 for(const file of ['server.js','database.js','iap.js','directory-search.js','calendar-export.js'])fs.copyFileSync(path.join(root,file),path.join(tmp,file));
 fs.cpSync(path.join(root,'geodata'),path.join(tmp,'geodata'),{recursive:true});
+fs.cpSync(path.join(root,'lib'),path.join(tmp,'lib'),{recursive:true});
 fs.symlinkSync(path.join(root,'node_modules'),path.join(tmp,'node_modules'),'dir');
 fs.symlinkSync(path.join(root,'public'),path.join(tmp,'public'),'dir');
 const port=31000+Math.floor(Math.random()*10000),base='http://127.0.0.1:'+port;

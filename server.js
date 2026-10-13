@@ -12,6 +12,8 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const { parseScheduledAt, publishDueBlogPosts } = require('./lib/blog-scheduler');
+const { sendDueCampaigns } = require('./lib/email-scheduler');
 const { Expo } = require('expo-server-sdk');
 const { initDB } = require('./database');
 const iap = require('./iap');
@@ -20,9 +22,19 @@ const expo = new Expo();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.PREVIEW_MODE === 'true' ? crypto.randomBytes(32).toString('hex') : '');
 if (!JWT_SECRET) throw new Error('JWT_SECRET must be configured');
 const db = initDB();
+// Dedicated credentials are accepted only in the isolated preview.
+const PREVIEW_ADMIN_EMAIL = process.env.PREVIEW_MODE === 'true' ? process.env.PREVIEW_ADMIN_EMAIL : null;
+if (PREVIEW_ADMIN_EMAIL && process.env.PREVIEW_ADMIN_PASSWORD) {
+  if (!PREVIEW_ADMIN_EMAIL.endsWith('@example.invalid')) throw new Error('Preview account must use example.invalid');
+  db.prepare('INSERT OR IGNORE INTO users (id,email,password_hash,display_name,tier,newsletter_subscribed) VALUES (?,?,?,?,?,0)')
+    .run('admin-preview', PREVIEW_ADMIN_EMAIL, bcrypt.hashSync(process.env.PREVIEW_ADMIN_PASSWORD,12), 'Admin Preview', 'starter');
+  db.prepare('INSERT OR IGNORE INTO users (id,email,password_hash,display_name,newsletter_subscribed) VALUES (?,?,?,?,1)')
+    .run('preview-subscriber','subscriber@example.invalid',bcrypt.hashSync(crypto.randomBytes(32).toString('hex'),10),'Synthetic subscriber');
+}
+
 // Import unpublished editorial review drafts into the admin blog table once.
 try {
   const dir = path.join(__dirname, 'content', 'blog-review');
@@ -141,6 +153,7 @@ try {
 // Nodemailer setup for newsletter emails
 let transporter = null;
 function setupTransporter(user, pass, host, port) {
+  if (process.env.PREVIEW_MODE === 'true') return; // Never deliver preview mail to real recipients.
   if (user && pass) {
     const config = host
       ? { host, port: port || 587, secure: false, auth: { user, pass } }
@@ -594,7 +607,7 @@ app.post('/api/auth/login', (req, res) => {
     if (!u || !bcrypt.compareSync(password, u.password_hash)) return res.status(401).json({ error: 'Invalid email or password' });
     const token = jwt.sign({ userId: u.id, tier: u.tier }, JWT_SECRET, { expiresIn: '30d' });
     db.prepare("UPDATE users SET last_login=datetime('now') WHERE id=?").run(u.id);
-    res.json({ token, user: { id: u.id, email: u.email, displayName: u.display_name, tier: u.tier, isAdmin: u.email === ADMIN_EMAIL } });
+    res.json({ token, user: { id: u.id, email: u.email, displayName: u.display_name, tier: u.tier, isAdmin: (u.email === ADMIN_EMAIL || u.email === PREVIEW_ADMIN_EMAIL) } });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1414,7 +1427,7 @@ const ADMIN_API_KEY = process.env.ADMIN_API_KEY || require('crypto').randomBytes
 function isAdmin(req) {
   if (req.headers['x-admin-key'] === ADMIN_API_KEY) return true;
   const u = db.prepare('SELECT email FROM users WHERE id=?').get(req.userId);
-  return u?.email === ADMIN_EMAIL;
+  return !!u && (u.email === ADMIN_EMAIL || u.email === PREVIEW_ADMIN_EMAIL);
 }
 
 // Admin delete member
@@ -1424,7 +1437,7 @@ app.delete('/api/admin/members/:id', auth, (req, res) => {
     const uid = req.params.id;
     const u = db.prepare('SELECT email FROM users WHERE id=?').get(uid);
     if (!u) return res.status(404).json({ error: 'User not found' });
-    if (u.email === ADMIN_EMAIL) return res.status(403).json({ error: 'Cannot delete admin account' });
+    if ((u.email === ADMIN_EMAIL || u.email === PREVIEW_ADMIN_EMAIL)) return res.status(403).json({ error: 'Cannot delete admin account' });
     // Clean up all related data before deleting user
     db.prepare('DELETE FROM push_tokens WHERE user_id=?').run(uid);
     db.prepare('DELETE FROM password_reset_tokens WHERE user_id=?').run(uid);
@@ -4277,6 +4290,13 @@ app.get('/api/combos/public/:shareId', (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Publish scheduled articles in bounded batches. No live deployment is triggered by this branch.
+const blogScheduleTimer = setInterval(() => {
+  try { publishDueBlogPosts(db, notifyAllBlogPost); }
+  catch (err) { console.error('[blog scheduler] failed:', err.message); }
+}, 60 * 1000);
+blogScheduleTimer.unref?.();
+
 // ============ BLOG SYSTEM ============
 // Public: list published blog posts
 app.get('/api/blog/posts', (req, res) => {
@@ -4308,12 +4328,14 @@ app.get('/api/admin/blog/posts', auth, (req, res) => {
 app.post('/api/admin/blog/posts', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
-    const { title, slug, content, excerpt, author, isPublished } = req.body;
+    const { title, slug, content, excerpt, author, isPublished, scheduledAt } = req.body;
     if (!title || !content) return res.status(400).json({ error: 'Title and content required' });
     const finalSlug = slug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    if (isPublished && scheduledAt) return res.status(400).json({ error: 'Choose publish now or schedule, not both' });
+    const scheduled = scheduledAt ? parseScheduledAt(scheduledAt) : null;
     const id = uuidv4();
-    db.prepare('INSERT INTO blog_posts (id, title, slug, content, excerpt, author, is_published) VALUES (?,?,?,?,?,?,?)')
-      .run(id, title, finalSlug, content, excerpt || content.substring(0, 200) + '...', author || 'Christina Workman', isPublished ? 1 : 0);
+    db.prepare('INSERT INTO blog_posts (id, title, slug, content, excerpt, author, is_published, scheduled_at, published_at) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run(id, title, finalSlug, content, excerpt || content.substring(0, 200) + '...', author || 'Christina Workman', isPublished ? 1 : 0, scheduled, isPublished ? new Date().toISOString() : null);
     // If published immediately, notify all members
     if (isPublished) notifyAllBlogPost(id, title, finalSlug);
     res.json({ id, slug: finalSlug });
@@ -4327,12 +4349,15 @@ app.post('/api/admin/blog/posts', auth, (req, res) => {
 app.put('/api/admin/blog/posts/:id', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
-    const { title, slug, content, excerpt, author, isPublished } = req.body;
+    const { title, slug, content, excerpt, author, isPublished, scheduledAt } = req.body;
     // Check if this is transitioning from unpublished to published
     const existing = db.prepare('SELECT is_published FROM blog_posts WHERE id=?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Post not found' });
+    if (isPublished && scheduledAt) return res.status(400).json({ error: 'Choose publish now or schedule, not both' });
+    const scheduled = scheduledAt ? parseScheduledAt(scheduledAt) : null;
     const wasPublished = existing && existing.is_published === 1;
-    db.prepare(`UPDATE blog_posts SET title=?, slug=?, content=?, excerpt=?, author=?, is_published=?, updated_at=datetime('now') WHERE id=?`)
-      .run(title, slug, content, excerpt, author || 'Christina Workman', isPublished ? 1 : 0, req.params.id);
+    db.prepare(`UPDATE blog_posts SET title=?, slug=?, content=?, excerpt=?, author=?, is_published=?, scheduled_at=?, published_at=CASE WHEN ?=1 AND is_published=0 THEN datetime('now') ELSE published_at END, updated_at=datetime('now') WHERE id=?`)
+      .run(title, slug, content, excerpt, author || 'Christina Workman', isPublished ? 1 : 0, scheduled, isPublished ? 1 : 0, req.params.id);
     // Notify only when transitioning from draft to published
     if (isPublished && !wasPublished) notifyAllBlogPost(req.params.id, title, slug);
     res.json({ success: true });
@@ -4352,7 +4377,7 @@ app.delete('/api/admin/blog/posts/:id', auth, (req, res) => {
 app.put('/api/admin/blog/:id/publish', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
-    db.prepare(`UPDATE blog_posts SET is_published=1, published_at=datetime('now'), updated_at=datetime('now') WHERE id=?`)
+    db.prepare(`UPDATE blog_posts SET is_published=1, scheduled_at=NULL, published_at=datetime('now'), updated_at=datetime('now') WHERE id=?`)
       .run(req.params.id);
     // Notify all members about the new blog post
     const post = db.prepare('SELECT id, title, slug FROM blog_posts WHERE id=?').get(req.params.id);
@@ -4508,6 +4533,8 @@ app.get('/api/admin/newsletter/history', auth, (req, res) => {
     res.json(sends);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
+
+require('./lib/admin-campaigns')(app, db, auth, isAdmin, () => transporter, JWT_SECRET);
 
 // Admin: send newsletter to all subscribers
 app.post('/api/admin/newsletter/send', auth, (req, res) => {
