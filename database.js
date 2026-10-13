@@ -846,6 +846,36 @@ function initDB() {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_blog_slug ON blog_posts(slug)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_blog_published ON blog_posts(is_published, published_at)`);
 
+  // Durable admin email campaigns. Delivery is handled separately from draft creation.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS scheduled_email_campaigns (
+      id TEXT PRIMARY KEY,
+      subject TEXT NOT NULL,
+      html TEXT NOT NULL,
+      text TEXT,
+      audience TEXT NOT NULL DEFAULT 'subscribers',
+      status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','scheduled','sending','sent','failed','cancelled')),
+      scheduled_at TEXT,
+      created_by TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      sent_at TEXT,
+      recipient_count INTEGER NOT NULL DEFAULT 0,
+      delivered_count INTEGER NOT NULL DEFAULT 0,
+      failed_count INTEGER NOT NULL DEFAULT 0,
+      error_message TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_email_campaign_schedule ON scheduled_email_campaigns(status,scheduled_at);
+    CREATE TABLE IF NOT EXISTS scheduled_email_recipients (
+      campaign_id TEXT NOT NULL,
+      email TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      sent_at TEXT,
+      error_message TEXT,
+      PRIMARY KEY (campaign_id,email)
+    );
+  `);
+
   // Newsletter sends table
   db.exec(`
     CREATE TABLE IF NOT EXISTS newsletter_sends (
