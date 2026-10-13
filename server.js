@@ -4893,7 +4893,7 @@ db.exec(`CREATE TABLE IF NOT EXISTS member_survey_responses (
 )`);
 const SURVEY_CHOICES = [
   ['Yes, regularly','A few times','Not yet'],
-  ["I haven't had time","I'm unsure how to get started","Something didn't work","I don't need it right now","Other"],
+  ["I haven't had time","I'm unsure how to get started","Something didn't work","I don't need it right now","Does not apply — I use it regularly","Other"],
   ['Tracking pieces and firings','Glazes and clay records','Studio Notes','Finding other potters','Clayton, the upcoming voice assistant','Other'],
   ['Easier setup','Better tutorials','More features','Fewer steps','Other'],
   ['Yes!','Maybe','Not right now','Other']
