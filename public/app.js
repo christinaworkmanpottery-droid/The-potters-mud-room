@@ -4535,8 +4535,7 @@ async function saveEmailSettings() {
   try {
     await api('/api/admin/email-settings', {
       method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ smtp_user: user, smtp_pass: pass })
+      body: { smtp_user: user, smtp_pass: pass }
     });
     toast('Email settings saved!', 'success');
     loadAdminEmailSettings();
