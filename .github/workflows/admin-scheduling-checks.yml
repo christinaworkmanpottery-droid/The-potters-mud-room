@@ -1,0 +1,32 @@
+name: Admin Scheduling Checks
+on:
+  pull_request:
+    paths:
+      - 'server.js'
+      - 'database.js'
+      - 'public/app.js'
+      - 'lib/blog-scheduler.js'
+      - 'lib/email-scheduler.js'
+      - 'tests/blog-scheduler.cjs'
+      - 'tests/email-scheduler.cjs'
+      - '.github/workflows/admin-scheduling-checks.yml'
+  workflow_dispatch:
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax checks
+        run: |
+          node --check server.js
+          node --check database.js
+          node --check public/app.js
+          node --check lib/blog-scheduler.js
+          node --check lib/email-scheduler.js
+      - name: Scheduling tests
+        run: |
+          node tests/blog-scheduler.cjs
+          node tests/email-scheduler.cjs
