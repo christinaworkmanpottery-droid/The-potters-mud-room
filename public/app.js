@@ -7175,7 +7175,12 @@ async function loadAdminMemberSurvey() {
     }));
     html += '<h4 style="margin:16px 0 8px">Written feedback (' + comments.length + ' shown)</h4>';
     if (!comments.length) html += '<p>No written responses yet.</p>';
-    comments.forEach(c => { html += '<div style="border-bottom:1px solid var(--border,#ddd);padding:10px 0"><small>' + esc(c.question) + ' · ' + esc(c.date || '') + '</small><p style="white-space:pre-wrap;overflow-wrap:anywhere;margin:5px 0">' + esc(c.comment) + '</p></div>'; });
+    titles.forEach(title => {
+      const group = comments.filter(c => c.question === title);
+      if (!group.length) return;
+      html += '<h5 style="margin:14px 0 6px">' + esc(title) + ' (' + group.length + ')</h5>';
+      group.forEach(c => { html += '<div style="border-bottom:1px solid var(--border,#ddd);padding:10px 0"><small>' + esc(c.date || '') + '</small><p style="white-space:pre-wrap;overflow-wrap:anywhere;margin:5px 0">' + esc(c.comment) + '</p></div>'; });
+    });
     if (data.total > (data.responses || []).length) html += '<p class="text-sm">Showing the latest 500 responses.</p>';
     el.innerHTML = html;
   } catch (e) { el.textContent = 'Unable to load survey results: ' + e.message; }
