@@ -11,3 +11,5 @@ test('rejects non-array responses',()=>{assert.throws(()=>normalizePieces({piece
 test('rejects missing authentication',async()=>{await assert.rejects(()=>loadStudioData({fetchImpl:async()=>{},token:''}),/Authenticated/)});
 test('requests scoped endpoints with auth',async()=>{const seen=[];const result=await loadStudioData({token:'example',fetchImpl:async(path,options)=>{seen.push({path,options});return {ok:true,json:async()=>path.includes('pieces')?[{id:1,name:'Bowl'}]:[{id:2,name:'EPK',in_stock:false}]}}});assert.equal(result.pieces[0].title,'Bowl');assert.equal(result.materials[0].name,'EPK');assert.deepEqual(seen.map(x=>x.path),['/api/pieces?excludeCasualties=1','/api/glaze-chemicals']);assert.equal(seen[0].options.headers.Authorization,'Bearer example')});
 test('surfaces request failure',async()=>{await assert.rejects(()=>loadStudioData({token:'example',fetchImpl:async()=>({ok:false,status:401})}),/401/)});
+
+test('uses real Pieces API clay_body_name field',()=>{const p=normalizePieces([{id:1,title:'Serving Bowl',clay_body_name:'B-Mix'}])[0];assert.equal(p.title,'Serving Bowl');assert.equal(p.clay,'B-Mix')});
