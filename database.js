@@ -841,6 +841,8 @@ function initDB() {
       updated_at TEXT DEFAULT (datetime('now'))
     )
   `);
+  try { db.exec('ALTER TABLE blog_posts ADD COLUMN scheduled_at TEXT'); } catch (e) { if (!/duplicate column/i.test(e.message)) throw e; }
+  db.exec('CREATE INDEX IF NOT EXISTS idx_blog_schedule ON blog_posts(is_published, scheduled_at)');
   db.exec(`CREATE INDEX IF NOT EXISTS idx_blog_slug ON blog_posts(slug)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_blog_published ON blog_posts(is_published, published_at)`);
 
