@@ -4168,7 +4168,7 @@ async function saveBlogPost() {
       timeZone:'America/Los_Angeles', timeZoneName:'shortOffset'
     }).formatToParts(date).find(p => p.type === 'timeZoneName')?.value;
     const zone = zoneName(new Date(localUtc.getTime() + 8 * 3600000));
-    const match = zone?.match(/GMT([+-])(\\d{1,2})(?::(\\d{2}))?/);
+    const match = zone?.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
     if (!match) return toast('Unable to resolve Pacific Time', 'error');
     const sign = match[1] === '-' ? '-' : '+';
     body.scheduledAt = value + ':00' + sign + match[2].padStart(2,'0') + ':' + (match[3] || '00');
