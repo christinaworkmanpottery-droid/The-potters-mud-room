@@ -13,6 +13,7 @@ const { v4: uuidv4 } = require('uuid');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const { parseScheduledAt, publishDueBlogPosts } = require('./lib/blog-scheduler');
+const { sendDueCampaigns } = require('./lib/email-scheduler');
 const { Expo } = require('expo-server-sdk');
 const { initDB } = require('./database');
 const iap = require('./iap');
@@ -4563,6 +4564,17 @@ app.put('/api/admin/email-campaigns/:id', auth, (req, res) => {
     res.json({ status:scheduled?'scheduled':'draft',scheduledAt:scheduled });
   } catch(e) { res.status(400).json({ error:e.message }); }
 });
+
+// Run scheduled campaign delivery independently of browser sessions.
+let emailCampaignWorkerBusy = false;
+const emailCampaignTimer = setInterval(async () => {
+  if (emailCampaignWorkerBusy) return;
+  emailCampaignWorkerBusy = true;
+  try { await sendDueCampaigns(db, transporter); }
+  catch (err) { console.error('[email scheduler] worker failed', err); }
+  finally { emailCampaignWorkerBusy = false; }
+}, 60 * 1000);
+emailCampaignTimer.unref?.();
 
 // Admin: send newsletter to all subscribers
 app.post('/api/admin/newsletter/send', auth, (req, res) => {
