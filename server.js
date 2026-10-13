@@ -4522,6 +4522,48 @@ app.get('/api/admin/newsletter/history', auth, (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
+// Draft and schedule an admin email without sending it immediately.
+app.get('/api/admin/email-campaigns', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  const rows = db.prepare("SELECT id,subject,audience,status,scheduled_at,created_at,sent_at,recipient_count,delivered_count,failed_count,error_message FROM scheduled_email_campaigns ORDER BY created_at DESC LIMIT 100").all();
+  res.json(rows);
+});
+app.post('/api/admin/email-campaigns', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const { subject, html, text, scheduledAt, audience = 'subscribers' } = req.body || {};
+    if (typeof subject !== 'string' || !subject.trim() || subject.length > 200 ||
+        typeof html !== 'string' || !html.trim() || html.length > 100000)
+      return res.status(400).json({ error: 'Valid subject and HTML required' });
+    if (!['subscribers'].includes(audience)) return res.status(400).json({ error: 'Unsupported audience' });
+    const scheduled = scheduledAt ? parseScheduledAt(scheduledAt) : null;
+    const id = uuidv4();
+    db.prepare("INSERT INTO scheduled_email_campaigns (id,subject,html,text,audience,status,scheduled_at,created_by) VALUES (?,?,?,?,?,?,?,?)")
+      .run(id, subject.trim(), html, typeof text === 'string' ? text : null, audience, scheduled ? 'scheduled' : 'draft', scheduled, req.userId);
+    res.json({ id, status: scheduled ? 'scheduled' : 'draft', scheduledAt: scheduled });
+  } catch (e) { res.status(400).json({ error: e.message }); }
+});
+app.put('/api/admin/email-campaigns/:id', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const { subject, html, text, scheduledAt, cancel } = req.body || {};
+    const existing = db.prepare('SELECT status FROM scheduled_email_campaigns WHERE id=?').get(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Campaign not found' });
+    if (!['draft','scheduled'].includes(existing.status)) return res.status(409).json({ error: 'Campaign already processing or completed' });
+    if (cancel) {
+      db.prepare("UPDATE scheduled_email_campaigns SET status='cancelled',scheduled_at=NULL,updated_at=datetime('now') WHERE id=?").run(req.params.id);
+      return res.json({ status:'cancelled' });
+    }
+    if (typeof subject !== 'string' || !subject.trim() || subject.length > 200 ||
+        typeof html !== 'string' || !html.trim() || html.length > 100000)
+      return res.status(400).json({ error:'Valid subject and HTML required' });
+    const scheduled = scheduledAt ? parseScheduledAt(scheduledAt) : null;
+    db.prepare("UPDATE scheduled_email_campaigns SET subject=?,html=?,text=?,status=?,scheduled_at=?,updated_at=datetime('now') WHERE id=?")
+      .run(subject.trim(),html,typeof text==='string'?text:null,scheduled?'scheduled':'draft',scheduled,req.params.id);
+    res.json({ status:scheduled?'scheduled':'draft',scheduledAt:scheduled });
+  } catch(e) { res.status(400).json({ error:e.message }); }
+});
+
 // Admin: send newsletter to all subscribers
 app.post('/api/admin/newsletter/send', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
