@@ -10,7 +10,7 @@ const { sendDueCampaigns } = require('../lib/email-scheduler');
       if (sql.includes("SET status='sending'")) return {run:()=>{if(claimed)return {changes:0};claimed=true;campaignStatus='sending';return {changes:1}}};
       if (sql.includes('SELECT DISTINCT lower(trim(email))')) return {all:()=>[{email:'subscriber@example.com'}]};
       if (sql.includes('INSERT OR IGNORE INTO scheduled_email_recipients')) return {run:()=>({changes:1})};
-      if (sql.includes("status='pending'")) return {all:()=>recipientStatus==='pending'?[{email:'subscriber@example.com'}]:[]};
+      if (sql.includes('SELECT email FROM scheduled_email_recipients')) return {all:()=>recipientStatus==='pending'?[{email:'subscriber@example.com'}]:[]};
       if (sql.includes("SET status='attempted'")) return {run:()=>{recipientStatus='attempted';return {changes:1}}};
       if (sql.includes("SET status='sent',sent_at")) return {run:()=>{recipientStatus='sent';return {changes:1}}};
       if (sql.includes('SUM(CASE WHEN')) return {get:()=>({delivered:1,failed:0})};
