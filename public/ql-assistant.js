@@ -22,7 +22,7 @@
     dock.dataset.state = state;
     dockStatus.textContent = message;
     // Read-only hook for future Clayton avatar artwork. No voice lifecycle changes.
-    const visualEvents = {listening:'listening',processing:'processing',responding:'replyStarted',stopped:'stopped',error:'failed'};
+    const visualEvents = {listening:'listening',starting:'ready',recovering:'processing',processing:'processing',responding:'replyStarted',speaking:'replyStarted',ready:'replyFinished',stopped:'stopped',unavailable:'speechUnavailable',error:'failed'};
     const visualEvent = visualEvents[state];
     if (visualEvent) window.dispatchEvent(new CustomEvent('clayton:' + visualEvent));
     sessionStart.disabled = handsFree || !available() || !speechSupported() || interactionMode() !== 'handsfree';
