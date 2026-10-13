@@ -6,8 +6,8 @@
   'use strict';
   const EVENTS=Object.freeze({
     ready:'idle',listening:'listening',processing:'thinking',
-    replyStarted:'speaking',replyFinished:'idle',
-    noteSaved:'success',cancelled:'idle',failed:'error',
+    replyStarted:'speaking',replyFinished:'idle',\n    speechAborted:'error',speechUnavailable:'error',
+    noteSaved:'success',noteUpdated:'success',noteDeleted:'success',\n    cancelled:'idle',failed:'error',
     stopped:'idle'
   });
   function connect({avatarController,source}={}){
