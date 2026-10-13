@@ -4162,18 +4162,16 @@ async function saveBlogPost() {
   if (document.getElementById('blogEdMode').value === 'schedule') {
     const value = document.getElementById('blogEdSchedule').value;
     if (!value) return toast('Select a publication date and time', 'error');
-    const pacific = new Date(value).toLocaleString('en-US', {timeZone:'America/Los_Angeles'});
-    // Convert the entered Pacific wall-clock time without assuming the device timezone.
-    const asUTC = new Date(value + ':00Z');
-    const rendered = new Date(asUTC).toLocaleString('en-US', {timeZone:'America/Los_Angeles'});
-    const offsetMinutes = (Date.parse(rendered) - Date.parse(pacific)) / 60000;
-    // Use Intl to calculate the timezone offset for the target date.
-    const parts = new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',timeZoneName:'shortOffset'}).formatToParts(asUTC);
-    const zone = parts.find(p=>p.type==='timeZoneName')?.value || 'GMT-7';
-    const match = zone.match(/GMT([+-])(\\d{1,2})(?::(\\d{2}))?/);
+    // Determine Pacific offset at the intended date, including daylight saving.
+    const localUtc = new Date(value + ':00Z');
+    const zoneName = date => new Intl.DateTimeFormat('en-US', {
+      timeZone:'America/Los_Angeles', timeZoneName:'shortOffset'
+    }).formatToParts(date).find(p => p.type === 'timeZoneName')?.value;
+    const zone = zoneName(new Date(localUtc.getTime() + 8 * 3600000));
+    const match = zone?.match(/GMT([+-])(\\d{1,2})(?::(\\d{2}))?/);
     if (!match) return toast('Unable to resolve Pacific Time', 'error');
-    const sign = match[1]==='-' ? '-' : '+';
-    body.scheduledAt = value + ':00' + sign + match[2].padStart(2,'0') + ':' + (match[3]||'00');
+    const sign = match[1] === '-' ? '-' : '+';
+    body.scheduledAt = value + ':00' + sign + match[2].padStart(2,'0') + ':' + (match[3] || '00');
   }
   try {
     if (_editingBlogId) {
