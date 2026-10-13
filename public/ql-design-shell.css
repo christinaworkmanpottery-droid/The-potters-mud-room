@@ -1,0 +1,33 @@
+/* Quantum Leap isolated visual shell. Retains the real recovery app and voice engine. */
+:root{--ql-navy:#0c263c;--ql-slate:#193b53;--ql-blue:#2f729c;--ql-mist:#e8f0f5;--ql-celadon:#a5d3ce}
+body:has(#mainApp:not(.hidden)){background:#dce8ee!important;color:#203344}
+#mainApp{background:#f7fafc;min-height:100dvh;padding-bottom:92px}
+#mainApp>.nav{background:#f7fafc!important;border-bottom:1px solid #d9e5ec!important;box-shadow:none!important}
+#mainApp .nav-brand{color:var(--ql-navy)!important}
+#mainApp .nav-brand .brand-emoji{display:none}
+#mainApp .nav-brand .brand-text{font-family:Georgia,serif!important;color:var(--ql-navy)!important}
+#mainApp .nav-brand .mud{color:var(--ql-navy)!important}
+#mainApp .page h1,#mainApp .page h2,.page-header h2{color:var(--ql-navy)!important;font-family:Georgia,serif!important}
+#mainApp .btn-primary{background:var(--ql-blue)!important;border-color:var(--ql-blue)!important;color:#fff!important;border-radius:13px!important}
+#mainApp .card,#mainApp .studio-note-card,#mainApp .stat-card{border-radius:17px!important;box-shadow:0 6px 24px #193b5310!important}
+#pageQLAssistant{max-width:640px!important;margin:auto;padding-bottom:110px!important}
+#pageQLAssistant #qlAssistantHeading{font-size:32px!important}
+#pageQLAssistant .clayton-avatars{background:linear-gradient(145deg,#0b263b,#1e5677)!important;color:#fff!important;border:0!important;border-radius:23px!important}
+#pageQLAssistant .clayton-stage{width:min(100%,285px)}
+#pageQLAssistant .clayton-choices{grid-template-columns:repeat(3,minmax(0,1fr))}
+#pageQLAssistant .clayton-status{color:#d4eaf5}
+#qlAssistantSession{position:fixed!important;left:12px!important;right:12px!important;bottom:calc(79px + env(safe-area-inset-bottom))!important;max-width:580px!important;max-height:140px!important;overflow:auto!important;padding:10px 14px!important;border:1px solid #b8d2e2!important;border-radius:20px!important;background:#f7fafc!important;color:#203344!important;box-shadow:0 6px 25px #0c263c25!important;z-index:10001!important}
+#qlAssistantSession:focus-within{max-height:min(55dvh,440px)!important}
+#qlAssistantSession .clayton-companion{margin:0!important}
+#qlAssistantSession .clayton-dock-avatar{width:44px!important}
+#qlAssistantSession #qlAssistantSessionCommand,#qlAssistantSession #qlAssistantSessionReply{max-height:55px;overflow:auto;font-size:13px}
+#qlAssistantSession #qlAssistantSessionStatus{font-size:12px}
+#qlAssistantSession #qlAssistantNotePreview{max-height:100px;overflow:auto}
+#qlAssistantSession button{min-height:38px!important;font-size:13px!important}
+#qlAssistantSession>p:last-child{display:none}
+#ql-bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:10000;background:#f7fafcf5;border-top:1px solid #d5e5ef;display:flex;justify-content:space-around;align-items:center;padding:8px 5px calc(8px + env(safe-area-inset-bottom));box-shadow:0 -3px 18px #0c263c12}
+#ql-bottom-nav button{background:none;border:0;color:#4c6b7e;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:55px;font:600 11px -apple-system,BlinkMacSystemFont,sans-serif;padding:5px}
+#ql-bottom-nav button .ql-icon{font-size:23px}
+#ql-bottom-nav button[data-current=true]{color:#0c4264}
+#ql-bottom-nav button[data-page=qlAssistant] .ql-icon{background:#0c4264;color:white;border-radius:50%;width:46px;height:46px;display:grid;place-items:center;margin-top:-17px;box-shadow:0 4px 15px #193b5340}
+@media(min-width:850px){#ql-bottom-nav{max-width:620px;margin:auto;border-radius:22px 22px 0 0}}
