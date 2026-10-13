@@ -18,3 +18,15 @@ jobs:
         run: node --require ./ql/rehearsal/suite-isolate.cjs --test tests/ql-assistant*.cjs tests/ql-studio-search.cjs tests/ql-studio-search-dom.cjs tests/ql-studio-search-http.cjs
       - name: Strict foundation gate
         run: QL_READINESS_STRICT=1 node --require ./ql/rehearsal/suite-isolate.cjs --test tests/ql-readiness-blockers.cjs tests/ql-safety-migrations.cjs
+      - name: Install isolated mobile WebKit test runtime
+        run: |
+          npm install --no-save --package-lock=false playwright@1.62.1
+          npx playwright install --with-deps webkit
+      - name: Mobile WebKit avatars and real local note persistence
+        run: node ql/assistant-avatars/browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: clayton-mobile-webkit
+          path: test-results/
+          if-no-files-found: ignore
