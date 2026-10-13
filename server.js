@@ -22,7 +22,7 @@ const expo = new Expo();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.PREVIEW_MODE === 'true' ? crypto.randomBytes(32).toString('hex') : '');
 if (!JWT_SECRET) throw new Error('JWT_SECRET must be configured');
 const db = initDB();
 // Import unpublished editorial review drafts into the admin blog table once.
@@ -4570,7 +4570,7 @@ let emailCampaignWorkerBusy = false;
 const emailCampaignTimer = setInterval(async () => {
   if (emailCampaignWorkerBusy) return;
   emailCampaignWorkerBusy = true;
-  try { await sendDueCampaigns(db, transporter); }
+  try { if (process.env.PREVIEW_MODE !== 'true') await sendDueCampaigns(db, transporter); }
   catch (err) { console.error('[email scheduler] worker failed', err); }
   finally { emailCampaignWorkerBusy = false; }
 }, 60 * 1000);
