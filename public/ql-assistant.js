@@ -686,7 +686,7 @@
     }
     if (handsFreeEnabled) {
       dock = node('aside'); dock.id = 'qlAssistantSession'; dock.setAttribute('aria-label', 'Voice session controls');
-      const note = node('p', 'Recovery verification. Wait for Microphone ready. Say “stop listening” to end. Keep Safari visible.');
+      const note = node('p', 'Keep Safari open while Clayton listens.'); note.className = 'ql-session-help';
       sessionStart = node('button', 'Start voice session'); sessionStart.id = 'qlAssistantSessionStart';
       sessionStop = node('button', 'End session'); sessionStop.id = 'qlAssistantSessionStop';
       for (const b of [sessionStart, sessionStop]) { b.type = 'button'; b.className = 'btn btn-secondary'; }
@@ -704,7 +704,10 @@
       const previewLabel=node('strong','Live note draft — not saved');
       notePreviewText=node('p');notePreviewText.id='qlAssistantNotePreviewText';notePreviewText.style.whiteSpace='pre-wrap';
       notePreview.append(previewLabel,notePreviewText);
-      dock.append(dockCommand, notePreview, dockReply, dockStatus, sessionStart, sessionStop, spokenLabel, note); avatarView?.attachDock(dock); document.body.append(dock);
+      dock.append(dockCommand, notePreview, dockReply, dockStatus, sessionStart, sessionStop, spokenLabel, note); avatarView?.attachDock(dock);
+      const collapseButton = node('button', 'Expand'); collapseButton.type='button'; collapseButton.className='ql-dock-toggle'; collapseButton.setAttribute('aria-expanded','false');
+      dock.dataset.collapsed='true'; collapseButton.onclick=()=>{const expanded=dock.dataset.collapsed==='true';dock.dataset.collapsed=expanded?'false':'true';collapseButton.textContent=expanded?'Minimize':'Expand';collapseButton.setAttribute('aria-expanded',String(expanded));};dock.prepend(collapseButton);
+      document.body.append(dock);
       const css = node('style'); css.textContent = '#qlAssistantSession{position:fixed;left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom));z-index:10001;margin:auto;max-width:620px;padding:12px;background:#fff;color:#252525;border:2px solid #654536;border-radius:12px;box-shadow:0 4px 20px #0003;max-height:35vh;overflow:auto;font-size:15px}#qlAssistantSession p{margin:4px 0 8px}#qlAssistantSession button{min-height:44px;margin:0 8px 4px 0}#qlAssistantSession[data-state="listening"]{border-color:#24734a}';
       document.head.append(css);
       sessionState(speechSupported() ? 'stopped' : 'unavailable', speechSupported() ? 'Stopped — ready when you start.' : 'Voice unavailable. Typing and the menu remain available.');
