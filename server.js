@@ -4901,7 +4901,8 @@ const SURVEY_CHOICES = [
 const surveySubmissionCooldown = new Map();
 app.post('/api/member-survey', (req, res) => {
   // Lightweight anti-spam controls; no IP address is stored with survey answers.
-  if (req.body?.website) return res.json({ ok: true });
+  if (typeof req.body !== 'object' || req.body === null || Array.isArray(req.body)) return res.status(400).json({ error: 'Invalid survey submission.' });
+  if (req.body.website) return res.json({ ok: true });
   const requester = req.ip || req.socket.remoteAddress || 'unknown';
   const now = Date.now();
   for (const [key, until] of surveySubmissionCooldown) if (until <= now) surveySubmissionCooldown.delete(key);
