@@ -3824,6 +3824,15 @@ async function loadAdmin() {
     html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(this)">📬 Newsletter ▸ <span style="font-size:0.8rem;color:var(--text-light);font-weight:normal">tap to expand</span></h3>' +
       '<div style="display:none"><div id="adminNewsletterContent">Loading...</div></div></div>';
 
+    // Scheduled email communications (opted-in subscribers only).
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(this)">📅 Email Scheduling ▸</h3>' +
+      '<div style="display:none"><p class="text-sm mb-12">Draft or schedule emails to subscribed members. Times are Pacific.</p>' +
+      '<div class="form-group"><label>Subject</label><input class="form-input" id="campaignSubject" maxlength="200"></div>' +
+      '<div class="form-group"><label>Email HTML</label><textarea class="form-textarea" id="campaignHtml" rows="7"></textarea></div>' +
+      '<div class="form-group"><label>Publication date and time (Pacific; leave blank to save draft)</label><input class="form-input" type="datetime-local" id="campaignWhen"></div>' +
+      '<button class="btn btn-primary btn-sm" onclick="saveEmailCampaign()">Save Campaign</button>' +
+      '<div id="adminCampaignList" style="margin-top:14px">Loading campaigns...</div></div></div>';
+
     // Email settings section
     html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(this)">📧 Email Settings ▸ <span style="font-size:0.8rem;color:var(--text-light);font-weight:normal">tap to expand</span></h3>' +
       '<div style="display:none">' +
@@ -3857,6 +3866,7 @@ async function loadAdmin() {
     loadAdminAnalytics();
     loadAdminReviews();
     loadAdminBlogPosts();
+    loadAdminEmailCampaigns();
     loadAdminFeaturedPotter();
     loadAdminNewsletter();
     loadAdminEmailSettings();
@@ -4290,6 +4300,64 @@ async function upgradeAllBetaTesters() {
     toast('Upgraded ' + result.upgraded + ' beta tester' + (result.upgraded !== 1 ? 's' : '') + '. Total signups: ' + result.total + '.', 'success');
     loadAdmin();
   } catch(e) { toast(e.message, 'error'); }
+}
+
+
+function pacificScheduleISO(value) {
+  if (!value) return null;
+  const candidate = new Date(value + ':00Z');
+  if (!Number.isFinite(candidate.getTime())) throw new Error('Invalid scheduled date');
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone:'America/Los_Angeles', year:'numeric',month:'2-digit',day:'2-digit',
+    hour:'2-digit',minute:'2-digit',hourCycle:'h23',timeZoneName:'shortOffset'
+  });
+  const zone = formatter.formatToParts(new Date(candidate.getTime() + 8 * 3600000))
+    .find(p=>p.type==='timeZoneName')?.value;
+  const match = zone?.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
+  if (!match) throw new Error('Cannot determine Pacific offset');
+  const offset = match[1] + match[2].padStart(2,'0') + ':' + (match[3]||'00');
+  const iso = value + ':00' + offset;
+  const actual = new Date(iso);
+  const parts = Object.fromEntries(formatter.formatToParts(actual).map(p=>[p.type,p.value]));
+  const roundtrip = parts.year+'-'+parts.month+'-'+parts.day+'T'+parts.hour+':'+parts.minute;
+  if (roundtrip !== value) throw new Error('That Pacific time does not exist because of daylight saving. Choose another time.');
+  if (actual.getTime() <= Date.now()) throw new Error('Choose a future date and time');
+  return iso;
+}
+async function loadAdminEmailCampaigns() {
+  const el = document.getElementById('adminCampaignList');
+  if (!el) return;
+  try {
+    const campaigns = await api('/api/admin/email-campaigns');
+    el.innerHTML = campaigns.length ? campaigns.map(c =>
+      '<div style="padding:10px 0;border-top:1px solid var(--border)"><strong>'+esc(c.subject)+'</strong> — '+esc(c.status)+
+      (c.scheduled_at ? ' · '+new Date(c.scheduled_at).toLocaleString('en-US',{timeZone:'America/Los_Angeles'})+' Pacific' : '')+
+      ' · Sent '+(c.delivered_count||0)+' / Failed '+(c.failed_count||0)+
+      (['draft','scheduled'].includes(c.status) ? ' <button class="btn btn-sm btn-secondary" onclick="cancelEmailCampaign(\''+c.id+'\')">Cancel</button>' : '')+
+      '</div>').join('') : '<p class="text-sm">No campaigns yet.</p>';
+  } catch(e) { el.textContent = 'Unable to load campaigns: '+e.message; }
+}
+async function saveEmailCampaign() {
+  const subject = document.getElementById('campaignSubject').value.trim();
+  const html = document.getElementById('campaignHtml').value.trim();
+  const when = document.getElementById('campaignWhen').value;
+  if (!subject || !html) return toast('Subject and email content required','error');
+  try {
+    const scheduledAt = pacificScheduleISO(when);
+    await api('/api/admin/email-campaigns',{method:'POST',body:{subject,html,scheduledAt,audience:'subscribers'}});
+    toast(scheduledAt?'Email scheduled':'Draft saved','success');
+    document.getElementById('campaignSubject').value='';
+    document.getElementById('campaignHtml').value='';
+    document.getElementById('campaignWhen').value='';
+    loadAdminEmailCampaigns();
+  } catch(e) { toast(e.message,'error'); }
+}
+async function cancelEmailCampaign(id) {
+  if (!confirm('Cancel this email campaign?')) return;
+  try {
+    await api('/api/admin/email-campaigns/'+id,{method:'PUT',body:{cancel:true}});
+    toast('Campaign cancelled','success'); loadAdminEmailCampaigns();
+  } catch(e) { toast(e.message,'error'); }
 }
 
 // ---- Admin: Newsletter ----
