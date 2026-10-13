@@ -10,7 +10,7 @@
   let controller, pendingText = null, enabled = false, entered = false;
   let page, entry, input, form, send, retry, output, fallback;
   let voiceEnabled = false, recognition = null, voiceTimer, stopTimer;
-  let talk, stop, cancel, voiceStatus;
+  let talk, stop, cancel, voiceStatus, avatarView;
   let handsFreeEnabled = false, handsFree = false, sessionTimer, restartTimer, speechTimer, speechProbeTimer, requestTimer;
   let dock, dockStatus, dockCommand, dockReply, sessionStart, sessionStop, spokenReplies, utterance, notePreview, notePreviewText;
   let speechReview = null, speechSuggestion = null, quietDraftReply = null, speechBurst = '', speechBurstTimer = null;
@@ -18,11 +18,12 @@
   let interruptionAttempts = 0, recoveryPaused = false, restartSequence = 0;
   const inVoiceContext = () => entered && (currentPage === 'qlAssistant' || handsFree);
   function sessionState(state, message) {
+    avatarView?.feedback(message);
     if (!dock) return;
     dock.dataset.state = state;
     dockStatus.textContent = message;
     // Read-only hook for future Clayton avatar artwork. No voice lifecycle changes.
-    const visualEvents = {listening:'listening',starting:'ready',recovering:'processing',processing:'processing',responding:'replyStarted',speaking:'replyStarted',ready:'replyFinished',stopped:'stopped',unavailable:'speechUnavailable',error:'failed'};
+    const visualEvents = {listening:'listening',starting:'ready',recovering:'processing',processing:'processing',responding:'ready',speaking:'replyStarted',ready:'replyFinished',stopped:'stopped',unavailable:'speechUnavailable',error:'failed','permission-denied':'speechUnavailable'};
     const visualEvent = visualEvents[state];
     if (visualEvent) window.dispatchEvent(new CustomEvent('clayton:' + visualEvent));
     sessionStart.disabled = handsFree || !available() || !speechSupported() || interactionMode() !== 'handsfree';
@@ -176,6 +177,7 @@
     stop.hidden = cancel.hidden = !recognition;
     stop.disabled = Boolean(recognition?.stopping);
     voiceStatus.textContent = message;
+    if (message) avatarView?.feedback(message);
     if (handsFree && message) sessionState(recognition?.stopping ? 'processing' : /^Starting/.test(message) ? 'starting' : 'listening', message);
   }
   function cancelVoice(message = '', abort = true) {
@@ -300,7 +302,7 @@
         } else voiceState(message);
       };
       turn.finish = finish;
-      engine.onstart = () => { if (active() && !turn.interrupted) voiceState(turn.stopping ? 'Finishing speech…' : 'Listening — speak now. Tap Stop when finished.'); };
+      engine.onstart = () => { if (active() && !turn.interrupted) { window.dispatchEvent(new CustomEvent('clayton:listening')); voiceState(turn.stopping ? 'Finishing speech…' : 'Listening — speak now. Tap Stop when finished.'); } };
       engine.onaudiostart = () => { if (active() && !turn.stopping && !turn.interrupted) voiceState('Microphone ready — speak now. Tap Stop when finished.'); };
       engine.onsoundstart = () => { if (active() && !turn.interrupted) { turn.heardSound = true; clearTimeout(speechBurstTimer); quietDraftReply = null; turn.quietReply = null; voiceState('Sound detected. Listening for your words…'); } };
       engine.onresult = event => {
@@ -400,6 +402,7 @@
           'aborted':'Speech was interrupted. Tap to try again or type your question.',
           'language-not-supported':'The speech service cannot use this language. You can type your question.'
         };
+        window.dispatchEvent(new CustomEvent('clayton:speechUnavailable'));
         finish(messages[event.error] || 'Speech is unavailable. You can try again or type your question.');
       };
       engine.onend = () => {
@@ -454,6 +457,7 @@
   function syncSession() {
     const next = identity();
     if (next !== session) { invalidate(); session = next; }
+    avatarView?.sync();
     if (entry) entry.hidden = !available();
     if (dock) { dock.hidden = !available() || interactionMode() !== 'handsfree'; sessionStart.hidden = interactionMode() === 'handsfree' && foregroundVoiceActivated; sessionStart.disabled = handsFree || !available() || !speechSupported() || interactionMode() !== 'handsfree'; }
     if (form) { input.disabled = !available(); send.disabled = !available(); }
@@ -498,6 +502,7 @@
     }
     let quietAcknowledgement = false;
     window.QLNoteSharing?.clear();
+    window.dispatchEvent(new CustomEvent('clayton:processing'));
     pendingText = text; output.textContent = 'Looking up your studio request…';
     retry.hidden = true; fallback.hidden = true; form.setAttribute('aria-busy', 'true');
     try {
@@ -510,6 +515,7 @@
       if (response.status === 401) { sessionInvalid(); return; }
       const data = await response.json();
       if (!active()) return;
+      window.dispatchEvent(new CustomEvent(response.ok ? 'clayton:ready' : 'clayton:failed'));
       if (response.status === 400) { conversationToken = null; noteDictation = false; if(notePreview){notePreview.hidden=true;notePreviewText.textContent='';} }
       if (response.status === 400 && data.code === 'UNSUPPORTED_INTENT') {
         output.textContent = 'That question isn’t supported in this test version yet.';
@@ -531,6 +537,8 @@
         }
         // The core owns all facts and wording, including empty/undated/tied records.
         output.textContent = data.response.text;
+        const savedEvent = {saved:'noteSaved',updated:'noteUpdated',renamed:'noteUpdated',deleted:'noteDeleted'}[data.result?.status];
+        if (savedEvent && /^studio\.note/.test(data.result?.tool || '')) window.dispatchEvent(new CustomEvent('clayton:' + savedEvent));
         if(['renamed','deleted'].includes(data.result?.status) && data.result.tool==='studio.note.manage'){
           if(document.getElementById('studioNoteId')?.value===data.result.noteId){
             if(data.result.status==='deleted')closeModal('studioNoteModal');
@@ -554,6 +562,7 @@
       if (active()) {
         conversationToken = null; noteDictation = false;
         if(notePreview){notePreview.hidden=true;notePreviewText.textContent='';}
+        window.dispatchEvent(new CustomEvent('clayton:failed'));
         fallback.hidden = true;
         output.textContent = 'The assistant is unavailable. Try again or use the menu to open a feature.';
         retry.hidden = false;
@@ -594,6 +603,51 @@
     }
     throw Error('Invalid navigation');
   }
+  function avatarFeedback(message, failed = false) {
+    avatarView?.feedback(message);
+    if (failed) window.dispatchEvent(new CustomEvent('clayton:speechUnavailable'));
+  }
+  function startAvatarVoice() {
+    syncSession();
+    if (!available()) { avatarFeedback('Sign in to use Clayton.', true); return; }
+    if (!voiceEnabled || !speechSupported()) { avatarFeedback('Speech recognition is unavailable here. Use Safari with microphone and speech permissions enabled, or type below.', true); return; }
+    if (utterance) { avatarFeedback('Clayton is speaking. Tap Stop before starting the microphone.'); return; }
+    if (handsFree || recognition) { avatarFeedback('Voice session is already active.'); return; }
+    if (pendingText) { avatarFeedback('Wait for Clayton to finish this request.'); return; }
+    entered = true;
+    if (handsFreeEnabled && interactionMode() === 'handsfree') beginSession(); else startVoice();
+  }
+  function stopAvatarVoice() {
+    // Stop audio without discarding the server-owned note/draft context.
+    foregroundVoiceActivated = false;
+    endSession('Stopped. Your note context is retained.', 'stopped', true);
+    avatarFeedback('Stopped. Your note context is retained.');
+    window.dispatchEvent(new CustomEvent('clayton:stopped'));
+    syncSession();
+  }
+  function hearClayton() {
+    syncSession();
+    if (!available()) { avatarFeedback('Sign in to use Clayton.', true); return; }
+    if (handsFree || recognition || pendingText || utterance) { avatarFeedback('Tap Stop and let any current request finish before hearing Clayton.'); return; }
+    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) { avatarFeedback('Speech playback is unavailable in this browser. Clayton’s replies remain visible as text.', true); return; }
+    const speech = new window.SpeechSynthesisUtterance('Hello, I am Clayton. Ready to help in your pottery studio.');
+    utterance = speech; speech.rate = .96; speech.lang = 'en-US';
+    const own = session;
+    const finish = failed => {
+      if (utterance !== speech || session !== own) return;
+      clearTimeout(speechTimer); utterance = null;
+      speech.onstart = speech.onend = speech.onerror = null;
+      if (failed) window.speechSynthesis.cancel();
+      avatarFeedback(failed ? 'Audio could not play. Check your volume and browser speech settings, then tap Hear Clayton again.' : 'Ready when you are.', failed);
+      if (!failed) window.dispatchEvent(new CustomEvent('clayton:replyFinished'));
+    };
+    speech.onstart = () => { if (utterance === speech && session === own) { speechAudioUnlocked = true; avatarFeedback('Speaking — microphone is off.'); window.dispatchEvent(new CustomEvent('clayton:replyStarted')); } };
+    speech.onend = () => finish(false); speech.onerror = () => finish(true);
+    speechTimer = setTimeout(() => finish(true), 15000);
+    avatarFeedback('Starting speech playback…');
+    // This runs synchronously inside the user gesture required by iPhone Safari.
+    try { window.speechSynthesis.speak(speech); } catch (_) { finish(true); }
+  }
   function mount() {
     page = node('section'); page.id = 'pageQLAssistant'; page.className = 'page';
     page.style.maxWidth = '640px'; page.setAttribute('aria-labelledby', 'qlAssistantHeading');
@@ -610,7 +664,9 @@
     fallback = node('button', 'Open Firings'); fallback.id = 'qlAssistantFiringFallback'; fallback.hidden = true; fallback.type = 'button'; fallback.className = 'btn btn-secondary';
     fallback.onclick = () => navigate('firings');
     form.append(label, input, send, retry); form.onsubmit = e => { e.preventDefault(); void submit(); };
-    page.append(heading, help, form, output, fallback);
+    page.append(heading, help);
+    avatarView = window.ClaytonAvatars?.mount(page, {api:API, account:() => authenticated() ? {id:currentUser.id,token} : null, start:startAvatarVoice, stop:stopAvatarVoice, hear:hearClayton});
+    page.append(form, output, fallback);
     if (voiceEnabled) {
       const voice = node('div'); voice.id = 'qlAssistantVoice';
       const notice = node('p', 'Tap-to-talk — testing. Your browser may send audio to its speech service. This app does not save audio or transcripts. Wait for Microphone ready, speak, then tap Stop. If words need review, tap Send. Typing stays available.');

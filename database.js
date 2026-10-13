@@ -1283,6 +1283,9 @@ function initDB() {
   safeAdd('users', 'country', 'TEXT');
   safeAdd('users', 'findable', 'INTEGER DEFAULT 0');
 
+  // Clayton preference is private to each member and independent of profile photos.
+  safeAdd('users', 'clayton_avatar', "TEXT NOT NULL DEFAULT 'bag'");
+
   // My Store migration tracking
   safeAdd('users', 'stores_migrated', 'INTEGER DEFAULT 0');
 

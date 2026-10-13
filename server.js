@@ -3149,6 +3149,20 @@ app.get('/api/ql/assistant/config', (req, res) => {
   });
 });
 if (process.env.QL_ASSISTANT_CORE_ENABLED === '1') {
+  const claytonAvatars = new Set(['bag','bowl','buddy','pebble','moon','microphone']);
+  app.get('/api/ql/assistant/preferences', auth, (req, res) => {
+    res.set('Cache-Control', 'private, no-store');
+    const member = db.prepare('SELECT clayton_avatar FROM users WHERE id=?').get(req.userId);
+    if (!member) return res.status(401).json({error:'Sign in required'});
+    res.json({avatar:claytonAvatars.has(member.clayton_avatar) ? member.clayton_avatar : 'bag'});
+  });
+  app.put('/api/ql/assistant/preferences', auth, (req, res) => {
+    res.set('Cache-Control', 'private, no-store');
+    if (!req.body || Object.keys(req.body).join(',') !== 'avatar' || !claytonAvatars.has(req.body.avatar)) return res.status(400).json({error:'Choose an approved avatar'});
+    const result = db.prepare('UPDATE users SET clayton_avatar=? WHERE id=?').run(req.body.avatar, req.userId);
+    if (!result.changes) return res.status(401).json({error:'Sign in required'});
+    res.json({avatar:req.body.avatar});
+  });
   app.post('/api/ql/assistant/turn', require('./ql/assistant/http.cjs').createAssistantHandler({
     db, jwtSecret: JWT_SECRET, enabled: true
   }));

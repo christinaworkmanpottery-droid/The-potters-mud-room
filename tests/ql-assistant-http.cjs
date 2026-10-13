@@ -46,6 +46,23 @@ test.after(async()=>{
 
 
 const proof={version:1,requestId:'integration',input:{text:'When was my last firing?'}};
+test('avatar preference persists, validates exact choices, and isolates members',async()=>{
+ const request=async(authToken,method='GET',body)=>{
+  const r=await fetch(base+'/api/ql/assistant/preferences',{method,headers:{'Content-Type':'application/json',...(authToken?{Authorization:'Bearer '+authToken}:{})},...(body?{body:JSON.stringify(body)}:{})});
+  return {status:r.status,data:await r.json()};
+ };
+ assert.equal((await request(null)).status,401);
+ for(const avatar of ['bag','bowl','buddy','pebble','moon','microphone']){
+  assert.equal((await request(token,'PUT',{avatar})).status,200);
+  assert.equal((await request(token)).data.avatar,avatar);
+  assert.equal(db.prepare('SELECT clayton_avatar FROM users WHERE id=?').get('a').clayton_avatar,avatar);
+ }
+ assert.equal((await request(foreignToken)).data.avatar,'bag');
+ assert.equal((await request(token,'PUT',{avatar:'unapproved'})).status,400);
+ assert.equal((await request(token,'PUT',{avatar:'bag',userId:'b'})).status,400);
+ assert.equal((await request(jwt.sign({userId:'missing'},secret),'PUT',{avatar:'bag'})).status,401);
+ assert.equal((await request(token)).data.avatar,'microphone');
+});
 async function ask(authToken=token,body=proof){const r=await fetch(base+'/api/ql/assistant/turn',{method:'POST',headers:{'Content-Type':'application/json',...(authToken?{Authorization:'Bearer '+authToken}:{})},body:JSON.stringify(body)});return {status:r.status,data:await r.json()};}
 test('actual server complete flow agrees with canonical firing list',async()=>{
  db.prepare('UPDATE firing_logs SET date=? WHERE user_id=?').run('2026-10-01','a');
