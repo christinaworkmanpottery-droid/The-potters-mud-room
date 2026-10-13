@@ -108,6 +108,7 @@
       speech.onstart = speech.onend = speech.onerror = null;
       utterance = null;
       if (forceRelease) try { synth.cancel(); } catch (_) { /* Best-effort Safari audio-session release. */ }
+      window.dispatchEvent(new CustomEvent('clayton:replyFinished'));
       listenAgain();
     };
     const probeSpeech = () => {
@@ -366,6 +367,7 @@
           if (event.error === 'aborted' || event.error === 'network') {
             if (turn.interrupted) return;
             turn.interrupted = true;
+            window.dispatchEvent(new CustomEvent('clayton:speechAborted'));
             clearTimeout(voiceTimer); clearTimeout(stopTimer);
             clearTimeout(speechBurstTimer); quietDraftReply = null; turn.quietReply = null;
             // onerror is not a disconnect acknowledgement. Keep this engine as
