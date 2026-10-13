@@ -4087,8 +4087,8 @@ async function loadAdminBlogPosts() {
     if (!posts.length) { el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">No blog posts yet</div>'; return; }
     el.innerHTML = posts.map(p =>
       '<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">' +
-      '<div><strong>' + esc(p.title) + '</strong> <span class="text-sm" style="color:' + (p.is_published ? 'var(--success)' : 'var(--text-muted)') + '">' + (p.is_published ? '✅ Published' : '📝 Draft') + '</span>' +
-      '<div class="text-sm" style="color:var(--text-muted)">' + fmtDate(p.published_at) + ' · /' + esc(p.slug) + ' · 👁️ ' + (p.view_count || 0) + ' views</div></div>' +
+      '<div><strong>' + esc(p.title) + '</strong> <span class="text-sm" style="color:' + (p.is_published ? 'var(--success)' : 'var(--text-muted)') + '">' + (p.is_published ? '✅ Published' : (p.scheduled_at ? '🕒 Scheduled' : '📝 Draft')) + '</span>' +
+      '<div class="text-sm" style="color:var(--text-muted)">' + (p.scheduled_at ? 'Publishes ' + new Date(p.scheduled_at).toLocaleString('en-US',{timeZone:'America/Los_Angeles'}) + ' Pacific' : (p.is_published ? fmtDate(p.published_at) : 'Unpublished')) + ' · /' + esc(p.slug) + ' · 👁️ ' + (p.view_count || 0) + ' views</div></div>' +
       '<div style="display:flex;gap:4px">' +
       '<button class="btn btn-sm btn-secondary" onclick="previewBlogPost(\'' + p.id + '\')" title="Preview">👁️</button>' +
       '<button class="btn btn-sm btn-secondary" onclick="editBlogPost(\'' + p.id + '\')">✏️</button>' +
@@ -4107,10 +4107,14 @@ function openBlogPostEditor(post) {
     '<div class="form-group"><label>Title</label><input type="text" class="form-input" id="blogEdTitle" value="' + esc(post?.title || '') + '"></div>' +
     '<div class="form-group"><label>Slug</label><input type="text" class="form-input" id="blogEdSlug" value="' + esc(post?.slug || '') + '" placeholder="auto-generated from title"></div>' +
     '<div class="form-group"><label>Excerpt</label><input type="text" class="form-input" id="blogEdExcerpt" value="' + esc(post?.excerpt || '') + '"></div>' +
-    '<div class="form-group"><label>Author</label><input type="text" class="form-input" id="blogEdAuthor" value="' + esc(post?.author || 'Christina Workman') + '"></div>' +
-    '<div class="form-group"><label>Content (use **bold**, *italic*, ## headers, - lists)</label>' +
+    
+    '<div class="form-group"><label>Content HTML (paste the fourth section from the blog draft)</label>' +
     '<textarea class="form-textarea" id="blogEdContent" rows="12" style="font-family:monospace;font-size:0.85rem">' + esc(post?.content || '') + '</textarea></div>' +
-    '<div class="form-group"><label><input type="checkbox" id="blogEdPublished"' + (post?.is_published ? ' checked' : '') + '> Published</label></div>' +
+    '<div class="form-group"><label>Publication</label><select class="form-input" id="blogEdMode" onchange="document.getElementById(\'blogEdScheduleWrap\').style.display=this.value===\'schedule\'?\'block\':\'none\'">' +
+    '<option value="draft"' + (!post?.is_published && !post?.scheduled_at ? ' selected' : '') + '>Save Draft</option>' +
+    '<option value="schedule"' + (post?.scheduled_at ? ' selected' : '') + '>Schedule Publication</option>' +
+    '<option value="publish"' + (post?.is_published ? ' selected' : '') + '>Publish Now</option></select></div>' +
+    '<div class="form-group" id="blogEdScheduleWrap" style="display:' + (post?.scheduled_at ? 'block' : 'none') + '"><label>Publication date and time (Pacific)</label><input class="form-input" id="blogEdSchedule" type="datetime-local" value="' + (post?.scheduled_at ? new Date(new Date(post.scheduled_at).getTime()-7*3600000).toISOString().slice(0,16) : '') + '"></div>' +
     '<div class="modal-footer"><button class="btn btn-secondary" onclick="document.getElementById(\'blogEditorOverlay\').remove()">Cancel</button>' +
     '<button class="btn btn-primary" onclick="saveBlogPost()">Save Post</button></div></div></div>';
   document.body.insertAdjacentHTML('beforeend', html);
@@ -4149,11 +4153,28 @@ async function saveBlogPost() {
     title: document.getElementById('blogEdTitle').value,
     slug: document.getElementById('blogEdSlug').value || null,
     excerpt: document.getElementById('blogEdExcerpt').value || null,
-    author: document.getElementById('blogEdAuthor').value || null,
+    author: 'Christina Workman',
     content: document.getElementById('blogEdContent').value,
-    isPublished: document.getElementById('blogEdPublished').checked
+    isPublished: document.getElementById('blogEdMode').value === 'publish',
+    scheduledAt: null
   };
   if (!body.title || !body.content) return toast('Title and content required', 'error');
+  if (document.getElementById('blogEdMode').value === 'schedule') {
+    const value = document.getElementById('blogEdSchedule').value;
+    if (!value) return toast('Select a publication date and time', 'error');
+    const pacific = new Date(value).toLocaleString('en-US', {timeZone:'America/Los_Angeles'});
+    // Convert the entered Pacific wall-clock time without assuming the device timezone.
+    const asUTC = new Date(value + ':00Z');
+    const rendered = new Date(asUTC).toLocaleString('en-US', {timeZone:'America/Los_Angeles'});
+    const offsetMinutes = (Date.parse(rendered) - Date.parse(pacific)) / 60000;
+    // Use Intl to calculate the timezone offset for the target date.
+    const parts = new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',timeZoneName:'shortOffset'}).formatToParts(asUTC);
+    const zone = parts.find(p=>p.type==='timeZoneName')?.value || 'GMT-7';
+    const match = zone.match(/GMT([+-])(\\d{1,2})(?::(\\d{2}))?/);
+    if (!match) return toast('Unable to resolve Pacific Time', 'error');
+    const sign = match[1]==='-' ? '-' : '+';
+    body.scheduledAt = value + ':00' + sign + match[2].padStart(2,'0') + ':' + (match[3]||'00');
+  }
   try {
     if (_editingBlogId) {
       await api('/api/admin/blog/posts/' + _editingBlogId, { method: 'PUT', body });
