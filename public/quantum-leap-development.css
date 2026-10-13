@@ -1,0 +1,24 @@
+/* Quantum Leap development visual shell; scoped to isolated recovery branch only. */
+#mainApp{--bg:#f7fafc;--bg-dark:#0c263c;--primary:#2f729c;--text:#203344;--text-light:#577e94;--border:#dce8ee;--accent:#a5d3ce;background:#f7fafc;color:#203344;min-height:100dvh}
+#mainApp .nav{background:#f7fafc!important;color:#0c263c!important;border-bottom:1px solid #dce8ee!important;box-shadow:0 3px 16px #17394b13!important}
+#mainApp .nav-brand,#mainApp .nav-brand *,#mainApp .nav-controls button{color:#0c263c!important}
+#mainApp .nav-brand .brand-emoji{display:none}
+#mainApp .nav-brand .brand-text{font-family:Georgia,serif;font-size:21px;line-height:1.05}
+#mainApp .nav-dropdown{background:#f7fafc;color:#203344;border:1px solid #dce8ee}
+#mainApp .nav-link{color:#203344}
+#mainApp .page-header h2,#mainApp .page h2{color:#0c263c;font-family:Georgia,serif}
+#mainApp .btn-primary{background:#2f729c!important;border-color:#2f729c!important;color:white!important;border-radius:12px}
+#mainApp .btn-secondary{background:#e8f0f5!important;border-color:#c4d7e3!important;color:#193b53!important;border-radius:12px}
+#mainApp .card,#mainApp .studio-note-card,#mainApp .modal{border-radius:18px!important;border-color:#dce8ee!important;box-shadow:0 5px 22px #17394b12!important}
+#mainApp .form-input{border-radius:12px;border-color:#b9cfdc}
+#pageQLAssistant{max-width:680px!important;margin:auto;padding-bottom:150px!important}
+#pageQLAssistant h2{font:32px Georgia,serif!important;color:#0c263c!important}
+#pageQLAssistant .clayton-avatars{background:linear-gradient(135deg,#0c263c,#1e5677);color:#f7fafc;border:0;border-radius:24px}
+#pageQLAssistant .clayton-status{color:#f7fafc}
+#pageQLAssistant .clayton-choices button{color:#203344}
+#qlAssistantSession{background:#f7fafc!important;border:1px solid #c4d7e3!important;border-radius:20px!important;box-shadow:0 7px 30px #17394b2e!important;color:#203344!important;max-height:33vh!important}
+#qlAssistantSession[data-collapsed="true"]{max-height:90px!important;overflow:hidden!important}
+#qlAssistantSession[data-collapsed="true"] #qlAssistantSessionCommand,#qlAssistantSession[data-collapsed="true"] #qlAssistantNotePreview,#qlAssistantSession[data-collapsed="true"] #qlAssistantSessionReply,#qlAssistantSession[data-collapsed="true"] #qlAssistantSessionStart,#qlAssistantSession[data-collapsed="true"] #qlAssistantSessionStop,#qlAssistantSession[data-collapsed="true"] label,#qlAssistantSession[data-collapsed="true"] .ql-session-help{display:none!important}
+#qlAssistantSession .ql-dock-toggle{float:right;min-height:36px!important;margin:0!important;border:1px solid #c4d7e3;border-radius:10px;background:#e8f0f5;color:#193b53;padding:5px 12px}
+#qlAssistantSession[data-collapsed="true"] .clayton-companion{margin:0;min-height:58px}
+@media(max-width:600px){#mainApp .nav-inner{padding:9px 15px!important}#qlAssistantSession{left:8px!important;right:8px!important;bottom:calc(8px + env(safe-area-inset-bottom))!important}#pageQLAssistant{padding:14px 12px 160px!important}}
