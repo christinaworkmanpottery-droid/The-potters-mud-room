@@ -1,0 +1,1 @@
+Approved Clayton avatar artwork must be sourced from the six user-approved originals; do not regenerate.
