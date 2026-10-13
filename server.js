@@ -25,6 +25,16 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || (process.env.PREVIEW_MODE === 'true' ? crypto.randomBytes(32).toString('hex') : '');
 if (!JWT_SECRET) throw new Error('JWT_SECRET must be configured');
 const db = initDB();
+// Dedicated credentials are accepted only in the isolated preview.
+const PREVIEW_ADMIN_EMAIL = process.env.PREVIEW_MODE === 'true' ? process.env.PREVIEW_ADMIN_EMAIL : null;
+if (PREVIEW_ADMIN_EMAIL && process.env.PREVIEW_ADMIN_PASSWORD) {
+  if (!PREVIEW_ADMIN_EMAIL.endsWith('@example.invalid')) throw new Error('Preview account must use example.invalid');
+  db.prepare('INSERT OR IGNORE INTO users (id,email,password_hash,display_name,tier,newsletter_subscribed) VALUES (?,?,?,?,?,0)')
+    .run('admin-preview', PREVIEW_ADMIN_EMAIL, bcrypt.hashSync(process.env.PREVIEW_ADMIN_PASSWORD,12), 'Admin Preview', 'starter');
+  db.prepare('INSERT OR IGNORE INTO users (id,email,password_hash,display_name,newsletter_subscribed) VALUES (?,?,?,?,1)')
+    .run('preview-subscriber','subscriber@example.invalid',bcrypt.hashSync(crypto.randomBytes(32).toString('hex'),10),'Synthetic subscriber');
+}
+
 // Import unpublished editorial review drafts into the admin blog table once.
 try {
   const dir = path.join(__dirname, 'content', 'blog-review');
@@ -143,6 +153,7 @@ try {
 // Nodemailer setup for newsletter emails
 let transporter = null;
 function setupTransporter(user, pass, host, port) {
+  if (process.env.PREVIEW_MODE === 'true') return; // Never deliver preview mail to real recipients.
   if (user && pass) {
     const config = host
       ? { host, port: port || 587, secure: false, auth: { user, pass } }
@@ -596,7 +607,7 @@ app.post('/api/auth/login', (req, res) => {
     if (!u || !bcrypt.compareSync(password, u.password_hash)) return res.status(401).json({ error: 'Invalid email or password' });
     const token = jwt.sign({ userId: u.id, tier: u.tier }, JWT_SECRET, { expiresIn: '30d' });
     db.prepare("UPDATE users SET last_login=datetime('now') WHERE id=?").run(u.id);
-    res.json({ token, user: { id: u.id, email: u.email, displayName: u.display_name, tier: u.tier, isAdmin: u.email === ADMIN_EMAIL } });
+    res.json({ token, user: { id: u.id, email: u.email, displayName: u.display_name, tier: u.tier, isAdmin: (u.email === ADMIN_EMAIL || u.email === PREVIEW_ADMIN_EMAIL) } });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1416,7 +1427,7 @@ const ADMIN_API_KEY = process.env.ADMIN_API_KEY || require('crypto').randomBytes
 function isAdmin(req) {
   if (req.headers['x-admin-key'] === ADMIN_API_KEY) return true;
   const u = db.prepare('SELECT email FROM users WHERE id=?').get(req.userId);
-  return u?.email === ADMIN_EMAIL;
+  return !!u && (u.email === ADMIN_EMAIL || u.email === PREVIEW_ADMIN_EMAIL);
 }
 
 // Admin delete member
@@ -1426,7 +1437,7 @@ app.delete('/api/admin/members/:id', auth, (req, res) => {
     const uid = req.params.id;
     const u = db.prepare('SELECT email FROM users WHERE id=?').get(uid);
     if (!u) return res.status(404).json({ error: 'User not found' });
-    if (u.email === ADMIN_EMAIL) return res.status(403).json({ error: 'Cannot delete admin account' });
+    if ((u.email === ADMIN_EMAIL || u.email === PREVIEW_ADMIN_EMAIL)) return res.status(403).json({ error: 'Cannot delete admin account' });
     // Clean up all related data before deleting user
     db.prepare('DELETE FROM push_tokens WHERE user_id=?').run(uid);
     db.prepare('DELETE FROM password_reset_tokens WHERE user_id=?').run(uid);
@@ -4338,7 +4349,7 @@ app.post('/api/admin/blog/posts', auth, (req, res) => {
 app.put('/api/admin/blog/posts/:id', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
-    const { title, slug, content, excerpt, author, isPublished } = req.body;
+    const { title, slug, content, excerpt, author, isPublished, scheduledAt } = req.body;
     // Check if this is transitioning from unpublished to published
     const existing = db.prepare('SELECT is_published FROM blog_posts WHERE id=?').get(req.params.id);
     if (!existing) return res.status(404).json({ error: 'Post not found' });
@@ -4523,58 +4534,7 @@ app.get('/api/admin/newsletter/history', auth, (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-// Draft and schedule an admin email without sending it immediately.
-app.get('/api/admin/email-campaigns', auth, (req, res) => {
-  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
-  const rows = db.prepare("SELECT id,subject,audience,status,scheduled_at,created_at,sent_at,recipient_count,delivered_count,failed_count,error_message FROM scheduled_email_campaigns ORDER BY created_at DESC LIMIT 100").all();
-  res.json(rows);
-});
-app.post('/api/admin/email-campaigns', auth, (req, res) => {
-  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
-  try {
-    const { subject, html, text, scheduledAt, audience = 'subscribers' } = req.body || {};
-    if (typeof subject !== 'string' || !subject.trim() || subject.length > 200 ||
-        typeof html !== 'string' || !html.trim() || html.length > 100000)
-      return res.status(400).json({ error: 'Valid subject and HTML required' });
-    if (!['subscribers'].includes(audience)) return res.status(400).json({ error: 'Unsupported audience' });
-    const scheduled = scheduledAt ? parseScheduledAt(scheduledAt) : null;
-    const id = uuidv4();
-    db.prepare("INSERT INTO scheduled_email_campaigns (id,subject,html,text,audience,status,scheduled_at,created_by) VALUES (?,?,?,?,?,?,?,?)")
-      .run(id, subject.trim(), html, typeof text === 'string' ? text : null, audience, scheduled ? 'scheduled' : 'draft', scheduled, req.userId);
-    res.json({ id, status: scheduled ? 'scheduled' : 'draft', scheduledAt: scheduled });
-  } catch (e) { res.status(400).json({ error: e.message }); }
-});
-app.put('/api/admin/email-campaigns/:id', auth, (req, res) => {
-  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
-  try {
-    const { subject, html, text, scheduledAt, cancel } = req.body || {};
-    const existing = db.prepare('SELECT status FROM scheduled_email_campaigns WHERE id=?').get(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Campaign not found' });
-    if (!['draft','scheduled'].includes(existing.status)) return res.status(409).json({ error: 'Campaign already processing or completed' });
-    if (cancel) {
-      db.prepare("UPDATE scheduled_email_campaigns SET status='cancelled',scheduled_at=NULL,updated_at=datetime('now') WHERE id=?").run(req.params.id);
-      return res.json({ status:'cancelled' });
-    }
-    if (typeof subject !== 'string' || !subject.trim() || subject.length > 200 ||
-        typeof html !== 'string' || !html.trim() || html.length > 100000)
-      return res.status(400).json({ error:'Valid subject and HTML required' });
-    const scheduled = scheduledAt ? parseScheduledAt(scheduledAt) : null;
-    db.prepare("UPDATE scheduled_email_campaigns SET subject=?,html=?,text=?,status=?,scheduled_at=?,updated_at=datetime('now') WHERE id=?")
-      .run(subject.trim(),html,typeof text==='string'?text:null,scheduled?'scheduled':'draft',scheduled,req.params.id);
-    res.json({ status:scheduled?'scheduled':'draft',scheduledAt:scheduled });
-  } catch(e) { res.status(400).json({ error:e.message }); }
-});
-
-// Run scheduled campaign delivery independently of browser sessions.
-let emailCampaignWorkerBusy = false;
-const emailCampaignTimer = setInterval(async () => {
-  if (emailCampaignWorkerBusy) return;
-  emailCampaignWorkerBusy = true;
-  try { if (process.env.PREVIEW_MODE !== 'true') await sendDueCampaigns(db, transporter); }
-  catch (err) { console.error('[email scheduler] worker failed', err); }
-  finally { emailCampaignWorkerBusy = false; }
-}, 60 * 1000);
-emailCampaignTimer.unref?.();
+require('./lib/admin-campaigns')(app, db, auth, isAdmin, () => transporter, JWT_SECRET);
 
 // Admin: send newsletter to all subscribers
 app.post('/api/admin/newsletter/send', auth, (req, res) => {

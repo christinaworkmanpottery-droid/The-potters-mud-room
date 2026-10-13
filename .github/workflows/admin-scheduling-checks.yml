@@ -7,6 +7,8 @@ on:
       - 'public/app.js'
       - 'lib/blog-scheduler.js'
       - 'lib/email-scheduler.js'
+      - 'lib/admin-campaigns.js'
+      - 'tests/admin-scheduling.cjs'
       - 'tests/blog-scheduler.cjs'
       - 'tests/email-scheduler.cjs'
       - '.github/workflows/admin-scheduling-checks.yml'
@@ -19,6 +21,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: npm ci
       - name: Syntax checks
         run: |
           node --check server.js
@@ -30,3 +33,5 @@ jobs:
         run: |
           node tests/blog-scheduler.cjs
           node tests/email-scheduler.cjs
+          node tests/admin-scheduling.cjs
+          npm run test:website

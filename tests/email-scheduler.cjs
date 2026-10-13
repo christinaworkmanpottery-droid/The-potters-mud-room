@@ -1,28 +1,19 @@
-const assert = require('node:assert/strict');
-const { sendDueCampaigns } = require('../lib/email-scheduler');
-(async () => {
-  const rows = [{id:'campaign-1',subject:'Survey',html:'<p>Survey</p>',text:null}];
-  let claimed=false, recipientStatus='pending', campaignStatus='scheduled', sendCount=0;
-  const db = {
-    transaction: fn => fn,
-    prepare(sql) {
-      if (sql.includes("FROM scheduled_email_campaigns WHERE status='scheduled'")) return {all:()=>campaignStatus==='scheduled'?rows:[]};
-      if (sql.includes("SET status='sending'")) return {run:()=>{if(claimed)return {changes:0};claimed=true;campaignStatus='sending';return {changes:1}}};
-      if (sql.includes('SELECT DISTINCT lower(trim(email))')) return {all:()=>[{email:'subscriber@example.com'}]};
-      if (sql.includes('INSERT OR IGNORE INTO scheduled_email_recipients')) return {run:()=>({changes:1})};
-      if (sql.includes('SELECT email FROM scheduled_email_recipients')) return {all:()=>recipientStatus==='pending'?[{email:'subscriber@example.com'}]:[]};
-      if (sql.includes("SET status='attempted'")) return {run:()=>{recipientStatus='attempted';return {changes:1}}};
-      if (sql.includes("SET status='sent',sent_at")) return {run:()=>{recipientStatus='sent';return {changes:1}}};
-      if (sql.includes('SUM(CASE WHEN')) return {get:()=>({delivered:1,failed:0})};
-      if (sql.includes('UPDATE scheduled_email_campaigns SET status=?')) return {run:status=>{campaignStatus=status;return {changes:1}}};
-      return {run:()=>({changes:1})};
-    }
-  };
-  const mailer={sendMail:async()=>{sendCount++}};
-  assert.equal(await sendDueCampaigns(db,mailer,new Date('2026-10-14T17:00:00Z')),1);
-  assert.equal(sendCount,1);
-  assert.equal(campaignStatus,'sent');
-  assert.equal(await sendDueCampaigns(db,mailer,new Date('2026-10-14T17:01:00Z')),0);
-  assert.equal(sendCount,1);
-  console.log('email scheduler tests passed');
-})().catch(e=>{console.error(e);process.exitCode=1});
+const assert=require('node:assert/strict');
+const Database=require('better-sqlite3');
+const {sendDueCampaigns,snapshotRecipients}=require('../lib/email-scheduler');
+(async()=>{
+ const db=new Database(':memory:');
+ db.exec(`CREATE TABLE users(email TEXT,newsletter_subscribed INTEGER);CREATE TABLE scheduled_email_campaigns(id TEXT PRIMARY KEY,subject TEXT,html TEXT,text TEXT,status TEXT,scheduled_at TEXT,updated_at TEXT,sent_at TEXT,recipient_count INTEGER,delivered_count INTEGER,failed_count INTEGER,error_message TEXT);CREATE TABLE scheduled_email_recipients(campaign_id TEXT,email TEXT,status TEXT DEFAULT 'pending',sent_at TEXT,error_message TEXT,PRIMARY KEY(campaign_id,email));`);
+ db.exec("INSERT INTO users VALUES ('A@example.com',1),('a@example.com',1),('unsub@example.com',0),('later@example.com',1),('fail@example.com',1)");
+ db.prepare("INSERT INTO scheduled_email_campaigns (id,subject,html,status,scheduled_at) VALUES ('c','Hello','<p>Hi</p>','scheduled','2030-01-01T00:00:00.000Z')").run();
+ assert.equal(snapshotRecipients(db,'c'),3);
+ db.exec("UPDATE users SET newsletter_subscribed=0 WHERE email='later@example.com'");
+ let sends=[];const mailer={sendMail:async m=>{sends.push(m.to);if(m.to==='fail@example.com')throw Error('Provider failure');}};
+ assert.equal(await sendDueCampaigns(db,mailer,new Date('2029-12-31')),0);
+ await Promise.all([sendDueCampaigns(db,mailer,new Date('2030-01-02')),sendDueCampaigns(db,mailer,new Date('2030-01-02'))]);
+ assert.deepEqual(sends,['a@example.com','fail@example.com']);
+ assert.equal(db.prepare("SELECT status FROM scheduled_email_campaigns").get().status,'failed');
+ assert.equal(db.prepare("SELECT status FROM scheduled_email_recipients WHERE email='later@example.com'").get().status,'skipped');
+ assert.equal(await sendDueCampaigns(db,mailer,new Date('2030-01-03')),0);
+ assert.equal(sends.length,2);db.close();console.log('PASS email scheduling: due time, duplicate/concurrent prevention, opt-out recheck, provider errors');
+})().catch(e=>{console.error(e);process.exitCode=1;});

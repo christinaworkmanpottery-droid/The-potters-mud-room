@@ -445,6 +445,7 @@ function logout() {
 async function checkAuth() {
   // Don't override reset-password view
   if (window.location.hash.startsWith('#reset-password')) return;
+  if (!token && window.location.hash === '#admin') { document.getElementById('landingPage').style.display='none'; document.getElementById('authScreen').style.display='flex'; return; }
   if (!token && window.location.hash === '#preview') { showGuestPreview('community', true); return; }
   if (!token) { document.getElementById('landingPage').style.display = ''; if (!window.location.hash && window.location.pathname === '/') trackPageView('/'); return; }
   try {
@@ -495,7 +496,7 @@ function showApp() {
     loadClayBodies(); loadGlazes();
     pollNotificationBadges();
     const adminNav = document.getElementById('navAdmin');
-    if (adminNav && currentUser?.email === 'christinaworkmanpottery@gmail.com') adminNav.style.display = '';
+    if (adminNav && currentUser?.isAdmin === true) adminNav.style.display = '';
     try { loadProfilePhoto(); } catch(e) { console.error('loadProfilePhoto error:', e); }
   } catch(showAppErr) {
     console.error('showApp error:', showAppErr);
@@ -3071,7 +3072,7 @@ async function viewForumPost(id) {
         if (['mp4','mov','webm'].includes(ext)) return '<video src="/uploads/' + p.filename + '" class="forum-photo" controls style="max-width:300px;max-height:200px"></video>';
         return '<img src="/uploads/' + p.filename + '" class="forum-photo-sm">';
       }).join('');
-      const deleteBtn = (r.user_id === currentUser?.id || currentUser?.email === 'christinaworkmanpottery@gmail.com') ? '<button class="btn-ghost btn-sm" onclick="deleteReply(\'' + r.id + '\',\'' + post.id + '\')" title="Delete reply">🗑️</button>' : '';
+      const deleteBtn = (r.user_id === currentUser?.id || currentUser?.isAdmin === true) ? '<button class="btn-ghost btn-sm" onclick="deleteReply(\'' + r.id + '\',\'' + post.id + '\')" title="Delete reply">🗑️</button>' : '';
       return '<div class="forum-reply">' +
         '<div style="display:flex;gap:10px">' + ra +
         '<div style="flex:1"><div style="display:flex;justify-content:space-between"><strong>' + esc(r.author_name||'Anonymous') + '</strong>' +
@@ -3086,7 +3087,7 @@ async function viewForumPost(id) {
       '<div><h2>' + esc(post.title) + '</h2>' +
       '<div class="text-sm" style="color:var(--text-light)">by <strong>' + esc(post.author_name||'Anonymous') + '</strong> · ' + timeAgo(post.created_at) +
       ' · 👁 ' + post.view_count + ' views · 💬 ' + post.reply_count + ' replies</div></div></div>' +
-      ((post.user_id === currentUser?.id || currentUser?.email === 'christinaworkmanpottery@gmail.com') ? '<div style="margin-bottom:12px;display:flex;gap:8px"><button class="btn btn-secondary btn-sm" onclick="editForumPost(\'' + post.id + '\',\'' + esc(post.title).replace(/'/g,'&#39;') + '\')" style="background:var(--primary);color:#fff">✏️ Edit Post</button><button class="btn btn-danger btn-sm" onclick="deleteForumPost(\'' + post.id + '\')">🗑️ Delete Post</button></div>' : '') +
+      ((post.user_id === currentUser?.id || currentUser?.isAdmin === true) ? '<div style="margin-bottom:12px;display:flex;gap:8px"><button class="btn btn-secondary btn-sm" onclick="editForumPost(\'' + post.id + '\',\'' + esc(post.title).replace(/'/g,'&#39;') + '\')" style="background:var(--primary);color:#fff">✏️ Edit Post</button><button class="btn btn-danger btn-sm" onclick="deleteForumPost(\'' + post.id + '\')">🗑️ Delete Post</button></div>' : '') +
       '<div style="white-space:pre-wrap;margin-bottom:16px">' + esc(post.body) + '</div>' +
       (photos ? '<div class="forum-photos-row mb-16">' + photos + '</div>' : '') +
       '</div>' +
@@ -3717,7 +3718,7 @@ function toggleAdminSection(el) {
 
 async function loadAdmin() {
   const el = document.getElementById('adminContent');
-  if (currentUser?.email !== 'christinaworkmanpottery@gmail.com') {
+  if (currentUser?.isAdmin !== true) {
     el.innerHTML = '<div class="card"><p>Admin access only.</p></div>';
     return;
   }
@@ -3827,10 +3828,10 @@ async function loadAdmin() {
     // Scheduled email communications (opted-in subscribers only).
     html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(this)">📅 Email Scheduling ▸</h3>' +
       '<div style="display:none"><p class="text-sm mb-12">Draft or schedule emails to subscribed members. Times are Pacific.</p>' +
-      '<div class="form-group"><label>Subject</label><input class="form-input" id="campaignSubject" maxlength="200"></div>' +
+      '<p id="campaignAudience" style="overflow-wrap:anywhere"></p><div class="form-group"><label>Subject</label><input class="form-input" id="campaignSubject" maxlength="200"></div>' +
       '<div class="form-group"><label>Email HTML</label><textarea class="form-textarea" id="campaignHtml" rows="7"></textarea></div>' +
-      '<div class="form-group"><label>Publication date and time (Pacific; leave blank to save draft)</label><input class="form-input" type="datetime-local" id="campaignWhen"></div>' +
-      '<button class="btn btn-primary btn-sm" onclick="saveEmailCampaign()">Save Campaign</button>' +
+      '<div class="form-group"><label>Send date and time (Pacific; leave blank to save draft)</label><input class="form-input" type="datetime-local" id="campaignWhen"></div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px"><button class="btn btn-primary btn-sm" onclick="saveEmailCampaign()">Save Campaign</button><button class="btn btn-secondary btn-sm" onclick="resetCampaign()">New campaign</button><button class="btn btn-secondary btn-sm" onclick="previewMailbox()">Preview Mailbox</button></div>' +
       '<div id="adminCampaignList" style="margin-top:14px">Loading campaigns...</div></div></div>';
 
     // Email settings section
@@ -4096,7 +4097,7 @@ async function loadAdminBlogPosts() {
     if (!el) return;
     if (!posts.length) { el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">No blog posts yet</div>'; return; }
     el.innerHTML = posts.map(p =>
-      '<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">' +
+      '<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center">' +
       '<div><strong>' + esc(p.title) + '</strong> <span class="text-sm" style="color:' + (p.is_published ? 'var(--success)' : 'var(--text-muted)') + '">' + (p.is_published ? '✅ Published' : (p.scheduled_at ? '🕒 Scheduled' : '📝 Draft')) + '</span>' +
       '<div class="text-sm" style="color:var(--text-muted)">' + (p.scheduled_at ? 'Publishes ' + new Date(p.scheduled_at).toLocaleString('en-US',{timeZone:'America/Los_Angeles'}) + ' Pacific' : (p.is_published ? fmtDate(p.published_at) : 'Unpublished')) + ' · /' + esc(p.slug) + ' · 👁️ ' + (p.view_count || 0) + ' views</div></div>' +
       '<div style="display:flex;gap:4px">' +
@@ -4115,7 +4116,7 @@ function openBlogPostEditor(post) {
     '<div class="modal" style="max-width:700px">' +
     '<div class="modal-header"><h2>' + (post ? 'Edit Post' : 'New Blog Post') + '</h2><button class="modal-close" onclick="document.getElementById(\'blogEditorOverlay\').remove()">&times;</button></div>' +
     '<div class="form-group"><label>Title</label><input type="text" class="form-input" id="blogEdTitle" value="' + esc(post?.title || '') + '"></div>' +
-    '<div class="form-group"><label>Slug</label><input type="text" class="form-input" id="blogEdSlug" value="' + esc(post?.slug || '') + '" placeholder="auto-generated from title"></div>' +
+    '<div class="form-group"><label>URL Slug</label><input type="text" class="form-input" id="blogEdSlug" value="' + esc(post?.slug || '') + '" placeholder="auto-generated from title"></div>' +
     '<div class="form-group"><label>Excerpt</label><input type="text" class="form-input" id="blogEdExcerpt" value="' + esc(post?.excerpt || '') + '"></div>' +
     
     '<div class="form-group"><label>Content HTML (paste the fourth section from the blog draft)</label>' +
@@ -4124,9 +4125,9 @@ function openBlogPostEditor(post) {
     '<option value="draft"' + (!post?.is_published && !post?.scheduled_at ? ' selected' : '') + '>Save Draft</option>' +
     '<option value="schedule"' + (post?.scheduled_at ? ' selected' : '') + '>Schedule Publication</option>' +
     '<option value="publish"' + (post?.is_published ? ' selected' : '') + '>Publish Now</option></select></div>' +
-    '<div class="form-group" id="blogEdScheduleWrap" style="display:' + (post?.scheduled_at ? 'block' : 'none') + '"><label>Publication date and time (Pacific)</label><input class="form-input" id="blogEdSchedule" type="datetime-local" value="' + (post?.scheduled_at ? new Date(new Date(post.scheduled_at).getTime()-7*3600000).toISOString().slice(0,16) : '') + '"></div>' +
+    '<div class="form-group" id="blogEdScheduleWrap" style="display:' + (post?.scheduled_at ? 'block' : 'none') + '"><label>Publication date and time (Pacific)</label><input class="form-input" id="blogEdSchedule" type="datetime-local" value="' + (post?.scheduled_at ? pacificInputValue(post.scheduled_at) : '') + '"></div>' +
     '<div class="modal-footer"><button class="btn btn-secondary" onclick="document.getElementById(\'blogEditorOverlay\').remove()">Cancel</button>' +
-    '<button class="btn btn-primary" onclick="saveBlogPost()">Save Post</button></div></div></div>';
+    '<button class="btn btn-secondary" onclick="previewBlogEditor()">Preview</button><button class="btn btn-primary" onclick="saveBlogPost()">Save Post</button></div></div></div>';
   document.body.insertAdjacentHTML('beforeend', html);
 }
 
@@ -4172,16 +4173,7 @@ async function saveBlogPost() {
   if (document.getElementById('blogEdMode').value === 'schedule') {
     const value = document.getElementById('blogEdSchedule').value;
     if (!value) return toast('Select a publication date and time', 'error');
-    // Determine Pacific offset at the intended date, including daylight saving.
-    const localUtc = new Date(value + ':00Z');
-    const zoneName = date => new Intl.DateTimeFormat('en-US', {
-      timeZone:'America/Los_Angeles', timeZoneName:'shortOffset'
-    }).formatToParts(date).find(p => p.type === 'timeZoneName')?.value;
-    const zone = zoneName(new Date(localUtc.getTime() + 8 * 3600000));
-    const match = zone?.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/);
-    if (!match) return toast('Unable to resolve Pacific Time', 'error');
-    const sign = match[1] === '-' ? '-' : '+';
-    body.scheduledAt = value + ':00' + sign + match[2].padStart(2,'0') + ':' + (match[3] || '00');
+    try { body.scheduledAt = pacificScheduleISO(value); } catch(e) { return toast(e.message, 'error'); }
   }
   try {
     if (_editingBlogId) {
@@ -4303,6 +4295,10 @@ async function upgradeAllBetaTesters() {
 }
 
 
+function pacificInputValue(value) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(value)).map(p=>[p.type,p.value]));
+  return p.year+'-'+p.month+'-'+p.day+'T'+p.hour+':'+p.minute;
+}
 function pacificScheduleISO(value) {
   if (!value) return null;
   const candidate = new Date(value + ':00Z');
@@ -4324,41 +4320,47 @@ function pacificScheduleISO(value) {
   if (actual.getTime() <= Date.now()) throw new Error('Choose a future date and time');
   return iso;
 }
+let editingCampaignId = null;
+let campaignAudience = null;
+async function reviewCampaignAudience() {
+  campaignAudience = await api('/api/admin/email-campaigns/eligibility');
+  document.getElementById('campaignAudience').textContent = campaignAudience.deliveryMode + '. Eligible subscribed recipients: ' + campaignAudience.recipients.length + '. ' + campaignAudience.recipients.map(r=>r.email).join(', ');
+  return campaignAudience;
+}
 async function loadAdminEmailCampaigns() {
-  const el = document.getElementById('adminCampaignList');
-  if (!el) return;
+  const el=document.getElementById('adminCampaignList'); if(!el)return;
   try {
-    const campaigns = await api('/api/admin/email-campaigns');
-    el.innerHTML = campaigns.length ? campaigns.map(c =>
-      '<div style="padding:10px 0;border-top:1px solid var(--border)"><strong>'+esc(c.subject)+'</strong> — '+esc(c.status)+
-      (c.scheduled_at ? ' · '+new Date(c.scheduled_at).toLocaleString('en-US',{timeZone:'America/Los_Angeles'})+' Pacific' : '')+
-      ' · Sent '+(c.delivered_count||0)+' / Failed '+(c.failed_count||0)+
-      (['draft','scheduled'].includes(c.status) ? ' <button class="btn btn-sm btn-secondary" onclick="cancelEmailCampaign(\''+c.id+'\')">Cancel</button>' : '')+
-      '</div>').join('') : '<p class="text-sm">No campaigns yet.</p>';
-  } catch(e) { el.textContent = 'Unable to load campaigns: '+e.message; }
+    await reviewCampaignAudience();
+    const campaigns=await api('/api/admin/email-campaigns');
+    el.innerHTML=campaigns.length?campaigns.map(c=>'<div style="padding:14px 0;border-top:1px solid var(--border);overflow-wrap:anywhere"><strong>'+esc(c.subject)+'</strong> — '+esc(c.status)+
+      (c.scheduled_at?' · '+new Date(c.scheduled_at).toLocaleString('en-US',{timeZone:'America/Los_Angeles'})+' Pacific':'')+
+      '<p>Recipients '+c.recipient_count+' · '+(campaignAudience.preview?'Captured':'Accepted by SMTP')+' '+c.delivered_count+' · Failed '+c.failed_count+'</p>'+
+      (c.error_message?'<p>'+esc(c.error_message)+'</p>':'')+
+      '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm btn-secondary" onclick="previewCampaign(\''+c.id+'\')">Preview</button>'+
+      '<button class="btn btn-sm btn-secondary" onclick="campaignResults(\''+c.id+'\')">Delivery details</button>'+
+      (['draft','scheduled'].includes(c.status)?'<button class="btn btn-sm btn-secondary" onclick="editCampaign(\''+c.id+'\')">Edit / Reschedule</button><button class="btn btn-sm btn-secondary" onclick="testCampaign(\''+c.id+'\')">Send test</button><button class="btn btn-sm btn-secondary" onclick="cancelEmailCampaign(\''+c.id+'\')">Cancel campaign</button>':'')+
+      (c.status==='draft'?'<button class="btn btn-sm btn-primary" onclick="sendCampaign(\''+c.id+'\')">Send now</button>':'')+'</div></div>').join(''):'<p>No campaigns yet.</p>';
+  }catch(e){el.textContent=e.message;}
 }
-async function saveEmailCampaign() {
-  const subject = document.getElementById('campaignSubject').value.trim();
-  const html = document.getElementById('campaignHtml').value.trim();
-  const when = document.getElementById('campaignWhen').value;
-  if (!subject || !html) return toast('Subject and email content required','error');
-  try {
-    const scheduledAt = pacificScheduleISO(when);
-    await api('/api/admin/email-campaigns',{method:'POST',body:{subject,html,scheduledAt,audience:'subscribers'}});
-    toast(scheduledAt?'Email scheduled':'Draft saved','success');
-    document.getElementById('campaignSubject').value='';
-    document.getElementById('campaignHtml').value='';
-    document.getElementById('campaignWhen').value='';
-    loadAdminEmailCampaigns();
-  } catch(e) { toast(e.message,'error'); }
+function showCampaignPreview(title,html) {
+  document.getElementById('campaignPreviewOverlay')?.remove();
+  const overlay=document.createElement('div');overlay.id='campaignPreviewOverlay';overlay.className='modal-overlay open';
+  const modal=document.createElement('div');modal.className='modal';modal.style.maxWidth='700px';
+  const heading=document.createElement('h2');heading.textContent=title;
+  const close=document.createElement('button');close.className='btn btn-secondary';close.textContent='Close preview';close.onclick=()=>overlay.remove();
+  const frame=document.createElement('iframe');frame.title='Email or blog preview';frame.setAttribute('sandbox','');frame.style.cssText='width:100%;height:60vh;border:0;background:white';frame.srcdoc='<meta name="viewport" content="width=device-width"><style>body{font:16px/1.6 system-ui;overflow-wrap:anywhere}img{max-width:100%}</style>'+html;
+  modal.append(heading,close,frame);overlay.append(modal);document.body.append(overlay);
 }
-async function cancelEmailCampaign(id) {
-  if (!confirm('Cancel this email campaign?')) return;
-  try {
-    await api('/api/admin/email-campaigns/'+id,{method:'PUT',body:{cancel:true}});
-    toast('Campaign cancelled','success'); loadAdminEmailCampaigns();
-  } catch(e) { toast(e.message,'error'); }
-}
+async function previewCampaign(id){try{const c=(await api('/api/admin/email-campaigns')).find(c=>c.id===id);showCampaignPreview(c.subject,c.html);}catch(e){toast(e.message,'error');}}
+async function editCampaign(id){try{const c=(await api('/api/admin/email-campaigns')).find(c=>c.id===id);editingCampaignId=id;document.getElementById('campaignSubject').value=c.subject;document.getElementById('campaignHtml').value=c.html;document.getElementById('campaignWhen').value=c.scheduled_at?pacificInputValue(c.scheduled_at):'';document.getElementById('campaignSubject').scrollIntoView({block:'center'});}catch(e){toast(e.message,'error');}}
+function resetCampaign(){editingCampaignId=null;['campaignSubject','campaignHtml','campaignWhen'].forEach(id=>document.getElementById(id).value='');}
+async function saveEmailCampaign(){try{const a=await reviewCampaignAudience();const scheduledAt=pacificScheduleISO(document.getElementById('campaignWhen').value);if(scheduledAt&&!confirm('Schedule this email for '+new Date(scheduledAt).toLocaleString('en-US',{timeZone:'America/Los_Angeles'})+' Pacific for '+a.recipients.length+' eligible recipients?'+(a.preview?' Preview mailbox only.':'')))return;
+  await api('/api/admin/email-campaigns'+(editingCampaignId?'/'+editingCampaignId:''),{method:editingCampaignId?'PUT':'POST',body:{subject:document.getElementById('campaignSubject').value,html:document.getElementById('campaignHtml').value,scheduledAt,audience:'subscribers',recipientCount:a.recipients.length}});resetCampaign();toast(scheduledAt?'Campaign scheduled':'Draft saved','success');await loadAdminEmailCampaigns();}catch(e){toast(e.message,'error');}}
+async function cancelEmailCampaign(id){if(!confirm('Cancel this campaign?'))return;try{await api('/api/admin/email-campaigns/'+id,{method:'PUT',body:{cancel:true}});await loadAdminEmailCampaigns();}catch(e){toast(e.message,'error');}}
+async function testCampaign(id){try{const r=await api('/api/admin/email-campaigns/'+id+'/test',{method:'POST',body:{}});toast(r.message,'success');}catch(e){toast(e.message,'error');}}
+async function sendCampaign(id){try{const a=await reviewCampaignAudience();if(!confirm('Send this campaign now to '+a.recipients.length+' eligible subscribed recipients? '+a.deliveryMode))return;const r=await api('/api/admin/email-campaigns/'+id+'/send',{method:'POST',body:{confirm:true,recipientCount:a.recipients.length}});toast(r.message,'success');await loadAdminEmailCampaigns();}catch(e){toast(e.message,'error');}}
+async function campaignResults(id){try{const rows=await api('/api/admin/email-campaigns/'+id+'/recipients');showCampaignPreview('Recipient delivery results',rows.map(r=>'<p>'+esc(r.email)+' — '+esc(r.status)+(r.error_message?' · '+esc(r.error_message):'')+'</p>').join('')||'<p>No delivery attempts.</p>');}catch(e){toast(e.message,'error');}}
+async function previewMailbox(){try{const rows=await api('/api/admin/email-campaigns/outbox');showCampaignPreview('Preview Mailbox — no real emails sent',rows.map(r=>'<h3>'+esc(r.subject)+'</h3><p>To: '+esc(r.recipient)+'</p>'+r.html+'<hr>').join('')||'<p>No captured messages yet.</p>');}catch(e){toast(e.message,'error');}}
 
 // ---- Admin: Newsletter ----
 async function loadAdminNewsletter() {
@@ -5506,7 +5508,7 @@ async function toggleComboComments(comboId) {
     const comments = await api('/api/community/combos/' + comboId + '/comments');
     let html = comments.map(c => {
       const avatar = c.author_avatar ? '<img src="/uploads/' + c.author_avatar + '" style="width:28px;height:28px;border-radius:50%;object-fit:cover">' : '<div style="width:28px;height:28px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:0.8rem">' + (c.author_name||'?')[0].toUpperCase() + '</div>';
-      const deleteBtn = (c.user_id === currentUser?.id || currentUser?.email === 'christinaworkmanpottery@gmail.com') ? '<button class="btn-ghost btn-sm" onclick="deleteComboComment(\'' + c.id + '\',\'' + comboId + '\')" style="font-size:0.7rem">🗑️</button>' : '';
+      const deleteBtn = (c.user_id === currentUser?.id || currentUser?.isAdmin === true) ? '<button class="btn-ghost btn-sm" onclick="deleteComboComment(\'' + c.id + '\',\'' + comboId + '\')" style="font-size:0.7rem">🗑️</button>' : '';
       return '<div style="display:flex;gap:8px;margin-bottom:10px">' + avatar +
         '<div style="flex:1"><div style="display:flex;justify-content:space-between"><strong class="text-sm">' + esc(c.author_name||'Anonymous') + '</strong><div>' + deleteBtn + '<span class="text-sm" style="color:var(--text-muted)">' + timeAgo(c.created_at) + '</span></div></div>' +
         '<div class="text-sm" style="margin-top:2px">' + esc(c.body) + '</div></div></div>';
@@ -7272,3 +7274,5 @@ async function loadAdminMemberSurvey() {
     el.innerHTML = html;
   } catch (e) { el.textContent = 'Unable to load survey results: ' + e.message; }
 }
+
+function previewBlogEditor(){showCampaignPreview(document.getElementById('blogEdTitle').value,document.getElementById('blogEdContent').value);}
