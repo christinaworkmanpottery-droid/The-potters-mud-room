@@ -3836,6 +3836,8 @@ async function loadAdmin() {
       '<p class="text-sm mb-12" style="color:var(--text-light)">See which features members are actually using — and which ones they\'re ignoring.</p>' +
       '<div id="adminUsageContent">Loading...</div></div></div>';
 
+    html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(this)">🏺 Member Survey Results ▸ <span style="font-size:0.8rem;color:var(--text-light);font-weight:normal">tap to expand</span></h3><div style="display:none"><p class="text-sm mb-12">Anonymous prelaunch survey feedback. <a href="/survey.html" target="_blank" rel="noopener">Preview survey</a></p><div id="adminMemberSurveyContent">Loading...</div></div></div>';
+
     // Docs & Templates section
     html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(this)">📋 Docs & Templates ▸ <span style="font-size:0.8rem;color:var(--text-light);font-weight:normal">tap to expand</span></h3>' +
       '<div style="display:none">' +
@@ -3848,6 +3850,7 @@ async function loadAdmin() {
       el.innerHTML = '<div class="card"><h3>Admin loaded but display error</h3><p>' + esc(String(renderErr)) + '</p><p>Members: ' + s.total + ' | Free: ' + s.byTier.free + ' | Unlimited: ' + s.byTier.starter + '</p></div>';
       return;
     }
+    loadAdminMemberSurvey();
     loadDiscountCodes();
     loadPromoCodes();
     loadAdminOrders();
@@ -7151,4 +7154,29 @@ function addComboPhotos(input) {
   files.forEach(file => { comboPhotoSlots[comboPhotoSlots.indexOf(null)] = file; });
   input.value = '';
   renderComboPhotos();
+}
+
+
+async function loadAdminMemberSurvey() {
+  const el = document.getElementById('adminMemberSurveyContent');
+  if (!el) return;
+  try {
+    const data = await api('/api/admin/member-survey');
+    const titles = ['App usage','Reason for limited use','Most interesting feature','Most useful improvement','Interest in Clayton'];
+    let html = '<p><strong>' + Number(data.total || 0) + ' total responses</strong></p>';
+    (data.counts || []).forEach((counts,i) => {
+      html += '<div style="margin:12px 0"><strong>' + esc(titles[i] || 'Question') + '</strong><div style="margin-top:5px">';
+      Object.entries(counts).forEach(([choice,n]) => { html += '<div style="display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid var(--border,#ddd);padding:4px 0"><span>' + esc(choice) + '</span><strong>' + Number(n) + '</strong></div>'; });
+      html += '</div></div>';
+    });
+    const comments = [];
+    (data.responses || []).forEach(r => (r.answers || []).forEach((a,i) => {
+      if (a.choice === 'Other' && a.other) comments.push({ date:r.created_at, question:titles[i], comment:a.other });
+    }));
+    html += '<h4 style="margin:16px 0 8px">Written feedback (' + comments.length + ' shown)</h4>';
+    if (!comments.length) html += '<p>No written responses yet.</p>';
+    comments.forEach(c => { html += '<div style="border-bottom:1px solid var(--border,#ddd);padding:10px 0"><small>' + esc(c.question) + ' · ' + esc(c.date || '') + '</small><p style="white-space:pre-wrap;overflow-wrap:anywhere;margin:5px 0">' + esc(c.comment) + '</p></div>'; });
+    if (data.total > (data.responses || []).length) html += '<p class="text-sm">Showing the latest 500 responses.</p>';
+    el.innerHTML = html;
+  } catch (e) { el.textContent = 'Unable to load survey results: ' + e.message; }
 }

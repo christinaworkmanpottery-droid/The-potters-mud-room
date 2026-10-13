@@ -4885,6 +4885,63 @@ app.post('/api/activity', auth, (req, res) => {
   } catch(e) { res.json({ ok: true }); /* don't fail on tracking */ }
 });
 
+// Prelaunch member feedback: anonymous survey, no account identifiers stored.
+db.exec(`CREATE TABLE IF NOT EXISTS member_survey_responses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  answers_json TEXT NOT NULL
+)`);
+const SURVEY_CHOICES = [
+  ['Yes, regularly','A few times','Not yet'],
+  ["I haven't had time","I'm unsure how to get started","Something didn't work","I don't need it right now","Other"],
+  ['Tracking pieces and firings','Glazes and clay records','Studio Notes','Finding other potters','Clayton, the upcoming voice assistant','Other'],
+  ['Easier setup','Better tutorials','More features','Fewer steps','Other'],
+  ['Yes!','Maybe','Not right now','Other']
+];
+const surveySubmissionCooldown = new Map();
+app.post('/api/member-survey', (req, res) => {
+  // Lightweight anti-spam controls; no IP address is stored with survey answers.
+  if (typeof req.body !== 'object' || req.body === null || Array.isArray(req.body)) return res.status(400).json({ error: 'Invalid survey submission.' });
+  if (req.body.website) return res.json({ ok: true });
+  const requester = req.ip || req.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  for (const [key, until] of surveySubmissionCooldown) if (until <= now) surveySubmissionCooldown.delete(key);
+  if (surveySubmissionCooldown.has(requester)) return res.status(429).json({ error: 'Please wait before sending another response.' });
+  const answers = req.body?.answers;
+  if (!Array.isArray(answers) || answers.length !== 5) return res.status(400).json({ error: 'Please submit the five survey questions.' });
+  const cleaned = [];
+  for (let i=0; i<5; i++) {
+    const a = answers[i];
+    if (!a || typeof a !== 'object' || Array.isArray(a)) return res.status(400).json({ error: 'Invalid answer.' });
+    const choice = a.choice === null ? null : a.choice;
+    if (choice !== null && (typeof choice !== 'string' || !SURVEY_CHOICES[i].includes(choice))) return res.status(400).json({ error: 'Invalid survey choice.' });
+    if (a.other !== undefined && typeof a.other !== 'string') return res.status(400).json({ error: 'Invalid written response.' });
+    const other = choice === 'Other' ? (a.other || '').trim() : '';
+    if (other.length > 1000) return res.status(400).json({ error: 'Written responses must be under 1,000 characters.' });
+    cleaned.push({ choice, other });
+  }
+  if (!cleaned.some(a => a.choice)) return res.status(400).json({ error: 'Please answer at least one question.' });
+  try {
+    db.prepare('INSERT INTO member_survey_responses (answers_json) VALUES (?)').run(JSON.stringify(cleaned));
+    surveySubmissionCooldown.set(requester, Date.now() + 60 * 60 * 1000);
+    res.json({ ok: true });
+  } catch (e) { console.error('Survey save failed:', e.message); res.status(500).json({ error: 'Unable to save feedback.' }); }
+});
+app.get('/api/admin/member-survey', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  try {
+    const rows = db.prepare('SELECT id, created_at, answers_json FROM member_survey_responses ORDER BY id DESC LIMIT 500').all();
+    const counts = SURVEY_CHOICES.map(choices => Object.fromEntries(choices.map(c => [c, 0])));
+    const responses = rows.map(r => {
+      const answers = JSON.parse(r.answers_json);
+      answers.forEach((a,i) => { if (a.choice && Object.hasOwn(counts[i],a.choice)) counts[i][a.choice]++; });
+      return { id:r.id, created_at:r.created_at, answers };
+    });
+    const total = db.prepare('SELECT COUNT(*) AS total FROM member_survey_responses').get().total;
+    res.json({ total, counts, responses });
+  } catch(e) { console.error('Survey admin read failed:',e.message); res.status(500).json({ error:'Unable to load survey results.' }); }
+});
+
 // GET /api/admin/activity-summary — admin usage analytics
 app.get('/api/admin/activity-summary', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
