@@ -42,3 +42,10 @@ test('voice preferences apply to real utterances and reset when account changes'
  f.w.document.querySelector('.ql-voice-settings button').click();assert.equal(preview,1);
  f.w.eval('setAuthToken(null);setAuthUser(null)');const reset={};f.w.QLVoiceSettings.apply(reset);assert.equal(reset.rate,0.96);assert.equal(reset.voice,undefined);
 });
+test('late Raw Materials response cannot repopulate a replaced account',async t=>{
+ const f=await fixture(t);let resolve;const prior=f.w.fetch;
+ f.w.fetch=(url,options)=>url==='/api/glaze-chemicals'?new Promise(r=>resolve=r):prior(url,options);
+ const pending=f.w.loadChemicals();f.w.eval("setAuthToken('other-token');setAuthUser({id:'other',tier:'starter'})");
+ resolve({ok:true,status:200,json:async()=>[{id:'private-a',name:'Private material',quantity:10}]});await pending;
+ assert.equal(f.el('chemicalList').textContent,'');
+});
