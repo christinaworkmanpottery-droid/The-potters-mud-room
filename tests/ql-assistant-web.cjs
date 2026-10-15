@@ -38,7 +38,7 @@ test('flag OFF has no entry, page, or turn request even with direct navigation',
 });
 test('missing/failed config fails closed',async t=>{const f=await fixture(t,new Error('offline'));assert.equal(f.el('qlAssistantEntry'),null);});
 test('non-boolean enabled fails closed',async t=>{const f=await fixture(t,{enabled:'true'});assert.equal(f.el('qlAssistantEntry'),null);});
-test('flag ON shows clearly marked separate entry and compact form',async t=>{const f=await fixture(t);assert.equal(f.el('qlAssistantEntry').hidden,false);assert.match(f.el('qlAssistantEntry').textContent,/QL.*testing/);assert.equal(f.el('qlAssistantInput').maxLength,200);});
+test('flag ON shows clearly marked separate entry and compact form',async t=>{const f=await fixture(t);assert.equal(f.el('qlAssistantEntry').hidden,false);assert.equal(f.el('qlAssistantEntry').textContent,'Clayton');assert.equal(f.el('qlAssistantInput').maxLength,200);});
 test('supported question sends version 1 contract with bounded context reference and renders only factual response',async t=>{
  const f=await fixture(t);f.send();assert.deepEqual(f.pending[0].body,{version:1,requestId:'web-1',input:{text:'When was my last firing?'},context:{token:null}});
  f.reply(0,undefined,{result:{secret:'hidden evidence'}});await tick();assert.equal(f.el('qlAssistantResponse').textContent,'Your latest recorded firing date is 2026-10-01.');assert.doesNotMatch(f.el('pageQLAssistant').textContent,/hidden evidence/);

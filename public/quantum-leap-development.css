@@ -44,3 +44,9 @@
 #qlAssistantSession{bottom:calc(80px + env(safe-area-inset-bottom))!important}
 @media(max-width:600px){.ql-studio-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.ql-studio-grid button{padding:18px 14px;font-size:16px}.ql-home-actions{gap:8px}.ql-home-actions .btn{font-size:13px;padding:12px}.ql-home-hero{border-radius:20px}.ql-home-nav button{font-size:11px}}
 .ql-voice-settings{padding:20px;margin:20px 0}.ql-voice-settings summary{cursor:pointer;min-height:44px;font-weight:600}.ql-voice-settings label{display:block;margin:16px 0 8px}.ql-voice-settings p{font-size:14px;line-height:1.5}
+
+#qlAssistantSession[data-collapsed="true"] #qlAssistantSessionStatus{display:none!important}
+#chemicalList{display:flex;flex-direction:column;gap:10px}
+#chemicalList .card{padding:16px 18px;box-shadow:none!important}
+#chemicalList .card-header{margin-bottom:0;gap:12px}
+#chemicalList button,#chemicalList a{min-width:44px;min-height:44px}

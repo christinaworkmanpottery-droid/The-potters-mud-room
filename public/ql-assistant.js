@@ -1,7 +1,7 @@
 /* Bounded QL proof. Speech is transient input to the same typed turn path. */
 (() => {
   'use strict';
-  const displayName = 'QL assistant — testing recovery';
+  const displayName = 'Clayton';
   const interactionModeKey = 'ql_assistant_interaction_mode';
   const interactionMode = () => localStorage[interactionModeKey] === 'manual' ? 'manual' : 'handsfree';
   const identity = () => JSON.stringify([token, currentUser?.id, localStorage.getItem('mudlog_token')]);
@@ -655,7 +655,7 @@
     page.style.maxWidth = '640px'; page.setAttribute('aria-labelledby', 'qlAssistantHeading');
     window.QLVoiceSettings?.mount(page, hearClayton);
     const heading = node('h2', displayName); heading.id = 'qlAssistantHeading';
-    const help = node('p', 'Open any studio feature, find saved records, or ask when you last fired. Try “Open my test tiles”, “Find blue glazes”, or “Open my last firing”. Changes still use the normal forms.');
+    const help = node('p', 'Your studio companion. Open a record, capture an idea, or work on a Studio Note. Try “New note” or “Open my last firing”.');
     form = node('form'); form.id = 'qlAssistantForm'; form.setAttribute('aria-busy', 'false');
     const label = node('label', 'Your question'); label.htmlFor = 'qlAssistantInput';
     input = node('input'); input.id = 'qlAssistantInput'; input.type = 'text'; input.maxLength = 200;
@@ -672,7 +672,7 @@
     page.append(form, output, fallback);
     if (voiceEnabled) {
       const voice = node('div'); voice.id = 'qlAssistantVoice';
-      const notice = node('p', 'Tap-to-talk — testing. Your browser may send audio to its speech service. This app does not save audio or transcripts. Wait for Microphone ready, speak, then tap Stop. If words need review, tap Send. Typing stays available.');
+      const notice = node('p', 'Your browser may send audio to its speech service. This app does not save audio or transcripts. Wait for Microphone ready, speak, then tap Stop. If words need review, tap Send. Typing stays available.');
       talk = node('button', 'Tap to talk — test'); talk.id = 'qlAssistantTalk';
       stop = node('button', 'Stop listening'); stop.id = 'qlAssistantStop';
       cancel = node('button', 'Cancel listening'); cancel.id = 'qlAssistantCancelVoice';

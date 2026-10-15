@@ -4,11 +4,11 @@ let token = localStorage.getItem('mudlog_token');
 let currentUser = null;
 // QL proof observes every application-owned credential/account replacement synchronously.
 function setAuthToken(value) {
-  if (value !== token) { window.QLAssistant?.invalidate(); window.QLHome?.invalidate(); window.QLVoiceSettings?.invalidate(); }
+  if (value !== token) { window.QLAssistant?.invalidate(); window.QLHome?.invalidate(); window.QLVoiceSettings?.invalidate(); document.getElementById('chemicalList')?.replaceChildren(); }
   token = value;
 }
 function setAuthUser(value) {
-  if (value?.id !== currentUser?.id) { window.QLAssistant?.invalidate(); window.QLHome?.invalidate(); window.QLVoiceSettings?.invalidate(); }
+  if (value?.id !== currentUser?.id) { window.QLAssistant?.invalidate(); window.QLHome?.invalidate(); window.QLVoiceSettings?.invalidate(); document.getElementById('chemicalList')?.replaceChildren(); }
   currentUser = value;
 }
 let guestMode = false;
@@ -6446,8 +6446,11 @@ function printShoppingList() {
 // Glaze chemicals
 let chemicals = [];
 async function loadChemicals() {
+  const requestToken = token;
   try {
-    chemicals = await api('/api/glaze-chemicals');
+    const data = await api('/api/glaze-chemicals');
+    if (requestToken !== token) return;
+    chemicals = data;
     const c = document.getElementById('chemicalList'), em = document.getElementById('chemicalEmpty');
     if (!chemicals.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
@@ -6460,8 +6463,8 @@ async function loadChemicals() {
       (ch.source ? ' · ' + esc(ch.source) : '') + '</div></div>' +
       '<div style="display:flex;gap:4px">' +
       (ch.source_url ? '<a href="' + externalHref(ch.source_url) + '" target="_blank" rel="noopener" class="btn-ghost btn-sm" title="Source">🔗</a>' : '') +
-      '<button class="btn-ghost btn-sm" onclick="editChemical(\'' + ch.id + '\')">✏️</button>' +
-      '<button class="btn-ghost btn-sm" onclick="deleteChemical(\'' + ch.id + '\')">🗑️</button></div></div>' +
+      '<button class="btn-ghost btn-sm" aria-label="Edit raw material" onclick="editChemical(\'' + ch.id + '\')">✏️</button>' +
+      '<button class="btn-ghost btn-sm" aria-label="Delete raw material" onclick="deleteChemical(\'' + ch.id + '\')">🗑️</button></div></div>' +
       (ch.notes ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(ch.notes) + '</div>' : '') +
       '</div>'
     ).join('');
