@@ -566,33 +566,16 @@ app.post('/api/auth/register', (req, res) => {
 
     const token = jwt.sign({ userId: id, tier: 'free' }, JWT_SECRET, { expiresIn: '30d' });
 
-    // Send welcome email (async, non-blocking)
+    // Terracotta welcome email; one delivery attempt per registered member.
     if (transporter && email) {
-      const welcomeHtml = `
-        <div style="font-family: Georgia, serif; max-width: 600px; margin: 0 auto; padding: 40px 20px; background: #fefae0;">
-          <h1 style="color: #5c4033; text-align: center; margin-bottom: 8px;">Welcome to The Potter's Mud Room!</h1>
-          <p style="color: #333; font-size: 16px; line-height: 1.6; text-align: center;">Hey ${displayName || 'there'}, we're so glad you're here. 🎨</p>
-          <hr style="border: none; border-top: 1px solid #d4a373; margin: 24px 0;" />
-          <h2 style="color: #5c4033; font-size: 18px;">Here's how to get started:</h2>
-          <ol style="color: #333; font-size: 15px; line-height: 1.8; padding-left: 20px;">
-            <li><strong>Log your first piece</strong> — Add the clay, glaze, and firing details so you never forget what worked.</li>
-            <li><strong>Explore the community</strong> — Join forum discussions, browse the glaze library, and connect with fellow potters.</li>
-            <li><strong>Track your progress</strong> — Watch your studio grow as you log more work over time.</li>
-          </ol>
-          <div style="text-align: center; margin: 32px 0;">
-            <a href="https://the-potters-mud-room.onrender.com" style="background: #606c38; color: #fefae0; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 16px;">Open The Mud Room</a>
-          </div>
-          <p style="color: #666; font-size: 13px; text-align: center;">You're on the Free plan (10 pieces). Need more? Upgrade to Unlimited anytime for $6.95/month.</p>
-          <hr style="border: none; border-top: 1px solid #d4a373; margin: 24px 0;" />
-          <p style="color: #999; font-size: 12px; text-align: center;">The Potter's Mud Room — Track your pottery, organize your studio, join the community.</p>
-        </div>
-      `;
-      transporter.sendMail({
-        from: process.env.SMTP_USER,
-        to: email,
-        subject: "Welcome to The Potter's Mud Room! 🏺",
-        html: welcomeHtml,
-      }).catch(e => console.warn('Welcome email failed:', e.message));
+      const welcomeHtml = `<div style="background:#f5f1eb;padding:32px 12px;font-family:Arial,sans-serif;color:#302c29"><div style="max-width:560px;margin:auto;background:#fffdf9;border-radius:14px;padding:34px 26px"><p style="font-size:13px;letter-spacing:2px;color:#775d50;text-align:center">THE POTTER’S MUD ROOM</p><h1 style="font-size:28px;line-height:1.2;text-align:center;color:#352e29">Welcome to Your Pottery Studio!</h1><p style="font-size:17px;line-height:1.65">We’re happy you’re here. Your studio has a new home where you can keep track of your pottery, from your first piece to the final firing.</p><p style="font-size:17px;line-height:1.65"><strong>Your first 10 pieces are free.</strong> Add a piece, upload photos, and keep your studio details organized in one place.</p><p style="text-align:center;margin:32px 0"><a href="https://the-potters-mud-room.onrender.com/#pieces" style="display:inline-block;background:#B65F43;color:#ffffff;text-decoration:none;font-size:17px;font-weight:bold;padding:17px 30px;border-radius:9px">Go to My Studio →</a></p><p style="font-size:17px;line-height:1.65">You can also explore firing logs and connect with the pottery community as you settle in.</p><p style="font-size:17px;line-height:1.6">Happy making!<br><strong>The Potter’s Mud Room</strong></p></div></div>`;
+      try {
+        db.exec("CREATE TABLE IF NOT EXISTS welcome_email_deliveries (user_id TEXT PRIMARY KEY, email TEXT NOT NULL, status TEXT NOT NULL, sent_at TEXT, attempted_at TEXT NOT NULL DEFAULT (datetime('now')))");
+        const claim = db.prepare("INSERT OR IGNORE INTO welcome_email_deliveries (user_id,email,status) VALUES (?,?,'pending')").run(id,email);
+        if (claim.changes) transporter.sendMail({ from: process.env.SMTP_USER, to: email, subject: "Welcome to The Potter's Mud Room!", html: welcomeHtml })
+          .then(() => db.prepare("UPDATE welcome_email_deliveries SET status='sent',sent_at=datetime('now') WHERE user_id=?").run(id))
+          .catch(e => { db.prepare("UPDATE welcome_email_deliveries SET status='failed' WHERE user_id=?").run(id); console.warn('Welcome email failed:', e.message); });
+      } catch (e) { console.warn('Welcome email tracking failed:', e.message); }
     }
 
     res.json({ token, user: { id, email, displayName: displayName || email.split('@')[0], tier: 'free' } });
