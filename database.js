@@ -1284,6 +1284,8 @@ function initDB() {
   safeAdd('users', 'findable', 'INTEGER DEFAULT 0');
 
   // Clayton preference is private to each member and independent of profile photos.
+  safeAdd('users', 'ql_voice_settings', "TEXT NOT NULL DEFAULT '{}'");
+  safeAdd('users', 'ql_home_images', "TEXT NOT NULL DEFAULT 'minimal'");
   safeAdd('users', 'clayton_avatar', "TEXT NOT NULL DEFAULT 'bag'");
 
   // My Store migration tracking

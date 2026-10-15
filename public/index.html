@@ -815,12 +815,31 @@
     <!-- DASHBOARD -->
     <div id="pageDashboard" class="page active">
       <div class="page-header">
-        <h2>🏺 Dashboard</h2>
+        <h2>Your studio</h2>
         <div style="display:flex;gap:12px;align-items:center">
           <div id="notificationBell"></div>
           <button class="btn btn-primary" onclick="openPieceModal()">+ New Piece</button>
         </div>
       </div>
+      <section class="ql-home-hero" aria-labelledby="ql-home-heading">
+        <p class="ql-eyebrow">A little space to create</p>
+        <h1 id="ql-home-heading">What are you<br>working on?</h1>
+        <p>Your pieces, your process, your studio.</p>
+        <div class="ql-home-actions">
+          <button id="ql-home-talk" class="btn btn-primary" onclick="navigate('qlAssistant')" disabled>Talk to Clayton</button>
+          <button class="btn btn-secondary" onclick="openPieceModal()">Manual entry</button>
+          <button class="btn btn-secondary" onclick="navigate('visualSearch')">Use a photo</button>
+        </div>
+      </section>
+      <nav class="ql-studio-grid" aria-label="Your studio">
+        <button onclick="navigate('pieces')">Pieces <span>Your work, from start to finish</span></button>
+        <button onclick="navigate('chemicals')">Raw Materials <span>Your material inventory</span></button>
+        <button onclick="navigate('studioNotes')">Studio Notes <span>Ideas and observations</span></button>
+        <button onclick="navigate('firings')">Firings <span>Your kiln records</span></button>
+        <button onclick="navigate('clayBodies')">Clay Bodies <span>Your clay library</span></button>
+        <button onclick="navigate('glazes')">Glazes <span>Colors, surfaces and recipes</span></button>
+      </nav>
+      <p id="ql-home-status" role="status"></p>
       <div id="upgradeBanner" class="upgrade-banner hidden">
         <div><strong style="color:var(--primary)">Free tier:</strong> <span id="pieceCountText">0/10 pieces</span></div>
       </div>
@@ -831,7 +850,7 @@
         <div class="stat-box" id="statSalesBox" onclick="navigate('sales')" style="cursor:pointer"><div class="stat-number" id="statSales">$0</div><div class="stat-label">Total Sales</div></div>
         <div class="stat-box" id="statForumPostsBox" onclick="navigate('forum')" style="cursor:pointer;display:none"><div class="stat-number" id="statForumPosts">0</div><div class="stat-label">Forum Posts</div></div>
       </div>
-      <h2 class="mb-16">Recent Pieces</h2>
+      <h2 class="mb-16">Continue where you left off</h2>
       <div id="recentPieces" class="card-grid"></div>
       <div id="dashboardEmpty" class="empty-state hidden">
         <div class="empty-state-icon">🏺</div>
@@ -1570,6 +1589,16 @@
       <div class="page-header">
         <h2>My Profile</h2>
       </div>
+      <section class="card ql-home-settings" aria-labelledby="ql-image-heading">
+        <h3 id="ql-image-heading">Home Screen images</h3>
+        <label for="ql-home-images">Choose your Home style</label>
+        <select id="ql-home-images" class="form-input">
+          <option value="minimal">Minimal</option><option value="mine">My Pottery Photos</option><option value="studio">Studio Stock Photos</option>
+        </select>
+        <p>Piece records always keep their own photographs. Where an image is unavailable, a clean slate card appears.</p>
+        <p id="ql-image-status" role="status"></p>
+        <button class="btn btn-secondary" onclick="navigate('qlAssistant')">Clayton avatar and voice</button>
+      </section>
       <div class="detail-grid">
         <div class="card">
           <h3 style="margin-bottom:16px">Profile Photo</h3>
@@ -3390,6 +3419,8 @@
 <script src="/ql-note-sharing.js?v=oct9-notes-1"></script>
 <link rel="stylesheet" href="/clayton-avatars.css?v=oct13-2">
 <link rel="stylesheet" href="/quantum-leap-development.css?v=oct13-1">
+<script src="/ql-voice-settings.js?v=oct15-1"></script>
+<script src="/ql-home.js?v=oct15-1"></script>
 <script src="/clayton-avatar-assets.js?v=oct13-1"></script>
 <script src="/clayton-avatars.js?v=oct13-2"></script>
 <script src="/ql-assistant.js?v=oct13-avatars-2"></script>

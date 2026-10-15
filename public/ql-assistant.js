@@ -101,6 +101,7 @@
     const preferred=voices.find(v=>/Samantha|Ava|Siri|Evan|Zoe/i.test(v.name) && /^en(?:-|$)/i.test(v.lang)) || voices.find(v=>/^en-US$/i.test(v.lang) && v.localService) || voices.find(v=>/^en(?:-|$)/i.test(v.lang));
     if(preferred) speech.voice=preferred;
     speech.rate=0.96; speech.pitch=1.02;
+    window.QLVoiceSettings?.apply(speech);
     const active = () => handsFree && own === voiceEpoch && utterance === speech;
     const completeSpeech = (forceRelease = false) => {
       if (!active() || finished) return;
@@ -632,6 +633,7 @@
     if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) { avatarFeedback('Speech playback is unavailable in this browser. Clayton’s replies remain visible as text.', true); return; }
     const speech = new window.SpeechSynthesisUtterance('Hello, I am Clayton. Ready to help in your pottery studio.');
     utterance = speech; speech.rate = .96; speech.lang = 'en-US';
+    window.QLVoiceSettings?.apply(speech);
     const own = session;
     const finish = failed => {
       if (utterance !== speech || session !== own) return;
@@ -651,6 +653,7 @@
   function mount() {
     page = node('section'); page.id = 'pageQLAssistant'; page.className = 'page';
     page.style.maxWidth = '640px'; page.setAttribute('aria-labelledby', 'qlAssistantHeading');
+    window.QLVoiceSettings?.mount(page, hearClayton);
     const heading = node('h2', displayName); heading.id = 'qlAssistantHeading';
     const help = node('p', 'Open any studio feature, find saved records, or ask when you last fired. Try “Open my test tiles”, “Find blue glazes”, or “Open my last firing”. Changes still use the normal forms.');
     form = node('form'); form.id = 'qlAssistantForm'; form.setAttribute('aria-busy', 'false');

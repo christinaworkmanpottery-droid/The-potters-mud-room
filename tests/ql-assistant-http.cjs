@@ -111,3 +111,25 @@ test('confirmed assistant note is the canonical manual API record; canceled draf
  const cancel=await turn('Add a studio note that Should not exist');await turn('Cancel',cancel.context);
  const rows=await fetch(base+'/api/studio/notes',{headers}).then(r=>r.json());assert.equal(rows.some(r=>r.body==='Should not exist'),false);
 });
+
+test('Home and voice preferences persist independently and reject cross-member fields',async()=>{
+ async function request(endpoint,authToken,method='GET',body){const r=await fetch(base+endpoint,{method,headers:{'Content-Type':'application/json',...(authToken?{Authorization:'Bearer '+authToken}:{})},...(body?{body:JSON.stringify(body)}:{})});return {status:r.status,data:await r.json()};}
+ const home='/api/ql/home/preferences',voice='/api/ql/voice/preferences';
+ assert.equal((await request(home,null)).status,401);
+ assert.equal((await request(voice,null)).status,401);
+ for(const images of ['minimal','mine','studio']) {
+  assert.equal((await request(home,token,'PUT',{images})).status,200);
+  assert.equal((await request(home,token)).data.images,images);
+  assert.equal((await request(home,foreignToken)).data.images,'minimal');
+ }
+ assert.equal((await request(home,token,'PUT',{images:'mine',userId:'b'})).status,400);
+ assert.equal((await request(home,token,'PUT',{images:'invalid'})).status,400);
+ const saved={style:'neutral',voiceURI:'device-voice',rate:0.8};
+ assert.equal((await request(voice,token,'PUT',saved)).status,200);
+ assert.deepEqual((await request(voice,token)).data,saved);
+ assert.equal((await request(voice,foreignToken)).data.voiceURI,'');
+ assert.equal((await request(voice,token,'PUT',{...saved,rate:20})).status,400);
+ assert.equal((await request(voice,token,'PUT',{...saved,userId:'b'})).status,400);
+ assert.equal((await request(voice,jwt.sign({userId:'missing'},secret),'PUT',saved)).status,401);
+ assert.equal((await request(home,token)).data.images,'studio');
+});
