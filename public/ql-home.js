@@ -9,6 +9,11 @@
     clearPieceEdgeMediaScope(grid);
     grid.querySelectorAll('img').forEach(img => img.remove());
     select.value = mode;
+    if (mode === 'studio') {
+      const img=document.createElement('img');
+      img.src='/images/ql-studio/ceramic-bowls.jpg';img.alt='Studio inspiration: handcrafted ceramic bowls';
+      img.loading='lazy';img.onerror=()=>img.remove();grid.firstElementChild.prepend(img);return;
+    }
     if (mode !== 'mine') return;
     const withPhotos = records.filter(p => p.primaryPhoto || p.photos?.length);
     // Member imagery stays on the Pieces card; it never misrepresents materials.
@@ -42,7 +47,7 @@
     const account=owner,version=++revision,value=select.value;mode=value;render();status.textContent='Saving…';
     queue=queue.catch(()=>{}).then(async()=>{
       if(owner!==account)return;
-      try {await request(account,'PUT',value);if(owner===account && revision===version)status.textContent=value==='studio'?'Saved. Studio photography is not yet available; slate cards are shown.':'Saved to your account.';}
+      try {await request(account,'PUT',value);if(owner===account && revision===version)status.textContent='Saved to your account.';}
       catch(_){if(owner===account && revision===version)status.textContent='Could not save. Select your style again to retry.';}
     });
   });

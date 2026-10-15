@@ -156,7 +156,7 @@ function createNoteManagement(db,notes,{now=Date.now}={}){
     if(!c||c.name!==p.contactName||(p.method!=='native'&&(p.method==='email'?c.email:c.phone)!==p.address))return reply('That contact changed. Please choose the recipient again.',state,'failed');
    }
    const r=reply('Sharing prepared. Tap the sharing card to review the recipient and open your compose/share interface. Nothing has been sent.',{...focus(userId,note)},'prepared');
-   r.response.share={noteId:note.id,title:p.title,body:p.body,method:p.method||'native',device:!!p.device,recipient:p.contactName||'',address:p.address||''};return r;
+   r.response.share={noteId:note.id,title:p.title,body:p.body,method:p.method||'native',device:!!p.device,recipient:p.contactName||'',address:p.address||'',...(p.device?{recipientQuery:p.recipient}: {})};return r;
   }
   return null;
  }
