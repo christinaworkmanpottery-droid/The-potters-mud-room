@@ -152,12 +152,15 @@ try {
 } catch(e) { console.error('⚠️  Could not migrate custom piece glaze support:', e.message); }
 // Nodemailer setup for newsletter emails
 let transporter = null;
+let activeMailUser = null;
+function mailSenderAddress() { return activeMailUser || process.env.SMTP_USER || 'thepottersmudroom@gmail.com'; }
 function setupTransporter(user, pass, host, port) {
   if (process.env.PREVIEW_MODE === 'true') return; // Never deliver preview mail to real recipients.
   if (user && pass) {
     const config = host
       ? { host, port: port || 587, secure: false, auth: { user, pass } }
       : { service: 'gmail', auth: { user, pass } };
+    activeMailUser = user;
     transporter = nodemailer.createTransport(config);
     transporter.verify((err) => {
       if (err) console.error('⚠️  SMTP verification failed:', err.message);
@@ -263,9 +266,9 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req,
           const user = db.prepare('SELECT email, display_name FROM users WHERE id=?').get(userId);
           if (product && user?.email && product.is_digital) {
             const downloadUrl = `${APP_URL}/api/shop/download/${orderId}?token=${require('jsonwebtoken').sign({ orderId, userId }, JWT_SECRET, { expiresIn: '30d' })}`;
-            const transporter = require('nodemailer').createTransport({ host: 'smtp.gmail.com', port: 587, secure: false, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } });
-            transporter.sendMail({
-              from: `"The Potter's Mud Room" <${process.env.SMTP_USER}>`,
+            const mailTransport = transporter;
+            mailTransport.sendMail({
+              from: `"The Potter's Mud Room" <${mailSenderAddress()}>`,
               to: user.email,
               subject: `Your download is ready — ${product.name}`,
               html: `<div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;padding:20px;color:#333"><h2 style="color:#8B4513">Thank you for your purchase! 🏺</h2><p>Hey ${user.display_name || 'there'}!</p><p>Your <strong>${product.name}</strong> is ready to download:</p><p style="margin:20px 0;padding:15px;background:#f5f0e8;border-radius:8px;text-align:center"><a href="${downloadUrl}" style="color:#8B4513;font-weight:bold;font-size:16px">📥 Download Your ${product.name}</a></p><p>This link is valid for 30 days. You can also access your purchases anytime in the app under your Profile.</p><p style="margin-top:30px">— Christina<br><em>The Potter's Mud Room</em></p></div>`
@@ -312,9 +315,9 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req,
       const email = charge.billing_details?.email;
       if (email) {
         try {
-          const transporter = require('nodemailer').createTransport({ host: 'smtp.gmail.com', port: 587, secure: false, auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } });
-          transporter.sendMail({
-            from: `"The Potter's Mud Room" <${process.env.SMTP_USER}>`,
+          const mailTransport = transporter;
+          mailTransport.sendMail({
+            from: `"The Potter's Mud Room" <${mailSenderAddress()}>`,
             to: email,
             subject: 'Your refund has been processed — The Potter\'s Mud Room',
             html: `<div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;padding:20px;color:#333"><h2 style="color:#8B4513">Refund Confirmation</h2><p>Hey there!</p><p>Your refund of <strong>$${(charge.amount_refunded / 100).toFixed(2)}</strong> has been processed. It should appear on your statement within 5-10 business days.</p><p>If you have any questions, just reply to this email.</p><p style="margin-top:30px">— Christina<br><em>The Potter's Mud Room</em><br><a href="https://thepottersmudroom.com" style="color:#8B4513">thepottersmudroom.com</a></p></div>`
@@ -572,7 +575,7 @@ app.post('/api/auth/register', (req, res) => {
       try {
         db.exec("CREATE TABLE IF NOT EXISTS welcome_email_deliveries (user_id TEXT PRIMARY KEY, email TEXT NOT NULL, status TEXT NOT NULL, sent_at TEXT, attempted_at TEXT NOT NULL DEFAULT (datetime('now')))");
         const claim = db.prepare("INSERT OR IGNORE INTO welcome_email_deliveries (user_id,email,status) VALUES (?,?,'pending')").run(id,email);
-        if (claim.changes) transporter.sendMail({ from: process.env.SMTP_USER, to: email, subject: "Welcome to The Potter's Mud Room!", html: welcomeHtml })
+        if (claim.changes) transporter.sendMail({ from: mailSenderAddress(), to: email, subject: "Welcome to The Potter's Mud Room!", html: welcomeHtml })
           .then(() => db.prepare("UPDATE welcome_email_deliveries SET status='sent',sent_at=datetime('now') WHERE user_id=?").run(id))
           .catch(e => { db.prepare("UPDATE welcome_email_deliveries SET status='failed' WHERE user_id=?").run(id); console.warn('Welcome email failed:', e.message); });
       } catch (e) { console.warn('Welcome email tracking failed:', e.message); }
@@ -3891,7 +3894,7 @@ app.post('/api/admin/announce', auth, (req, res) => {
       const trackOpen = `https://thepottersmudroom.com/api/newsletter/open/${announceId}/${emailB64}`;
       const htmlWithTracking = html + `<img src="${trackOpen}" width="1" height="1" style="display:none" alt="">`;
       transporter.sendMail({
-        from: process.env.SMTP_USER || 'thepottersmudroom@gmail.com',
+        from: mailSenderAddress(),
         to: r.email,
         subject,
         html: htmlWithTracking,
@@ -4551,7 +4554,7 @@ app.post('/api/admin/newsletter/send', auth, (req, res) => {
         const trackOpen = `https://thepottersmudroom.com/api/newsletter/open/${sendId}/${emailB64}`;
         const trackClick = `https://thepottersmudroom.com/api/newsletter/click/${sendId}/${emailB64}?url=${encodeURIComponent('https://thepottersmudroom.com/blog/' + post.slug)}`;
         const mailOptions = {
-          from: process.env.SMTP_USER || 'thepottersmudroom@gmail.com',
+          from: mailSenderAddress(),
           to: subscriber.email,
           subject: 'New from The Potter\'s Mud Room: ' + post.title,
           html: `
@@ -4611,7 +4614,7 @@ app.post('/api/admin/announce', auth, (req, res) => {
       const trackOpen = `https://thepottersmudroom.com/api/newsletter/open/${announceId}/${emailB64}`;
       const htmlWithTracking = html + `<img src="${trackOpen}" width="1" height="1" style="display:none" alt="">`;
       transporter.sendMail({
-        from: process.env.SMTP_USER || 'thepottersmudroom@gmail.com',
+        from: mailSenderAddress(),
         to: r.email,
         subject,
         html: htmlWithTracking,
@@ -4642,7 +4645,7 @@ app.post('/api/admin/email-send', auth, (req, res) => {
     let sent = 0, failed = 0;
     const promises = recipients.map(email =>
       transporter.sendMail({
-        from: process.env.SMTP_USER || 'thepottersmudroom@gmail.com',
+        from: mailSenderAddress(),
         to: email,
         subject,
         html,
@@ -5180,7 +5183,7 @@ app.post('/api/admin/beta-signups/notify', auth, (req, res) => {
     for (const s of unsent) {
       try {
         await transporter.sendMail({
-          from: process.env.SMTP_USER || 'thepottersmudroom@gmail.com',
+          from: mailSenderAddress(),
           to: s.email,
           subject: '\uD83C\uDFFA You\'re In! Install The Potter\'s Mud Room Beta',
           html: `<div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;padding:20px">
