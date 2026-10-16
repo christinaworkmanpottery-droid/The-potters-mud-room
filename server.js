@@ -4518,6 +4518,7 @@ app.post('/api/admin/email-settings', auth, (req, res) => {
     if (smtp_host) db.prepare("INSERT OR REPLACE INTO site_settings (key, value) VALUES ('smtp_host', ?)").run(smtp_host);
     if (smtp_port) db.prepare("INSERT OR REPLACE INTO site_settings (key, value) VALUES ('smtp_port', ?)").run(String(smtp_port));
     
+    db.prepare("INSERT OR REPLACE INTO site_settings (key,value) VALUES ('smtp_config_source','database')").run();
     setupTransporter(smtp_user, smtp_pass, smtp_host || null, smtp_port ? parseInt(smtp_port) : undefined);
     
     res.json({ success: true, message: 'Email settings saved. Testing connection...' });
@@ -5584,8 +5585,8 @@ app.get('/llms.txt', (req, res) => {
 });
 
 
-// Load SMTP from database on startup (if not in env vars)
-if (!transporter) {
+// Explicit Admin saves remain authoritative across restarts.
+if (!transporter || db.prepare("SELECT value FROM site_settings WHERE key='smtp_config_source'").get()?.value === 'database') {
   try {
     const smtpUser = db.prepare("SELECT value FROM site_settings WHERE key='smtp_user'").get();
     const smtpPass = db.prepare("SELECT value FROM site_settings WHERE key='smtp_pass'").get();
