@@ -166,13 +166,6 @@ function setupTransporter(user, pass, host, port) {
   }
 }
 
-// Try env vars first
-if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-  setupTransporter(process.env.SMTP_USER, process.env.SMTP_PASS, process.env.SMTP_HOST, parseInt(process.env.SMTP_PORT) || undefined);
-} else {
-  console.warn('⚠️  SMTP not configured via env — will check database on startup');
-}
-
 // Stripe setup (optional — works without keys, just disables payments)
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY || '';
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
@@ -4505,7 +4498,7 @@ app.get('/api/admin/email-settings', auth, (req, res) => {
   try {
     const user = db.prepare("SELECT value FROM site_settings WHERE key='smtp_user'").get();
     const configured = !!transporter;
-    res.json({ configured, email: activeMailUser || (user ? user.value : null) });
+    res.json({ configured, email: activeMailUser || (user ? user.value : null), state: transporter?.state() || null });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -4531,7 +4524,7 @@ app.post('/api/admin/email-settings/test', auth, async (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   if (!transporter) return res.json({ success: false, error: 'No email configured' });
   try {
-    await transporter.verify();
+    await transporter.verify({manual:true});
     res.json({ success: true, message: 'Email connection working!' });
   } catch(e) {
     res.json({ success: false, error: e.message });
@@ -5587,18 +5580,13 @@ app.get('/llms.txt', (req, res) => {
 });
 
 
-// Explicit Admin saves remain authoritative across restarts.
-if (!transporter || db.prepare("SELECT value FROM site_settings WHERE key='smtp_config_source'").get()?.value === 'database') {
-  try {
-    const smtpUser = db.prepare("SELECT value FROM site_settings WHERE key='smtp_user'").get();
-    const smtpPass = db.prepare("SELECT value FROM site_settings WHERE key='smtp_pass'").get();
-    const smtpHost = db.prepare("SELECT value FROM site_settings WHERE key='smtp_host'").get();
-    const smtpPort = db.prepare("SELECT value FROM site_settings WHERE key='smtp_port'").get();
-    if (smtpUser && smtpPass) {
-      setupTransporter(smtpUser.value, smtpPass.value, smtpHost ? smtpHost.value : null, smtpPort ? parseInt(smtpPort.value) : undefined);
-    }
-  } catch(e) { /* site_settings table might not exist yet */ }
-}
+// Resolve the authoritative settings once; never initialize an obsolete account first.
+const startupMailConfig = require('./lib/mail-config').resolveMailConfig(db, process.env);
+if (startupMailConfig) {
+  const {user, pass, host, port} = startupMailConfig;
+  setupTransporter(user, pass, host, port);
+  console.log('[mail] Configuration source:', startupMailConfig.source);
+} else console.warn('[mail] SMTP not configured');
 
 // Seed draft blog posts on startup
 try { const { seedBlogDrafts } = require('./seed-blog-drafts'); seedBlogDrafts(db); } catch(e) { console.warn('Blog seed skipped:', e.message); }

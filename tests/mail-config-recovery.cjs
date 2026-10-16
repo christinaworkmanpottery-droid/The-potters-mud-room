@@ -1,0 +1,26 @@
+'use strict';
+const assert=require('node:assert/strict'),Database=require('better-sqlite3');
+const {resolveMailConfig}=require('../lib/mail-config');
+const {createReliableMailer,classify}=require('../lib/reliable-mail');
+(async()=>{
+const db=new Database(':memory:');db.exec('CREATE TABLE site_settings(key TEXT PRIMARY KEY,value TEXT)');
+const env={SMTP_USER:'fixture@test.invalid',SMTP_PASS:'old'};
+assert.equal(resolveMailConfig(db,env).source,'environment');
+for(const [k,v] of Object.entries({smtp_user:'fixture@test.invalid',smtp_pass:'saved'}))db.prepare('INSERT INTO site_settings VALUES(?,?)').run(k,v);
+assert.equal(resolveMailConfig(db,env).pass,'saved','Legacy Admin saves survive restart');
+let now=100000,calls=0,fail=true;
+const provider={createTransport(){return {close(){},async verify(){calls++;if(fail)throw Object.assign(Error('Username and Password not accepted'),{code:'EAUTH',responseCode:535,command:'AUTH PLAIN'});}};}};
+const options={noTimer:true,clock:()=>now,sleep:async ms=>{now+=ms}};
+const config={auth:{user:env.SMTP_USER,pass:'saved'}};
+let mail=createReliableMailer(db,provider,config,options);
+await assert.rejects(mail.verify());assert.equal(mail.state().disabled,1);
+await assert.rejects(mail.verify({manual:true}));assert.equal(calls,1,'Manual checks respect cooldown');
+mail.close();mail=createReliableMailer(db,provider,config,options);assert.equal(mail.state().disabled,1);
+now=mail.state().blocked_until+1;
+await assert.rejects(mail.verify());assert.equal(calls,1,'No automatic retry of rejected credentials');
+fail=false;await mail.verify({manual:true});assert.equal(calls,2);assert.equal(mail.state().disabled,0);
+await assert.rejects(mail.verify({manual:true}));assert.equal(calls,2,'Repeated clicks cannot repeat authentication');
+assert.equal(classify({code:'EAUTH',responseCode:454}).retryable,true);
+assert.equal(classify({code:'EAUTH',responseCode:535}).retryable,false);
+mail.close();db.close();console.log('PASS saved credential precedence, durable block, cooldown, same-password recovery, test rate limit, 454/535 distinction');
+})().catch(e=>{console.error(e);process.exitCode=1});

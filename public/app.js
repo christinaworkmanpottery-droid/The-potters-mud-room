@@ -4508,6 +4508,8 @@ async function loadAdminEmailSettings() {
     if (settings.configured) {
       html += '<div style="padding:12px;background:var(--success-bg,#e8f5e9);border-radius:var(--radius);margin-bottom:12px">' +
         '<strong>✅ Email configured:</strong> ' + esc(settings.email) + '</div>';
+      if (settings.state?.disabled) html += '<p>Automatic sending is paused after an authentication rejection. Test the existing settings after the cooldown before replacing any credentials.</p>';
+      if (settings.state?.blocked_until > Date.now()) html += '<p>Next connection check allowed after ' + esc(new Date(settings.state.blocked_until).toLocaleString()) + '.</p>';
       html += '<button class="btn btn-sm" onclick="testEmailSettings()" id="testEmailBtn">Test Connection</button> ';
       html += '<button class="btn btn-sm btn-ghost" onclick="showEmailForm()">Change Settings</button>';
       html += '<div id="emailTestResult" style="margin-top:8px"></div>';
