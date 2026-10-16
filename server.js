@@ -6,7 +6,7 @@ const multer = require('multer');
 const { normalizeExternalUrl, moneyCents, saleQuantity } = require('./public/website-utils');
 
 // Deploy version tag — used to verify which code is actually running on Render
-const DEPLOY_VERSION = '47-payments-20261016';
+const DEPLOY_VERSION = '47-email-reliability-20261016';
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
@@ -153,14 +153,16 @@ function setupTransporter(user, pass, host, port) {
   if (process.env.PREVIEW_MODE === 'true') return; // Never deliver preview mail to real recipients.
   if (user && pass) {
     const config = host
-      ? { host, port: port || 587, secure: false, auth: { user, pass } }
+      ? { host, port: port || 587, secure: port === 465, requireTLS: port !== 465, auth: { user, pass } }
       : { service: 'gmail', auth: { user, pass } };
     activeMailUser = user;
-    transporter = nodemailer.createTransport(config);
-    transporter.verify((err) => {
-      if (err) console.error('⚠️  SMTP verification failed:', err.message);
-      else console.log('✅ SMTP connected as', user, host ? '(via '+host+')' : '(via gmail)');
+    if (transporter) transporter.close();
+    transporter = require('./lib/reliable-mail').createReliableMailer(db, nodemailer, config, {
+      eligible: mail => mail.deliveryKind !== 'marketing' || require('./lib/email-scheduler').eligibleRecipients(db).some(u=>u.email===String(mail.to).trim().toLowerCase()),
+      accepted: mail => { if(mail.welcomeUserId) db.prepare("UPDATE welcome_email_deliveries SET status='sent',sent_at=datetime('now') WHERE user_id=?").run(mail.welcomeUserId); }
     });
+    // Do not authenticate on startup: the first queued message checks delivery.
+
   }
 }
 
@@ -485,7 +487,7 @@ app.post('/api/auth/register', (req, res) => {
       try {
         db.exec("CREATE TABLE IF NOT EXISTS welcome_email_deliveries (user_id TEXT PRIMARY KEY, email TEXT NOT NULL, status TEXT NOT NULL, sent_at TEXT, attempted_at TEXT NOT NULL DEFAULT (datetime('now')))");
         const claim = db.prepare("INSERT OR IGNORE INTO welcome_email_deliveries (user_id,email,status) VALUES (?,?,'pending')").run(id,email);
-        if (claim.changes) transporter.sendMail({ from: mailSenderAddress(), to: email, subject: "Welcome to The Potter's Mud Room!", html: welcomeHtml })
+        if (claim.changes) transporter.sendMail({ deliveryKey: "welcome:"+id, welcomeUserId:id, from: mailSenderAddress(), to: email, subject: "Welcome to The Potter's Mud Room!", html: welcomeHtml })
           .then(() => db.prepare("UPDATE welcome_email_deliveries SET status='sent',sent_at=datetime('now') WHERE user_id=?").run(id))
           .catch(e => { db.prepare("UPDATE welcome_email_deliveries SET status='failed' WHERE user_id=?").run(id); console.warn('Welcome email failed:', e.message); });
       } catch (e) { console.warn('Welcome email tracking failed:', e.message); }
@@ -3725,6 +3727,7 @@ app.post('/api/admin/announce', auth, (req, res) => {
       const trackOpen = `https://thepottersmudroom.com/api/newsletter/open/${announceId}/${emailB64}`;
       const htmlWithTracking = html + `<img src="${trackOpen}" width="1" height="1" style="display:none" alt="">`;
       transporter.sendMail({
+        deliveryKey:'announcement:'+announceId+':'+r.email.trim().toLowerCase(),deliveryKind:'marketing',
         from: mailSenderAddress(),
         to: r.email,
         subject,
@@ -4378,6 +4381,7 @@ app.post('/api/admin/newsletter/send', auth, (req, res) => {
         const trackOpen = `https://thepottersmudroom.com/api/newsletter/open/${sendId}/${emailB64}`;
         const trackClick = `https://thepottersmudroom.com/api/newsletter/click/${sendId}/${emailB64}?url=${encodeURIComponent('https://thepottersmudroom.com/blog/' + post.slug)}`;
         const mailOptions = {
+          deliveryKey:'newsletter:'+blogPostId+':'+subscriber.email.trim().toLowerCase(),deliveryKind:'marketing',
           from: mailSenderAddress(),
           to: subscriber.email,
           subject: 'New from The Potter\'s Mud Room: ' + post.title,
@@ -4438,6 +4442,7 @@ app.post('/api/admin/announce', auth, (req, res) => {
       const trackOpen = `https://thepottersmudroom.com/api/newsletter/open/${announceId}/${emailB64}`;
       const htmlWithTracking = html + `<img src="${trackOpen}" width="1" height="1" style="display:none" alt="">`;
       transporter.sendMail({
+        deliveryKey:'announcement:'+announceId+':'+r.email.trim().toLowerCase(),deliveryKind:'marketing',
         from: mailSenderAddress(),
         to: r.email,
         subject,
@@ -5091,6 +5096,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     const resetLink = `https://thepottersmudroom.com/#reset-password?token=${resetToken}`;
     if (transporter) {
       await transporter.sendMail({
+        expiresAt:Date.parse(expiresAt),
         from: '"The Potter\'s Mud Room" <thepottersmudroom@gmail.com>',
         to: user.email,
         subject: 'Reset Your Password — The Potter\'s Mud Room',

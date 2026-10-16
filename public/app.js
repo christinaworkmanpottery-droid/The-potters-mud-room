@@ -4325,7 +4325,7 @@ let editingCampaignId = null;
 let campaignAudience = null;
 async function reviewCampaignAudience() {
   campaignAudience = await api('/api/admin/email-campaigns/eligibility');
-  document.getElementById('campaignAudience').textContent = campaignAudience.deliveryMode + '. Eligible subscribed recipients: ' + campaignAudience.recipients.length + '. ' + campaignAudience.recipients.map(r=>r.email).join(', ');
+  document.getElementById('campaignAudience').innerHTML = esc(campaignAudience.deliveryMode) + '. Eligible subscribed recipients: ' + campaignAudience.recipients.length + '<details><summary>Review audience</summary><div style="overflow-wrap:anywhere">' + campaignAudience.recipients.map(r=>esc(r.email)).join(', ') + '</div></details><p><button class="btn btn-sm btn-secondary" onclick="checkEmailSender()">Check sender</button> <button class="btn btn-sm btn-secondary" onclick="emailDeliveryLog()">All email outcomes</button> <button class="btn btn-sm btn-secondary" onclick="loadAdminEmailCampaigns()">Refresh delivery status</button></p>';
   return campaignAudience;
 }
 async function loadAdminEmailCampaigns() {
@@ -4335,11 +4335,14 @@ async function loadAdminEmailCampaigns() {
     const campaigns=await api('/api/admin/email-campaigns');
     el.innerHTML=campaigns.length?campaigns.map(c=>'<div style="padding:14px 0;border-top:1px solid var(--border);overflow-wrap:anywhere"><strong>'+esc(c.subject)+'</strong> — '+esc(c.status)+
       (c.scheduled_at?' · '+new Date(c.scheduled_at).toLocaleString('en-US',{timeZone:'America/Los_Angeles'})+' Pacific':'')+
-      '<p>Recipients '+c.recipient_count+' · '+(campaignAudience.preview?'Captured':'Accepted by SMTP')+' '+c.delivered_count+' · Failed '+c.failed_count+'</p>'+
+      '<p>Total intended: '+c.recipient_count+'<br>'+ (campaignAudience.preview?'Captured':'Accepted by SMTP')+': '+(c.accepted_count||0)+'<br>Failed: '+(c.actual_failed_count||0)+' · Pending / retrying: '+(c.pending_count||0)+' · Skipped: '+(c.skipped_count||0)+'<br>Uncertain: '+(c.uncertain_count||0)+'</p>'+
+      '<p>Confirmed inbox delivery: unavailable<br>Reliable opens: unavailable (image loads cannot reliably prove reading).</p>'+
+      (c.survey_responses!==null&&c.survey_responses!==undefined?'<p>Anonymous survey responses (all submissions): '+c.survey_responses+'<br>Responses ÷ intended recipients: '+(c.recipient_count?(100*c.survey_responses/c.recipient_count).toFixed(1):'0')+'%<br><small>Anonymous responses cannot be matched to individual invitations.</small></p>':'')+
       (c.error_message?'<p>'+esc(c.error_message)+'</p>':'')+
       '<div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-sm btn-secondary" onclick="previewCampaign(\''+c.id+'\')">Preview</button>'+
       '<button class="btn btn-sm btn-secondary" onclick="campaignResults(\''+c.id+'\')">Delivery details</button>'+
       (['draft','scheduled'].includes(c.status)?'<button class="btn btn-sm btn-secondary" onclick="editCampaign(\''+c.id+'\')">Edit / Reschedule</button><button class="btn btn-sm btn-secondary" onclick="testCampaign(\''+c.id+'\')">Send test</button><button class="btn btn-sm btn-secondary" onclick="cancelEmailCampaign(\''+c.id+'\')">Cancel campaign</button>':'')+
+      (c.status==='failed'&&c.actual_failed_count?'<button class="btn btn-sm btn-secondary" onclick="recoverCampaignFailures(\''+c.id+'\','+c.actual_failed_count+')">Recover verified failures only</button>':'')+
       (c.status==='draft'?'<button class="btn btn-sm btn-primary" onclick="sendCampaign(\''+c.id+'\')">Send now</button>':'')+'</div></div>').join(''):'<p>No campaigns yet.</p>';
   }catch(e){el.textContent=e.message;}
 }
@@ -4360,7 +4363,8 @@ async function saveEmailCampaign(){try{const a=await reviewCampaignAudience();co
 async function cancelEmailCampaign(id){if(!confirm('Cancel this campaign?'))return;try{await api('/api/admin/email-campaigns/'+id,{method:'PUT',body:{cancel:true}});await loadAdminEmailCampaigns();}catch(e){toast(e.message,'error');}}
 async function testCampaign(id){try{const r=await api('/api/admin/email-campaigns/'+id+'/test',{method:'POST',body:{}});toast(r.message,'success');}catch(e){toast(e.message,'error');}}
 async function sendCampaign(id){try{const a=await reviewCampaignAudience();if(!confirm('Send this campaign now to '+a.recipients.length+' eligible subscribed recipients? '+a.deliveryMode))return;const r=await api('/api/admin/email-campaigns/'+id+'/send',{method:'POST',body:{confirm:true,recipientCount:a.recipients.length}});toast(r.message,'success');await loadAdminEmailCampaigns();}catch(e){toast(e.message,'error');}}
-async function campaignResults(id){try{const rows=await api('/api/admin/email-campaigns/'+id+'/recipients');showCampaignPreview('Recipient delivery results',rows.map(r=>'<p>'+esc(r.email)+' — '+esc(r.status)+(r.error_message?' · '+esc(r.error_message):'')+'</p>').join('')||'<p>No delivery attempts.</p>');}catch(e){toast(e.message,'error');}}
+function emailErrorSummary(message){return /454[ -]4\.7\.0|too many login attempts/i.test(message||'')?'Gmail temporarily restricted sign-in. Retry after the sending cooldown.':String(message||'').replace(/[\r\n]+/g,' ').slice(0,160);}
+async function campaignResults(id){try{const rows=await api('/api/admin/email-campaigns/'+id+'/recipients');showCampaignPreview('Recipient delivery results',rows.map(r=>'<article style="padding:14px 0;border-bottom:1px solid #ddd;overflow-wrap:anywhere"><strong>'+esc(r.email)+'</strong><br>'+esc(r.status==='sent'?'Accepted by SMTP':r.status==='attempted'?'Uncertain — manual review':r.status)+(r.retry_at?'<br>Retry after: '+esc(new Date(r.retry_at).toLocaleString()):'')+(r.error_message?'<p>'+esc(emailErrorSummary(r.error_message))+'</p><details><summary>Technical detail</summary><p style="white-space:pre-wrap">'+esc(r.error_message)+'</p></details>':'')+'</article>').join('')||'<p>No delivery attempts.</p>');}catch(e){toast(e.message,'error');}}
 async function previewMailbox(){try{const rows=await api('/api/admin/email-campaigns/outbox');showCampaignPreview('Preview Mailbox — no real emails sent',rows.map(r=>'<h3>'+esc(r.subject)+'</h3><p>To: '+esc(r.recipient)+'</p>'+r.html+'<hr>').join('')||'<p>No captured messages yet.</p>');}catch(e){toast(e.message,'error');}}
 
 // ---- Admin: Newsletter ----
@@ -7277,3 +7281,7 @@ async function loadAdminMemberSurvey() {
 }
 
 function previewBlogEditor(){showCampaignPreview(document.getElementById('blogEdTitle').value,document.getElementById('blogEdContent').value);}
+
+async function checkEmailSender(){try{const r=await api('/api/admin/email-campaigns/sender-check',{method:'POST',body:{}});toast(r.message,'success');}catch(e){toast(e.message,'error');}}
+async function recoverCampaignFailures(id,failedCount){if(!confirm('Recover only '+failedCount+' verified authentication failures? Previously accepted invitations will not be resent. Unsubscribed and reserved test addresses are skipped.'))return;try{const r=await api('/api/admin/email-campaigns/'+id+'/recover',{method:'POST',body:{confirm:true,failedCount}});toast(r.message,'success');await loadAdminEmailCampaigns();}catch(e){toast(e.message,'error');}}
+async function emailDeliveryLog(){try{const rows=await api('/api/admin/email-campaigns/delivery-log');showCampaignPreview('All email outcomes', '<p>Accepted means accepted by SMTP, not confirmed inbox delivery. Uncertain outcomes require manual review and are not automatically resent.</p>'+rows.map(r=>'<article style="overflow-wrap:anywhere;padding:12px 0;border-bottom:1px solid #ddd"><strong>'+esc(r.recipient)+'</strong><br>'+esc(r.status)+' · Attempts: '+r.attempts+(r.retry_at?'<br>Retry after '+esc(new Date(r.retry_at).toLocaleString()):'')+(r.error_message?'<p>'+esc(emailErrorSummary(r.error_message))+'</p>':'')+'</article>').join(''));}catch(e){toast(e.message,'error');}}
