@@ -4,11 +4,11 @@ let token = localStorage.getItem('mudlog_token');
 let currentUser = null;
 // QL proof observes every application-owned credential/account replacement synchronously.
 function setAuthToken(value) {
-  if (value !== token) window.QLAssistant?.invalidate();
+  if (value !== token) { window.QLAssistant?.invalidate(); window.QLHome?.invalidate(); window.QLVoiceSettings?.invalidate(); document.getElementById('chemicalList')?.replaceChildren(); }
   token = value;
 }
 function setAuthUser(value) {
-  if (value?.id !== currentUser?.id) window.QLAssistant?.invalidate();
+  if (value?.id !== currentUser?.id) { window.QLAssistant?.invalidate(); window.QLHome?.invalidate(); window.QLVoiceSettings?.invalidate(); document.getElementById('chemicalList')?.replaceChildren(); }
   currentUser = value;
 }
 let guestMode = false;
@@ -532,6 +532,7 @@ async function checkAuth() {
   }
 }
 function showApp() {
+  window.QLVoiceSettings?.sync();
   window.QLAssistant?.syncSession();
   window.StudioSearch?.syncSession();
   try {
@@ -603,6 +604,7 @@ function navigate(page, options = {}) {
     }
     if (!options.fromHistory) restoredUrl = '';
     currentPage = page;
+    window.QLHome?.navigate(page);
     // A navigation writes one history entry. Rendering a Back/Forward destination never writes one.
     const route = options.route || page;
     if (!options.fromHistory && window.location.hash !== '#' + route) {
@@ -671,6 +673,8 @@ function closeNav() {
 async function loadDashboard() {
   const edgeGeneration = pieceEdgeGeneration, edgeToken = token;
   try {
+    window.QLHome?.sync();
+    document.getElementById('ql-home-status').textContent = 'Loading your studio…';
     const d = await api('/api/dashboard');
     if (edgeGeneration !== pieceEdgeGeneration || edgeToken !== token) return;
     document.getElementById('statPieces').textContent = d.totalPieces;
@@ -689,9 +693,11 @@ async function loadDashboard() {
     const c = document.getElementById('recentPieces'), em = document.getElementById('dashboardEmpty');
     if (!d.recentPieces.length) { c.innerHTML = ''; em.classList.remove('hidden'); }
     else { em.classList.add('hidden'); c.innerHTML = d.recentPieces.map(pieceCard).join(''); void loadPieceEdgeMedia(c); }
+    document.getElementById('ql-home-status').textContent = '';
+    window.QLHome?.pieces(d.recentPieces);
     // Build 47 parity: Load notification bell indicator
     loadNotificationIndicator();
-  } catch (err) { toast(err.message, 'error'); }
+  } catch (err) { if (edgeToken !== token) return; document.getElementById('ql-home-status').textContent = 'Your studio could not load. Reopen Home to retry.'; toast(err.message, 'error'); }
 }
 
 // Build 47 parity: Notification bell indicator
@@ -4569,6 +4575,7 @@ async function hydrateProfileMedia(root) {
 
 // ---- Profile ----
 async function loadProfile() {
+  window.QLHome?.sync();
   const requestToken = token;
   try {
     const d = await api('/api/auth/me');
@@ -6439,8 +6446,11 @@ function printShoppingList() {
 // Glaze chemicals
 let chemicals = [];
 async function loadChemicals() {
+  const requestToken = token;
   try {
-    chemicals = await api('/api/glaze-chemicals');
+    const data = await api('/api/glaze-chemicals');
+    if (requestToken !== token) return;
+    chemicals = data;
     const c = document.getElementById('chemicalList'), em = document.getElementById('chemicalEmpty');
     if (!chemicals.length) { c.innerHTML=''; em.classList.remove('hidden'); return; }
     em.classList.add('hidden');
@@ -6453,8 +6463,8 @@ async function loadChemicals() {
       (ch.source ? ' · ' + esc(ch.source) : '') + '</div></div>' +
       '<div style="display:flex;gap:4px">' +
       (ch.source_url ? '<a href="' + externalHref(ch.source_url) + '" target="_blank" rel="noopener" class="btn-ghost btn-sm" title="Source">🔗</a>' : '') +
-      '<button class="btn-ghost btn-sm" onclick="editChemical(\'' + ch.id + '\')">✏️</button>' +
-      '<button class="btn-ghost btn-sm" onclick="deleteChemical(\'' + ch.id + '\')">🗑️</button></div></div>' +
+      '<button class="btn-ghost btn-sm" aria-label="Edit raw material" onclick="editChemical(\'' + ch.id + '\')">✏️</button>' +
+      '<button class="btn-ghost btn-sm" aria-label="Delete raw material" onclick="deleteChemical(\'' + ch.id + '\')">🗑️</button></div></div>' +
       (ch.notes ? '<div class="text-sm mt-8" style="color:var(--text-light)">' + esc(ch.notes) + '</div>' : '') +
       '</div>'
     ).join('');

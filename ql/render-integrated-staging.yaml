@@ -1,0 +1,40 @@
+# Review before applying: upgrading the existing free preview incurs Render charges.
+# This file deliberately contains no production service and is not the root Blueprint.
+services:
+  - type: web
+    name: mudroom-ql-integrated-oct14
+    runtime: node
+    repo: https://github.com/christinaworkmanpottery-droid/The-potters-mud-room
+    branch: ql/integrated-preview-20261014
+    region: oregon
+    plan: starter
+    numInstances: 1
+    autoDeployTrigger: off
+    buildCommand: npm ci --omit=dev
+    startCommand: node ql/start-integrated-staging.cjs
+    healthCheckPath: /api/ql/assistant/config
+    disk:
+      name: ql-integrated-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: 22.23.3
+      - key: NODE_ENV
+        value: production
+      - key: QL_REQUIRE_DURABLE_STORAGE
+        value: '1'
+      - key: APP_URL
+        value: https://mudroom-ql-integrated-oct14.onrender.com
+      - key: JWT_SECRET
+        sync: false
+      - key: QL_PREVIEW_PASSWORD
+        sync: false
+      - key: QL_ASSISTANT_CORE_ENABLED
+        value: '1'
+      - key: QL_ASSISTANT_WEB_ENABLED
+        value: '1'
+      - key: QL_ASSISTANT_VOICE_WEB_ENABLED
+        value: '1'
+      - key: QL_ASSISTANT_HANDS_FREE_WEB_ENABLED
+        value: '1'

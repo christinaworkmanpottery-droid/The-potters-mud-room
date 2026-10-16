@@ -3149,6 +3149,36 @@ app.get('/api/ql/assistant/config', (req, res) => {
   });
 });
 if (process.env.QL_ASSISTANT_CORE_ENABLED === '1') {
+  const voiceDefaults = {style:'masculine', voiceURI:'', rate:0.96};
+  app.get('/api/ql/voice/preferences', auth, (req, res) => {
+    res.set('Cache-Control', 'private, no-store');
+    const member = db.prepare('SELECT ql_voice_settings FROM users WHERE id=?').get(req.userId);
+    if (!member) return res.status(401).json({error:'Sign in required'});
+    let saved; try { saved=JSON.parse(member.ql_voice_settings); } catch (_) {}
+    res.json({...voiceDefaults, ...saved});
+  });
+  app.put('/api/ql/voice/preferences', auth, (req, res) => {
+    res.set('Cache-Control', 'private, no-store');
+    const body=req.body;
+    if (!body || Object.keys(body).sort().join(',')!=='rate,style,voiceURI' || !['masculine','feminine','neutral'].includes(body.style) || typeof body.voiceURI!=='string' || body.voiceURI.length>500 || typeof body.rate!=='number' || !Number.isFinite(body.rate) || body.rate<0.6 || body.rate>1.4) return res.status(400).json({error:'Choose valid voice settings'});
+    const result=db.prepare('UPDATE users SET ql_voice_settings=? WHERE id=?').run(JSON.stringify(body),req.userId);
+    if(!result.changes)return res.status(401).json({error:'Sign in required'});
+    res.json(body);
+  });
+  const homeImageModes = new Set(['minimal', 'mine', 'studio']);
+  app.get('/api/ql/home/preferences', auth, (req, res) => {
+    res.set('Cache-Control', 'private, no-store');
+    const member = db.prepare('SELECT ql_home_images FROM users WHERE id=?').get(req.userId);
+    if (!member) return res.status(401).json({error:'Sign in required'});
+    res.json({images:homeImageModes.has(member.ql_home_images) ? member.ql_home_images : 'minimal'});
+  });
+  app.put('/api/ql/home/preferences', auth, (req, res) => {
+    res.set('Cache-Control', 'private, no-store');
+    if (!req.body || Object.keys(req.body).join(',') !== 'images' || !homeImageModes.has(req.body.images)) return res.status(400).json({error:'Choose a Home image style'});
+    const result = db.prepare('UPDATE users SET ql_home_images=? WHERE id=?').run(req.body.images, req.userId);
+    if (!result.changes) return res.status(401).json({error:'Sign in required'});
+    res.json({images:req.body.images});
+  });
   const claytonAvatars = new Set(['bag','bowl','buddy','pebble','moon','microphone']);
   app.get('/api/ql/assistant/preferences', auth, (req, res) => {
     res.set('Cache-Control', 'private, no-store');
