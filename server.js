@@ -1370,6 +1370,17 @@ app.post('/api/admin/payments/reconcile', auth, async (req, res) => {
   catch (_) { res.status(503).json({ error: 'Stripe reconciliation could not complete. Existing access and last verified history were preserved.' }); }
 });
 
+require('./lib/admin-member-mail').register({app,auth,isAdmin,db,stripe,billing,getTransporter:()=>transporter,getSender:mailSenderAddress,adminEmail:ADMIN_EMAIL,verifyAccess:async user=>{
+  // Ephemeral server-internal diagnostic session. Never returned or persisted.
+  const token=jwt.sign({userId:user.id,tier:user.tier},JWT_SECRET,{expiresIn:'30s'});
+  const checks=[];
+  for(const path of ['/api/test-tiles','/api/sales/summary','/api/user/subscription']) {
+    const r=await fetch('http://127.0.0.1:'+PORT+path,{headers:{authorization:'Bearer '+token},signal:AbortSignal.timeout(10000)});
+    const data=await r.json();checks.push({path,status:r.status,...(path==='/api/user/subscription'?{active:data.status==='active'&&data.plan==='starter'}:{})});
+  }
+  return checks;
+}});
+
 // Admin: view orders
 app.get('/api/admin/orders', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });

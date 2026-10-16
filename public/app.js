@@ -3835,6 +3835,8 @@ async function loadAdmin() {
       '<div style="display:flex;flex-wrap:wrap;gap:6px"><button class="btn btn-primary btn-sm" onclick="saveEmailCampaign()">Save Campaign</button><button class="btn btn-secondary btn-sm" onclick="resetCampaign()">New campaign</button><button class="btn btn-secondary btn-sm" onclick="previewMailbox()">Preview Mailbox</button></div>' +
       '<div id="adminCampaignList" style="margin-top:14px">Loading campaigns...</div></div></div>';
 
+    html += '<div class="card mb-16"><h3 style="cursor:pointer" onclick="toggleAdminSection(this)">Member email verification ▸</h3><div style="display:none"><p>Verify a paid annual member before sending the personal thank-you. The welcome test sends only to your Admin inbox using isolated payment fixtures.</p><label for="memberMailEmail">Member email</label><input class="form-input" id="memberMailEmail" type="email"><p><button class="btn btn-secondary" onclick="memberMailAction(\'verify\')">Verify member and delivery history</button> <button class="btn btn-primary" onclick="memberMailAction(\'send\')">Send personal thank-you once</button> <button class="btn btn-secondary" onclick="memberMailAction(\'welcome-test\')">Test annual welcome to Admin only</button></p><pre id="memberMailResult" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre></div></div>';
+
     // Email settings section
     html += '<div class="card mb-16"><h3 style="margin-bottom:12px;cursor:pointer" onclick="toggleAdminSection(this)">📧 Email Settings ▸ <span style="font-size:0.8rem;color:var(--text-light);font-weight:normal">tap to expand</span></h3>' +
       '<div style="display:none">' +
@@ -7287,3 +7289,12 @@ function previewBlogEditor(){showCampaignPreview(document.getElementById('blogEd
 async function checkEmailSender(){try{const r=await api('/api/admin/email-campaigns/sender-check',{method:'POST',body:{}});toast(r.message,'success');}catch(e){toast(e.message,'error');}}
 async function recoverCampaignFailures(id,failedCount){if(!confirm('Recover only '+failedCount+' verified authentication failures? Previously accepted invitations will not be resent. Unsubscribed and reserved test addresses are skipped.'))return;try{const r=await api('/api/admin/email-campaigns/'+id+'/recover',{method:'POST',body:{confirm:true,failedCount}});toast(r.message,'success');await loadAdminEmailCampaigns();}catch(e){toast(e.message,'error');}}
 async function emailDeliveryLog(){try{const rows=await api('/api/admin/email-campaigns/delivery-log');showCampaignPreview('All email outcomes', '<p>Accepted means accepted by SMTP, not confirmed inbox delivery. Uncertain outcomes require manual review and are not automatically resent.</p>'+rows.map(r=>'<article style="overflow-wrap:anywhere;padding:12px 0;border-bottom:1px solid #ddd"><strong>'+esc(r.recipient)+'</strong><br>'+esc(r.status)+' · Attempts: '+r.attempts+(r.retry_at?'<br>Retry after '+esc(new Date(r.retry_at).toLocaleString()):'')+(r.error_message?'<p>'+esc(emailErrorSummary(r.error_message))+'</p>':'')+'</article>').join(''));}catch(e){toast(e.message,'error');}}
+
+async function memberMailAction(action) {
+  const output=document.getElementById('memberMailResult');
+  output.textContent='Checking…';
+  try {
+    const result=await api('/api/admin/member-mail/'+action,{method:'POST',body:{email:document.getElementById('memberMailEmail').value}});
+    output.textContent=JSON.stringify(result,null,2);
+  } catch(e) {output.textContent=e.message;}
+}
