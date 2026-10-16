@@ -269,7 +269,7 @@ function showMemberGroup(filter) {
   else if (filter === 'free') filtered = m.filter(x => x.tier === 'free' || (!x.tier));
   else if (filter === 'recent7') { const c=Date.now(); filtered=m.filter(x=>c-new Date(x.created_at).getTime()<7*86400000); }
   else if (filter === 'recent30') { const c=Date.now(); filtered=m.filter(x=>c-new Date(x.created_at).getTime()<30*86400000); }
-  let rows = filtered.map(x => '<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px">' + esc(x.display_name||'—') + '</td><td style="padding:8px;font-size:0.8rem">' + esc(x.email) + '</td><td style="padding:8px">' + esc(({paid:'Paid',free:'Free',gifted:'Gifted',inactive:'Inactive subscription',unverified:'Unverified subscription'})[x.billingClassification] || 'Unknown') + '</td><td style="padding:8px;font-size:0.8rem">' + (x.created_at?new Date(x.created_at).toLocaleDateString():'') + '</td></tr>').join('');
+  let rows = filtered.map(x => '<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px">' + esc(x.display_name||'—') + '</td><td style="padding:8px;font-size:0.8rem">' + esc(x.email) + '</td><td style="padding:8px">' + esc(({paid:'Paid',free:'Free',gifted:'Gifted',inactive:'Inactive subscription',unverified:'Unverified subscription',review:'Needs review'})[x.billingClassification] || 'Unknown') + '</td><td style="padding:8px;font-size:0.8rem">' + (x.created_at?new Date(x.created_at).toLocaleDateString():'') + '</td></tr>').join('');
   document.getElementById('adminMemberFilter').innerHTML = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem"><tr style="border-bottom:2px solid var(--border);text-align:left"><th style="padding:8px">Name</th><th style="padding:8px">Email</th><th style="padding:8px">Type</th><th style="padding:8px">Joined</th></tr>' + rows + '</table></div>';
   document.getElementById('adminMemberFilterTitle').innerText = filtered.length + ' member(s)';
   document.getElementById('adminMemberFilterBox').style.display = 'block';
@@ -3733,7 +3733,7 @@ async function loadAdmin() {
     const m = data.members || [];
     const s = data.stats || { total: 0, byTier: { free: 0, paid: 0, gifted: 0 }, recent7d: 0, recent30d: 0 };
     
-    let html = '<div class="card mb-16" style="padding:14px"><h3 style="margin-bottom:10px">🔍 Search Members</h3>' +
+    let html = '<div class="card mb-16"><button class="btn btn-primary" onclick="showPaymentsRevenue()">Payments &amp; Revenue</button></div>' + '<div class="card mb-16" style="padding:14px"><h3 style="margin-bottom:10px">🔍 Search Members</h3>' +
       '<div style="display:flex;gap:8px"><input type="text" class="form-input" id="adminSearchInput" placeholder="Search by name or email..." onkeydown="if(event.key===\'Enter\')adminSearchMembers()">' +
       '<button class="btn btn-primary btn-sm" onclick="adminSearchMembers()">Search</button></div>' +
       '<div id="adminSearchResults" class="mt-8"></div></div>';
@@ -3747,7 +3747,8 @@ async function loadAdmin() {
       '<div class="stat-box" style="cursor:pointer" onclick="showMemberGroup(\'paid\')"><div class="stat-number" style="color:var(--success)">' + (s.byTier.paid||0) + '</div><div class="stat-label">Paid Unlimited</div></div>' +
       '<div class="stat-box" style="cursor:pointer" onclick="showMemberGroup(\'gifted\')"><div class="stat-number" style="color:var(--primary)">' + (s.byTier.gifted||0) + '</div><div class="stat-label">Gifted Unlimited</div></div>' +
       '<div class="stat-box" style="cursor:pointer" onclick="showMemberGroup(\'free\')"><div class="stat-number">' + (s.byTier.free||0) + '</div><div class="stat-label">Free</div></div>' +
-      '</div>';
+      '<div class="stat-box"><div class="stat-number">' + (s.byTier.review||0) + '</div><div class="stat-label">Needs review</div></div></div>';
+    html += '<p class="text-sm">Stripe verified: ' + esc(s.verifiedAt ? new Date(s.verifiedAt).toLocaleString() : 'pending') + (s.paidCountVerifiedByStripe ? '' : ' — verification pending or stale') + '</p>';
     html += '<div id="adminMemberFilterBox" style="display:none;margin-bottom:16px" class="card"><h4 id="adminMemberFilterTitle" style="margin-bottom:8px"></h4><div id="adminMemberFilter"></div></div>';
 
     // Members table — collapsed by default
@@ -4572,10 +4573,10 @@ async function loadAdminUsage() {
 
     // Active users: today / week / month
     html += '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">' +
-      '<div class="stat-box"><div class="stat-number">' + (d.activeToday || 0) + '</div><div class="stat-label">Active Today</div></div>' +
+      '<div class="stat-box"><div class="stat-number">' + (d.activeToday || 0) + '</div><div class="stat-label">Content creators · 24h</div></div>' +
       '<div class="stat-box"><div class="stat-number">' + (d.activeWeek || 0) + '</div><div class="stat-label">This Week</div></div>' +
       '<div class="stat-box"><div class="stat-number">' + (d.activeMonth || 0) + '</div><div class="stat-label">This Month</div></div>' +
-      '<div class="stat-box"><div class="stat-number">' + (d.totalActions || 0) + '</div><div class="stat-label">Total Actions</div></div>' +
+      '<div class="stat-box"><div class="stat-number">' + (d.totalActions || 0) + '</div><div class="stat-label">Saved content records</div></div>' +
       '</div>';
 
     // Supplemental engagement data excludes admin and common test aliases.
@@ -4643,7 +4644,7 @@ async function loadAdminUsage() {
     // Daily active users chart
     if (d.dailyActiveUsers && d.dailyActiveUsers.length) {
       const maxU = Math.max(...d.dailyActiveUsers.map(x => x.users));
-      html += '<h4 style="margin:20px 0 8px">Daily Active Users (last 30 days)</h4>';
+      html += '<h4 style="margin:20px 0 8px">Daily content creators (UTC, last 30 days)</h4>';
       html += '<div style="display:flex;align-items:flex-end;gap:2px;height:60px;border-bottom:1px solid var(--border, #ddd)">';
       d.dailyActiveUsers.forEach(day => {
         const h = maxU > 0 ? Math.max(2, Math.round(day.users / maxU * 56)) : 2;
@@ -4674,6 +4675,7 @@ async function loadAdminUsage() {
       html += '</table>';
     }
 
+    html = '<div class="card"><p>' + esc(d.activityDefinition || '') + '</p></div>' + html;
     el.innerHTML = html;
   } catch(e) {
     el.innerHTML = '<div class="text-sm" style="color:var(--text-muted)">Could not load usage data: ' + esc(e.message) + '</div>';

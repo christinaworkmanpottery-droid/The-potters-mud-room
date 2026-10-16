@@ -1,0 +1,21 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {spawn}=require('node:child_process');const Database=require('better-sqlite3');const Stripe=require('stripe');
+const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'billing-http-'));const root=path.resolve(__dirname,'..');
+for(const f of ['server.js','database.js','iap.js','directory-search.js','calendar-export.js'])fs.copyFileSync(path.join(root,f),path.join(tmp,f));
+for(const d of ['lib','geodata'])fs.cpSync(path.join(root,d),path.join(tmp,d),{recursive:true});
+for(const d of ['node_modules','public'])fs.symlinkSync(path.join(root,d),path.join(tmp,d),'dir');
+fs.writeFileSync(path.join(tmp,'mock-stripe.cjs'),`const Module=require('module');const original=Module._load;const Real=original('stripe',module);const list=async()=>({data:[],has_more:false});Module._load=function(name,...rest){if(name!=='stripe')return original.call(this,name,...rest);return ()=>({webhooks:Real.webhooks,checkout:{sessions:{list}},subscriptions:{list},charges:{list},invoices:{list},payouts:{list}});};`);
+const port=34000+Math.floor(Math.random()*10000),secret='whsec_local_test_only',base='http://127.0.0.1:'+port;
+let output='';const server=spawn(process.execPath,['--require','./mock-stripe.cjs','server.js'],{cwd:tmp,env:{PATH:process.env.PATH,PORT:String(port),JWT_SECRET:'local-test-only-secret',STRIPE_SECRET_KEY:'sk_test_fixture',STRIPE_WEBHOOK_SECRET:secret,NODE_ENV:'test'},stdio:['ignore','pipe','pipe']});server.stdout.on('data',b=>output+=b);server.stderr.on('data',b=>output+=b);
+(async()=>{
+ for(let n=0;n<100&&!output.includes('running on');n++){if(server.exitCode!==null)throw Error(output);await new Promise(r=>setTimeout(r,100));}assert.match(output,/running on/);
+ const payload=JSON.stringify({id:'evt_signed_fixture',livemode:true,type:'invoice.paid',data:{object:{id:'in_fixture'}}});
+ const header=Stripe.webhooks.generateTestHeaderString({payload,secret});
+ const post=(body,signature)=>fetch(base+'/api/stripe/webhook',{method:'POST',body,headers:{'content-type':'application/json',...(signature?{'stripe-signature':signature}:{})}});
+ assert.equal((await post(payload)).status,400);console.log('PASS webhook rejects missing signature');
+ assert.equal((await post(payload+' ',header)).status,400);console.log('PASS webhook rejects tampered raw body');
+ const expired=Stripe.webhooks.generateTestHeaderString({payload,secret,timestamp:Math.floor(Date.now()/1000)-1000});assert.equal((await post(payload,expired)).status,400);console.log('PASS webhook rejects expired signature');
+ assert.equal((await post(payload,header)).status,200);assert.equal((await post(payload,header)).status,200);
+ const db=new Database(path.join(tmp,'data/pottery.db'));assert.equal(db.prepare('SELECT COUNT(*) n FROM billing_events').get().n,1);console.log('PASS valid signature durably queues exactly one event across retries');db.close();
+ console.log('4 signed webhook HTTP checks passed');
+})().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>server.kill('SIGTERM'));

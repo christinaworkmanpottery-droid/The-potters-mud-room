@@ -6,7 +6,7 @@ const multer = require('multer');
 const { normalizeExternalUrl, moneyCents, saleQuantity } = require('./public/website-utils');
 
 // Deploy version tag — used to verify which code is actually running on Render
-const DEPLOY_VERSION = '47';
+const DEPLOY_VERSION = '47-payments-20261016';
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
@@ -95,13 +95,8 @@ db.exec(`CREATE TABLE IF NOT EXISTS ai_usage (
 )`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_ai_usage_user_month ON ai_usage(user_id, created_at)`);
 
-// Migrate all tiers to free/unlimited (starter = unlimited internally)
-try {
-  db.pragma('ignore_check_constraints = ON');
-  db.prepare("UPDATE users SET tier='starter' WHERE tier IN ('basic','mid','top')").run();
-  db.prepare("UPDATE users SET tier='starter', billing_period='stripe-monthly' WHERE LOWER(email) IN ('jgk1020@gmail.com','awhiteman96@gmail.com','christinaworkmanpottery@gmail.com')").run();
-  db.pragma('ignore_check_constraints = OFF');
-} catch(e) { db.pragma('ignore_check_constraints = OFF'); }
+// Tier aliases are normalized at access checks. Never grant memberships by email
+// or bypass database constraints during startup.
 
 // AI tokens column
 try { db.exec("ALTER TABLE users ADD COLUMN ai_tokens INTEGER DEFAULT 0"); } catch(e) { /* already exists */ }
@@ -232,102 +227,15 @@ const safeUpload = (fieldName) => (req, res, next) => {
   });
 };
 
-// Stripe webhook needs raw body — must be BEFORE express.json()
+const billing = require('./lib/billing').createBilling({ db, stripe, appUrl: APP_URL, adminEmail: 'christinaworkmanpottery@gmail.com' });
+// Verify the exact raw body, then durably enqueue before acknowledging delivery.
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req, res) => {
-  if (!stripe || !STRIPE_WEBHOOK_SECRET) return res.status(400).send('Stripe not configured');
+  if (!stripe || !STRIPE_WEBHOOK_SECRET) return res.status(503).send('Stripe not configured');
   let event;
-  try {
-    event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], STRIPE_WEBHOOK_SECRET);
-  } catch (err) {
-    console.error('Webhook sig verification failed:', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-
-  switch (event.type) {
-    case 'checkout.session.completed': {
-      const session = event.data.object;
-      const userId = session.metadata?.userId;
-      const purchaseType = session.metadata?.purchaseType;
-      if (!userId) break;
-
-      if (purchaseType === 'subscription') {
-        const tier = session.metadata.tier;
-        db.prepare('UPDATE users SET tier=?, stripe_customer_id=?, stripe_subscription_id=? WHERE id=?')
-          .run(tier, session.customer, session.subscription, userId);
-      } else if (purchaseType === 'merchant') {
-        // Record merchant purchase
-        const productId = session.metadata.productId;
-        const orderId = uuidv4();
-        db.prepare('INSERT INTO merchant_orders (id, user_id, product_id, price_paid, status, stripe_session_id) VALUES (?,?,?,?,?,?)')
-          .run(orderId, userId, productId, session.amount_total / 100, 'completed', session.id);
-        // Send confirmation email with download link for digital products
-        try {
-          const product = db.prepare('SELECT * FROM merchant_products WHERE id=?').get(productId);
-          const user = db.prepare('SELECT email, display_name FROM users WHERE id=?').get(userId);
-          if (product && user?.email && product.is_digital) {
-            const downloadUrl = `${APP_URL}/api/shop/download/${orderId}?token=${require('jsonwebtoken').sign({ orderId, userId }, JWT_SECRET, { expiresIn: '30d' })}`;
-            const mailTransport = transporter;
-            mailTransport.sendMail({
-              from: `"The Potter's Mud Room" <${mailSenderAddress()}>`,
-              to: user.email,
-              subject: `Your download is ready — ${product.name}`,
-              html: `<div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;padding:20px;color:#333"><h2 style="color:#8B4513">Thank you for your purchase! 🏺</h2><p>Hey ${user.display_name || 'there'}!</p><p>Your <strong>${product.name}</strong> is ready to download:</p><p style="margin:20px 0;padding:15px;background:#f5f0e8;border-radius:8px;text-align:center"><a href="${downloadUrl}" style="color:#8B4513;font-weight:bold;font-size:16px">📥 Download Your ${product.name}</a></p><p>This link is valid for 30 days. You can also access your purchases anytime in the app under your Profile.</p><p style="margin-top:30px">— Christina<br><em>The Potter's Mud Room</em></p></div>`
-            }).catch(e => console.error('Purchase email failed:', e.message));
-          }
-        } catch(emailErr) { console.error('Purchase email error:', emailErr.message); }
-      } else if (purchaseType === 'ai_tokens') {
-        // Add purchased AI tokens to user's balance
-        const questions = parseInt(session.metadata.questions) || 0;
-        if (questions > 0) {
-          db.prepare('UPDATE users SET ai_tokens = COALESCE(ai_tokens, 0) + ? WHERE id=?').run(questions, userId);
-        }
-      }
-      break;
-    }
-    case 'customer.subscription.updated': {
-      const sub = event.data.object;
-      let user = db.prepare('SELECT id FROM users WHERE stripe_subscription_id=?').get(sub.id);
-      if (!user && sub.customer) user = db.prepare('SELECT id FROM users WHERE stripe_customer_id=?').get(sub.customer);
-      if (user && sub.status !== 'active' && sub.status !== 'trialing') {
-        // Never downgrade lifetime beta testers
-        const isBeta = db.prepare('SELECT is_beta_tester FROM users WHERE id=?').get(user.id);
-        if (!isBeta?.is_beta_tester) {
-          db.prepare('UPDATE users SET tier=?, stripe_subscription_id=NULL WHERE id=?').run('free', user.id);
-        }
-      }
-      break;
-    }
-    case 'customer.subscription.deleted': {
-      const sub = event.data.object;
-      let user = db.prepare('SELECT id FROM users WHERE stripe_subscription_id=?').get(sub.id);
-      if (!user && sub.customer) user = db.prepare('SELECT id FROM users WHERE stripe_customer_id=?').get(sub.customer);
-      if (user) {
-        // Never downgrade lifetime beta testers
-        const isBeta = db.prepare('SELECT is_beta_tester FROM users WHERE id=?').get(user.id);
-        if (!isBeta?.is_beta_tester) {
-          db.prepare('UPDATE users SET tier=?, stripe_subscription_id=NULL WHERE id=?').run('free', user.id);
-        }
-      }
-      break;
-    }
-    case 'charge.refunded': {
-      const charge = event.data.object;
-      const email = charge.billing_details?.email;
-      if (email) {
-        try {
-          const mailTransport = transporter;
-          mailTransport.sendMail({
-            from: `"The Potter's Mud Room" <${mailSenderAddress()}>`,
-            to: email,
-            subject: 'Your refund has been processed — The Potter\'s Mud Room',
-            html: `<div style="font-family:Georgia,serif;max-width:600px;margin:0 auto;padding:20px;color:#333"><h2 style="color:#8B4513">Refund Confirmation</h2><p>Hey there!</p><p>Your refund of <strong>$${(charge.amount_refunded / 100).toFixed(2)}</strong> has been processed. It should appear on your statement within 5-10 business days.</p><p>If you have any questions, just reply to this email.</p><p style="margin-top:30px">— Christina<br><em>The Potter's Mud Room</em><br><a href="https://thepottersmudroom.com" style="color:#8B4513">thepottersmudroom.com</a></p></div>`
-          }).catch(e => console.error('Refund email failed:', e.message));
-        } catch(e) { console.error('Refund email error:', e.message); }
-      }
-      break;
-    }
-  }
-  res.json({ received: true });
+  try { event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], STRIPE_WEBHOOK_SECRET); }
+  catch (_) { return res.status(400).send('Invalid Stripe signature'); }
+  try { billing.acceptEvent(event); res.json({ received: true }); }
+  catch (_) { res.status(503).send('Event could not be saved; retry required'); }
 });
 
 app.use(cors());
@@ -619,27 +527,6 @@ app.get('/api/user/subscription', auth, async (req, res) => {
   if (!u) return res.status(404).json({ error: 'User not found' });
 
   let hasStripe = !!u.stripe_subscription_id;
-
-  // If no stripe_subscription_id stored but user has a paid tier, try to sync from Stripe
-  if (!hasStripe && u.tier && u.tier !== 'free' && stripe && u.email) {
-    try {
-      let customerId = u.stripe_customer_id;
-      if (!customerId) {
-        const customers = await stripe.customers.list({ email: u.email, limit: 1 });
-        if (customers.data.length > 0) {
-          customerId = customers.data[0].id;
-          db.prepare('UPDATE users SET stripe_customer_id=? WHERE id=?').run(customerId, req.userId);
-        }
-      }
-      if (customerId) {
-        const subs = await stripe.subscriptions.list({ customer: customerId, status: 'active', limit: 1 });
-        if (subs.data.length > 0) {
-          db.prepare('UPDATE users SET stripe_subscription_id=? WHERE id=?').run(subs.data[0].id, req.userId);
-          hasStripe = true;
-        }
-      }
-    } catch (e) { /* non-critical — just means we can't confirm Stripe link */ }
-  }
 
   // Check IAP status
   const hasIAP = iap.isIAPActive(db, req.userId);
@@ -1469,79 +1356,21 @@ app.delete('/api/admin/members/:id', auth, (req, res) => {
 });
 
 // Admin dashboard — see all members, signups, cancellations, tiers
-app.get('/api/admin/members', auth, async (req, res) => {
+app.get('/api/admin/members', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
-  try {
-    const members = db.prepare(`SELECT id, email, display_name, tier, billing_period, plan_expires_at, 
-      avatar_filename, created_at, updated_at, stripe_customer_id, stripe_subscription_id 
-      FROM users ORDER BY created_at DESC`).all();
-    // Billing evidence is not the same as a confirmed payment.
-    // Never count billing_period='stripe-monthly' as a paid subscription.
-    // Native production purchases with a future expiry have verified receipt evidence;
-    // Stripe references are reported separately until checked against Stripe.
-    const activeIAP = new Set(db.prepare(`
-      SELECT DISTINCT user_id FROM iap_purchases
-      WHERE environment='production' AND expires_at > CAST(strftime('%s','now') AS INTEGER)
-    `).all().map(row => row.user_id));
-    // Confirm Stripe references against the billing provider. Unknown status must
-    // never be silently counted as paid or gifted.
-    const stripeStatuses = new Map();
-    const stripeIds = [...new Set(members.filter(m => m.stripe_subscription_id).map(m => m.stripe_subscription_id))];
-    if (stripe) {
-      for (const id of stripeIds) {
-        try {
-          const subscription = await stripe.subscriptions.retrieve(id);
-          stripeStatuses.set(id, subscription.status === 'active' ? 'active' : 'inactive');
-        } catch (error) {
-          console.error('Admin Stripe verification failed:', error.message);
-          stripeStatuses.set(id, 'unknown');
-        }
-      }
-    }
-    const stats = {
-      total: members.length,
-      byTier: { free: 0, paid: 0, gifted: 0 },
-      billingEvidence: { activeProductionIAP: 0, stripeUnverified: 0, stripeVerifiedActive: 0, stripeVerifiedInactive: 0, manuallyGrantedOrGifted: 0 },
-      paidCountVerifiedByStripe: !!stripe && stripeIds.every(id => stripeStatuses.get(id) !== 'unknown'),
-      recent7d: 0,
-      recent30d: 0
-    };
-    const now = Date.now();
-    members.forEach(m => {
-      const isUnlimited = m.tier === 'starter' || ['basic','mid','top'].includes(m.tier);
-      m.billingClassification = !isUnlimited ? 'free'
-        : activeIAP.has(m.id) ? 'paid'
-        : m.stripe_subscription_id && stripeStatuses.get(m.stripe_subscription_id) === 'active' ? 'paid'
-        : m.stripe_subscription_id && stripeStatuses.get(m.stripe_subscription_id) === 'inactive' ? 'inactive'
-        : m.stripe_subscription_id ? 'unverified' : 'gifted';
-      if (!isUnlimited) {
-        stats.byTier.free++;
-      } else if (activeIAP.has(m.id)) {
-        stats.byTier.paid++;
-        stats.billingEvidence.activeProductionIAP++;
-      } else if (m.stripe_subscription_id) {
-        const status = stripeStatuses.get(m.stripe_subscription_id);
-        if (status === 'active') {
-          stats.byTier.paid++;
-          stats.billingEvidence.stripeVerifiedActive++;
-        } else if (status === 'inactive') {
-          stats.billingEvidence.stripeVerifiedInactive++;
-        } else {
-          stats.billingEvidence.stripeUnverified++;
-        }
-      } else {
-        stats.byTier.gifted++;
-        stats.billingEvidence.manuallyGrantedOrGifted++;
-      }
-      const age = now - new Date(m.created_at).getTime();
-      if (age >= 0 && age < 7 * 86400000) stats.recent7d++;
-      if (age >= 0 && age < 30 * 86400000) stats.recent30d++;
-    });
-    res.json({ members, stats });
-  } catch(err) {
-    console.error('Admin members error:', err.message);
-    res.status(500).json({ error: 'Failed to load members: ' + err.message });
-  }
+  res.set('Cache-Control', 'no-store');
+  res.json(billing.membershipReport());
+});
+app.get('/api/admin/payments', auth, (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  res.set('Cache-Control', 'no-store');
+  res.json(billing.dashboard());
+});
+app.post('/api/admin/payments/reconcile', auth, async (req, res) => {
+  if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
+  res.set('Cache-Control', 'no-store');
+  try { await billing.reconcile(); res.json(billing.dashboard()); }
+  catch (_) { res.status(503).json({ error: 'Stripe reconciliation could not complete. Existing access and last verified history were preserved.' }); }
 });
 
 // Admin: view orders
@@ -3913,18 +3742,15 @@ app.post('/api/admin/announce', auth, (req, res) => {
 
 // Manually upgrade/fix a member (e.g. when Stripe webhook missed). Admin only.
 // Body: { tier, billingPeriod, stripeCustomerId, stripeSubscriptionId }
-app.post('/api/admin/members/:id/upgrade', auth, (req, res) => {
+app.post('/api/admin/members/:id/upgrade', auth, async (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
-    const { tier, billingPeriod, stripeCustomerId, stripeSubscriptionId } = req.body || {};
-    if (!tier) return res.status(400).json({ error: 'tier required' });
-    db.pragma('ignore_check_constraints = ON');
-    db.prepare(`UPDATE users SET tier=?, billing_period=?, stripe_customer_id=?, stripe_subscription_id=? WHERE id=?`)
-      .run(tier, billingPeriod || 'stripe-monthly', stripeCustomerId || null, stripeSubscriptionId || null, req.params.id);
-    db.pragma('ignore_check_constraints = OFF');
-    const u = db.prepare('SELECT id,email,tier,billing_period,stripe_customer_id,stripe_subscription_id FROM users WHERE id=?').get(req.params.id);
-    res.json({ success: true, user: u });
-  } catch(e) { res.status(500).json({ error: e.message }); }
+    await billing.reconcile();
+    const member = billing.membershipReport().members.find(m => m.id === req.params.id);
+    if (!member) return res.status(404).json({ error: 'Member not found' });
+    if (member.billingClassification !== 'paid') return res.status(409).json({ error: 'No verified paid membership found. Use promo tools for complimentary access.' });
+    res.json({ success: true, user: member });
+  } catch (_) { res.status(503).json({ error: 'Stripe verification failed; access unchanged' }); }
 });
 
 app.get('/api/admin/members/search', auth, (req, res) => {
@@ -4375,21 +4201,17 @@ app.put('/api/admin/blog/:id/publish', auth, (req, res) => {
 });
 
 // Remote admin: upgrade a user's tier by email (password-protected)
-app.post('/api/admin/upgrade-tier/remote', (req, res) => {
-  const { password, email, tier } = req.body;
+app.post('/api/admin/upgrade-tier/remote', async (req, res) => {
+  const { password, email } = req.body;
   if (!process.env.ADMIN_BLOG_PASSWORD || password !== process.env.ADMIN_BLOG_PASSWORD) return res.status(401).json({ error: 'Unauthorized' });
   if (!email) return res.status(400).json({ error: 'Email required' });
-  const targetTier = tier || 'starter';
   try {
-    db.pragma('ignore_check_constraints = ON');
-    const result = db.prepare('UPDATE users SET tier=?, billing_period=? WHERE LOWER(email)=?').run(targetTier, 'stripe-monthly', email.toLowerCase());
-    db.pragma('ignore_check_constraints = OFF');
-    if (result.changes === 0) return res.status(404).json({ error: 'User not found' });
-    res.json({ success: true, email, tier: targetTier });
-  } catch(e) {
-    db.pragma('ignore_check_constraints = OFF');
-    res.status(500).json({ error: e.message });
-  }
+    await billing.reconcile();
+    const member = billing.membershipReport().members.find(m => m.email.toLowerCase() === String(email).toLowerCase());
+    if (!member) return res.status(404).json({ error: 'User not found' });
+    if (member.billingClassification !== 'paid') return res.status(409).json({ error: 'No verified paid subscription. Use promo tools for complimentary access.' });
+    res.json({ success: true, email: member.email, tier: member.tier });
+  } catch (_) { res.status(503).json({ error: 'Stripe verification failed; access unchanged' }); }
 });
 
 // Admin blog via password (for remote management without JWT)
@@ -5124,6 +4946,8 @@ app.get('/api/admin/activity-summary', auth, (req, res) => {
       activeWeek,
       activeMonth,
       piecesThisMonth,
+      legacyUnfiltered: { activeToday, activeWeek, activeMonth, totalActions, dailyActiveUsers, activityOverTime, featureUsage },
+      ...require('./lib/member-activity').memberActivity(db, ADMIN_EMAIL),
     });
   } catch(e) {
     console.error('Activity summary error:', e.message);
@@ -6895,6 +6719,7 @@ app.post('/api/admin/run-migration-007', (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
+  billing.start();
   console.log(`🏺 The Potter's Mud Room running on http://localhost:${PORT}`);
   // Eagerly backfill color signatures at startup so they're ready before first search
   setImmediate(async () => {

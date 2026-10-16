@@ -11,6 +11,8 @@ function initDB() {
   const db = new Database(DB_PATH);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
+  try { require('./lib/billing-schema').migrateLegacyUsers(db); }
+  catch (error) { console.error('[billing] Schema repair deferred; original database preserved:', error.message); }
 
   db.exec(`
     -- Users with profiles
@@ -1071,8 +1073,8 @@ function initDB() {
     if (betaRows.length) {
       const syncBetaUser = db.prepare(`
         UPDATE users
-        SET tier='top', billing_period='promo', plan_expires_at=NULL, is_beta_tester=1
-        WHERE LOWER(email)=? AND LOWER(email) != 'christinaworkmanpottery@gmail.com'
+        SET tier='starter', billing_period='promo', plan_expires_at=NULL, is_beta_tester=1
+        WHERE LOWER(email)=? AND LOWER(email) != 'christinaworkmanpottery@gmail.com' AND is_beta_tester=0 AND stripe_subscription_id IS NULL
       `);
       betaRows.forEach(row => syncBetaUser.run(row.email));
     }

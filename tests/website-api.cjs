@@ -44,6 +44,18 @@ async function test(name,fn){await fn();console.log('PASS',name);}
  fs.writeFileSync(path.join(tmp,'data/uploads/piece.png'),png);
  db.prepare('INSERT INTO piece_photos(id,piece_id,filename,is_primary) VALUES(?,?,?,?)').run('piece-photo','fixture-piece','piece.png',1);
  assert.equal((await request("/api/auth/me")).user.id,fixture);
+ await test('payment and revenue endpoints reject unauthenticated and ordinary members',async()=>{
+  for(const [route,method] of [['/api/admin/payments','GET'],['/api/admin/payments/reconcile','POST'],['/api/admin/members','GET']]){
+   await assert.rejects(request(route,method,undefined,{}),e=>e.status===401);
+   await assert.rejects(request(route,method),e=>e.status===403);
+  }
+  const report=await request('/api/admin/payments','GET',undefined,{'x-admin-key':adminKey});
+  assert.equal(report.stats.paidCountVerifiedByStripe,false);
+  assert.equal(report.payments.length,0);
+  const res=await fetch(base+'/api/admin/payments',{headers:{'x-admin-key':adminKey}});
+  assert.equal(res.headers.get('cache-control'),'no-store');
+ });
+
  let sale,combo;
  await test('Quick Sale 2 × $1.50 survives edit and returns $3.00 in CSV',async()=>{
   const batch=await request('/api/sales/bulk','POST',{eventName:'Fixture event',date:'2026-09-25',venueType:'studio',lineItems:[{itemDescription:'Mini dish',quantity:2,priceEach:1.50}]});sale=batch.ids[0];
