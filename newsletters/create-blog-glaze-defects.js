@@ -1,5 +1,6 @@
+if (!process.env.MUDROOM_ADMIN_PASSWORD) throw new Error('Set MUDROOM_ADMIN_PASSWORD securely before running this administrative script');
 const https = require('https');
-const BASE = 'https://the-potters-mud-room.onrender.com';
+const BASE = 'https://thepottersmudroom.com';
 
 function api(method, path, token, body) {
   return new Promise((resolve, reject) => {
@@ -86,7 +87,7 @@ const content = `<p>Pull a kiln load. Beautiful pieces, gorgeous glaze… and th
 (async () => {
   const login = await api('POST', '/api/auth/login', null, {
     email: 'christinaworkmanpottery@gmail.com',
-    password: 'Jade4uac'
+    password: process.env.MUDROOM_ADMIN_PASSWORD
   });
   if (!login.body.token) { console.error('Login failed:', login); process.exit(1); }
   const token = login.body.token;

@@ -1,6 +1,7 @@
+if (!process.env.MUDROOM_ADMIN_PASSWORD) throw new Error('Set MUDROOM_ADMIN_PASSWORD securely before running this administrative script');
 // Send beta tester recruitment email to all members
 const https = require('https');
-const BASE = 'https://the-potters-mud-room.onrender.com';
+const BASE = 'https://thepottersmudroom.com';
 
 function api(method, path, token, body) {
   return new Promise((resolve, reject) => {
@@ -63,7 +64,7 @@ const html = `
 `;
 
 (async () => {
-  const login = await api('POST', '/api/auth/login', null, { email: 'christinaworkmanpottery@gmail.com', password: 'Jade4uac' });
+  const login = await api('POST', '/api/auth/login', null, { email: 'christinaworkmanpottery@gmail.com', password: process.env.MUDROOM_ADMIN_PASSWORD });
   if (!login.token) { console.error('Login failed:', login); return; }
   console.log('Logged in. Sending beta recruitment email...');
   

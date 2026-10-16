@@ -1,7 +1,8 @@
+if (!process.env.MUDROOM_ADMIN_PASSWORD) throw new Error('Set MUDROOM_ADMIN_PASSWORD securely before running this administrative script');
 // Send announcement notification + email to all real users
 const https = require('https');
 
-const BASE = 'https://the-potters-mud-room.onrender.com';
+const BASE = 'https://thepottersmudroom.com';
 
 // Skip test accounts
 const SKIP_EMAILS = [
@@ -40,7 +41,7 @@ async function api(method, path, token, body) {
   // Login as admin
   const login = await api('POST', '/api/auth/login', null, {
     email: 'christinaworkmanpottery@gmail.com',
-    password: 'Jade4uac'
+    password: process.env.MUDROOM_ADMIN_PASSWORD
   });
   
   if (!login.token) { console.error('Login failed:', login); return; }

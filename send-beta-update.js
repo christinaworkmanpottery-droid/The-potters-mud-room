@@ -1,6 +1,6 @@
 // Send beta update email to all beta signups about iOS bug
 const https = require('https');
-const BASE = 'https://the-potters-mud-room.onrender.com';
+const BASE = 'https://thepottersmudroom.com';
 
 function api(method, path, token, body) {
   return new Promise((resolve, reject) => {

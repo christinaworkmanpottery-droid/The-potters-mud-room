@@ -158,7 +158,7 @@ function setupTransporter(user, pass, host, port) {
     activeMailUser = user;
     if (transporter) transporter.close();
     transporter = require('./lib/reliable-mail').createReliableMailer(db, nodemailer, config, {
-      eligible: mail => mail.deliveryKind !== 'marketing' || require('./lib/email-scheduler').eligibleRecipients(db).some(u=>u.email===String(mail.to).trim().toLowerCase()),
+      eligible: mail => require('./lib/membership-mail').eligible(db,mail) && (mail.deliveryKind !== 'marketing' || require('./lib/email-scheduler').eligibleRecipients(db).some(u=>u.email===String(mail.to).trim().toLowerCase())),
       accepted: mail => { if(mail.welcomeUserId) db.prepare("UPDATE welcome_email_deliveries SET status='sent',sent_at=datetime('now') WHERE user_id=?").run(mail.welcomeUserId); }
     });
     // Do not authenticate on startup: the first queued message checks delivery.
@@ -176,7 +176,8 @@ if (process.env.SMTP_USER && process.env.SMTP_PASS) {
 // Stripe setup (optional — works without keys, just disables payments)
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY || '';
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
-const APP_URL = process.env.APP_URL || 'http://localhost:3000';
+if (process.env.PREVIEW_MODE !== 'true') require('./lib/public-links').canonicalizePublicAssets(require('path').join(__dirname,'public'));
+const APP_URL = process.env.PREVIEW_MODE === 'true' ? (process.env.APP_URL || 'http://localhost:3000') : require('./lib/public-links').PUBLIC_URL;
 let stripe = null;
 if (STRIPE_SECRET) {
   stripe = require('stripe')(STRIPE_SECRET);
@@ -229,7 +230,8 @@ const safeUpload = (fieldName) => (req, res, next) => {
   });
 };
 
-const billing = require('./lib/billing').createBilling({ db, stripe, appUrl: APP_URL, adminEmail: 'christinaworkmanpottery@gmail.com' });
+const membershipMail = require('./lib/membership-mail').createMembershipMail({db,stripe,getTransporter:()=>transporter,getSender:mailSenderAddress});
+const billing = require('./lib/billing').createBilling({ db, stripe, appUrl: APP_URL, adminEmail: 'christinaworkmanpottery@gmail.com', onPaymentVerified:membershipMail.queue });
 // Verify the exact raw body, then durably enqueue before acknowledging delivery.
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req, res) => {
   if (!stripe || !STRIPE_WEBHOOK_SECRET) return res.status(503).send('Stripe not configured');
@@ -5302,8 +5304,8 @@ app.post('/api/ai/buy-tokens', auth, async (req, res) => {
         quantity: 1
       }],
       metadata: { userId: req.userId, purchaseType: 'ai_tokens', pack, questions: String(config.questions) },
-      success_url: process.env.BASE_URL ? process.env.BASE_URL + '/#aiChat' : 'https://thepottersmudroom.com/#aiChat',
-      cancel_url: process.env.BASE_URL ? process.env.BASE_URL + '/#aiChat' : 'https://thepottersmudroom.com/#aiChat',
+      success_url: APP_URL + '/#aiChat',
+      cancel_url: APP_URL + '/#aiChat',
     });
     res.json({ url: session.url });
   } catch(e) {
