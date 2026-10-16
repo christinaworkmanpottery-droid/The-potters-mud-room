@@ -1,3 +1,4 @@
+process.env.PREVIEW_MODE='true';
 const assert=require('node:assert/strict');
 const Database=require('better-sqlite3');
 const {sendDueCampaigns,snapshotRecipients}=require('../lib/email-scheduler');
