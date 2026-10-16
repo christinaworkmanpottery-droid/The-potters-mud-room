@@ -6,7 +6,7 @@ const multer = require('multer');
 const { normalizeExternalUrl, moneyCents, saleQuantity } = require('./public/website-utils');
 
 // Deploy version tag — used to verify which code is actually running on Render
-const DEPLOY_VERSION = '47-payments-20261016';
+const DEPLOY_VERSION = '47-email-reliability-20261016';
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
@@ -153,14 +153,13 @@ function setupTransporter(user, pass, host, port) {
   if (process.env.PREVIEW_MODE === 'true') return; // Never deliver preview mail to real recipients.
   if (user && pass) {
     const config = host
-      ? { host, port: port || 587, secure: false, auth: { user, pass } }
+      ? { host, port: port || 587, secure: port === 465, requireTLS: port !== 465, auth: { user, pass } }
       : { service: 'gmail', auth: { user, pass } };
     activeMailUser = user;
-    transporter = nodemailer.createTransport(config);
-    transporter.verify((err) => {
-      if (err) console.error('⚠️  SMTP verification failed:', err.message);
-      else console.log('✅ SMTP connected as', user, host ? '(via '+host+')' : '(via gmail)');
-    });
+    if (transporter) transporter.close();
+    transporter = require('./lib/reliable-mail').createReliableMailer(db, nodemailer, config);
+    // Do not authenticate on startup: the first queued message checks delivery.
+
   }
 }
 
