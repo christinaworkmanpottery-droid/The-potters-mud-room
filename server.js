@@ -4502,8 +4502,8 @@ app.get('/api/admin/email-settings', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   try {
     const user = db.prepare("SELECT value FROM site_settings WHERE key='smtp_user'").get();
-    const configured = !!(user && user.value);
-    res.json({ configured, email: user ? user.value : null });
+    const configured = !!transporter;
+    res.json({ configured, email: activeMailUser || (user ? user.value : null) });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 

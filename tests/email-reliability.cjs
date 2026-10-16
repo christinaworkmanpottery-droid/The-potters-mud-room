@@ -14,7 +14,7 @@ const {sendDueCampaigns,ensureRetrySchema,recoverAuthenticationFailures}=require
  assert.equal(calls,1,'31 queued failures must cause only one authentication attempt');
  const first=mailer.state().blocked_until;assert.equal(first-now,3600000);
  mailer.close();mailer=createReliableMailer(db,provider,{auth:{user:'test@example.invalid'}},opts);
- await assert.rejects(mailer.sendMail({to:'restart@example.invalid'}),/paused/);assert.equal(calls,1);
+ await assert.rejects(mailer.sendMail({to:'restart@example.invalid'}),/paused/);await assert.rejects(mailer.verify(),/paused/);assert.equal(calls,1);
  now=first+1;await assert.rejects(mailer.sendMail({to:'backoff@example.invalid'}));assert.equal(mailer.state().blocked_until-now,7200000);
  now=mailer.state().blocked_until+1;fail=false;
  await mailer.sendMail({deliveryKey:'stable',to:'ok@example.invalid'});const before=calls;
