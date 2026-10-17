@@ -1,0 +1,18 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),{JSDOM}=require('jsdom');
+const src=fs.readFileSync('public/app.js','utf8');
+const dom=new JSDOM('<div id="adminMemberFilterBox" style="display:none"><h4 id="adminMemberFilterTitle"></h4><div id="adminMemberFilter"></div></div>',{runScripts:'dangerously'}),w=dom.window;
+w.HTMLElement.prototype.scrollIntoView=function(){};
+w.esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+w._adminMembers=[{email:'paid@example.invalid',billingClassification:'paid'},{email:'gift@example.invalid',billingClassification:'gifted'},...[1,2,3].map(n=>({email:n+'@example.invalid',billingClassification:'review',reviewReasons:['Legacy subscription <needs verification>']}))];
+w.eval(src.slice(src.indexOf('function showMemberGroup('),src.indexOf('\nfunction esc(',src.indexOf('function showMemberGroup('))));
+const line=src.split('\n').find(l=>l.includes('(s.byTier.review||0)'));assert.ok(line.includes('<button'));
+w.eval('var s={byTier:{review:3}};var html='+line.trim());
+w.document.body.insertAdjacentHTML('afterbegin',w.html);
+w.document.querySelector('button').click();
+assert.equal(w.document.querySelectorAll('#adminMemberFilter tr').length,4);
+assert.equal(w.document.querySelector('#adminMemberFilterBox').style.display,'block');
+assert.ok(!w.document.querySelector('#adminMemberFilter').textContent.includes('paid@example.invalid'));
+assert.match(w.document.querySelector('#adminMemberFilter').textContent,/Review reason/);
+assert.match(w.document.querySelector('#adminMemberFilter').textContent,/Legacy subscription <needs verification>/);
+w.showMemberGroup('paid');assert.equal(w.document.querySelectorAll('#adminMemberFilter tr').length,2);
+dom.window.close();console.log('PASS Needs Review button opens only three review members, reasons escaped, existing paid filter preserved');

@@ -266,13 +266,15 @@ function showMemberGroup(filter) {
   let filtered = m;
   if (filter === 'paid') filtered = m.filter(x => x.billingClassification === 'paid');
   else if (filter === 'gifted') filtered = m.filter(x => x.billingClassification === 'gifted');
+  else if (filter === 'review') filtered = m.filter(x => x.billingClassification === 'review');
   else if (filter === 'free') filtered = m.filter(x => x.tier === 'free' || (!x.tier));
   else if (filter === 'recent7') { const c=Date.now(); filtered=m.filter(x=>c-new Date(x.created_at).getTime()<7*86400000); }
   else if (filter === 'recent30') { const c=Date.now(); filtered=m.filter(x=>c-new Date(x.created_at).getTime()<30*86400000); }
-  let rows = filtered.map(x => '<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px">' + esc(x.display_name||'—') + '</td><td style="padding:8px;font-size:0.8rem">' + esc(x.email) + '</td><td style="padding:8px">' + esc(({paid:'Paid',free:'Free',gifted:'Gifted',inactive:'Inactive subscription',unverified:'Unverified subscription',review:'Needs review'})[x.billingClassification] || 'Unknown') + '</td><td style="padding:8px;font-size:0.8rem">' + (x.created_at?new Date(x.created_at).toLocaleDateString():'') + '</td></tr>').join('');
-  document.getElementById('adminMemberFilter').innerHTML = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem"><tr style="border-bottom:2px solid var(--border);text-align:left"><th style="padding:8px">Name</th><th style="padding:8px">Email</th><th style="padding:8px">Type</th><th style="padding:8px">Joined</th></tr>' + rows + '</table></div>';
-  document.getElementById('adminMemberFilterTitle').innerText = filtered.length + ' member(s)';
+  let rows = filtered.map(x => '<tr style="border-bottom:1px solid var(--border)"><td style="padding:8px">' + esc(x.display_name||'—') + '</td><td style="padding:8px;font-size:0.8rem">' + esc(x.email) + '</td><td style="padding:8px">' + esc(({paid:'Paid',free:'Free',gifted:'Gifted',inactive:'Inactive subscription',unverified:'Unverified subscription',review:'Needs review'})[x.billingClassification] || 'Unknown') + '</td><td style="padding:8px;font-size:0.8rem">' + (x.created_at?new Date(x.created_at).toLocaleDateString():'') + '</td>' + (filter === 'review' ? '<td style="padding:8px;min-width:220px">' + esc((x.reviewReasons || []).join(' ') || 'Membership payment or subscription needs verification. Existing access is preserved.') + '</td>' : '') + '</tr>').join('');
+  document.getElementById('adminMemberFilter').innerHTML = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem"><tr style="border-bottom:2px solid var(--border);text-align:left"><th style="padding:8px">Name</th><th style="padding:8px">Email</th><th style="padding:8px">Type</th><th style="padding:8px">Joined</th>' + (filter === 'review' ? '<th style="padding:8px">Review reason</th>' : '') + '</tr>' + rows + '</table></div>';
+  document.getElementById('adminMemberFilterTitle').innerText = filter === 'review' ? 'Needs review — ' + filtered.length + ' member(s)' : filtered.length + ' member(s)';
   document.getElementById('adminMemberFilterBox').style.display = 'block';
+  document.getElementById('adminMemberFilterBox').scrollIntoView({block:'nearest'});
 }
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
@@ -3747,7 +3749,7 @@ async function loadAdmin() {
       '<div class="stat-box" style="cursor:pointer" onclick="showMemberGroup(\'paid\')"><div class="stat-number" style="color:var(--success)">' + (s.byTier.paid||0) + '</div><div class="stat-label">Paid Unlimited</div></div>' +
       '<div class="stat-box" style="cursor:pointer" onclick="showMemberGroup(\'gifted\')"><div class="stat-number" style="color:var(--primary)">' + (s.byTier.gifted||0) + '</div><div class="stat-label">Gifted Unlimited</div></div>' +
       '<div class="stat-box" style="cursor:pointer" onclick="showMemberGroup(\'free\')"><div class="stat-number">' + (s.byTier.free||0) + '</div><div class="stat-label">Free</div></div>' +
-      '<div class="stat-box"><div class="stat-number">' + (s.byTier.review||0) + '</div><div class="stat-label">Needs review</div></div></div>';
+      '<button type="button" class="stat-box" style="cursor:pointer;font:inherit;color:inherit" onclick="showMemberGroup(\'review\')"><span class="stat-number" style="display:block">' + (s.byTier.review||0) + '</span><span class="stat-label">Needs review</span></button></div>';
     html += '<p class="text-sm">Stripe verified: ' + esc(s.verifiedAt ? new Date(s.verifiedAt).toLocaleString() : 'pending') + (s.paidCountVerifiedByStripe ? '' : ' — verification pending or stale') + '</p>';
     html += '<div id="adminMemberFilterBox" style="display:none;margin-bottom:16px" class="card"><h4 id="adminMemberFilterTitle" style="margin-bottom:8px"></h4><div id="adminMemberFilter"></div></div>';
 
