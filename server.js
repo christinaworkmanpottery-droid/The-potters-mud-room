@@ -4605,6 +4605,17 @@ db.exec(`CREATE TABLE IF NOT EXISTS member_survey_responses (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   answers_json TEXT NOT NULL
 )`);
+// One-time prelaunch cleanup: remove only survey test submissions, never member/activity data.
+// The marker persists in SQLite so restarts and later deployments cannot repeat the deletion.
+db.transaction(() => {
+  db.exec(`CREATE TABLE IF NOT EXISTS survey_maintenance_flags (key TEXT PRIMARY KEY, completed_at TEXT NOT NULL DEFAULT (datetime('now')))`);
+  const marker = 'reset_test_responses_2026_10_12';
+  if (!db.prepare('SELECT 1 FROM survey_maintenance_flags WHERE key = ?').get(marker)) {
+    db.prepare('DELETE FROM member_survey_responses').run();
+    db.prepare('INSERT INTO survey_maintenance_flags (key) VALUES (?)').run(marker);
+    console.log('[survey] One-time prelaunch test-response reset completed');
+  }
+})();
 const SURVEY_CHOICES = [
   ['Yes, regularly','A few times','Not yet'],
   ["I haven't had time","I'm unsure how to get started","Something didn't work","I don't need it right now","Does not apply — I use it regularly","Other"],
