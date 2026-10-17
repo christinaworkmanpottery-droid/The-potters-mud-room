@@ -484,7 +484,7 @@ app.post('/api/auth/register', (req, res) => {
         const claim = db.prepare("INSERT OR IGNORE INTO welcome_email_deliveries (user_id,email,status) VALUES (?,?,'pending')").run(id,email);
         if (claim.changes) transporter.sendMail({ deliveryKey: "welcome:"+id, welcomeUserId:id, from: mailSenderAddress(), to: email, subject: "Welcome to The Potter's Mud Room!", html: welcomeHtml })
           .then(() => db.prepare("UPDATE welcome_email_deliveries SET status='sent',sent_at=datetime('now') WHERE user_id=?").run(id))
-          .catch(e => { db.prepare("UPDATE welcome_email_deliveries SET status='failed' WHERE user_id=?").run(id); console.warn('Welcome email failed:', e.message); });
+          .catch(e => { const outcome=db.prepare('SELECT status FROM smtp_delivery_log WHERE id=?').get('welcome:'+id); db.prepare("UPDATE welcome_email_deliveries SET status=? WHERE user_id=?").run(outcome?.status || 'failed',id); console.warn('Welcome email failed:', e.message); });
       } catch (e) { console.warn('Welcome email tracking failed:', e.message); }
     }
 
