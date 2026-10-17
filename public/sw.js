@@ -1,4 +1,4 @@
-const CACHE = 'mudroom-v47';
+const CACHE = 'mudroom-v47-account-preservation';
 const STATIC = ['/','style.css','app.js','/manifest.json','/assets/icon-192.png','/assets/icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -10,6 +10,7 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  if(new URL(e.request.url).pathname.startsWith('/uploads/')) { e.respondWith(fetch(e.request,{cache:'no-store'}));return; }
   // Never intercept API calls or auth — always go to network
   if (e.request.url.includes('/api/') || e.request.method !== 'GET') return;
   // Updated application code must not remain stuck in an old Safari cache.

@@ -129,6 +129,7 @@ async function api(path, opts = {}) {
   }
   const res = await fetch(API + path, { ...opts, headers: opts.body instanceof FormData ? { Authorization: 'Bearer ' + token } : h });
   const d = await res.json();
+  if(d.code==='MEMBERSHIP_INACTIVE'){window.location.replace('/reactivate');throw new Error(d.error);}
   if (!res.ok) throw new Error(d.error || 'Something went wrong');
   return d;
 }
@@ -471,12 +472,14 @@ async function checkAuth() {
   }
 }
 function showApp() {
+  if(currentUser?.accountAccess?.blocked){window.location.replace('/reactivate');return;}
   try {
     guestMode = false;
     document.getElementById('landingPage').style.display = 'none';
     document.getElementById('authScreen').style.display = 'none';
     document.getElementById('mainApp').classList.remove('hidden');
     refreshAccountStatus();
+    if(currentUser?.accountAccess?.status==='grace'){let banner=document.getElementById('renewalGraceNotice');if(!banner){banner=document.createElement('div');banner.id='renewalGraceNotice';banner.className='card';document.getElementById('mainApp').prepend(banner);}banner.textContent='Your renewal payment needs attention. Unlimited access continues through '+new Date(currentUser.accountAccess.graceUntil).toLocaleDateString()+'. Update your payment method in Plans. Your collection will stay saved.';}
     const tier = currentUser?.tier || 'free';
     const tierLv = { free: 0, basic: 1, mid: 1, starter: 1, top: 1, unlimited: 1 };
     document.querySelectorAll('[data-min-tier]').forEach(el => {
@@ -3605,7 +3608,7 @@ async function subscribePlan(plan) {
 }
 
 async function cancelSubscription() {
-  if (!confirm('Are you sure you want to cancel your subscription? This will cancel all active subscriptions on your Stripe account immediately.')) return;
+  if (!confirm('Are you sure you want to cancel your subscription? Your access will continue through your already-paid period, and all your saved pottery history will be preserved.')) return;
   try {
     const result = await api('/api/billing/cancel', { method:'POST' });
     toast(result.message || 'Subscription cancelled successfully.', 'success');
@@ -3735,7 +3738,7 @@ async function loadAdmin() {
     const m = data.members || [];
     const s = data.stats || { total: 0, byTier: { free: 0, paid: 0, gifted: 0 }, recent7d: 0, recent30d: 0 };
     
-    let html = '<div class="card mb-16"><button class="btn btn-primary" onclick="showPaymentsRevenue()">Payments &amp; Revenue</button></div>' + '<div class="card mb-16" style="padding:14px"><h3 style="margin-bottom:10px">🔍 Search Members</h3>' +
+    let html = '<div class="card mb-16"><button class="btn btn-primary" onclick="showPaymentsRevenue()">Payments &amp; Revenue</button> <button class="btn btn-secondary" onclick="showAccountProtection()">Account Protection</button></div>' + '<div class="card mb-16" style="padding:14px"><h3 style="margin-bottom:10px">🔍 Search Members</h3>' +
       '<div style="display:flex;gap:8px"><input type="text" class="form-input" id="adminSearchInput" placeholder="Search by name or email..." onkeydown="if(event.key===\'Enter\')adminSearchMembers()">' +
       '<button class="btn btn-primary btn-sm" onclick="adminSearchMembers()">Search</button></div>' +
       '<div id="adminSearchResults" class="mt-8"></div></div>';

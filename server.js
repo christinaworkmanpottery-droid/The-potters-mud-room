@@ -6,7 +6,7 @@ const multer = require('multer');
 const { normalizeExternalUrl, moneyCents, saleQuantity } = require('./public/website-utils');
 
 // Deploy version tag — used to verify which code is actually running on Render
-const DEPLOY_VERSION = '47-email-reliability-20261016';
+const DEPLOY_VERSION = '47-account-preservation-20261016';
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
@@ -25,6 +25,8 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || (process.env.PREVIEW_MODE === 'true' ? crypto.randomBytes(32).toString('hex') : '');
 if (!JWT_SECRET) throw new Error('JWT_SECRET must be configured');
 const db = initDB();
+const accountProtection = require('./lib/account-access');
+accountProtection.init(db);
 // Dedicated credentials are accepted only in the isolated preview.
 const PREVIEW_ADMIN_EMAIL = process.env.PREVIEW_MODE === 'true' ? process.env.PREVIEW_ADMIN_EMAIL : null;
 if (PREVIEW_ADMIN_EMAIL && process.env.PREVIEW_ADMIN_PASSWORD) {
@@ -158,7 +160,7 @@ function setupTransporter(user, pass, host, port) {
     activeMailUser = user;
     if (transporter) transporter.close();
     transporter = require('./lib/reliable-mail').createReliableMailer(db, nodemailer, config, {
-      eligible: mail => require('./lib/membership-mail').eligible(db,mail) && (mail.deliveryKind !== 'marketing' || require('./lib/email-scheduler').eligibleRecipients(db).some(u=>u.email===String(mail.to).trim().toLowerCase())),
+      eligible: mail => require('./lib/access-notifications').eligible(db,mail) && require('./lib/membership-mail').eligible(db,mail) && (mail.deliveryKind !== 'marketing' || require('./lib/email-scheduler').eligibleRecipients(db).some(u=>u.email===String(mail.to).trim().toLowerCase())),
       accepted: mail => { if(mail.welcomeUserId) db.prepare("UPDATE welcome_email_deliveries SET status='sent',sent_at=datetime('now') WHERE user_id=?").run(mail.welcomeUserId); }
     });
     // Do not authenticate on startup: the first queued message checks delivery.
@@ -225,6 +227,7 @@ const safeUpload = (fieldName) => (req, res, next) => {
 
 const membershipMail = require('./lib/membership-mail').createMembershipMail({db,stripe,getTransporter:()=>transporter,getSender:mailSenderAddress});
 const billing = require('./lib/billing').createBilling({ db, stripe, appUrl: APP_URL, adminEmail: 'christinaworkmanpottery@gmail.com', onPaymentVerified:membershipMail.queue });
+const renewal = require('./lib/renewal-checkout').createRenewal({db,stripe,billing});
 // Verify the exact raw body, then durably enqueue before acknowledging delivery.
 app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), (req, res) => {
   if (!stripe || !STRIPE_WEBHOOK_SECRET) return res.status(503).send('Stripe not configured');
@@ -251,11 +254,19 @@ app.use((req, res, next) => {
   }
   next();
 });
-app.use('/uploads', express.static(UPLOADS_DIR));
+const uploadOwners = accountProtection.mediaOwners(db);
+app.use('/uploads', (req,res,next) => {
+  res.set('Cache-Control','private, no-store');
+  let filename;try{filename=path.basename(decodeURIComponent(req.path));}catch(_){return res.status(400).end();}
+  if(uploadOwners(filename).some(id=>accountProtection.access(db,id).blocked))return res.status(403).end();
+  next();
+}, express.static(UPLOADS_DIR,{cacheControl:false,etag:false}));
+app.get('/reactivate',(req,res)=>res.set('Cache-Control','no-store').sendFile(path.join(__dirname,'public','reactivate.html')));
+
 
 // Version check endpoint — verify which code is actually deployed
 app.get('/api/version', (req, res) => {
-  res.json({ version: DEPLOY_VERSION, deployed: new Date().toISOString() });
+  res.json({ version: DEPLOY_VERSION, commit:process.env.RENDER_GIT_COMMIT || null, deployed: new Date().toISOString() });
 });
 
 const noCacheWebHeaders = (res, filePath) => {
@@ -383,8 +394,16 @@ function auth(req, res, next) {
   if (req.headers['x-admin-key'] === ADMIN_API_KEY) { req.userId = 'admin-key'; return next(); }
   const t = req.headers.authorization?.replace('Bearer ', '');
   if (!t) return res.status(401).json({ error: 'Not authenticated' });
-  try { const d = jwt.verify(t, JWT_SECRET); req.userId = d.userId; const u = db.prepare('SELECT tier FROM users WHERE id=?').get(d.userId); req.userTier = u?.tier || d.tier; next(); }
-  catch { res.status(401).json({ error: 'Invalid token' }); }
+  try {
+    const d=jwt.verify(t,JWT_SECRET); req.userId=d.userId;
+    const u=db.prepare('SELECT tier FROM users WHERE id=?').get(d.userId);
+    if(!u)return res.status(401).json({error:'Invalid account'});
+    req.accountAccess=accountProtection.access(db,d.userId);
+    req.userTier=req.accountAccess.unlimited?'starter':u.tier;
+    res.set('Cache-Control','no-store');
+    if(req.accountAccess.blocked && !accountProtection.recoveryAllowed(req))return accountProtection.denial(res,req.accountAccess);
+    return next();
+  } catch { return res.status(401).json({error:'Invalid token'}); }
 }
 // Refresh tier from DB (since Stripe might have updated it)
 function refreshTier(req, res, next) {
@@ -398,7 +417,7 @@ function requireTier(min) {
   const minLv = min === 'starter' ? 1 : 0;
   return (req, res, next) => {
     const u = db.prepare('SELECT tier FROM users WHERE id=?').get(req.userId);
-    const currentTier = normalizeTier(u?.tier || req.userTier);
+    const currentTier = req.accountAccess?.unlimited ? 'starter' : normalizeTier(u?.tier || req.userTier);
     if ((lv[currentTier] || 0) >= minLv) { req.userTier = currentTier; return next(); }
     res.status(403).json({ error: min === 'starter' ? 'Upgrade to Unlimited to use this feature.' : 'Upgrade required.' });
   };
@@ -500,11 +519,12 @@ app.post('/api/auth/login', (req, res) => {
     if (!u || !bcrypt.compareSync(password, u.password_hash)) return res.status(401).json({ error: 'Invalid email or password' });
     const token = jwt.sign({ userId: u.id, tier: u.tier }, JWT_SECRET, { expiresIn: '30d' });
     db.prepare("UPDATE users SET last_login=datetime('now') WHERE id=?").run(u.id);
-    res.json({ token, user: { id: u.id, email: u.email, displayName: u.display_name, tier: u.tier, isAdmin: (u.email === ADMIN_EMAIL || u.email === PREVIEW_ADMIN_EMAIL) } });
+    res.json({ token, user: { id: u.id, email: u.email, displayName: u.display_name, tier: u.tier, accountAccess: accountProtection.access(db,u.id), isAdmin: (u.email === ADMIN_EMAIL || u.email === PREVIEW_ADMIN_EMAIL) } });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/auth/me', auth, (req, res) => {
+  if(req.accountAccess?.blocked) { const u=db.prepare('SELECT id,email,display_name FROM users WHERE id=?').get(req.userId); return res.json({user:{id:u.id,email:u.email,displayName:u.display_name,accountAccess:req.accountAccess}}); }
   const u = db.prepare('SELECT id,email,display_name,username,bio,location,website,avatar_filename,is_private,tier,unit_system,temp_unit,referral_code,newsletter_subscribed,created_at,city,state_region,country,findable,billing_period,plan_expires_at FROM users WHERE id=?').get(req.userId);
   if (!u) return res.status(404).json({ error: 'Not found' });
   // Ensure referral code exists
@@ -515,7 +535,7 @@ app.get('/api/auth/me', auth, (req, res) => {
   }
   // Get referral stats
   const referralStats = db.prepare('SELECT COUNT(*) as count FROM referral_rewards WHERE referrer_id=?').get(req.userId);
-  res.json({ user: { ...u, isAdmin: isAdmin(req), displayName: u.display_name, pieceCount: getPieceCount(req.userId), referralCount: referralStats?.count || 0, freeMonthsRemaining: u.free_months_remaining || 0, newsletterSubscribed: u.newsletter_subscribed } });
+  res.json({ user: { ...u, accountAccess:req.accountAccess, isAdmin: isAdmin(req), displayName: u.display_name, pieceCount: getPieceCount(req.userId), referralCount: referralStats?.count || 0, freeMonthsRemaining: u.free_months_remaining || 0, newsletterSubscribed: u.newsletter_subscribed } });
 });
 
 // User subscription status (used by mobile app BillingScreen)
@@ -531,7 +551,8 @@ app.get('/api/user/subscription', auth, async (req, res) => {
 
   res.json({
     plan: u.tier || 'free',
-    status: hasPremium ? 'active' : 'inactive',
+    status: req.accountAccess.unlimited ? 'active' : 'inactive',
+    accountAccess:req.accountAccess,
     billingPeriod: u.billing_period || null,
     expiresAt: u.plan_expires_at || null,
     hasStripeSubscription: hasStripe,
@@ -542,28 +563,15 @@ app.get('/api/user/subscription', auth, async (req, res) => {
 });
 
 // Alias for mobile app checkout (app calls /api/create-checkout-session)
-app.post('/api/create-checkout-session', auth, async (req, res) => {
-  if (!stripe) return res.status(400).json({ error: 'Stripe not configured' });
-  const { planId, plan } = req.body;
-  const selectedPlan = planId || plan;
-  const PRICE_CONFIG_LOCAL = {
-    free: null,
-    starter: { amount: 695, name: "Unlimited Plan — $6.95/mo", tier: 'starter', interval: 'month' },
-    'starter-yearly': { amount: 6950, name: "Unlimited Plan — $69.50/year", tier: 'starter', interval: 'year' },
-  };
-  const config = PRICE_CONFIG_LOCAL[selectedPlan];
-  if (!config) return res.status(400).json({ error: 'Invalid plan' });
-  try {
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      mode: 'subscription',
-      line_items: [{ price_data: { currency: 'usd', recurring: { interval: config.interval || 'month' }, product_data: { name: config.name }, unit_amount: config.amount }, quantity: 1 }],
-      metadata: { userId: req.userId, purchaseType: 'subscription', tier: config.tier, billing: config.interval || 'monthly' },
-      success_url: `${APP_URL || 'https://thepottersmudroom.com'}?upgraded=${config.tier}`,
-      cancel_url: `${APP_URL || 'https://thepottersmudroom.com'}?cancelled=true`,
-    });
-    res.json({ url: session.url });
-  } catch (err) { res.status(500).json({ error: err.message }); }
+async function membershipCheckout(req,res) {
+  try {const result=await renewal.checkout(req.userId,req.body.planId || req.body.plan);return res.status(result.storeManaged?409:200).json(result);}
+  catch(error){return res.status(409).json({error:error.message});}
+}
+app.post('/api/create-checkout-session',auth,membershipCheckout);
+app.get('/api/billing/access',auth,(req,res)=>res.json(accountProtection.access(db,req.userId)));
+app.post('/api/billing/refresh',auth,async(req,res)=>{
+  try{await billing.reconcile();res.json(accountProtection.access(db,req.userId));}
+  catch(_){res.status(503).json({error:'Payment verification is temporarily unavailable. Your records and last verified access are unchanged.'});}
 });
 
 // Stripe Customer Portal (manage subscription from mobile app)
@@ -575,21 +583,7 @@ app.post('/api/create-portal-session', auth, async (req, res) => {
 
     let customerId = user.stripe_customer_id;
 
-    // If no stripe_customer_id stored, try to find customer by email in Stripe
-    if (!customerId && user.email) {
-      const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-      if (customers.data.length > 0) {
-        customerId = customers.data[0].id;
-        // Sync back to DB so this lookup only happens once
-        db.prepare('UPDATE users SET stripe_customer_id=? WHERE id=?').run(customerId, req.userId);
-        // Also find and save active subscription ID
-        const subs = await stripe.subscriptions.list({ customer: customerId, status: 'active', limit: 1 });
-        if (subs.data.length > 0) {
-          db.prepare('UPDATE users SET stripe_subscription_id=? WHERE id=?').run(subs.data[0].id, req.userId);
-        }
-      }
-    }
-
+    // Email alone is not sufficient to attach billing records to an account.
     if (!customerId) {
       return res.status(404).json({ error: 'No Stripe subscription found for your account. Contact support if you believe this is an error.' });
     }
@@ -741,14 +735,13 @@ app.get('/api/iap/restore', auth, async (req, res) => {
 // Apple sends this to notify of renewals, expirations, refunds, etc.
 // No auth middleware — Apple calls this directly.
 app.post('/api/iap/apple/notifications', express.json(), async (req, res) => {
-  // Acknowledge immediately so Apple doesn't retry
-  res.status(200).json({ ok: true });
+  // Verify signed notifications before changing any entitlement.
 
   try {
     const { signedPayload } = req.body;
-    if (!signedPayload) return; // nothing to do
+    if (!signedPayload) return res.status(400).json({error:'Missing signed notification'});
 
-    const parsed = iap.parseAppleNotification(signedPayload);
+    const parsed = await iap.parseAppleNotification(signedPayload);
     console.log(`[IAP] Apple notification: ${parsed.notificationType}/${parsed.subtype || ''} product=${parsed.productId}`);
 
     // Find user by appAccountToken (we set this to userId on purchase from the app)
@@ -760,10 +753,12 @@ app.post('/api/iap/apple/notifications', express.json(), async (req, res) => {
       userId = row?.user_id;
     }
 
-    if (!userId) {
-      console.warn(`[IAP] Apple notification: could not find user for transactionId=${parsed.transactionId}`);
-      return;
-    }
+    const original=db.prepare('SELECT user_id FROM iap_purchases WHERE transaction_id=?').get(parsed.transactionId);
+    if(original && userId && original.user_id!==userId)throw Error('Purchase account identity mismatch');
+    userId=original?.user_id || userId;
+    if(!userId || !db.prepare('SELECT 1 FROM users WHERE id=?').get(userId))return res.status(200).json({ok:true,unlinked:true});
+    const previous=db.prepare('SELECT verified_at FROM account_entitlements WHERE user_id=? AND source_id=?').get(userId,parsed.transactionId);
+    if(previous && parsed.signedAt<Date.parse(previous.verified_at))return res.status(200).json({ok:true,stale:true});
 
     switch (parsed.notificationType) {
       case 'SUBSCRIBED':
@@ -789,7 +784,7 @@ app.post('/api/iap/apple/notifications', express.json(), async (req, res) => {
       case 'DID_FAIL_TO_RENEW': {
         // Subscription is in billing retry — keep premium for now,
         // EXPIRED notification will arrive when grace period ends
-        console.log(`[IAP] Apple DID_FAIL_TO_RENEW for user ${userId} — keeping access during retry period`);
+        if(parsed.environment==='production')accountProtection.record(db,{userId,sourceId:parsed.transactionId,provider:'ios',status:'expired',paidThrough:new Date(parsed.expiresAt*1000).toISOString(),graceUntil:parsed.graceUntil,verifiedAt:new Date().toISOString()});
         break;
       }
       case 'GRACE_PERIOD_EXPIRED': {
@@ -804,9 +799,9 @@ app.post('/api/iap/apple/notifications', express.json(), async (req, res) => {
       default:
         console.log(`[IAP] Apple notification type ${parsed.notificationType} — no action taken`);
     }
+    res.status(200).json({ok:true});
   } catch (err) {
-    console.error('[IAP] Apple notification processing error:', err.message);
-    // Already sent 200 — don't let Apple retry valid deliveries due to our processing bug
+    console.error('[IAP] Apple notification rejected or deferred:',err.message);res.status(503).json({error:'Notification not processed; retry required'});
   }
 });
 
@@ -815,66 +810,15 @@ app.post('/api/iap/apple/notifications', express.json(), async (req, res) => {
 // Google sends { message: { data: base64 }, subscription: string }
 // No auth middleware — Google calls this directly.
 app.post('/api/iap/android/notifications', express.json(), async (req, res) => {
-  // Acknowledge immediately — Google requires 200 within a few seconds
-  res.status(200).json({ ok: true });
-
   try {
-    const parsed = iap.parseGoogleNotification(req.body);
-
-    if (parsed.notificationType === 'TEST') {
-      console.log('[IAP] Google test notification received — OK');
-      return;
-    }
-
-    console.log(`[IAP] Google notification: ${parsed.notificationType} product=${parsed.productId}`);
-
-    if (!parsed.purchaseToken || !parsed.productId) return;
-
-    // Find user by purchaseToken in our DB
-    const row = db.prepare('SELECT user_id FROM iap_purchases WHERE transaction_id=?').get(parsed.purchaseToken);
-    const userId = row?.user_id;
-
-    if (!userId) {
-      console.warn(`[IAP] Google notification: no user found for purchaseToken — may be a new purchase (frontend will verify)`);
-      return;
-    }
-
-    switch (parsed.notificationType) {
-      case 'SUBSCRIPTION_RENEWED':
-      case 'SUBSCRIPTION_RECOVERED':
-      case 'SUBSCRIPTION_RESTARTED': {
-        // Re-verify against Google Play API to get latest expiry
-        try {
-          const verified = await iap.verifyAndroidPurchase(parsed.productId, parsed.purchaseToken);
-          iap.upsertIAPRecord(db, userId, 'android', verified);
-        } catch (e) {
-          console.error('[IAP] Google re-verify failed:', e.message);
-        }
-        break;
-      }
-      case 'SUBSCRIPTION_EXPIRED':
-      case 'SUBSCRIPTION_REVOKED': {
-        iap.revokeIAPAccess(db, userId, parsed.purchaseToken);
-        break;
-      }
-      case 'SUBSCRIPTION_CANCELED': {
-        // Canceled but still within paid period — keep access, will expire naturally
-        console.log(`[IAP] Google subscription canceled for user ${userId} — access continues until expiry`);
-        break;
-      }
-      case 'SUBSCRIPTION_ON_HOLD':
-      case 'SUBSCRIPTION_PAUSED': {
-        // Billing issue — could revoke here or wait for EXPIRED
-        // Keeping access during hold/pause is more user-friendly
-        console.log(`[IAP] Google subscription on hold/paused for user ${userId}`);
-        break;
-      }
-      default:
-        console.log(`[IAP] Google notification type ${parsed.notificationType} — no action taken`);
-    }
-  } catch (err) {
-    console.error('[IAP] Google notification processing error:', err.message);
-  }
+    const parsed=iap.parseGoogleNotification(req.body);
+    if(parsed.notificationType==='TEST')return res.json({ok:true});
+    const row=db.prepare('SELECT user_id FROM iap_purchases WHERE transaction_id=?').get(parsed.purchaseToken);
+    if(!row)return res.json({ok:true,unlinked:true});
+    const verified=await iap.verifyAndroidPurchase(parsed.productId,parsed.purchaseToken);
+    iap.upsertIAPRecord(db,row.user_id,'android',verified);
+    res.json({ok:true});
+  }catch(error){console.error('[IAP] Google verification deferred:',error.message);res.status(503).json({error:'Verification unavailable; existing access preserved'});}
 });
 
 // Change password
@@ -1194,103 +1138,10 @@ app.get('/api/billing/plans', (req, res) => {
   });
 });
 
-app.post('/api/billing/checkout', auth, async (req, res) => {
-  if (!stripe) return res.status(400).json({ error: 'Stripe not configured yet — coming soon!' });
-  const { plan } = req.body;
-  const config = PRICE_CONFIG[plan];
-  if (!config) return res.status(400).json({ error: 'Invalid plan' });
-  const isYearly = plan.includes('-yearly');
-  const actualTier = config.tier || plan;
-
-  try {
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      mode: 'subscription',
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          recurring: { interval: isYearly ? 'year' : 'month' },
-          product_data: { name: config.name },
-          unit_amount: config.amount,
-        },
-        quantity: 1,
-      }],
-      metadata: { userId: req.userId, purchaseType: 'subscription', tier: actualTier, billing: isYearly ? 'yearly' : 'monthly' },
-      success_url: `${APP_URL}?upgraded=${actualTier}`,
-      cancel_url: `${APP_URL}?cancelled=true`,
-    });
-    res.json({ url: session.url });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
-
-app.post('/api/billing/cancel', auth, async (req, res) => {
-  if (!stripe) return res.status(400).json({ error: 'Stripe not configured' });
-  const u = db.prepare('SELECT stripe_subscription_id, stripe_customer_id FROM users WHERE id=?').get(req.userId);
-
-  let cancelledCount = 0;
-
-  // 1) Try cancelling by stored subscription ID
-  if (u?.stripe_subscription_id) {
-    try {
-      await stripe.subscriptions.cancel(u.stripe_subscription_id);
-      cancelledCount++;
-    } catch (err) {
-      // If subscription already cancelled or not found, that's fine — continue
-      if (!err.message.includes('No such subscription') && !err.message.includes('already been canceled')) {
-        console.error('Cancel by sub ID error:', err.message);
-      }
-    }
-  }
-
-  // 2) Also check Stripe directly by customer ID for any remaining active subs
-  //    This catches orphaned subscriptions the local DB lost track of
-  if (u?.stripe_customer_id) {
-    try {
-      const activeSubs = await stripe.subscriptions.list({
-        customer: u.stripe_customer_id,
-        status: 'active',
-        limit: 10,
-      });
-      for (const sub of activeSubs.data) {
-        try {
-          await stripe.subscriptions.cancel(sub.id);
-          cancelledCount++;
-        } catch (err) {
-          console.error('Cancel active sub error:', err.message);
-        }
-      }
-      // Also cancel any 'past_due' or 'trialing' subs
-      for (const status of ['past_due', 'trialing']) {
-        const subs = await stripe.subscriptions.list({
-          customer: u.stripe_customer_id,
-          status,
-          limit: 10,
-        });
-        for (const sub of subs.data) {
-          try {
-            await stripe.subscriptions.cancel(sub.id);
-            cancelledCount++;
-          } catch (err) {
-            console.error(`Cancel ${status} sub error:`, err.message);
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Stripe customer lookup error:', err.message);
-    }
-  }
-
-  // 3) Always clean up local DB regardless
-  db.prepare('UPDATE users SET tier=?, stripe_subscription_id=NULL WHERE id=?').run('free', req.userId);
-
-  if (cancelledCount > 0) {
-    res.json({ success: true, message: `Cancelled ${cancelledCount} subscription(s). You're back on the free tier.` });
-  } else if (u?.stripe_subscription_id || u?.stripe_customer_id) {
-    // Had Stripe info but nothing to cancel — already done
-    res.json({ success: true, message: 'No active subscriptions found on Stripe. Local account reset to free tier.' });
-  } else {
-    res.json({ success: true, message: 'Account reset to free tier.' });
-  }
+app.post('/api/billing/checkout',auth,membershipCheckout);
+app.post('/api/billing/cancel',auth,async(req,res)=>{
+  try{res.json(await renewal.cancel(req.userId));}
+  catch(error){res.status(409).json({error:error.message});}
 });
 
 // ============ ADMIN ============
@@ -1353,6 +1204,19 @@ app.delete('/api/admin/members/:id', auth, (req, res) => {
 });
 
 // Admin dashboard — see all members, signups, cancellations, tiers
+app.get('/api/admin/account-protection',auth,(req,res)=>{
+  if(!isAdmin(req))return res.status(403).json({error:'Admin only'});
+  res.json(accountProtection.audit(db));
+});
+app.put('/api/admin/members/:id/student-verification',auth,(req,res)=>{
+  if(!isAdmin(req))return res.status(403).json({error:'Admin only'});
+  const {verifiedUntil,school,identityVerified,currentEnrollmentVerified,accreditedSchool}=req.body;
+  if(!db.prepare('SELECT id FROM users WHERE id=?').get(req.params.id))return res.status(404).json({error:'Member not found'});
+  if(identityVerified!==true || currentEnrollmentVerified!==true || accreditedSchool!==true || !String(school||'').trim() || !(Date.parse(verifiedUntil)>Date.now()))return res.status(400).json({error:'Verified identity, current enrollment, accredited school, and future verification expiry are required.'});
+  db.prepare('INSERT INTO student_membership_verifications VALUES(?,?,?,?,?) ON CONFLICT(user_id) DO UPDATE SET verified_until=excluded.verified_until,verified_by=excluded.verified_by,verified_at=excluded.verified_at,school=excluded.school').run(req.params.id,new Date(verifiedUntil).toISOString(),req.userId,new Date().toISOString(),String(school).trim());
+  res.json({success:true,discountPercent:25});
+});
+
 app.get('/api/admin/members', auth, (req, res) => {
   if (!isAdmin(req)) return res.status(403).json({ error: 'Admin only' });
   res.set('Cache-Control', 'no-store');
@@ -3988,6 +3852,7 @@ app.get('/api/events/export/ics', auth, (req, res) => {
 app.get('/api/events/subscribe/:userId', (req, res) => {
   const user = db.prepare('SELECT id FROM users WHERE id=?').get(req.params.userId);
   if (!user) return res.status(404).send('Not found');
+  if(accountProtection.access(db,user.id).blocked)return accountProtection.denial(res,accountProtection.access(db,user.id));
   const events = db.prepare('SELECT * FROM events WHERE user_id=? ORDER BY event_date ASC').all(req.params.userId);
   const icsContent = buildICS(events);
   res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
@@ -6613,6 +6478,20 @@ app.post('/api/gallery/:id/message', auth, (req, res) => {
 });
 
 // Catch-all for any method on /api/ that didn't match a route
+app.post('/api/emergency/disk-cleanup', (req, res) => {
+  const { password } = req.body || {};
+  if (!process.env.ADMIN_BLOG_PASSWORD || password !== process.env.ADMIN_BLOG_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    db.pragma('wal_checkpoint(PASSIVE)');
+    res.json({success:true,filesDeleted:0,message:'Safe checkpoint completed. All account records, photos, and database journal files are preserved.'});
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
 app.all('/api/*', (req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
@@ -6653,53 +6532,6 @@ app.post('/api/emergency/reset-password', (req, res) => {
   res.json({ success: true, email });
 });
 
-app.post('/api/emergency/disk-cleanup', (req, res) => {
-  const { password } = req.body || {};
-  if (!process.env.ADMIN_BLOG_PASSWORD || password !== process.env.ADMIN_BLOG_PASSWORD) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  try {
-    let freed = 0, deleted = 0;
-    // 1. Delete WAL and SHM files
-    const walPath = path.join(__dirname, 'data', 'pottery.db-wal');
-    const shmPath = path.join(__dirname, 'data', 'pottery.db-shm');
-    if (fs.existsSync(walPath)) {
-      freed += fs.statSync(walPath).size;
-      fs.unlinkSync(walPath);
-      console.log('[EMERGENCY] Deleted WAL file');
-    }
-    if (fs.existsSync(shmPath)) {
-      freed += fs.statSync(shmPath).size;
-      fs.unlinkSync(shmPath);
-      console.log('[EMERGENCY] Deleted SHM file');
-    }
-    // 2. Delete ALL uploaded files
-    if (fs.existsSync(UPLOADS_DIR)) {
-      const files = fs.readdirSync(UPLOADS_DIR)
-        .map(f => ({ name: f, size: fs.statSync(path.join(UPLOADS_DIR, f)).size }))
-        .sort((a, b) => b.size - a.size);
-      for (const f of files) {
-        try {
-          fs.unlinkSync(path.join(UPLOADS_DIR, f.name));
-          freed += f.size;
-          deleted++;
-        } catch(e) {}
-      }
-    }
-    // 3. Run VACUUM on the database to reclaim space
-    try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch(e) {}
-    try { db.exec('VACUUM'); } catch(e) { console.log('[EMERGENCY] VACUUM failed:', e.message); }
-    res.json({
-      success: true,
-      freedMB: (freed / 1024 / 1024).toFixed(2),
-      filesDeleted: deleted,
-      message: 'Emergency cleanup complete. Uploads deleted, WAL removed, VACUUM attempted.'
-    });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
 // One-time migration endpoint (remove after use)
 app.post('/api/admin/run-migration-007', (req, res) => {
   const { password } = req.body;
@@ -6728,6 +6560,8 @@ app.post('/api/admin/run-migration-007', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
   billing.start();
+  const notifyAccess=()=>require('./lib/access-notifications').queue({db,transporter,from:mailSenderAddress()}).catch(e=>console.error('[account-protection] Notification deferred:',e.message));
+  const accessMailTimer=setInterval(notifyAccess,60000);accessMailTimer.unref();
   console.log(`🏺 The Potter's Mud Room running on http://localhost:${PORT}`);
   // Eagerly backfill color signatures at startup so they're ready before first search
   setImmediate(async () => {

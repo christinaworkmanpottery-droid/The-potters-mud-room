@@ -47,3 +47,12 @@ function renderBillingHistory() {
   html+='<details class="card"><summary style="min-height:44px;cursor:pointer">Bank payouts &amp; account fees</summary><p>Payouts cover the entire Stripe account. Billing fees and other adjustments are separate from card-processing fees. Stripe’s arrival date is not bank confirmation.</p>'+data.payouts.map(p=>'<section style="border-top:1px solid var(--border);padding:12px 0"><strong>'+esc(money(p.amount,p.currency))+'</strong> · '+esc(p.status)+' · '+esc(p.arrivalDate)+'<p style="overflow-wrap:anywhere">'+esc(p.id)+'</p>'+p.adjustments.map(a=>'<p>'+esc(a.description||'Account adjustment')+': '+esc(money(a.net,a.currency))+'</p>').join('')+'</section>').join('')+'</details>';
   root.innerHTML=html;
 }
+
+async function showAccountProtection(){
+  if(currentUser?.isAdmin!==true)return;
+  const root=document.getElementById('adminContent');root.innerHTML='<p role="status">Auditing account protection…</p>';
+  try{
+    const data=await api('/api/admin/account-protection');
+    root.innerHTML='<div class="card"><button class="btn btn-secondary" onclick="loadAdmin()">Back to members</button><h2>Account Protection</h2><p>All '+data.total+' accounts audited. Nonpayment never deletes studio records or photos.</p><p>Last audit: '+esc(data.auditedAt)+'</p>'+Object.entries(data.counts).map(([status,count])=>'<p>'+esc(status)+': <strong>'+count+'</strong></p>').join('')+'<h3>Preserved studio records</h3>'+Object.entries(data.studioRecords||{}).map(([table,count])=>'<p>'+esc(table)+': '+count+'</p>').join('')+'<p>Unverified legacy memberships remain accessible for review. Native apps need an update to show the reactivation screen and restrict previously downloaded offline data.</p><details><summary>Account-by-account results</summary>'+data.members.map(m=>'<p style="overflow-wrap:anywhere">'+esc(m.userId)+' — '+esc(m.status)+' — '+(m.blocked?'Renewal only':'Access retained')+'</p>').join('')+'</details></div>';
+  }catch(e){root.textContent=e.message;}
+}

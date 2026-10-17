@@ -130,6 +130,9 @@ function hasPremiumAccess(db, userId) {
  */
 function upsertIAPRecord(db, userId, platform, verified) {
   const now = Math.floor(Date.now() / 1000);
+  const owner=db.prepare('SELECT user_id FROM iap_purchases WHERE transaction_id=?').get(verified.transactionId);
+  if(owner && owner.user_id!==userId)throw Error('This purchase belongs to another account. Sign in to the original account.');
+  if(verified.environment==='sandbox' && require('./lib/account-access').access(db,userId).blocked)throw Error('A test purchase cannot reactivate a suspended paid membership');
 
   // Upsert into iap_purchases
   db.prepare(`
@@ -155,43 +158,26 @@ function upsertIAPRecord(db, userId, platform, verified) {
     now
   );
 
-  // Update users table: set tier=starter + iap columns
-  // Only update iap_expires_at if this record is newer than what's stored
-  const u = db.prepare('SELECT iap_expires_at FROM users WHERE id=?').get(userId);
-  if (!u.iap_expires_at || verified.expiresAt > u.iap_expires_at) {
-    db.prepare(`
-      UPDATE users
-      SET tier = 'starter',
-          iap_platform = ?,
-          iap_transaction_id = ?,
-          iap_expires_at = ?,
-          updated_at = datetime('now')
-      WHERE id = ?
-    `).run(platform, verified.transactionId, verified.expiresAt, userId);
-  }
+  const protection=require('./lib/account-access');protection.init(db);
+  if(verified.environment==='production')protection.record(db,{userId,sourceId:verified.transactionId,provider:platform,status:'expired',paidThrough:new Date(verified.expiresAt*1000).toISOString(),graceUntil:verified.graceUntil || null,verifiedAt:new Date().toISOString()});
+
+  const latest=db.prepare("SELECT * FROM iap_purchases WHERE user_id=? AND environment=? ORDER BY expires_at DESC LIMIT 1").get(userId,verified.environment);
+  db.prepare("UPDATE users SET tier=CASE WHEN ?>? THEN 'starter' ELSE tier END,iap_platform=?,iap_transaction_id=?,iap_expires_at=?,updated_at=datetime('now') WHERE id=?").run(latest.expires_at,now,latest.platform,latest.transaction_id,latest.expires_at,userId);
+
 }
 
 /**
  * When a subscription expires or is revoked, downgrade the user.
  * Only downgrades if no other active entitlement exists.
  */
-function revokeIAPAccess(db, userId, transactionId) {
-  // Mark this specific transaction as expired
-  db.prepare(`
-    UPDATE iap_purchases SET expires_at = ?, updated_at = ?
-    WHERE transaction_id = ?
-  `).run(Math.floor(Date.now() / 1000) - 1, Math.floor(Date.now() / 1000), transactionId);
-
-  // Check if any other entitlement still active
-  if (!hasPremiumAccess(db, userId)) {
-    db.prepare(`
-      UPDATE users
-      SET tier = 'free',
-          iap_expires_at = NULL,
-          updated_at = datetime('now')
-      WHERE id = ?
-    `).run(userId);
-  }
+function revokeIAPAccess(db,userId,transactionId) {
+  const purchase=db.prepare('SELECT * FROM iap_purchases WHERE transaction_id=? AND user_id=?').get(transactionId,userId);
+  if(!purchase)return;
+  const now=Math.floor(Date.now()/1000);
+  db.prepare('UPDATE iap_purchases SET expires_at=?,updated_at=? WHERE transaction_id=? AND user_id=?').run(now-1,now,transactionId,userId);
+  db.prepare('UPDATE users SET iap_expires_at=? WHERE id=? AND iap_transaction_id=?').run(now-1,userId,transactionId);
+  const protection=require('./lib/account-access');protection.init(db);
+  if(purchase.environment==='production')protection.record(db,{userId,sourceId:transactionId,provider:purchase.platform,status:'revoked',paidThrough:new Date((now-1)*1000).toISOString(),graceUntil:null,verifiedAt:new Date().toISOString()});
 }
 
 // ─── Apple ───────────────────────────────────────────────────────────────────
@@ -226,6 +212,7 @@ async function verifyAppleReceipt(receiptData) {
     throw new Error(`Apple receipt verification failed: ${msg}`);
   }
 
+  if(result.receipt?.bundle_id!==APPLE_BUNDLE_ID)throw Error('Receipt belongs to another application');
   // Find the latest active in-app subscription
   const inApp = result.latest_receipt_info || result.receipt?.in_app || [];
   if (!inApp.length) {
@@ -272,73 +259,20 @@ async function verifyAppleReceipt(receiptData) {
  * Returns { userId, transactionId, expiresAt, notificationType, productId, environment }
  * or throws if the payload can't be parsed.
  */
-function parseAppleNotification(signedPayload) {
-  if (!signedPayload) throw new Error('Missing signedPayload');
-
-  // Decode the outer JWT (3 parts: header.payload.sig)
-  const parts = signedPayload.split('.');
-  if (parts.length !== 3) throw new Error('Invalid JWS format');
-
-  let outerPayload;
-  try {
-    outerPayload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-  } catch (e) {
-    throw new Error('Failed to decode outer JWT payload');
-  }
-
-  const notificationType = outerPayload.notificationType;
-  const subtype = outerPayload.subtype;
-  const data = outerPayload.data;
-
-  if (!data?.signedTransactionInfo) {
-    throw new Error('Missing signedTransactionInfo in notification');
-  }
-
-  // Decode inner transaction JWT
-  const txParts = data.signedTransactionInfo.split('.');
-  if (txParts.length !== 3) throw new Error('Invalid transaction JWS format');
-
-  let txPayload;
-  try {
-    txPayload = JSON.parse(Buffer.from(txParts[1], 'base64url').toString('utf8'));
-  } catch (e) {
-    throw new Error('Failed to decode transaction JWT payload');
-  }
-
-  // Decode renewal info JWT if present
-  let renewalPayload = null;
-  if (data.signedRenewalInfo) {
-    try {
-      const rParts = data.signedRenewalInfo.split('.');
-      renewalPayload = JSON.parse(Buffer.from(rParts[1], 'base64url').toString('utf8'));
-    } catch (e) {
-      // non-fatal
-    }
-  }
-
-  const productId = txPayload.productId;
-  if (!VALID_PRODUCT_IDS.includes(productId)) {
-    throw new Error(`Unknown productId in notification: ${productId}`);
-  }
-
-  const transactionId = txPayload.originalTransactionId;
-  const expiresAt = txPayload.expiresDate
-    ? Math.floor(txPayload.expiresDate / 1000)
-    : null;
-
-  const environment = (data.environment || '').toLowerCase() === 'sandbox' ? 'sandbox' : 'production';
-
-  return {
-    notificationType,
-    subtype,
-    productId,
-    transactionId,
-    expiresAt,
-    environment,
-    bundleId: txPayload.bundleId,
-    appAccountToken: txPayload.appAccountToken, // we set this = userId on purchase
-    rawPayload: JSON.stringify(outerPayload),
-  };
+async function parseAppleNotification(signedPayload) {
+  const {SignedDataVerifier,Environment}=require('@apple/app-store-server-library');
+  const root=require('fs').readFileSync(require('path').join(__dirname,'lib/certs/AppleRootCA-G3.cer'));
+  // This untrusted value is used only to select the verifier's expected app ID;
+  // the signed certificate chain, production environment and fixed bundle ID are verified.
+  const hint=JSON.parse(Buffer.from(String(signedPayload).split('.')[1] || '', 'base64url').toString());
+  const environment=hint.data?.environment==='Sandbox'?Environment.SANDBOX:Environment.PRODUCTION;
+  const verifier=new SignedDataVerifier([root],true,environment,APPLE_BUNDLE_ID,Number(process.env.APPLE_APP_ID || hint.data?.appAppleId));
+  const outer=await verifier.verifyAndDecodeNotification(signedPayload);
+  if(!outer.data?.signedTransactionInfo)throw Error('Missing signed transaction');
+  const tx=await verifier.verifyAndDecodeTransaction(outer.data.signedTransactionInfo);
+  const renewal=outer.data.signedRenewalInfo?await verifier.verifyAndDecodeRenewalInfo(outer.data.signedRenewalInfo):null;
+  if(!VALID_PRODUCT_IDS.includes(tx.productId))throw Error('Unknown product ID');
+  return {notificationType:outer.notificationType,subtype:outer.subtype,productId:tx.productId,transactionId:tx.originalTransactionId,expiresAt:Math.floor(tx.expiresDate/1000),environment:environment===Environment.PRODUCTION?'production':'sandbox',bundleId:tx.bundleId,appAccountToken:tx.appAccountToken,graceUntil:renewal?.gracePeriodExpiresDate?new Date(renewal.gracePeriodExpiresDate).toISOString():null,signedAt:outer.signedDate,rawPayload:JSON.stringify(outer)};
 }
 
 // Apple status code meanings (for error messages)
@@ -408,30 +342,19 @@ async function verifyAndroidPurchase(productId, purchaseToken) {
 
   const publisher = await getAndroidPublisher();
 
-  const response = await publisher.purchases.subscriptions.get({
-    packageName: GOOGLE_PACKAGE_NAME,
-    subscriptionId: productId,
-    token: purchaseToken,
-  });
-
-  const sub = response.data;
-
-  // paymentState: 0=pending, 1=received, 2=free trial, 3=pending deferred upgrade
-  if (sub.paymentState === 0) {
-    throw new Error('Payment is still pending — subscription not yet active');
-  }
-
-  // cancelReason present = cancelled (but may still be within paid period)
-  const expiresAtMs = Number(sub.expiryTimeMillis);
-  if (!expiresAtMs || expiresAtMs <= 0) {
-    throw new Error('Could not determine subscription expiry from Google response');
-  }
-
-  const expiresAt = Math.floor(expiresAtMs / 1000);
+  const response=await publisher.purchases.subscriptionsv2.get({packageName:GOOGLE_PACKAGE_NAME,token:purchaseToken});
+  const sub=response.data;
+  const item=sub.lineItems?.find(i=>i.productId===productId);
+  if(!item)throw Error('Product does not match verified Google purchase');
+  const state=sub.subscriptionState;
+  if(['SUBSCRIPTION_STATE_PENDING','SUBSCRIPTION_STATE_PENDING_PURCHASE_CANCELED'].includes(state))throw Error('Payment is pending');
+  const expiresAtMs=Date.parse(item.expiryTime);
+  if(!Number.isFinite(expiresAtMs))throw Error('Missing verified subscription expiry');
+  const expiresAt=['SUBSCRIPTION_STATE_ON_HOLD','SUBSCRIPTION_STATE_PAUSED','SUBSCRIPTION_STATE_EXPIRED'].includes(state)?Math.min(Math.floor(expiresAtMs/1000),Math.floor(Date.now()/1000)-1):Math.floor(expiresAtMs/1000);
 
   // Acknowledge the purchase if not already acknowledged
   // Google requires acknowledgment within 3 days or it refunds automatically
-  if (sub.acknowledgementState === 0) {
+  if (sub.acknowledgementState === 'ACKNOWLEDGEMENT_STATE_PENDING') {
     try {
       await publisher.purchases.subscriptions.acknowledge({
         packageName: GOOGLE_PACKAGE_NAME,
@@ -446,7 +369,7 @@ async function verifyAndroidPurchase(productId, purchaseToken) {
 
   // Determine test vs production
   // purchaseType: 0=normal, 1=test, 2=promo
-  const environment = sub.purchaseType === 1 ? 'sandbox' : 'production';
+  const environment = sub.testPurchase ? 'sandbox' : 'production';
 
   return {
     productId,
