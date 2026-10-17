@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');const {JSDOM}=require('jsdom');
+const source=fs.readFileSync('public/app.js','utf8');
+const dom=new JSDOM('<body></body>',{runScripts:'dangerously'});const w=dom.window;
+let posted,answers=['5.7.1','Student account restricted'];
+w.esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));w.emailErrorSummary=s=>s;w.toast=()=>{};w.prompt=()=>answers.shift();
+w.api=async(path,opts)=>{if(opts){posted=opts.body;return {};}return [{id:'welcome:test',recipient:'student@example.invalid',status:posted?'bounced':'accepted',attempts:1,message_id:'<test>',smtp_response:'250 OK'}];};
+w.eval(source.slice(source.lastIndexOf('function showEmailDeliveryOutcomes')));
+for(const name of ['emailDeliveryLog','recordEmailBounce'])w.eval(source.split('\n').find(l=>l.startsWith('async function '+name+'(')));
+(async()=>{await w.emailDeliveryLog();assert.equal(w.document.querySelectorAll('iframe').length,0);const b=[...w.document.querySelectorAll('button')].find(b=>b.textContent==='Record permanent bounce');assert.ok(b);b.click();await new Promise(r=>setImmediate(r));assert.equal(posted.statusCode,'5.7.1');assert.equal(posted.deliveryId,'welcome:test');assert.match(w.document.body.textContent,/Bounced — permanent rejection/);assert.equal(w.document.querySelectorAll('[onclick]').length,0);dom.window.close();console.log('PASS Admin bounce control executes outside sandboxed content; correct API body; refreshed permanent-bounce status');})().catch(e=>{console.error(e);process.exitCode=1;});
